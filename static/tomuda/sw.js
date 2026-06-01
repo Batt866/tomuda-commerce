@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v1";
+const CACHE = "tomuda-v2";
 const PRECACHE = ["/", "/static/tomuda/styles.css", "/static/tomuda/data.js"];
 
 self.addEventListener("install", (event) => {

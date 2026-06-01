@@ -1,0 +1,15 @@
+ТОМУДА — Одоогийн deploy link (HTTPS)
+
+https://jews-starting-king-recommended.trycloudflare.com
+
+⚠️ Анхаар:
+- Энэ link таны компьютер дээр server + tunnel ажиллаж байх үед л ажиллана
+- 20 хэрэглэгчид энэ link-ийг илгээж, утсан дээр суулгаж болно
+- Байнгын deploy (Render) хийхийн тулд GitHub нэвтрэх хэрэгтэй
+
+GitHub device login (нэг удаа):
+1. https://github.com/login/device нээнэ
+2. Код оруулна (gh auth login-ийн код)
+
+Дараа нь:
+gh repo create tomuda-commerce --public --source=. --push

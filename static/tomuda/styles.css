@@ -65,6 +65,7 @@
   }
 }
 
+:root {
   --background: 0.95 0.01 230;
   --foreground: 0.15 0.02 250;
   --card: 1 0 0;
