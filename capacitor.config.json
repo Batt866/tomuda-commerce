@@ -1,0 +1,9 @@
+{
+  "appId": "mn.tomuda.commerce",
+  "appName": "TOMUDA",
+  "webDir": "static/tomuda",
+  "server": {
+    "url": "https://YOUR_BACKEND_DOMAIN",
+    "cleartext": false
+  }
+}

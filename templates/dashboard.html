@@ -1,0 +1,60 @@
+{% load static %}
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#16899a" />
+    <meta name="description" content="Борлуулалт, агуулах, захиалга удирдах систем" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ТОМУДА" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
+    <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
+    <title>ТОМУДА - Борлуулалт, агуулах</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: "#eef2f5",
+              foreground: "#182032",
+              card: "#ffffff",
+              primary: "#16899a",
+              "primary-foreground": "#ffffff",
+              secondary: "#f5f7f9",
+              "muted-foreground": "#687386",
+              border: "#d8dee6",
+              sidebar: "#101623",
+              "sidebar-foreground": "#eef2f5",
+              "sidebar-primary": "#16899a",
+              "sidebar-primary-foreground": "#ffffff",
+              "sidebar-accent": "#252d3d",
+              "sidebar-border": "#353d4e",
+            },
+          },
+        },
+      };
+    </script>
+    <link
+      rel="stylesheet"
+      href="{% static 'tomuda/vendor/leaflet/leaflet.css' %}?v=20260527-map-local"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'tomuda/styles.css' %}?v=20260531-pwa"
+    />
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="modal"></div>
+    <script
+      src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"
+    ></script>
+    <script src="{% static 'tomuda/data.js' %}?v=20260527-menu-icon"></script>
+    <script src="{% static 'tomuda/app.js' %}?v=20260531-pwa"></script>
+  </body>
+</html>

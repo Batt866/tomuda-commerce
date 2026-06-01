@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ТОМУДА - Борлуулалт, агуулах</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: "oklch(var(--background))",
+              foreground: "oklch(var(--foreground))",
+              card: "oklch(var(--card))",
+              primary: "oklch(var(--primary))",
+              "primary-foreground": "oklch(var(--primary-foreground))",
+              secondary: "oklch(var(--secondary))",
+              "muted-foreground": "oklch(var(--muted-foreground))",
+              border: "oklch(var(--border))",
+              sidebar: "oklch(var(--sidebar))",
+              "sidebar-foreground": "oklch(var(--sidebar-foreground))",
+              "sidebar-primary": "oklch(var(--sidebar-primary))",
+              "sidebar-primary-foreground":
+                "oklch(var(--sidebar-primary-foreground))",
+              "sidebar-accent": "oklch(var(--sidebar-accent))",
+              "sidebar-border": "oklch(var(--sidebar-border))",
+            },
+          },
+        },
+      };
+    </script>
+    <link
+      rel="stylesheet"
+      href="./vendor/leaflet/leaflet.css"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="modal"></div>
+    <script
+      src="./vendor/leaflet/leaflet.js"
+    ></script>
+    <script src="./data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

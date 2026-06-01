@@ -1,0 +1,127 @@
+:root {
+  --background: 0.95 0.01 230;
+  --foreground: 0.15 0.02 250;
+  --card: 1 0 0;
+  --primary: 0.55 0.12 195;
+  --primary-foreground: 1 0 0;
+  --secondary: 0.97 0.01 230;
+  --muted-foreground: 0.45 0.02 250;
+  --border: 0.88 0.01 230;
+  --sidebar: 0.12 0.02 250;
+  --sidebar-foreground: 0.95 0.01 230;
+  --sidebar-primary: 0.55 0.12 195;
+  --sidebar-primary-foreground: 1 0 0;
+  --sidebar-accent: 0.2 0.02 250;
+  --sidebar-border: 0.25 0.02 250;
+  --hex-background: #eef2f5;
+  --hex-foreground: #182032;
+  --hex-card: #ffffff;
+  --hex-primary: #16899a;
+  --hex-primary-foreground: #ffffff;
+  --hex-secondary: #f5f7f9;
+  --hex-muted-foreground: #687386;
+  --hex-border: #d8dee6;
+  --hex-sidebar: #101623;
+  --hex-sidebar-foreground: #eef2f5;
+  --hex-sidebar-primary: #16899a;
+  --hex-sidebar-primary-foreground: #ffffff;
+  --hex-sidebar-accent: #252d3d;
+  --hex-sidebar-border: #353d4e;
+}
+
+* { border-color: var(--hex-border); }
+html, body, #app {
+  min-height: 100%;
+  background: var(--hex-background) !important;
+}
+body {
+  margin: 0;
+  background: var(--hex-background);
+  color: var(--hex-foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+input, select, textarea, button { box-shadow: none; }
+
+aside[class*="bg-sidebar"] {
+  background: var(--hex-sidebar) !important;
+  color: var(--hex-sidebar-foreground) !important;
+}
+
+main {
+  background: var(--hex-background) !important;
+}
+
+.bg-background { background-color: var(--hex-background) !important; }
+.text-foreground { color: var(--hex-foreground) !important; }
+.bg-card { background-color: var(--hex-card) !important; }
+.bg-primary { background-color: var(--hex-primary) !important; }
+.text-primary { color: var(--hex-primary) !important; }
+.text-primary-foreground { color: var(--hex-primary-foreground) !important; }
+.bg-secondary { background-color: var(--hex-secondary) !important; }
+.text-muted-foreground { color: var(--hex-muted-foreground) !important; }
+.border-border { border-color: var(--hex-border) !important; }
+.divide-border > :not([hidden]) ~ :not([hidden]) { border-color: var(--hex-border) !important; }
+.bg-sidebar { background-color: var(--hex-sidebar) !important; }
+.text-sidebar-foreground { color: var(--hex-sidebar-foreground) !important; }
+.text-sidebar-primary { color: var(--hex-sidebar-primary) !important; }
+.bg-sidebar-primary { background-color: var(--hex-sidebar-primary) !important; }
+.text-sidebar-primary-foreground { color: var(--hex-sidebar-primary-foreground) !important; }
+.bg-sidebar-accent { background-color: var(--hex-sidebar-accent) !important; }
+.border-sidebar-border { border-color: var(--hex-sidebar-border) !important; }
+
+.bg-primary\/5 { background-color: #eaf6f8 !important; }
+.bg-primary\/10 { background-color: #dceff2 !important; }
+.bg-secondary\/30 { background-color: #fbfcfd !important; }
+.bg-secondary\/40 { background-color: #fafbfc !important; }
+.bg-secondary\/50 { background-color: #f7f9fb !important; }
+.bg-secondary\/60 { background-color: #f6f8fa !important; }
+.bg-secondary\/70 { background-color: #f4f7f9 !important; }
+.hover\:bg-secondary\/30:hover { background-color: #fbfcfd !important; }
+.hover\:bg-secondary\/40:hover { background-color: #fafbfc !important; }
+.hover\:bg-secondary\/80:hover { background-color: #eef2f5 !important; }
+.hover\:bg-primary\/90:hover { background-color: #117d8d !important; }
+.hover\:bg-sidebar-accent:hover { background-color: var(--hex-sidebar-accent) !important; }
+.hover\:bg-sidebar-border:hover { background-color: var(--hex-sidebar-border) !important; }
+.text-sidebar-foreground\/70 { color: #a9b1bf !important; }
+
+input, select, textarea {
+  color: var(--hex-foreground);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--hex-muted-foreground);
+}
+
+.tomuda-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--hex-sidebar-primary);
+  color: white;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.modal-scroll { max-height: calc(90vh - 120px); }
+
+@media print {
+  body * { visibility: hidden !important; }
+  .print-receipt, .print-receipt * { visibility: visible !important; }
+  .print-receipt { display: block !important; position: absolute; inset: 0; background: white; color: black; font-family: Arial, sans-serif; }
+  .receipt-page { width: 190mm; margin: 0 auto; padding: 6mm 4mm; font-size: 10.5px; line-height: 1.25; }
+  .receipt-header { display: grid; grid-template-columns: 22mm 1fr 34mm; gap: 4mm; align-items: start; }
+  .receipt-logo { width: 18mm; height: 18mm; display: grid; place-items: center; background: #16899a; color: white; font-size: 20px; font-weight: 900; }
+  .receipt-header h1 { font-size: 15px; margin: 1mm 0 2mm; font-weight: 800; }
+  .receipt-title { text-align: center; font-family: Georgia, "Times New Roman", serif; font-size: 16px; margin: 4mm 0; font-weight: 800; }
+  .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin-bottom: 4mm; }
+  .receipt-info p, .receipt-bank p, .receipt-total p { display: flex; justify-content: space-between; gap: 4mm; margin: 1mm 0; }
+  .receipt-bank { border: 1px solid #222; padding: 2mm 4mm; margin-bottom: 4mm; }
+  .receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  .receipt-table th, .receipt-table td { border: 1px solid #222; padding: 1.5mm; text-align: left; }
+  .receipt-table th:nth-child(n+5), .receipt-table td:nth-child(n+5) { text-align: right; }
+  .receipt-total { width: 78mm; margin-left: auto; }
+  footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-top: 8mm; }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "ТОМУДА - Борлуулалт, агуулах",
+  "short_name": "ТОМУДА",
+  "description": "Борлуулалт, агуулах, захиалга удирдах систем",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#eef2f5",
+  "theme_color": "#16899a",
+  "lang": "mn",
+  "icons": [
+    {
+      "src": "/static/tomuda/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/tomuda/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/tomuda/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
