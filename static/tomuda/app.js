@@ -164,6 +164,24 @@ function isIosDevice() {
 function isAndroidDevice() {
   return /Android/i.test(navigator.userAgent || "");
 }
+function isChromeAndroid() {
+  const ua = navigator.userAgent || "";
+  return (
+    isAndroidDevice() &&
+    /Chrome/i.test(ua) &&
+    !/EdgA|OPR|SamsungBrowser|MiuiBrowser|UCBrowser/i.test(ua)
+  );
+}
+function pwaInstallLabel() {
+  if (isAndroidDevice()) return "📱 Android App суулгах";
+  if (isIosDevice()) return "📱 iPhone дээр суулгах";
+  return "📱 Утсан дээр суулгах";
+}
+function openInChrome() {
+  const page = location.href;
+  const path = page.replace(/^https?:\/\//, "");
+  location.href = `intent://${path}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(page)};end`;
+}
 function initPwa() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch((err) =>
@@ -177,54 +195,75 @@ function initPwa() {
   });
   if (isStandalonePwa()) return;
   const dismissed = Number(localStorage.getItem("pwa-install-dismissed") || 0);
-  if (Date.now() - dismissed < 7 * 86400000) return;
-  if (isIosDevice() || isAndroidDevice()) {
+  const showAuto = Date.now() - dismissed >= 7 * 86400000;
+  if (isAndroidDevice() && showAuto) {
+    setTimeout(() => {
+      if (isChromeAndroid()) showPwaInstallBanner();
+      else openPwaInstallModal();
+    }, 1000);
+    return;
+  }
+  if (isIosDevice() && showAuto) {
     setTimeout(showPwaInstallBanner, 1200);
   }
 }
 function pwaInstallSidebarBtn() {
   if (isStandalonePwa()) return "";
-  return `<button onclick="openPwaInstallModal()" class="w-full px-4 py-3 rounded text-left hover:bg-sidebar-accent border border-sidebar-primary/30"><span class="font-medium text-sidebar-primary">📱 App суулгах</span></button>`;
+  return `<button onclick="openPwaInstallModal()" class="w-full px-4 py-3 rounded text-left hover:bg-sidebar-accent border border-sidebar-primary/30"><span class="font-medium text-sidebar-primary">${pwaInstallLabel()}</span></button>`;
 }
 function openPwaInstallModal() {
   dismissPwaInstall(false);
   const inApp = isInAppBrowser();
   const ios = isIosDevice();
+  const android = isAndroidDevice();
   let steps = "";
-  if (inApp) {
-    steps = `<div class="p-4 rounded bg-red-50 text-red-800 text-sm mb-4"><b>Анхаар:</b> Facebook, Instagram доторх browser-ээр суулгах боломжгүй. Link-ийг <b>Chrome</b> эсвэл <b>Safari</b>-аар нээнэ үү.</div>`;
-  }
-  if (ios) {
-    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Safari</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Дэлгэцийн доод <b>Хуваалцах □↑</b> дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span><b>Нүүр дэлгэцэнд нэмэх</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">4</span><span><b>Нэмэх</b> → нүүр дэлгэцээс ТОМУДА icon-оор нээнэ</span></li></ol>`;
-  } else if (isAndroidDevice()) {
-    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Chrome</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>${pwaInstallPrompt ? "Доорх <b>Суулгах</b> дарна" : "Баруун дээд <b>⋮</b> → <b>App суулгах</b> эсвэл <b>Нүүр дэлгэцэнд нэмэх</b>"}</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Нүүр дэлгэц дээр ТОМУДА icon гарна</span></li></ol>`;
+  let title = "Утсан дээр суулгах";
+  if (android) {
+    title = "Android App суулгах";
+    if (!isChromeAndroid() || inApp) {
+      steps = `<div class="p-4 rounded bg-amber-50 text-amber-900 text-sm mb-4">Эхлээд <b>Google Chrome</b>-оор нээнэ үү. Play Store шаардлаггүй.</div><button type="button" onclick="openInChrome()" class="w-full py-3 mb-4 bg-primary text-primary-foreground rounded font-semibold">Chrome-оор нээх</button>`;
+    }
+    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Chrome</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>${pwaInstallPrompt ? "Доорх <b>App суулгах</b> дарна" : "Дээд <b>⋮</b> цэс → <b>App суулгах</b> эсвэл <b>Нүүр дэлгэцэнд нэмэх</b>"}</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Нүүр дэлгэц дээр <b>ТОМУДА</b> icon гарна</span></li></ol>`;
+  } else if (ios) {
+    title = "iPhone дээр суулгах";
+    if (inApp) {
+      steps = `<div class="p-4 rounded bg-amber-50 text-amber-900 text-sm mb-4">Link-ийг <b>Safari</b>-аар нээнэ үү.</div>`;
+    }
+    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Safari</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Доод <b>Хуваалцах □↑</b> → <b>Нүүр дэлгэцэнд нэмэх</b></span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span><b>Нэмэх</b> дарна</span></li></ol>`;
   } else {
-    steps += `<p class="text-sm text-muted-foreground">Утасныхаа browser-ээр энэ хуудсыг нээж, Chrome (Android) эсвэл Safari (iPhone) ашиглана уу.</p>`;
+    steps += `<p class="text-sm text-muted-foreground">Android: Chrome. iPhone: Safari ашиглана уу.</p>`;
   }
-  const installBtn = pwaInstallPrompt
-    ? `<button type="button" onclick="installPwaApp()" class="w-full py-3 mt-4 bg-primary text-primary-foreground rounded font-semibold">Суулгах</button>`
-    : "";
+  const installBtn =
+    android && pwaInstallPrompt
+      ? `<button type="button" onclick="installPwaApp()" class="w-full py-3 mt-4 bg-primary text-primary-foreground rounded font-semibold text-base">App суулгах</button>`
+      : "";
   box(
-    "Утсан дээр суулгах",
-    `<div class="p-5 overflow-y-auto max-h-[70vh]"><p class="text-sm text-muted-foreground mb-4">App Store, Play Store шаардлаггүй.</p>${steps}${installBtn}</div>`,
+    title,
+    `<div class="p-5 overflow-y-auto max-h-[70vh]"><p class="text-sm text-muted-foreground mb-4">Play Store, App Store шаардлаггүй.</p>${steps}${installBtn}</div>`,
     "max-w-md",
   );
 }
 function showPwaInstallBanner() {
   if (isStandalonePwa() || document.getElementById("pwa-install")) return;
-  const ios = isIosDevice();
-  const hint = ios
-    ? "Safari → <strong>Хуваалцах □↑</strong> → <strong>Нүүр дэлгэцэнд нэмэх</strong>"
-    : pwaInstallPrompt
-      ? "Chrome → <strong>Суулгах</strong> товч дарна"
-      : "Chrome → <strong>⋮</strong> → <strong>App суулгах</strong>";
-  const quick = pwaInstallPrompt
-    ? `<button type="button" onclick="installPwaApp()" class="pwa-install-btn">Суулгах</button>`
-    : `<button type="button" onclick="openPwaInstallModal()" class="pwa-install-btn">Заавар</button>`;
+  if (isAndroidDevice() && !isChromeAndroid()) {
+    openPwaInstallModal();
+    return;
+  }
+  const android = isAndroidDevice();
+  const hint = android
+    ? pwaInstallPrompt
+      ? "Google Chrome → <strong>App суулгах</strong> дарна"
+      : "Chrome <strong>⋮</strong> → <strong>App суулгах</strong>"
+    : "Safari → <strong>Хуваалцах □↑</strong> → <strong>Нүүр дэлгэцэнд нэмэх</strong>";
+  const title = android ? "🤖 Android App суулгах" : "📱 iPhone дээр суулгах";
+  const quick =
+    android && pwaInstallPrompt
+      ? `<button type="button" onclick="installPwaApp()" class="pwa-install-btn">App суулгах</button>`
+      : `<button type="button" onclick="openPwaInstallModal()" class="pwa-install-btn">Заавар</button>`;
   const el = document.createElement("div");
   el.id = "pwa-install";
   el.className = "pwa-install-banner";
-  el.innerHTML = `<div class="pwa-install-inner"><div><p class="pwa-install-title">📱 Утсан дээр суулгах</p><p class="pwa-install-text">${hint}</p></div><div class="pwa-install-actions">${quick}<button type="button" onclick="dismissPwaInstall()" class="pwa-install-dismiss">Хаах</button></div></div>`;
+  el.innerHTML = `<div class="pwa-install-inner"><div><p class="pwa-install-title">${title}</p><p class="pwa-install-text">${hint}</p></div><div class="pwa-install-actions">${quick}<button type="button" onclick="dismissPwaInstall()" class="pwa-install-dismiss">Хаах</button></div></div>`;
   document.body.appendChild(el);
 }
 function installPwaApp() {
@@ -760,7 +799,7 @@ function employeesView() {
 function loginView() {
   const installBtn = isStandalonePwa()
     ? ""
-    : `<button type="button" onclick="openPwaInstallModal()" class="w-full mt-4 py-3 bg-primary/10 text-primary rounded font-medium text-sm">📱 Утсан дээр суулгах</button>`;
+    : `<button type="button" onclick="openPwaInstallModal()" class="w-full mt-4 py-3 bg-primary/10 text-primary rounded font-medium text-sm">${pwaInstallLabel()}</button>`;
   return `<div class="min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-sm"><div class="mb-5"><h1 class="text-lg font-bold">Ажилчин нэвтрэх</h1><p class="text-sm text-muted-foreground mt-1">Админаас өгсөн нууц үгээ оруулна уу</p></div><form onsubmit="login(event)" class="bg-card rounded p-5 space-y-4"><input id="password" autofocus type="password" placeholder="Нууц үг" class="w-full px-4 py-3 bg-secondary rounded"><div id="loginError"></div><button class="w-full h-12 rounded text-base font-semibold bg-primary text-primary-foreground">Нэвтрэх</button>${installBtn}</form><div class="mt-5 text-center text-sm text-muted-foreground bg-card rounded p-3"><p>Борлуулалт: <b class="font-mono text-foreground">hasan</b></p><p>Админ: <b class="font-mono text-foreground">admin</b></p></div></div></div>`;
 }
 function workerOrdersList() {
@@ -1788,5 +1827,6 @@ Object.assign(window, {
   installPwaApp,
   dismissPwaInstall,
   openPwaInstallModal,
+  openInChrome,
 });
 boot();
