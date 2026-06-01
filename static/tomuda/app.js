@@ -247,6 +247,14 @@ function openPwaInstallModal() {
   const inApp = isInAppBrowser();
   const ios = isIosDevice();
   const android = isAndroidDevice();
+  if (inApp) {
+    box(
+      android ? "Android App суулгах" : "iPhone дээр суулгах",
+      `<div class="p-5 overflow-y-auto max-h-[70vh]"><p class="text-sm text-muted-foreground mb-4">Play Store, App Store шаардлаггүй.</p>${pwaInAppEscapeSteps()}</div>`,
+      "max-w-md",
+    );
+    return;
+  }
   let steps = "";
   let title = "Утсан дээр суулгах";
   if (android) {
