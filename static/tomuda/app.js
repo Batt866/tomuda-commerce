@@ -156,7 +156,35 @@ function isStandalonePwa() {
   );
 }
 function isInAppBrowser() {
-  return /FBAN|FBAV|Instagram|Line\//i.test(navigator.userAgent || "");
+  const ua = navigator.userAgent || "";
+  return /FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|MicroMessenger|WeChat/i.test(ua);
+}
+function inAppBrowserName() {
+  const ua = navigator.userAgent || "";
+  if (/Instagram/i.test(ua)) return "Instagram";
+  if (/FBAN|FBAV/i.test(ua)) return "Facebook";
+  return "энэ app";
+}
+function copyAppLink() {
+  const url = location.href.split("#")[0];
+  const done = () => alert("Link хуулагдлаа!\n\nChrome (Android) эсвэл Safari (iPhone) нээж, хаягийн мөрөнд paste хийгээд нээнэ үү.");
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => prompt("Link-ийг хуулна уу:", url));
+  } else {
+    prompt("Link-ийг хуулна уу:", url);
+  }
+}
+function pwaInAppEscapeSteps() {
+  const app = inAppBrowserName();
+  const android = isAndroidDevice();
+  const ios = isIosDevice();
+  if (android) {
+    return `<div class="p-4 rounded bg-red-50 text-red-900 text-sm mb-4"><b>${app} дотор суулгах боломжгүй!</b><br>Эхлээд Chrome browser руу шилжинэ үү.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээд баруун <b>⋮</b> (гурвалжин) дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Chrome-ээр нээх</b> / <b>Open in Chrome</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Chrome нээгдсний дараа <b>App суулгах</b> заавар дагана</span></li></ol><button type="button" onclick="openInChrome()" class="w-full py-3 mb-2 bg-primary text-primary-foreground rounded font-semibold">Chrome-оор нээх</button><button type="button" onclick="copyAppLink()" class="w-full py-3 bg-secondary rounded font-medium">Link хуулах</button>`;
+  }
+  if (ios) {
+    return `<div class="p-4 rounded bg-red-50 text-red-900 text-sm mb-4"><b>${app} дотор суулгах боломжгүй!</b><br>Эхлээд Safari browser руу шилжинэ үү.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээд баруун <b>⋯</b> (цэгүүд) дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Safari-аар нээх</b> / <b>Open in Safari</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Safari дээр доод <b>Хуваалцах □↑</b> → <b>Нүүр дэлгэцэнд нэмэх</b></span></li></ol><button type="button" onclick="copyAppLink()" class="w-full py-3 bg-primary text-primary-foreground rounded font-semibold">Link хуулах</button>`;
+  }
+  return `<p class="text-sm">Link-ийг Chrome эсвэл Safari-аар нээнэ үү.</p><button type="button" onclick="copyAppLink()" class="w-full py-3 mt-3 bg-primary text-primary-foreground rounded font-semibold">Link хуулах</button>`;
 }
 function isIosDevice() {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
@@ -204,7 +232,10 @@ function initPwa() {
     return;
   }
   if (isIosDevice() && showAuto) {
-    setTimeout(showPwaInstallBanner, 1200);
+    setTimeout(() => {
+      if (isInAppBrowser()) openPwaInstallModal();
+      else showPwaInstallBanner();
+    }, 1200);
   }
 }
 function pwaInstallSidebarBtn() {
@@ -245,7 +276,7 @@ function openPwaInstallModal() {
 }
 function showPwaInstallBanner() {
   if (isStandalonePwa() || document.getElementById("pwa-install")) return;
-  if (isAndroidDevice() && !isChromeAndroid()) {
+  if (isInAppBrowser()) {
     openPwaInstallModal();
     return;
   }
@@ -1828,5 +1859,6 @@ Object.assign(window, {
   dismissPwaInstall,
   openPwaInstallModal,
   openInChrome,
+  copyAppLink,
 });
 boot();
