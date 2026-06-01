@@ -155,6 +155,15 @@ function isStandalonePwa() {
     window.navigator.standalone === true
   );
 }
+function isInAppBrowser() {
+  return /FBAN|FBAV|Instagram|Line\//i.test(navigator.userAgent || "");
+}
+function isIosDevice() {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+}
+function isAndroidDevice() {
+  return /Android/i.test(navigator.userAgent || "");
+}
 function initPwa() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch((err) =>
@@ -169,38 +178,67 @@ function initPwa() {
   if (isStandalonePwa()) return;
   const dismissed = Number(localStorage.getItem("pwa-install-dismissed") || 0);
   if (Date.now() - dismissed < 7 * 86400000) return;
-  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+  if (isIosDevice() || isAndroidDevice()) {
     setTimeout(showPwaInstallBanner, 1200);
   }
 }
+function pwaInstallSidebarBtn() {
+  if (isStandalonePwa()) return "";
+  return `<button onclick="openPwaInstallModal()" class="w-full px-4 py-3 rounded text-left hover:bg-sidebar-accent border border-sidebar-primary/30"><span class="font-medium text-sidebar-primary">📱 App суулгах</span></button>`;
+}
+function openPwaInstallModal() {
+  dismissPwaInstall(false);
+  const inApp = isInAppBrowser();
+  const ios = isIosDevice();
+  let steps = "";
+  if (inApp) {
+    steps = `<div class="p-4 rounded bg-red-50 text-red-800 text-sm mb-4"><b>Анхаар:</b> Facebook, Instagram доторх browser-ээр суулгах боломжгүй. Link-ийг <b>Chrome</b> эсвэл <b>Safari</b>-аар нээнэ үү.</div>`;
+  }
+  if (ios) {
+    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Safari</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Дэлгэцийн доод <b>Хуваалцах □↑</b> дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span><b>Нүүр дэлгэцэнд нэмэх</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">4</span><span><b>Нэмэх</b> → нүүр дэлгэцээс ТОМУДА icon-оор нээнэ</span></li></ol>`;
+  } else if (isAndroidDevice()) {
+    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Chrome</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>${pwaInstallPrompt ? "Доорх <b>Суулгах</b> дарна" : "Баруун дээд <b>⋮</b> → <b>App суулгах</b> эсвэл <b>Нүүр дэлгэцэнд нэмэх</b>"}</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Нүүр дэлгэц дээр ТОМУДА icon гарна</span></li></ol>`;
+  } else {
+    steps += `<p class="text-sm text-muted-foreground">Утасныхаа browser-ээр энэ хуудсыг нээж, Chrome (Android) эсвэл Safari (iPhone) ашиглана уу.</p>`;
+  }
+  const installBtn = pwaInstallPrompt
+    ? `<button type="button" onclick="installPwaApp()" class="w-full py-3 mt-4 bg-primary text-primary-foreground rounded font-semibold">Суулгах</button>`
+    : "";
+  box(
+    "Утсан дээр суулгах",
+    `<div class="p-5 overflow-y-auto max-h-[70vh]"><p class="text-sm text-muted-foreground mb-4">App Store, Play Store шаардлаггүй.</p>${steps}${installBtn}</div>`,
+    "max-w-md",
+  );
+}
 function showPwaInstallBanner() {
   if (isStandalonePwa() || document.getElementById("pwa-install")) return;
-  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const ios = isIosDevice();
   const hint = ios
-    ? "Safari → Дэлгэцийн доод <strong>Хуваалцах</strong> → <strong>Нүүр дэлгэцэнд нэмэх</strong>"
+    ? "Safari → <strong>Хуваалцах □↑</strong> → <strong>Нүүр дэлгэцэнд нэмэх</strong>"
     : pwaInstallPrompt
-      ? "App Store, Play Store шаардлагагүй — шууд утсан дээр суулгана"
-      : "Chrome цэс → <strong>App суулгах</strong> эсвэл <strong>Нүүр дэлгэцэнд нэмэх</strong>";
-  const btn = pwaInstallPrompt
+      ? "Chrome → <strong>Суулгах</strong> товч дарна"
+      : "Chrome → <strong>⋮</strong> → <strong>App суулгах</strong>";
+  const quick = pwaInstallPrompt
     ? `<button type="button" onclick="installPwaApp()" class="pwa-install-btn">Суулгах</button>`
-    : "";
+    : `<button type="button" onclick="openPwaInstallModal()" class="pwa-install-btn">Заавар</button>`;
   const el = document.createElement("div");
   el.id = "pwa-install";
   el.className = "pwa-install-banner";
-  el.innerHTML = `<div class="pwa-install-inner"><div><p class="pwa-install-title">📱 Утсан дээр суулгах</p><p class="pwa-install-text">${hint}</p></div><div class="pwa-install-actions">${btn}<button type="button" onclick="dismissPwaInstall()" class="pwa-install-dismiss">Хаах</button></div></div>`;
+  el.innerHTML = `<div class="pwa-install-inner"><div><p class="pwa-install-title">📱 Утсан дээр суулгах</p><p class="pwa-install-text">${hint}</p></div><div class="pwa-install-actions">${quick}<button type="button" onclick="dismissPwaInstall()" class="pwa-install-dismiss">Хаах</button></div></div>`;
   document.body.appendChild(el);
 }
 function installPwaApp() {
-  if (!pwaInstallPrompt) return showPwaInstallBanner();
+  if (!pwaInstallPrompt) return openPwaInstallModal();
   pwaInstallPrompt.prompt();
   pwaInstallPrompt.userChoice.finally(() => {
     pwaInstallPrompt = null;
-    dismissPwaInstall();
+    dismissPwaInstall(false);
+    closeModal();
   });
 }
-function dismissPwaInstall() {
+function dismissPwaInstall(remember = true) {
   document.getElementById("pwa-install")?.remove();
-  localStorage.setItem("pwa-install-dismissed", String(Date.now()));
+  if (remember) localStorage.setItem("pwa-install-dismissed", String(Date.now()));
 }
 function scheduleBackendSave() {
   if (!backendReady) return;
@@ -255,7 +293,7 @@ function shell(content) {
     if (userRole === "admin") return true;
     return ["worker", "customers", "products"].includes(id);
   });
-  return `<div class="min-h-screen bg-background flex"><button onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed top-4 left-4 z-50 bg-sidebar text-sidebar-foreground rounded" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<aside class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="p-6 border-b border-sidebar-border"><div class="flex items-center gap-3"><div class="tomuda-logo">T</div><div><h1 class="text-lg font-bold text-sidebar-primary">ТОМУДА</h1><p class="text-sm text-sidebar-foreground/70 mt-1">Борлуулалт, агуулах</p></div></div></div><nav class="flex-1 p-4 space-y-1">${nav.map(([id, label]) => `<button onclick="go('${id}')" class="w-full px-4 py-3 rounded text-left ${state.currentView === id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}</nav><div class="p-4 border-t border-sidebar-border"><div class="flex items-center gap-3 px-4 py-3 rounded bg-sidebar-accent"><div class="flex-1 min-w-0"><p class="font-medium truncate">${state.currentEmployee?.name || "Нэвтрээгүй"}</p><p class="text-xs text-sidebar-foreground/70">${state.currentEmployee ? role(state.currentEmployee.role) : "Ажилчин хэсгээс нэвтэрнэ"}</p></div>${state.currentEmployee ? `<button onclick="logout()" class="px-3 py-2 hover:bg-sidebar-border rounded text-sm">Гарах</button>` : ""}</div></div></aside><main class="flex-1 p-4 lg:p-8 overflow-auto"><div class="max-w-7xl mx-auto pt-12 lg:pt-0">${["employees", "inventory", "reports"].includes(state.currentView) ? `<button onclick="go('admin')" class="mb-4 px-4 py-2 bg-card rounded text-sm">Админ руу буцах</button>` : ""}${content}</div></main></div>`;
+  return `<div class="min-h-screen bg-background flex"><button onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed top-4 left-4 z-50 bg-sidebar text-sidebar-foreground rounded" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<aside class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="p-6 border-b border-sidebar-border"><div class="flex items-center gap-3"><div class="tomuda-logo">T</div><div><h1 class="text-lg font-bold text-sidebar-primary">ТОМУДА</h1><p class="text-sm text-sidebar-foreground/70 mt-1">Борлуулалт, агуулах</p></div></div></div><nav class="flex-1 p-4 space-y-1">${nav.map(([id, label]) => `<button onclick="go('${id}')" class="w-full px-4 py-3 rounded text-left ${state.currentView === id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}${pwaInstallSidebarBtn()}</nav><div class="p-4 border-t border-sidebar-border"><div class="flex items-center gap-3 px-4 py-3 rounded bg-sidebar-accent"><div class="flex-1 min-w-0"><p class="font-medium truncate">${state.currentEmployee?.name || "Нэвтрээгүй"}</p><p class="text-xs text-sidebar-foreground/70">${state.currentEmployee ? role(state.currentEmployee.role) : "Ажилчин хэсгээс нэвтэрнэ"}</p></div>${state.currentEmployee ? `<button onclick="logout()" class="px-3 py-2 hover:bg-sidebar-border rounded text-sm">Гарах</button>` : ""}</div></div></aside><main class="flex-1 p-4 lg:p-8 overflow-auto"><div class="max-w-7xl mx-auto pt-12 lg:pt-0">${["employees", "inventory", "reports"].includes(state.currentView) ? `<button onclick="go('admin')" class="mb-4 px-4 py-2 bg-card rounded text-sm">Админ руу буцах</button>` : ""}${content}</div></main></div>`;
 }
 function adminView() {
   const pending = state.orders.filter((o) => o.status === "pending").length,
@@ -720,7 +758,10 @@ function employeesView() {
   return `<div class="space-y-5"><div class="flex justify-between"><div><h2 class="text-lg font-bold">Ажилтан</h2><p class="text-sm text-muted-foreground mt-1">Ажилтан нэмэх, устгах, нууц үг тохируулах</p></div><button onclick="employeeModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Ажилтан нэмэх</button></div><div class="bg-card rounded overflow-hidden"><table class="w-full"><tbody class="divide-y divide-border">${state.employees.map((e) => `<tr><td class="px-4 py-3 font-medium">${e.name}</td><td class="px-4 py-3 text-sm font-mono">${e.password}</td><td class="px-4 py-3 text-sm">${role(e.role)}</td><td class="px-4 py-3 text-right"><button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 bg-red-100 text-red-700 rounded text-sm">Устгах</button></td></tr>`).join("")}</tbody></table></div></div>`;
 }
 function loginView() {
-  return `<div class="min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-sm"><div class="mb-5"><h1 class="text-lg font-bold">Ажилчин нэвтрэх</h1><p class="text-sm text-muted-foreground mt-1">Админаас өгсөн нууц үгээ оруулна уу</p></div><form onsubmit="login(event)" class="bg-card rounded p-5 space-y-4"><input id="password" autofocus type="password" placeholder="Нууц үг" class="w-full px-4 py-3 bg-secondary rounded"><div id="loginError"></div><button class="w-full h-12 rounded text-base font-semibold bg-primary text-primary-foreground">Нэвтрэх</button></form><div class="mt-5 text-center text-sm text-muted-foreground bg-card rounded p-3"><p>Борлуулалт: <b class="font-mono text-foreground">hasan</b></p><p>Админ: <b class="font-mono text-foreground">admin</b></p></div></div></div>`;
+  const installBtn = isStandalonePwa()
+    ? ""
+    : `<button type="button" onclick="openPwaInstallModal()" class="w-full mt-4 py-3 bg-primary/10 text-primary rounded font-medium text-sm">📱 Утсан дээр суулгах</button>`;
+  return `<div class="min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-sm"><div class="mb-5"><h1 class="text-lg font-bold">Ажилчин нэвтрэх</h1><p class="text-sm text-muted-foreground mt-1">Админаас өгсөн нууц үгээ оруулна уу</p></div><form onsubmit="login(event)" class="bg-card rounded p-5 space-y-4"><input id="password" autofocus type="password" placeholder="Нууц үг" class="w-full px-4 py-3 bg-secondary rounded"><div id="loginError"></div><button class="w-full h-12 rounded text-base font-semibold bg-primary text-primary-foreground">Нэвтрэх</button>${installBtn}</form><div class="mt-5 text-center text-sm text-muted-foreground bg-card rounded p-3"><p>Борлуулалт: <b class="font-mono text-foreground">hasan</b></p><p>Админ: <b class="font-mono text-foreground">admin</b></p></div></div></div>`;
 }
 function workerOrdersList() {
   let list = state.orders.filter((o) => o.customerId === state.workerCustomer);
@@ -1746,5 +1787,6 @@ Object.assign(window, {
   saveBackendState,
   installPwaApp,
   dismissPwaInstall,
+  openPwaInstallModal,
 });
 boot();
