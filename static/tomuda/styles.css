@@ -334,23 +334,29 @@ textarea.text-sm,
 .stock-alert-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  align-content: flex-start;
+}
+
+.stock-alert-form {
+  min-height: 0;
 }
 
 .stock-alert-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 52px;
-  gap: 8px;
+  grid-template-columns: 36px minmax(0, 1fr) 48px;
+  gap: 6px;
   align-items: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 8px;
   background: var(--hex-secondary);
   border: 1px solid transparent;
+  flex-shrink: 0;
 }
 
 .stock-alert-thumb {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 6px;
   object-fit: cover;
   background: var(--hex-card);
@@ -361,30 +367,23 @@ textarea.text-sm,
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stock-alert-row__meta {
-  margin: 2px 0 0;
-  font-size: 10px;
-  line-height: 1.3;
-  color: var(--hex-muted-foreground);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stock-alert-row__stock {
-  margin: 2px 0 0;
+.stock-alert-row__sub {
+  margin: 1px 0 0;
   font-size: 11px;
-  line-height: 1.3;
+  line-height: 1.2;
   color: var(--hex-muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.stock-alert-row__stock b {
+.stock-alert-row__sub b {
   color: var(--hex-foreground);
 }
 
@@ -409,8 +408,8 @@ textarea.text-sm,
 
 .stock-alert-row__input {
   width: 100%;
-  max-width: 52px;
-  padding: 5px 4px;
+  max-width: 48px;
+  padding: 4px 2px;
   font-size: 13px;
   font-weight: 700;
   text-align: center;
@@ -1772,7 +1771,7 @@ input::placeholder, textarea::placeholder {
     max-height: calc(100dvh - 55px) !important;
   }
 
-  #modal > div > div > :not(.border-b):not(.picker-step2):not(.picker-step1) {
+  #modal > div > div > :not(.border-b):not(.picker-step2):not(.picker-step1):not(.stock-alert-form) {
     max-height: calc(100dvh - 55px);
     overflow-y: auto;
   }
@@ -1785,6 +1784,60 @@ input::placeholder, textarea::placeholder {
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+  }
+
+  #modal > div > div > .stock-alert-form {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .stock-alert-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    gap: 3px !important;
+  }
+
+  .stock-alert-row {
+    grid-template-columns: 32px minmax(0, 1fr) 44px;
+    gap: 6px;
+    padding: 5px 6px !important;
+  }
+
+  .stock-alert-thumb {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .stock-alert-row__name {
+    font-size: 12px !important;
+  }
+
+  .stock-alert-row__sub {
+    font-size: 10px !important;
+  }
+
+  .stock-alert-row__limit-label {
+    display: none;
+  }
+
+  .stock-alert-row__input {
+    max-width: 44px !important;
+    min-height: 32px;
+    padding: 3px 2px !important;
+  }
+
+  .stock-alert-form__foot button {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
   }
 
   .picker-step2__scroll {
@@ -1980,6 +2033,61 @@ input::placeholder, textarea::placeholder {
   .grid.grid-cols-3 {
     gap: 6px !important;
   }
+}
+
+.receipt-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border-radius: 8px;
+  border: 2px solid #16899a;
+  color: #16899a;
+  background: rgba(22, 137, 154, 0.1);
+  line-height: 1;
+}
+
+.receipt-no--xs {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border-width: 1.5px;
+}
+
+.receipt-no--sm {
+  font-size: 13px;
+  padding: 4px 9px;
+  min-width: 2.4rem;
+}
+
+.receipt-no--lg {
+  font-size: 1.35rem;
+  padding: 7px 14px;
+  border-radius: 10px;
+}
+
+.receipt-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.receipt-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-bottom: 2px;
+}
+
+.receipt-detail-head__type {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.03em;
 }
 
 #print-root {
