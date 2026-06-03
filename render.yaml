@@ -9,8 +9,9 @@ services:
     name: tomuda-commerce
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py seed_tomuda
-    startCommand: gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && python manage.py seed_tomuda && gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT --timeout 120
     envVars:
       - key: DEBUG
         value: "0"
