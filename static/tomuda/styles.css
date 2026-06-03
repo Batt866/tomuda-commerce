@@ -331,6 +331,26 @@ textarea.text-sm,
   font-weight: 600;
 }
 
+.stock-alert-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--hex-secondary);
+  border: 1px solid transparent;
+}
+
+.stock-alert-row--low {
+  background: var(--hex-warning-soft);
+  border-color: var(--hex-warning);
+}
+
+.stock-alert-row__limit input {
+  font-weight: 600;
+}
+
 .product-card__actions {
   display: flex;
   flex-direction: row;
