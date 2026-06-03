@@ -325,6 +325,12 @@ textarea.text-sm,
   background: var(--hex-secondary);
 }
 
+.product-card__badge--low {
+  background: var(--hex-warning-soft);
+  color: var(--hex-warning-text);
+  font-weight: 600;
+}
+
 .product-card__actions {
   display: flex;
   flex-direction: row;

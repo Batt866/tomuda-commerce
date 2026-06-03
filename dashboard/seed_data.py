@@ -269,5 +269,9 @@ def default_state() -> dict:
             "deliveryName": "Дуламсүрэн",
             "deliveryPhone": "99076727",
             "workerQty": {},
+            "settings": {
+                "stockAlertEnabled": True,
+                "stockAlertMin": 10,
+            },
         }
     )
