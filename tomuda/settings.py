@@ -109,6 +109,6 @@ SECURE_HSTS_PRELOAD = not DEBUG
 if module_available("whitenoise.storage"):
     STORAGES = {
         "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
         },
     }
