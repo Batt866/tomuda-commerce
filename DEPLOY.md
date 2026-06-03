@@ -1,5 +1,8 @@
 # TOMUDA — Deploy + утсан дээр суулгах
 
+> **Render дээр бүрэн deploy заавар (Монгол):** [RENDER-DEPLOY-MN.md](./RENDER-DEPLOY-MN.md)  
+> Алхам алхмаар, алдаа засах, PWA, CSRF бүгд тэнд.
+
 ## 1. Render дээр deploy (20 хэрэглэгчид зориулсан)
 
 ### Алхам

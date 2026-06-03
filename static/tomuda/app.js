@@ -260,6 +260,7 @@ async function boot() {
   ensureSettings();
   initNoZoom();
   initPickerModalActions();
+  initQtyStepperButtons();
   initAppBack();
   render();
   initPwa();
@@ -355,6 +356,17 @@ function bindCapacitorBackButton() {
     else tryExitApp();
   });
 }
+function initQtyStepperButtons() {
+  if (document.documentElement.dataset.qtyStepperBound) return;
+  document.documentElement.dataset.qtyStepperBound = "1";
+  document.addEventListener(
+    "mousedown",
+    (e) => {
+      if (e.target.closest(".qty-stepper button")) e.preventDefault();
+    },
+    true,
+  );
+}
 function initPickerModalActions() {
   if (modal.dataset.pickerBound) return;
   modal.dataset.pickerBound = "1";
@@ -367,6 +379,7 @@ function initPickerModalActions() {
     const qtyBtn = e.target.closest("[data-picker-qty]");
     if (qtyBtn?.disabled) return;
     if (qtyBtn) {
+      e.preventDefault();
       setWorkerQty(
         qtyBtn.getAttribute("data-product-id") || "",
         Number(qtyBtn.getAttribute("data-qty")),
@@ -389,6 +402,17 @@ function initPickerModalActions() {
     }
   });
   modal.addEventListener("change", (e) => {
+    const check = e.target.closest("[data-picker-check]");
+    if (check) {
+      const id = check.getAttribute("data-product-id") || "";
+      if (check.checked) {
+        const cur = state.workerQty[id] || 0;
+        setWorkerQty(id, cur > 0 ? cur : 1);
+      } else {
+        setWorkerQty(id, 0);
+      }
+      return;
+    }
     const qtyInput = e.target.closest("[data-picker-qty-input]");
     if (!qtyInput) return;
     setWorkerQty(
@@ -781,14 +805,14 @@ function stockAlertModal() {
         .map((p) => {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><div class="stock-alert-row__info min-w-0"><p class="font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category || "-")} · Одоо: <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b> ${esc(p.unit || "ш")}</p></div><label class="stock-alert-row__limit shrink-0"><span class="text-xs text-muted-foreground block mb-1">Доод (≤)</span><input type="number" name="minStock_${esc(p.id)}" min="0" step="1" value="${limit}" placeholder="0" class="w-20 px-2 py-2 bg-secondary rounded text-center text-sm app-input" title="0 = сануулгагүй"></label></div>`;
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImage(p)}" alt="" class="stock-alert-thumb" width="40" height="40" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__meta">${esc(p.category || "-")} · ${esc(p.barcode || "-")}</p><p class="stock-alert-row__stock">Үлд: <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` / доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="number" name="minStock_${esc(p.id)}" min="0" step="1" value="${limit}" placeholder="0" class="stock-alert-row__input app-input" title="Доод" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
     "Үлдэгдэл сануулга",
-    `<form onsubmit="saveStockAlertSettings(event)" class="p-5 flex flex-col max-h-[85vh]"><label class="flex items-center gap-3 text-sm cursor-pointer mb-3"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Бараа бүрт тусдаа доод хэмжээ (сануулга идэвхтэй)</span></label><p class="text-xs text-muted-foreground mb-3">Жишээ: Coca Cola → 20, Pantag → 30. Үлдэгдэл энэ тооноос доош бол «дутуу» гэж тооцно. <b>0</b> = тухайн бараанд сануулга байхгүй.</p><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Бараа хайх..." class="w-full px-3 py-2.5 bg-secondary rounded text-sm mb-3">${low.length ? `<div class="tone tone--warning tone--block text-sm mb-3"><b>Одоо дутуу: ${low.length}</b> — ${low.slice(0, 4).map((p) => esc(p.name)).join(", ")}${low.length > 4 ? "…" : ""}</div>` : ""}<div class="modal-scroll overflow-y-auto flex-1 -mx-1 px-1 space-y-2">${rows}</div><div class="pt-4 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-3 bg-secondary rounded font-medium">Болих</button><button type="submit" class="py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
-    "max-w-lg",
+    `<form onsubmit="saveStockAlertSettings(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="flex items-center justify-between gap-3 mb-3"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Дутуу: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-secondary rounded text-sm mb-3"><div class="stock-alert-list modal-scroll overflow-y-auto flex-1 -mx-1 px-1">${rows}</div><div class="pt-4 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-3 bg-secondary rounded font-medium">Болих</button><button type="submit" class="py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    "max-w-xl",
   );
 }
 function saveStockAlertSettings(e) {
@@ -1507,7 +1531,7 @@ function workerNewOrderStep(cart) {
   return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-start justify-between gap-2"><div class="flex-1 min-w-0">${workerStoreSummary(customer)}</div><button type="button" onclick="clearWorkerStore()" class="px-2 py-1.5 bg-secondary rounded text-sm shrink-0">Солих</button></div><div class="p-3 space-y-3"><div class="flex items-stretch gap-2"><div class="grid grid-cols-3 gap-1 flex-1 text-sm rounded bg-secondary/50 p-2 text-center"><div><b>${cart.skuCount}</b><p class="text-xs text-muted-foreground">Бараа</p></div><div><b>${cart.pieceQty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(cart.total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><button type="button" onclick="openPickerModal()" class="worker-add-plus" aria-label="Бараа нэмэх">+</button></div><input type="date" value="${deliveryDay}" onchange="state.deliveryDate=this.value;render()" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${employeeField}</div><div class="divide-y divide-border">${listHtml || `<div class="p-6 text-center text-sm text-muted-foreground">+ дарж бараа нэмнэ</div>`}</div><div class="sticky bottom-0 bg-card p-3 border-t border-border space-y-2">${paymentTermPicker()}<button onclick="saveWorker()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium ${cart.paid.length ? "" : "opacity-50"}">Хадгалах</button></div></section>`;
 }
 function workerSelectedRow(p) {
-  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0 flex-1"><p class="font-medium truncate">${p.name}</p><p class="worker-row-meta text-xs text-muted-foreground">${p.category} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button onclick="setWorkerQty('${p.id}',${p.qty - 1})">-</button><input onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number"><button onclick="setWorkerQty('${p.id}',${p.qty + 1})">+</button></div></div>`;
+  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${p.name}</p><p class="worker-row-meta text-xs text-muted-foreground">${p.category} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty - 1})">−</button><input onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${p.stock}" class="app-input"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty + 1})" ${p.qty >= p.stock ? "disabled" : ""}>+</button></div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + o.total, 0),
@@ -1746,7 +1770,7 @@ function productModal(id) {
   };
   box(
     id ? "Бараа засах" : "Бараа бүртгэх",
-    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" class="category-scroll w-full px-4 py-2 bg-secondary rounded" size="6">${[...(p.category ? [p.category] : []), ...cats().filter((c) => c !== p.category)].map((c) => `<option ${p.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("minStock", "Доод үлдэгдэл (сануулга)", p.minStock ?? 0, "number")}<p class="text-xs text-muted-foreground -mt-2">Эсвэл Админ → <button type="button" class="text-primary underline" onclick="closeModal();stockAlertModal()">Үлдэгдэл сануулга</button></p>${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" class="category-scroll w-full px-4 py-2 bg-secondary rounded" size="6">${[...(p.category ? [p.category] : []), ...cats().filter((c) => c !== p.category)].map((c) => `<option ${p.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("minStock", "Доод үлдэгдэл", p.minStock ?? 0, "number")}${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
 function handleProductImage(input) {
@@ -2262,11 +2286,18 @@ function clearPickerCart() {
   render();
   pickerModal();
 }
+function pickerQtyStepper(p, q) {
+  const id = esc(p.id);
+  const prev = Math.max(0, q - 1);
+  const next = Math.min(p.stock, q + 1);
+  return `<div class="qty-stepper picker-qty-stepper"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${prev}">−</button><input data-picker-qty-input data-product-id="${id}" value="${q}" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="${p.stock}" class="app-input"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${next}" ${q >= p.stock ? "disabled" : ""}>+</button></div>`;
+}
 function pickerRow(p) {
   const q = state.workerQty[p.id] || 0,
+    checked = q > 0,
     left = p.stock - q,
     id = esc(p.id);
-  return `<div class="picker-row ${q ? "is-selected" : ""}"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="text-sm font-medium truncate">${p.name}</p><p class="text-xs text-muted-foreground">${esc(p.barcode)}</p><div class="flex flex-wrap gap-2 mt-2 text-xs"><span class="px-2 py-1 rounded bg-card font-semibold">${fmt(p.price)}</span><span class="px-2 py-1 rounded bg-card text-muted-foreground">Үлд ${left}</span>${q ? `<span class="px-2 py-1 rounded bg-primary text-primary-foreground">${fmt(q * p.price)}</span>` : ""}</div></div>${q ? `<div class="qty-stepper"><button type="button" data-picker-qty data-product-id="${id}" data-qty="${q - 1}">-</button><input data-picker-qty-input data-product-id="${id}" value="${q}" type="number" min="0" max="${p.stock}" class="app-input"><button type="button" data-picker-qty data-product-id="${id}" data-qty="${q + 1}">+</button></div>` : `<button type="button" data-picker-qty data-product-id="${id}" data-qty="1" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm ${p.stock ? "" : "opacity-50"}" ${p.stock ? "" : "disabled"}>Нэмэх</button>`}</div>`;
+  return `<div class="picker-row ${checked ? "is-selected" : ""}"><label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.barcode)}</p><div class="flex flex-wrap gap-2 mt-2 text-xs"><span class="px-2 py-1 rounded bg-card font-semibold">${fmt(p.price)}</span><span class="px-2 py-1 rounded bg-card text-muted-foreground">Үлд ${left}</span>${checked ? `<span class="px-2 py-1 rounded bg-primary text-primary-foreground">${fmt(q * p.price)}</span>` : ""}</div></div>${checked ? pickerQtyStepper(p, q) : ""}</div>`;
 }
 function setPickerCategory(cat) {
   if (!cat) return;
