@@ -76,6 +76,28 @@ PWA-гаар хангалттай бол Store шаардлаггүй. Хэрэ�
 
 ## 5. Шалгах
 
-- `GET /api/health` → `{"status":"ok"}`
+- `GET /api/health` → `{"ok":true,"app":"tomuda"}`
 - Chrome DevTools → Application → Manifest + Service Worker идэвхтэй эсэх
 - Утаснаас HTTPS URL нээж суулгах banner шалгах
+
+```bash
+./scripts/check-deploy-link.sh
+```
+
+---
+
+## 6. Deploy link ажиллахгүй бол
+
+| Шалтгаан | Засвар |
+|----------|--------|
+| **Хуучин trycloudflare URL** | Tunnel хаагдсан үед URL устана. `./scripts/start-tomuda.sh` дахин ажиллуулж `DEPLOY-LINK.txt`-ийн шинэ линкийг ашиглана |
+| **Mac унтсан / terminal хаагдсан** | Backend + cloudflared зогсоно → дахин `./scripts/start-tomuda.sh` |
+| **Render 404 (no-server)** | [render.com](https://render.com) → Blueprint → `Batt866/tomuda-commerce` repo сонгоод deploy хийнэ |
+| **APK хуучин URL** | `start-tomuda.sh` capacitor.config.json-ийг автоматаар шинэчилнэ, дараа нь `npm run cap:sync` |
+
+**Одоо ажиллаж буй түр линк** (зөвхөн tunnel асаалттай үед):
+
+```bash
+./scripts/start-tomuda.sh
+cat DEPLOY-LINK.txt
+```

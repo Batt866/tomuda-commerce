@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v4";
+const CACHE = "tomuda-v8";
 const PRECACHE = ["/", "/static/tomuda/styles.css", "/static/tomuda/data.js"];
 
 self.addEventListener("install", (event) => {
@@ -21,6 +21,21 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  if (url.pathname.includes("/static/tomuda/app.js")) {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(request)),
+    );
+    return;
+  }
 
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(

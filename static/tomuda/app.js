@@ -3,7 +3,9 @@ const modal = document.getElementById("modal");
 let barcodeScanTarget = "picker",
   barcodeStream = null,
   barcodeScanFrame = 0,
-  barcodeScanning = false;
+  barcodeScanning = false,
+  zxingReader = null,
+  zxingControls = null;
 const state = {
   ...seed,
   currentView: "worker",
@@ -40,6 +42,10 @@ const state = {
   countDone: false,
 };
 const API_BASE = window.TOMUDA_API_BASE || "/api";
+const BRAND = {
+  logoWhite: "/static/tomuda/branding/logo-white.png",
+  logoBlue: "/static/tomuda/branding/logo-blue.png",
+};
 const persistKeys = [
   "customers",
   "products",
@@ -64,13 +70,18 @@ const dte = (d) => new Date(d).toLocaleDateString("mn-MN");
 const isoDay = (d) => {
   const x = new Date(d);
   if (Number.isNaN(x.getTime())) return "";
-  return x.toISOString().slice(0, 10);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const day = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 };
+const todayIso = () => isoDay(new Date());
 const tomorrowIso = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   return isoDay(d);
 };
+const orderDay = (o) => isoDay(o.deliveryDate || o.createdAt);
 const mapsLink = (lat, lng) =>
   lat && lng && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))
     ? `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`
@@ -87,6 +98,7 @@ const esc = (s = "") =>
         "'": "&#039;",
       })[c],
   );
+const pickerOpen = () => !!modal.querySelector("[data-picker-root]");
 const cats = () => [
   ...new Set([
     ...state.products.map((p) => p.category),
@@ -94,8 +106,76 @@ const cats = () => [
   ]),
 ];
 const role = (r) =>
-  ({ admin: "Админ", sales: "Борлуулалт", warehouse: "Агуулах" })[r] ||
-  "Ажилчин хэсгээс нэвтэрнэ";
+  ({ admin: "Админ", sales: "HT", warehouse: "Агуулах" })[r] || "Ажилчин";
+function currentRole() {
+  return state.currentEmployee?.role || "";
+}
+function isAdmin() {
+  return currentRole() === "admin";
+}
+function canDelete() {
+  return isAdmin();
+}
+function defaultViewForRole(r) {
+  if (r === "admin") return "admin";
+  if (r === "warehouse") return "warehouse";
+  return "worker";
+}
+function canAccessView(viewId, r = currentRole()) {
+  if (r === "admin") return true;
+  if (r === "warehouse")
+    return ["warehouse", "warehouseReceipts"].includes(viewId);
+  if (r === "sales")
+    return [
+      "worker",
+      "customers",
+      "products",
+      "warehouse",
+      "warehouseReceipts",
+    ].includes(viewId);
+  return false;
+}
+function allowedNavIds(r = currentRole()) {
+  if (r === "admin")
+    return ["worker", "customers", "products", "warehouse", "count", "admin"];
+  if (r === "warehouse") return ["warehouse"];
+  if (r === "sales") return ["worker", "customers", "products", "warehouse"];
+  return ["worker", "customers", "products"];
+}
+const EMPLOYEE_EMAIL_DEFAULTS = {
+  admin: "admin@tomuda.mn",
+  "emp-dulam": "aguulah@tomuda.mn",
+  "emp-hasan": "ht@tomuda.mn",
+  "emp-galsan": "ht.galsan@tomuda.mn",
+  "emp-munkh": "ht.munkh@tomuda.mn",
+};
+function normalizeEmail(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+function ensureEmployeeEmails() {
+  state.employees.forEach((e) => {
+    if (!e.email && EMPLOYEE_EMAIL_DEFAULTS[e.id]) {
+      e.email = EMPLOYEE_EMAIL_DEFAULTS[e.id];
+    }
+  });
+}
+function orderActor() {
+  if (state.currentEmployee?.role === "sales") return state.currentEmployee;
+  return (
+    state.employees.find((x) => x.id === state.orderEmployee) ||
+    state.currentEmployee ||
+    {}
+  );
+}
+function orderEmailFields(emp) {
+  const actor = emp || state.currentEmployee || {};
+  return {
+    employeeEmail: actor.email || "",
+    createdByEmail: state.currentEmployee?.email || actor.email || "",
+  };
+}
 const status = (s) =>
   ({
     pending: "Хүлээгдэж буй",
@@ -104,15 +184,18 @@ const status = (s) =>
     cancelled: "Цуцалсан",
   })[s];
 const badge = (s) =>
-  s === "confirmed"
-    ? "bg-emerald-100 text-emerald-700"
-    : s === "pending"
-      ? "bg-amber-100 text-amber-700"
-      : s === "delivered"
-        ? "bg-blue-100 text-blue-700"
-        : "bg-red-100 text-red-700";
+  ({
+    confirmed: "tone tone--success",
+    pending: "tone tone--warning",
+    delivered: "tone tone--info",
+    cancelled: "tone tone--danger",
+  })[s] || "tone tone--danger";
 const card = (l, v, t = "") =>
-  `<div class="bg-card rounded p-4"><p class="text-sm text-muted-foreground">${l}</p><p class="text-lg font-semibold ${t}">${v}</p></div>`;
+  `<div class="stat-card bg-card rounded p-4"><p class="stat-card__label">${l}</p><p class="stat-card__value ${t}">${v}</p></div>`;
+const pageHead = (title, action = "") =>
+  action
+    ? `<div class="page-head page-head--row"><h2 class="page-head__title">${title}</h2>${action}</div>`
+    : `<h2 class="page-head__title">${title}</h2>`;
 const productImage = (p) =>
   p.image ||
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
@@ -128,7 +211,8 @@ function applyPersistentState(data) {
   persistKeys.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(data, key)) state[key] = data[key];
   });
-  if (!state.promotionRules?.quantity) state.promotionRules = { quantity: [], price: [] };
+  if (!state.promotionRules?.quantity)
+    state.promotionRules = { quantity: [], price: [] };
   return true;
 }
 async function boot() {
@@ -145,8 +229,166 @@ async function boot() {
     console.warn("Backend state load failed", error);
   }
   backendReady = true;
+  ensureEmployeeEmails();
+  initNoZoom();
+  initPickerModalActions();
+  initAppBack();
   render();
   initPwa();
+}
+function handleAppBack() {
+  if (!state.isLoggedIn) return false;
+
+  if (barcodeScanning) {
+    stopBarcodeScan();
+    if (pickerOpen()) pickerModal();
+    else render();
+    return true;
+  }
+
+  if (modal.innerHTML.trim()) {
+    if (pickerOpen() && state.filters.workerCategory) backToPickerCategories();
+    else closeModal();
+    return true;
+  }
+
+  if (state.mobileOpen) {
+    state.mobileOpen = false;
+    render();
+    return true;
+  }
+
+  if (
+    state.currentView === "worker" &&
+    state.filters.worker === "new" &&
+    state.workerStoreReady
+  ) {
+    state.workerStoreReady = false;
+    state.workerCustomer = "";
+    state.searches.workerStore = "";
+    render();
+    return true;
+  }
+
+  const subAdminViews = ["employees", "inventory", "reports", "promotions"];
+  if (subAdminViews.includes(state.currentView)) {
+    go("admin");
+    return true;
+  }
+
+  if (state.currentView === "warehouseReceipts") {
+    go("warehouse");
+    return true;
+  }
+
+  const defaultView = defaultViewForRole(currentRole());
+  if (state.currentView !== defaultView) {
+    go(defaultView);
+    return true;
+  }
+
+  if (state.currentView === "worker" && state.filters.worker === "orders") {
+    state.filters.worker = "new";
+    render();
+    return true;
+  }
+
+  return false;
+}
+function armAppBackGuard() {
+  history.pushState({ tomudaBack: 1 }, "");
+}
+function tryExitApp() {
+  const App = window.Capacitor?.Plugins?.App;
+  if (App?.exitApp) {
+    App.exitApp();
+    return;
+  }
+  if (window.Capacitor?.isNativePlatform?.()) return;
+  history.back();
+}
+function initAppBack() {
+  if (window.__tomudaBackReady) return;
+  window.__tomudaBackReady = true;
+  armAppBackGuard();
+  window.addEventListener("popstate", () => {
+    if (handleAppBack()) armAppBackGuard();
+    else tryExitApp();
+  });
+  bindCapacitorBackButton();
+}
+function bindCapacitorBackButton() {
+  const cap = window.Capacitor;
+  if (!cap?.isNativePlatform?.()) return;
+  const App = cap.Plugins?.App;
+  if (!App?.addListener) return;
+  App.addListener("backButton", () => {
+    if (handleAppBack()) armAppBackGuard();
+    else tryExitApp();
+  });
+}
+function initPickerModalActions() {
+  if (modal.dataset.pickerBound) return;
+  modal.dataset.pickerBound = "1";
+  modal.addEventListener("click", (e) => {
+    const catBtn = e.target.closest("[data-picker-cat]");
+    if (catBtn) {
+      setPickerCategory(catBtn.getAttribute("data-picker-cat") || "");
+      return;
+    }
+    const qtyBtn = e.target.closest("[data-picker-qty]");
+    if (qtyBtn?.disabled) return;
+    if (qtyBtn) {
+      setWorkerQty(
+        qtyBtn.getAttribute("data-product-id") || "",
+        Number(qtyBtn.getAttribute("data-qty")),
+      );
+      return;
+    }
+    const backBtn = e.target.closest("[data-picker-back]");
+    if (backBtn) {
+      backToPickerCategories();
+      return;
+    }
+    const clearSearchBtn = e.target.closest("[data-picker-clear-search]");
+    if (clearSearchBtn) {
+      clearPickerSearch();
+      return;
+    }
+    const clearCartBtn = e.target.closest("[data-picker-clear-cart]");
+    if (clearCartBtn) {
+      clearPickerCart();
+    }
+  });
+  modal.addEventListener("change", (e) => {
+    const qtyInput = e.target.closest("[data-picker-qty-input]");
+    if (!qtyInput) return;
+    setWorkerQty(
+      qtyInput.getAttribute("data-product-id") || "",
+      Number(qtyInput.value),
+    );
+  });
+}
+function initNoZoom() {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (meta) {
+    meta.setAttribute(
+      "content",
+      "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+    );
+  }
+  ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
+    document.addEventListener(type, (e) => e.preventDefault(), {
+      passive: false,
+    });
+  });
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    },
+    { passive: false },
+  );
 }
 let pwaInstallPrompt = null;
 function isStandalonePwa() {
@@ -157,7 +399,9 @@ function isStandalonePwa() {
 }
 function isInAppBrowser() {
   const ua = navigator.userAgent || "";
-  return /FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|MicroMessenger|WeChat/i.test(ua);
+  return /FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat|MicroMessenger|WeChat/i.test(
+    ua,
+  );
 }
 function inAppBrowserName() {
   const ua = navigator.userAgent || "";
@@ -167,9 +411,15 @@ function inAppBrowserName() {
 }
 function copyAppLink() {
   const url = location.href.split("#")[0];
-  const done = () => alert("Link хуулагдлаа!\n\nChrome (Android) эсвэл Safari (iPhone) нээж, хаягийн мөрөнд paste хийгээд нээнэ үү.");
+  const done = () =>
+    alert(
+      "Link хуулагдлаа!\n\nChrome (Android) эсвэл Safari (iPhone) нээж, хаягийн мөрөнд paste хийгээд нээнэ үү.",
+    );
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).then(done).catch(() => prompt("Link-ийг хуулна уу:", url));
+    navigator.clipboard
+      .writeText(url)
+      .then(done)
+      .catch(() => prompt("Link-ийг хуулна уу:", url));
   } else {
     prompt("Link-ийг хуулна уу:", url);
   }
@@ -179,10 +429,10 @@ function pwaInAppEscapeSteps() {
   const android = isAndroidDevice();
   const ios = isIosDevice();
   if (android) {
-    return `<div class="p-4 rounded bg-red-50 text-red-900 text-sm mb-4"><b>${app} дотор суулгах боломжгүй!</b><br>Эхлээд Chrome browser руу шилжинэ үү.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээд баруун <b>⋮</b> (гурвалжин) дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Chrome-ээр нээх</b> / <b>Open in Chrome</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Chrome нээгдсний дараа <b>App суулгах</b> заавар дагана</span></li></ol><button type="button" onclick="openInChrome()" class="w-full py-3 mb-2 bg-primary text-primary-foreground rounded font-semibold">Chrome-оор нээх</button><button type="button" onclick="copyAppLink()" class="w-full py-3 bg-secondary rounded font-medium">Link хуулах</button>`;
+    return `<div class="tone tone--success tone--block text-sm mb-4"><b>Android:</b> APK файлыг татаад шууд суулгана. Instagram, Facebook дотор ч болно.</div>${androidApkInstallSteps()}`;
   }
   if (ios) {
-    return `<div class="p-4 rounded bg-red-50 text-red-900 text-sm mb-4"><b>${app} дотор суулгах боломжгүй!</b><br>Эхлээд Safari browser руу шилжинэ үү.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээд баруун <b>⋯</b> (цэгүүд) дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Safari-аар нээх</b> / <b>Open in Safari</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Safari дээр доод <b>Хуваалцах □↑</b> → <b>Нүүр дэлгэцэнд нэмэх</b></span></li></ol><button type="button" onclick="copyAppLink()" class="w-full py-3 bg-primary text-primary-foreground rounded font-semibold">Link хуулах</button>`;
+    return `<div class="tone tone--danger tone--block text-sm mb-4"><b>${app} дотор суулгах боломжгүй!</b><br>Эхлээд Safari browser руу шилжинэ үү.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээд баруун <b>⋯</b> (цэгүүд) дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Safari-аар нээх</b> / <b>Open in Safari</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Safari дээр доод <b>Хуваалцах □↑</b> → <b>Нүүр дэлгэцэнд нэмэх</b></span></li></ol><button type="button" onclick="copyAppLink()" class="w-full py-3 bg-primary text-primary-foreground rounded font-semibold">Link хуулах</button>`;
   }
   return `<p class="text-sm">Link-ийг Chrome эсвэл Safari-аар нээнэ үү.</p><button type="button" onclick="copyAppLink()" class="w-full py-3 mt-3 bg-primary text-primary-foreground rounded font-semibold">Link хуулах</button>`;
 }
@@ -191,6 +441,12 @@ function isIosDevice() {
 }
 function isAndroidDevice() {
   return /Android/i.test(navigator.userAgent || "");
+}
+function isSafariBrowser() {
+  const ua = navigator.userAgent || "";
+  return (
+    isIosDevice() && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)
+  );
 }
 function isChromeAndroid() {
   const ua = navigator.userAgent || "";
@@ -201,122 +457,215 @@ function isChromeAndroid() {
   );
 }
 function pwaInstallLabel() {
-  if (isAndroidDevice()) return "📱 Android App суулгах";
-  if (isIosDevice()) return "📱 iPhone дээр суулгах";
-  return "📱 Утсан дээр суулгах";
+  return "📱 App суулгах";
+}
+function isNativeApp() {
+  return isStandalonePwa() || !!window.Capacitor;
+}
+function showInstallToast(msg) {
+  document.querySelector(".install-toast")?.remove();
+  const el = document.createElement("div");
+  el.className = "install-toast";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("install-toast--visible"));
+  setTimeout(() => {
+    el.classList.remove("install-toast--visible");
+    setTimeout(() => el.remove(), 300);
+  }, 4500);
+}
+function downloadAndroidApk() {
+  const url = apkDownloadUrl();
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "TOMUDA.apk";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  sessionStorage.setItem("tomuda-apk-downloaded", "1");
+  window.setTimeout(() => {
+    if (document.visibilityState !== "hidden") location.href = url;
+  }, 400);
+}
+async function triggerNativeInstallPrompt() {
+  if (!pwaInstallPrompt) return false;
+  try {
+    await pwaInstallPrompt.prompt();
+    await pwaInstallPrompt.userChoice;
+    pwaInstallPrompt = null;
+    dismissPwaInstall(false);
+    dismissInstallCoach();
+    return true;
+  } catch (err) {
+    console.warn("Install prompt failed", err);
+    pwaInstallPrompt = null;
+    return false;
+  }
+}
+function dismissInstallCoach() {
+  document.getElementById("install-coach")?.remove();
+}
+function showIosInstallCoach() {
+  dismissInstallCoach();
+  const el = document.createElement("div");
+  el.id = "install-coach";
+  el.className = "ios-install-coach";
+  el.innerHTML = `<div class="ios-install-coach-backdrop" onclick="dismissInstallCoach()"></div><div class="ios-install-coach-panel"><p class="ios-install-coach-title">📱 iPhone дээр суулгах</p><p class="ios-install-coach-step">1. Доод <b>Share □↑</b> дарна</p><p class="ios-install-coach-step">2. <b>Add to Home Screen</b> (Нүүр дэлгэцэнд нэмэх)</p><p class="ios-install-coach-step">3. <b>Add</b> (Нэмэх) дарна</p><div class="ios-install-coach-arrow" aria-hidden="true">↓</div><button type="button" class="ios-install-coach-btn" onclick="dismissInstallCoach()">Ойлголоо</button></div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("ios-install-coach--visible"));
+}
+function showAndroidInstallCoach() {
+  dismissInstallCoach();
+  const el = document.createElement("div");
+  el.id = "install-coach";
+  el.className = "ios-install-coach";
+  el.innerHTML = `<div class="ios-install-coach-backdrop" onclick="dismissInstallCoach()"></div><div class="ios-install-coach-panel"><p class="ios-install-coach-title">📱 Android дээр суулгах</p><p class="install-coach-warn"><b>Play Protect блокловол:</b> «More details» → «Install anyway» дарна. Энэ нь манай app, аюулгүй.</p><p class="ios-install-coach-step">1. <b>TOMUDA.apk</b> файл дээр дарна</p><p class="ios-install-coach-step">2. «App blocked» гарвал → <b>More details</b></p><p class="ios-install-coach-step">3. <b>Install anyway</b> дарна</p><p class="ios-install-coach-step">4. «Unknown apps» зөвшөөрнө</p><button type="button" class="ios-install-coach-btn" onclick="downloadAndroidApk()">Дахин татах</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:var(--hex-secondary);color:var(--hex-foreground)" onclick="dismissInstallCoach()">Ойлголоо</button></div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("ios-install-coach--visible"));
+}
+function installUrlWithFlag() {
+  const url = new URL(location.href);
+  url.searchParams.set("install", "1");
+  return url.toString();
+}
+function openInSafari() {
+  const target = installUrlWithFlag();
+  if (/CriOS/i.test(navigator.userAgent || "")) {
+    location.href = target.replace(/^https:\/\//, "x-safari-https://");
+    return;
+  }
+  location.href = target;
+}
+function installAppOnPhone() {
+  if (isNativeApp()) return;
+  dismissPwaInstall(false);
+
+  if (isIosDevice()) {
+    if (!isSafariBrowser() || isInAppBrowser()) {
+      sessionStorage.setItem("tomuda-pending-install", "1");
+      openInSafari();
+      showInstallToast("Safari нээгдэж байна...");
+      return;
+    }
+    triggerNativeInstallPrompt().then((installed) => {
+      if (!installed) showIosInstallCoach();
+    });
+    return;
+  }
+
+  triggerNativeInstallPrompt().then((installed) => {
+    if (installed) return;
+    if (isAndroidDevice()) {
+      if (isInAppBrowser()) {
+        openInChrome();
+        showInstallToast("Chrome нээгдэж байна...");
+        return;
+      }
+      downloadAndroidApk();
+      showAndroidInstallCoach();
+      return;
+    }
+    downloadAndroidApk();
+    showAndroidInstallCoach();
+  });
+}
+function checkPendingApkInstallCoach() {
+  if (
+    sessionStorage.getItem("tomuda-apk-downloaded") === "1" &&
+    isAndroidDevice() &&
+    !isNativeApp()
+  ) {
+    sessionStorage.removeItem("tomuda-apk-downloaded");
+    setTimeout(showAndroidInstallCoach, 800);
+  }
+}
+function tryAutoInstallFromRedirect() {
+  const url = new URL(location.href);
+  const pending =
+    url.searchParams.get("install") === "1" ||
+    sessionStorage.getItem("tomuda-pending-install") === "1";
+  if (!pending) return;
+  url.searchParams.delete("install");
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
+  sessionStorage.removeItem("tomuda-pending-install");
+
+  if (!isIosDevice()) {
+    if (isAndroidDevice()) installAppOnPhone();
+    return;
+  }
+
+  if (!isSafariBrowser()) return;
+
+  let tries = 0;
+  const attempt = async () => {
+    if (await triggerNativeInstallPrompt()) return;
+    if (++tries < 15) {
+      setTimeout(attempt, 400);
+      return;
+    }
+    showIosInstallCoach();
+  };
+  setTimeout(attempt, 600);
+}
+function apkDownloadUrl() {
+  return "/static/tomuda/downloads/TOMUDA.apk";
+}
+function androidApkInstallSteps() {
+  return `<a href="${apkDownloadUrl()}" download="TOMUDA.apk" class="block w-full py-3 mb-4 bg-primary text-primary-foreground rounded font-semibold text-center no-underline">📥 TOMUDA.apk татах (Play Store шаардлаггүй)</a><ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээрх товчоор <b>APK файл</b> татна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Татсан файл дээр дарж <b>суулгана</b></span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>«Танихгүй эх үүсвэр» гэвэл <b>Зөвшөөрөх</b> дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">4</span><span>Нүүр дэлгэцээс <b>ТОМУДА</b> app-аар нээнэ</span></li></ol>`;
 }
 function openInChrome() {
-  const page = location.href;
+  const page = installUrlWithFlag();
   const path = page.replace(/^https?:\/\//, "");
   location.href = `intent://${path}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(page)};end`;
 }
 function initPwa() {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch((err) =>
-      console.warn("Service worker registration failed", err),
-    );
+    navigator.serviceWorker
+      .register("/sw.js")
+      .catch((err) => console.warn("Service worker registration failed", err));
   }
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     pwaInstallPrompt = e;
-    showPwaInstallBanner();
+    showUnifiedInstallBanner();
   });
-  if (isStandalonePwa()) return;
+  window.addEventListener("appinstalled", () => {
+    dismissPwaInstall(false);
+    dismissInstallCoach();
+    showInstallToast("App амжилттай суулгагдлаа!");
+  });
+  checkPendingApkInstallCoach();
+  tryAutoInstallFromRedirect();
+  if (isNativeApp()) return;
   const dismissed = Number(localStorage.getItem("pwa-install-dismissed") || 0);
   const showAuto = Date.now() - dismissed >= 7 * 86400000;
-  if (isAndroidDevice() && showAuto) {
-    setTimeout(() => {
-      if (isChromeAndroid()) showPwaInstallBanner();
-      else openPwaInstallModal();
-    }, 1000);
-    return;
-  }
-  if (isIosDevice() && showAuto) {
-    setTimeout(() => {
-      if (isInAppBrowser()) openPwaInstallModal();
-      else showPwaInstallBanner();
-    }, 1200);
-  }
+  if (showAuto) setTimeout(showUnifiedInstallBanner, 1200);
 }
 function pwaInstallSidebarBtn() {
-  if (isStandalonePwa()) return "";
-  return `<button onclick="openPwaInstallModal()" class="w-full px-4 py-3 rounded text-left hover:bg-sidebar-accent border border-sidebar-primary/30"><span class="font-medium text-sidebar-primary">${pwaInstallLabel()}</span></button>`;
+  if (isNativeApp()) return "";
+  return `<button onclick="installAppOnPhone()" class="w-full px-4 py-3 rounded text-left hover:bg-sidebar-accent border border-sidebar-primary/30"><span class="font-medium text-sidebar-primary">${pwaInstallLabel()}</span></button>`;
 }
-function openPwaInstallModal() {
-  dismissPwaInstall(false);
-  const inApp = isInAppBrowser();
-  const ios = isIosDevice();
-  const android = isAndroidDevice();
-  if (inApp) {
-    box(
-      android ? "Android App суулгах" : "iPhone дээр суулгах",
-      `<div class="p-5 overflow-y-auto max-h-[70vh]"><p class="text-sm text-muted-foreground mb-4">Play Store, App Store шаардлаггүй.</p>${pwaInAppEscapeSteps()}</div>`,
-      "max-w-md",
-    );
-    return;
-  }
-  let steps = "";
-  let title = "Утсан дээр суулгах";
-  if (android) {
-    title = "Android App суулгах";
-    if (!isChromeAndroid() || inApp) {
-      steps = `<div class="p-4 rounded bg-amber-50 text-amber-900 text-sm mb-4">Эхлээд <b>Google Chrome</b>-оор нээнэ үү. Play Store шаардлаггүй.</div><button type="button" onclick="openInChrome()" class="w-full py-3 mb-4 bg-primary text-primary-foreground rounded font-semibold">Chrome-оор нээх</button>`;
-    }
-    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Chrome</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>${pwaInstallPrompt ? "Доорх <b>App суулгах</b> дарна" : "Дээд <b>⋮</b> цэс → <b>App суулгах</b> эсвэл <b>Нүүр дэлгэцэнд нэмэх</b>"}</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Нүүр дэлгэц дээр <b>ТОМУДА</b> icon гарна</span></li></ol>`;
-  } else if (ios) {
-    title = "iPhone дээр суулгах";
-    if (inApp) {
-      steps = `<div class="p-4 rounded bg-amber-50 text-amber-900 text-sm mb-4">Link-ийг <b>Safari</b>-аар нээнэ үү.</div>`;
-    }
-    steps += `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Safari</b> browser-ээр link нээнэ</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Доод <b>Хуваалцах □↑</b> → <b>Нүүр дэлгэцэнд нэмэх</b></span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span><b>Нэмэх</b> дарна</span></li></ol>`;
-  } else {
-    steps += `<p class="text-sm text-muted-foreground">Android: Chrome. iPhone: Safari ашиглана уу.</p>`;
-  }
-  const installBtn =
-    android && pwaInstallPrompt
-      ? `<button type="button" onclick="installPwaApp()" class="w-full py-3 mt-4 bg-primary text-primary-foreground rounded font-semibold text-base">App суулгах</button>`
-      : "";
-  box(
-    title,
-    `<div class="p-5 overflow-y-auto max-h-[70vh]"><p class="text-sm text-muted-foreground mb-4">Play Store, App Store шаардлаггүй.</p>${steps}${installBtn}</div>`,
-    "max-w-md",
-  );
-}
-function showPwaInstallBanner() {
-  if (isStandalonePwa() || document.getElementById("pwa-install")) return;
-  if (isInAppBrowser()) {
-    openPwaInstallModal();
-    return;
-  }
-  const android = isAndroidDevice();
-  const hint = android
-    ? pwaInstallPrompt
-      ? "Google Chrome → <strong>App суулгах</strong> дарна"
-      : "Chrome <strong>⋮</strong> → <strong>App суулгах</strong>"
-    : "Safari → <strong>Хуваалцах □↑</strong> → <strong>Нүүр дэлгэцэнд нэмэх</strong>";
-  const title = android ? "🤖 Android App суулгах" : "📱 iPhone дээр суулгах";
-  const quick =
-    android && pwaInstallPrompt
-      ? `<button type="button" onclick="installPwaApp()" class="pwa-install-btn">App суулгах</button>`
-      : `<button type="button" onclick="openPwaInstallModal()" class="pwa-install-btn">Заавар</button>`;
+function showUnifiedInstallBanner() {
+  if (isNativeApp() || document.getElementById("pwa-install")) return;
   const el = document.createElement("div");
   el.id = "pwa-install";
   el.className = "pwa-install-banner";
-  el.innerHTML = `<div class="pwa-install-inner"><div><p class="pwa-install-title">${title}</p><p class="pwa-install-text">${hint}</p></div><div class="pwa-install-actions">${quick}<button type="button" onclick="dismissPwaInstall()" class="pwa-install-dismiss">Хаах</button></div></div>`;
+  el.innerHTML = `<div class="pwa-install-inner"><div><p class="pwa-install-title">${pwaInstallLabel()}</p><p class="pwa-install-text">Дармагц суулгагдана — нүүр дэлгэц дээр <strong>байнгын app</strong></p></div><div class="pwa-install-actions"><button type="button" onclick="installAppOnPhone()" class="pwa-install-btn">Суулгах</button><button type="button" onclick="dismissPwaInstall()" class="pwa-install-dismiss">Хаах</button></div></div>`;
   document.body.appendChild(el);
 }
+function openPwaInstallModal() {
+  installAppOnPhone();
+}
+function showPwaInstallBanner() {
+  showUnifiedInstallBanner();
+}
 function installPwaApp() {
-  if (!pwaInstallPrompt) return openPwaInstallModal();
-  pwaInstallPrompt.prompt();
-  pwaInstallPrompt.userChoice.finally(() => {
-    pwaInstallPrompt = null;
-    dismissPwaInstall(false);
-    closeModal();
-  });
+  installAppOnPhone();
 }
 function dismissPwaInstall(remember = true) {
   document.getElementById("pwa-install")?.remove();
-  if (remember) localStorage.setItem("pwa-install-dismissed", String(Date.now()));
+  if (remember)
+    localStorage.setItem("pwa-install-dismissed", String(Date.now()));
 }
 function scheduleBackendSave() {
   if (!backendReady) return;
@@ -342,6 +691,7 @@ async function saveBackendState() {
 }
 
 function go(view) {
+  if (!canAccessView(view)) return;
   state.currentView = view;
   state.mobileOpen = false;
   render();
@@ -356,47 +706,29 @@ function search(key, value) {
   }
 }
 function shell(content) {
-  const userRole = state.currentEmployee?.role;
+  const userRole = currentRole();
   const nav = [
     ["worker", "Захиалга үүсгэх"],
     ["customers", "Харилцагч"],
     ["products", "Бараа"],
     ["warehouse", "Агуулах"],
-    ["count", "Тооллог"],
+    ["count", "Тооллогo"],
     ["admin", "Админ"],
-  ].filter(([id]) => {
-    if (userRole === "warehouse")
-      return ["warehouse", "warehouseReceipts"].includes(id);
-    if (userRole === "sales") return id !== "admin" && id !== "promotions";
-    if (userRole === "admin") return true;
-    return ["worker", "customers", "products"].includes(id);
-  });
-  return `<div class="min-h-screen bg-background flex"><button onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed top-4 left-4 z-50 bg-sidebar text-sidebar-foreground rounded" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<aside class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="p-6 border-b border-sidebar-border"><div class="flex items-center gap-3"><div class="tomuda-logo">T</div><div><h1 class="text-lg font-bold text-sidebar-primary">ТОМУДА</h1><p class="text-sm text-sidebar-foreground/70 mt-1">Борлуулалт, агуулах</p></div></div></div><nav class="flex-1 p-4 space-y-1">${nav.map(([id, label]) => `<button onclick="go('${id}')" class="w-full px-4 py-3 rounded text-left ${state.currentView === id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}${pwaInstallSidebarBtn()}</nav><div class="p-4 border-t border-sidebar-border"><div class="flex items-center gap-3 px-4 py-3 rounded bg-sidebar-accent"><div class="flex-1 min-w-0"><p class="font-medium truncate">${state.currentEmployee?.name || "Нэвтрээгүй"}</p><p class="text-xs text-sidebar-foreground/70">${state.currentEmployee ? role(state.currentEmployee.role) : "Ажилчин хэсгээс нэвтэрнэ"}</p></div>${state.currentEmployee ? `<button onclick="logout()" class="px-3 py-2 hover:bg-sidebar-border rounded text-sm">Гарах</button>` : ""}</div></div></aside><main class="flex-1 p-4 lg:p-8 overflow-auto"><div class="max-w-7xl mx-auto pt-12 lg:pt-0">${["employees", "inventory", "reports"].includes(state.currentView) ? `<button onclick="go('admin')" class="mb-4 px-4 py-2 bg-card rounded text-sm">Админ руу буцах</button>` : ""}${content}</div></main></div>`;
+  ].filter(([id]) => allowedNavIds(userRole).includes(id));
+  return `<div class="min-h-screen bg-background flex"><button onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<aside class="mobile-sidebar fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1></div></div></div><nav class="flex-1 p-4 space-y-1 overflow-y-auto">${nav.map(([id, label]) => `<button onclick="go('${id}')" class="w-full px-4 py-3 rounded text-left ${state.currentView === id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}${pwaInstallSidebarBtn()}</nav><div class="p-4 border-t border-sidebar-border"><div class="flex items-center gap-3 px-4 py-3 rounded bg-sidebar-accent"><div class="flex-1 min-w-0"><p class="font-medium truncate">${state.currentEmployee?.name || "Нэвтрээгүй"}</p><p class="text-xs text-sidebar-foreground/70 truncate">${state.currentEmployee ? role(state.currentEmployee.role) : ""}</p></div>${state.currentEmployee ? `<button onclick="logout()" class="px-3 py-2 hover:bg-sidebar-border rounded text-sm shrink-0">Гарах</button>` : ""}</div></div></aside><main class="flex-1 p-4 lg:p-8 overflow-auto"><div class="max-w-7xl mx-auto pt-12 lg:pt-0">${["employees", "inventory", "reports", "promotions"].includes(state.currentView) ? `<button onclick="go('admin')" class="mb-2 px-3 py-1.5 bg-card rounded text-sm">← Админ</button>` : ""}${content}</div></main></div>`;
 }
 function adminView() {
   const pending = state.orders.filter((o) => o.status === "pending").length,
     low = state.products.filter((p) => p.stock <= p.minStock).length,
     sales = state.employees.length;
   const actions = [
-    [
-      "products",
-      "Бараа удирдах",
-      "Бараа нэмэх, төрөл удирдах, үнэ үлдэгдэл засах",
-    ],
-    [
-      "employees",
-      "Ажилтан удирдах",
-      "Ажилтан нэмэх, устгах, нууц үг тохируулах",
-    ],
-    ["inventory", "Агуулах", "Орлого авах, зарлага гаргах, үлдэгдэл хянах"],
-    ["reports", "Тайлан", "Өдөр, сар, дэлгүүр, ажилтнаар борлуулалт харах"],
-    [
-      "promotions",
-      "Урамшуулал",
-      "Тоо ширхгийн болон үнийн хөнгөлөлтийн дүрэм тохируулах",
-    ],
+    ["products", "Бараа"],
+    ["employees", "Ажилтан"],
+    ["inventory", "Агуулах"],
+    ["reports", "Тайлан"],
+    ["promotions", "Урамшуулал"],
   ];
-  return `<div class="space-y-5"><div><h2 class="text-lg font-bold">Админ</h2><p class="text-sm text-muted-foreground mt-1">Бараа, ажилтан, агуулах, тайланг нэг дороос удирдана</p></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-3">${card("Хүлээгдэж буй", pending)}${card("Захиалгад оруулах бараа", low)}${card("Харилцагч", state.customers.length)}${card("Ажилтны тоо", sales)}</div><div class="grid grid-cols-1 md:grid-cols-2 gap-3">${actions.map((a) => `<button onclick="go('${a[0]}')" class="bg-card rounded p-5 text-left hover:bg-secondary/40"><p class="font-semibold">${a[1]}</p><p class="text-sm text-muted-foreground mt-1">${a[2]}</p></button>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Админ")}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Хүлээгдэж", pending)}${card("Дутуу үлд", low)}${card("Харилцагч", state.customers.length)}${card("Ажилтан", sales)}</div><div class="grid grid-cols-2 md:grid-cols-3 gap-2">${actions.map((a) => `<button onclick="go('${a[0]}')" class="admin-action bg-card rounded p-4 text-left font-semibold hover:bg-secondary/40">${a[1]}</button>`).join("")}</div></div>`;
 }
 function ordersView() {
   return `<div class="space-y-5">${orderReceiptsPanel({ title: "Захиалга", searchKey: "orders", showCreate: true })}</div>`;
@@ -417,7 +749,7 @@ function orderReceiptsPanel({
     );
   if (compact)
     return warehouseReceiptsPanel(rows, { title, searchKey, employeeIds });
-  return `<section class="bg-card rounded overflow-hidden"><div class="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><h2 class="text-lg font-bold">${title}</h2><p class="text-sm text-muted-foreground mt-1">${employeeIds.length ? "Сонгосон ажилтны захиалгууд" : "Бүх захиалгын баримт"}</p></div>${showCreate ? `<button onclick="orderModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Шинэ захиалга</button>` : ""}</div><div class="p-4 flex flex-col sm:flex-row gap-3"><input data-focus="${searchKey}" value="${esc(q)}" oninput="search('${searchKey}',this.value)" placeholder="Харилцагч хайх" class="flex-1 px-4 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold">Захиалга</th><th class="px-4 py-3 text-left text-xs font-semibold">Ажилтан</th><th class="px-4 py-3 text-left text-xs font-semibold">Бараа</th><th class="px-4 py-3 text-left text-xs font-semibold">Төлөв</th><th class="px-4 py-3 text-right text-xs font-semibold">Дүн</th><th class="px-4 py-3 text-right text-xs font-semibold">Үйлдэл</th></tr></thead><tbody class="divide-y divide-border">${rows.map(orderRow).join("")}</tbody></table></div>${rows.length ? "" : `<div class="p-12 text-center text-muted-foreground">Захиалга олдсонгүй</div>`}</section>`;
+  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2>${showCreate ? `<button onclick="orderModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Шинэ</button>` : ""}</div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(q)}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold">Захиалга</th><th class="px-4 py-3 text-left text-xs font-semibold">Ажилтан</th><th class="px-4 py-3 text-left text-xs font-semibold">Бараа</th><th class="px-4 py-3 text-left text-xs font-semibold">Төлөв</th><th class="px-4 py-3 text-right text-xs font-semibold">Дүн</th><th class="px-4 py-3 text-right text-xs font-semibold">Үйлдэл</th></tr></thead><tbody class="divide-y divide-border">${rows.map(orderRow).join("")}</tbody></table></div>${rows.length ? "" : `<div class="p-12 text-center text-muted-foreground">Захиалга олдсонгүй</div>`}</section>`;
 }
 function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   if (rows.length && !rows.some((o) => o.id === state.selectedWarehouseOrderId))
@@ -425,13 +757,28 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   if (!rows.length) state.selectedWarehouseOrderId = "";
   const selected = rows.find((o) => o.id === state.selectedWarehouseOrderId),
     total = rows.reduce((s, o) => s + o.total, 0);
-  return `<section class="bg-card rounded overflow-hidden"><div class="p-4 border-b border-border"><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><h2 class="text-lg font-bold">${title}</h2><p class="text-sm text-muted-foreground mt-1">${employeeIds.length ? "Сонгосон ажилтны захиалгууд" : "Бүх захиалгын баримт"}</p></div><div class="flex items-start gap-3 sm:text-right"><div><p class="text-sm text-muted-foreground">Нийт захиалгын үнэ</p><p class="text-2xl font-bold text-primary">${fmt(total)}</p></div><button onclick="go('warehouse')" class="px-3 py-1.5 bg-secondary rounded text-sm">Агуулах руу буцах</button></div></div></div><div class="p-4 flex flex-col sm:flex-row gap-3"><input data-focus="${searchKey}" value="${esc(state.searches[searchKey] || "")}" oninput="search('${searchKey}',this.value)" placeholder="Дэлгүүр хайх" class="flex-1 px-4 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] border-t border-border"><div class="border-b lg:border-b-0 lg:border-r border-border max-h-[520px] overflow-y-auto">${rows.length ? rows.map((o) => `<button onclick="selectWarehouseOrder('${o.id}')" class="w-full text-left px-4 py-3 border-b border-border hover:bg-secondary/40 ${state.selectedWarehouseOrderId === o.id ? "bg-primary/10" : ""}"><p class="font-semibold truncate">${o.customerName}</p></button>`).join("") : `<div class="p-6 text-sm text-muted-foreground text-center">Захиалга олдсонгүй</div>`}</div>${selected ? warehouseOrderDetail(selected) : `<div class="p-8 text-sm text-muted-foreground text-center">Дэлгүүр сонгоно уу</div>`}</div></section>`;
+  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2><div class="flex items-center gap-2 shrink-0"><b class="text-primary">${fmt(total)}</b><button onclick="go('warehouse')" class="px-2 py-1.5 bg-secondary rounded text-sm">←</button></div></div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(state.searches[searchKey] || "")}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] border-t border-border"><div class="border-b lg:border-b-0 lg:border-r border-border max-h-[520px] overflow-y-auto">${rows.length ? rows.map((o) => `<button onclick="selectWarehouseOrder('${o.id}')" class="w-full text-left px-4 py-3 border-b border-border hover:bg-secondary/40 ${state.selectedWarehouseOrderId === o.id ? "bg-primary/10" : ""}"><p class="font-semibold truncate">${o.customerName}</p></button>`).join("") : `<div class="p-6 text-sm text-muted-foreground text-center">Захиалга олдсонгүй</div>`}</div>${selected ? warehouseOrderDetail(selected) : `<div class="p-8 text-sm text-muted-foreground text-center">Дэлгүүр сонгоно уу</div>`}</div></section>`;
 }
 function warehouseOrderDetail(o) {
-  return `<div class="p-4 space-y-4"><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><p class="text-sm text-muted-foreground">Захиалгын дүн</p><p class="text-2xl font-bold text-primary">${fmt(o.total)}</p></div><div class="flex flex-wrap gap-2"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span><button onclick="receiptDetail('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Хэвлэх</button></div></div><div><h3 class="font-semibold">${o.customerName}</h3><p class="text-sm text-muted-foreground">${o.employeeName || "-"} · ${dte(o.createdAt)}</p></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span class="text-right">Тоо</span><span class="text-right">Дүн</span></div>${o.items.map((i) => `<div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-3 border-t border-border text-sm"><span class="font-medium">${i.productName}</span><b class="text-right">${i.quantity}</b><span class="text-right">${fmt(i.total)}</span></div>`).join("")}</div></div>`;
+  return `<div class="p-4 space-y-4"><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><p class="text-sm text-muted-foreground">Захиалгын дүн</p><p class="text-2xl font-bold text-primary">${fmt(o.total)}</p></div><div class="flex flex-wrap gap-2"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Хэвлэх</button></div></div><div><h3 class="font-semibold">${o.customerName}</h3><p class="text-sm text-muted-foreground">${o.employeeName || "-"} · ${dte(o.createdAt)}</p></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span class="text-right">Тоо</span><span class="text-right">Дүн</span></div>${o.items.map((i) => `<div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-3 border-t border-border text-sm"><span class="font-medium">${i.productName}</span><b class="text-right">${i.quantity}</b><span class="text-right">${fmt(i.total)}</span></div>`).join("")}</div></div>`;
 }
 function orderRow(o) {
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><p class="font-medium">${o.customerName}</p><p class="text-xs text-muted-foreground">#${o.id} · ${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderDetail('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Харах</button>${o.status === "pending" ? `<button onclick="setOrder('${o.id}','confirmed')" class="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded text-sm">Батлах</button><button onclick="setOrder('${o.id}','cancelled')" class="px-3 py-1.5 bg-red-100 text-red-700 rounded text-sm">Цуцлах</button>` : ""}${o.status === "confirmed" ? `<button onclick="setOrder('${o.id}','delivered')" class="px-3 py-1.5 bg-blue-100 text-blue-700 rounded text-sm">Хүргэсэн</button>` : ""}</div></td></tr>`;
+  const pendingActions =
+    o.status === "pending"
+      ? `<button onclick="setOrder('${o.id}','confirmed')" class="px-3 py-1.5 tone tone--success rounded text-sm">Батлах</button>${canDelete() ? `<button onclick="setOrder('${o.id}','cancelled')" class="px-3 py-1.5 tone tone--danger rounded text-sm">Цуцлах</button>` : ""}`
+      : "";
+  const deliveredAction =
+    o.status === "confirmed"
+      ? `<button onclick="setOrder('${o.id}','delivered')" class="px-3 py-1.5 tone tone--info rounded text-sm">Хүргэсэн</button>`
+      : "";
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><p class="font-medium">${o.customerName}</p><p class="text-xs text-muted-foreground">#${o.id} · ${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${pendingActions}${deliveredAction}</div></td></tr>`;
+}
+function customerListHead() {
+  return `<div class="customer-row customer-row--head" aria-hidden="true"><div class="customer-row__name"><span>Харилцагч</span></div><div class="customer-row__phone"><span>Дугаар</span></div><div class="customer-row__address"><span>Хаяг</span></div><div class="customer-row__actions"><span class="customer-row__actions-label">Үйлдэл</span></div></div>`;
+}
+function customerListRow(c, actionsHtml, active = false) {
+  const addr = customerAddress(c);
+  return `<div class="customer-row ${active ? "customer-row--active" : ""}"><div class="customer-row__name min-w-0"><p class="customer-row__title">${esc(c.name)}</p><p class="customer-row__company">${esc(c.companyName || "-")}</p></div><div class="customer-row__phone"><span class="customer-row__label">Дугаар</span><span class="customer-row__value">${esc(c.phone1 || "-")}</span></div><div class="customer-row__address min-w-0"><span class="customer-row__label">Хаяг</span><span class="customer-row__value customer-row__value--address" title="${esc(addr)}">${esc(addr)}</span></div><div class="customer-row__actions">${actionsHtml}</div></div>`;
 }
 function customersView() {
   const q = state.searches.customers || "",
@@ -440,7 +787,7 @@ function customersView() {
         (v || "").toLowerCase().includes(q.toLowerCase()),
       ),
     );
-  return `<div class="space-y-5"><div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h2 class="text-lg font-bold">Харилцагч бүртгэл</h2><p class="text-muted-foreground mt-1">Дэлгүүр, байгууллагын мэдээлэл</p></div><button onclick="customerModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded">Харилцагч нэмэх</button></div><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Нэр, компани, утасаар хайх..." class="w-full px-4 py-3 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="hidden lg:grid grid-cols-[1.1fr_140px_1.4fr_190px] gap-3 px-4 py-3 bg-secondary/50 text-xs font-semibold text-muted-foreground"><span>Харилцагч</span><span>Дугаар</span><span>Хаяг</span><span class="text-right">Үйлдэл</span></div><div class="divide-y divide-border/60">${rows.map(customerRow).join("")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Харилцагч", `<button type="button" onclick="customerModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Хайх..." class="list-panel__search app-input"></div><div class="list-panel__table">${customerListHead()}<div class="list-panel__body divide-y divide-border/60">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function customerAddress(c) {
   return (
@@ -449,13 +796,21 @@ function customerAddress(c) {
   );
 }
 function customerRow(c) {
-  const addr = customerAddress(c);
-  return `<div class="p-4 hover:bg-secondary/30"><div class="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_140px_1.4fr_190px] lg:items-center"><div><p class="font-semibold">${c.name}</p><p class="text-sm text-muted-foreground">${c.companyName}</p></div><p class="font-medium text-sm">${c.phone1 || "-"}</p><p class="font-medium text-sm truncate">${addr}</p><div class="flex gap-2 lg:justify-end"><button onclick="customerDetail('${c.id}')" class="px-3 py-2 bg-secondary rounded text-sm">Дэлгэрэнгүй</button><button onclick="customerModal('${c.id}')" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm">Засах</button></div></div></div>`;
+  const deleteBtn = canDelete()
+    ? `<button type="button" onclick="confirmDelete('customer','${c.id}')" class="list-btn list-btn--danger">Устгах</button>`
+    : "";
+  return customerListRow(
+    c,
+    `<button type="button" onclick="customerDetail('${c.id}')" class="list-btn list-btn--secondary">Харах</button><button type="button" onclick="customerModal('${c.id}')" class="list-btn list-btn--primary">Засах</button>${deleteBtn}`,
+  );
 }
 function workerStoreRow(c) {
-  const addr = customerAddress(c),
-    active = state.workerCustomer === c.id;
-  return `<div class="p-4 hover:bg-secondary/30 ${active ? "bg-primary/5" : ""}"><div class="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_140px_1.4fr_190px] lg:items-center"><div><p class="font-semibold">${c.name}</p><p class="text-sm text-muted-foreground">${c.companyName || "-"}</p></div><p class="font-medium text-sm">${c.phone1 || "-"}</p><p class="font-medium text-sm truncate">${addr}</p><div class="flex gap-2 lg:justify-end"><button type="button" onclick="customerDetail('${c.id}')" class="px-3 py-2 bg-secondary rounded text-sm">Дэлгэрэнгүй</button><button type="button" onclick="pickWorkerStore('${c.id}')" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm">Сонгох</button></div></div></div>`;
+  const active = state.workerCustomer === c.id;
+  return customerListRow(
+    c,
+    `<button type="button" onclick="customerDetail('${c.id}')" class="list-btn list-btn--secondary">Харах</button><button type="button" onclick="pickWorkerStore('${c.id}')" class="list-btn list-btn--primary">Сонгох</button>`,
+    active,
+  );
 }
 function productsView() {
   const q = state.searches.products || "",
@@ -467,15 +822,17 @@ function productsView() {
         (cat === "all" || p.category === cat),
     ),
     low = state.products.filter((p) => p.stock <= p.minStock).length;
-  return `<div class="space-y-5"><div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><h2 class="text-lg font-bold">Бараа</h2><p class="text-muted-foreground mt-1">Бараа хайх, бүртгэх, файл татах</p></div><button onclick="csv('products.csv',state.products.map(p=>[p.barcode,p.name,p.category,p.price,p.stock,p.unit]))" class="px-4 py-2 bg-secondary rounded">Файл татах</button></div><div class="grid grid-cols-1 sm:grid-cols-3 gap-3">${card("Нийт бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Анхаарах үлдэгдэл", low, low ? "text-amber-600" : "text-emerald-600")}</div><div class="bg-card rounded p-3 flex flex-col gap-3 xl:flex-row"><input data-focus="products" value="${esc(q)}" oninput="search('products',this.value)" placeholder="Нэр, баркодоор хайх..." class="flex-1 px-4 py-3 bg-secondary rounded"><select onchange="state.filters.category=this.value;render()" class="px-4 py-3 bg-secondary rounded"><option value="all">Бүх төрөл</option>${cats()
+  return `<div class="space-y-4">${pageHead("Бараа", `<button onclick="csv('products.csv',state.products.map(p=>[p.barcode,p.name,p.category,p.price,p.stock,p.unit]))" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Татах</button>`)}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Дутуу", low, low ? "text-tone-warning" : "text-tone-success")}</div><div class="bg-card rounded p-3 products-toolbar"><input data-focus="products" value="${esc(q)}" oninput="search('products',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded"><select onchange="state.filters.category=this.value;render()" class="px-3 py-2.5 bg-secondary rounded"><option value="all">Бүх төрөл</option>${cats()
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
-    )}</select><button onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div><div class="bg-card rounded overflow-hidden"><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr>${["Зураг", "Бараа", "Баркод", "Үнэ", "Хэмжих нэгж", "Үйлдэл"].map((h, i) => `<th class="px-6 py-4 ${i === 5 ? "text-right" : "text-left"} text-sm font-semibold">${h}</th>`).join("")}</tr></thead><tbody class="divide-y divide-border">${list.map(productRow).join("")}</tbody></table></div></div></div>`;
+    )}</select>${isAdmin() ? `<button onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button>` : ""}</div><div class="bg-card rounded overflow-hidden product-list">${list.length ? list.map(productCard).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
-function productRow(p) {
-  const img = `<img src="${productImage(p)}" class="w-12 h-12 rounded object-cover">`;
-  return `<tr class="hover:bg-secondary/30"><td class="px-6 py-4">${img}</td><td class="px-6 py-4"><p class="font-medium">${p.name}</p><p class="text-xs text-muted-foreground">${p.country}</p></td><td class="px-6 py-4 text-sm font-mono">${p.barcode}</td><td class="px-6 py-4 text-sm font-semibold">${fmt(p.price)}</td><td class="px-6 py-4 text-sm">${p.unit}</td><td class="px-6 py-4"><div class="flex justify-end gap-2"><button onclick="productModal('${p.id}')" class="px-3 py-2 bg-secondary rounded">Засах</button><button onclick="confirmDelete('product','${p.id}')" class="px-3 py-2 bg-red-100 text-red-700 rounded">Устгах</button></div></td></tr>`;
+function productCard(p) {
+  const adminActions = isAdmin()
+    ? `<div class="product-card__actions"><button onclick="productModal('${p.id}')" class="px-3 py-2 bg-secondary rounded text-sm">Засах</button><button onclick="confirmDelete('product','${p.id}')" class="px-3 py-2 tone tone--danger rounded text-sm">Устгах</button></div>`
+    : "";
+  return `<article class="product-card">${adminActions}<div class="product-card__body"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-card__img"><div class="product-card__meta"><p class="product-card__title">${p.name}</p><p class="product-card__sub product-card__sub--desktop">${p.category || "-"} · ${p.country || ""}</p><div class="product-card__row"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge">Үлд: ${p.stock ?? 0}</span></div><p class="product-card__sub product-card__sub--desktop font-mono">${p.barcode || "-"}</p></div></div></article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -487,31 +844,43 @@ function inventoryView() {
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
           p.barcode.includes(q)),
     );
-  return `<div class="space-y-5"><div class="flex justify-between gap-4"><div><h2 class="text-lg font-bold">Агуулах</h2><p class="text-sm text-muted-foreground mt-1">Орлого, зарлага, үлдэгдэл</p></div><button onclick="csv('inventory.csv',state.inventoryLogs.map(l=>[dte(l.date),l.productName,l.type,l.quantity,l.employeeName]))" class="px-4 py-2 bg-secondary rounded text-sm">Татах</button></div><div class="flex gap-2 p-1 bg-secondary rounded w-fit">${[
+  return `<div class="space-y-4">${pageHead("Агуулах", `<button onclick="csv('inventory.csv',state.inventoryLogs.map(l=>[dte(l.date),l.productName,l.type,l.quantity,l.employeeName]))" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Татах</button>`)}<div class="inventory-tabs grid grid-cols-3 gap-1 p-1 bg-secondary rounded">${[
     ["stock", "Үлдэгдэл"],
     ["in", "Орлого авах"],
     ["out", "Зарлага гаргах"],
   ]
     .map(
       (t) =>
-        `<button onclick="state.filters.inventory='${t[0]}';render()" class="px-4 py-2 rounded text-sm ${tab === t[0] ? "bg-card" : "text-muted-foreground"}">${t[1]}</button>`,
+        `<button type="button" onclick="state.filters.inventory='${t[0]}';render()" class="inventory-tab px-2 py-2.5 rounded text-sm font-medium ${tab === t[0] ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}">${t[1]}</button>`,
     )
     .join(
       "",
-    )}</div><div class="bg-card rounded p-3 space-y-3"><div class="flex gap-2 overflow-x-auto pb-1"><button onclick="setInventoryCategory('all')" class="px-3 py-2 rounded whitespace-nowrap text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
+    )}</div><div class="bg-card rounded p-3 space-y-3"><div class="inventory-categories flex flex-wrap gap-2"><button type="button" onclick="setInventoryCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
     .map(
       (c) =>
-        `<button onclick="setInventoryCategory('${esc(c)}')" class="px-3 py-2 rounded whitespace-nowrap text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${c}</button>`,
+        `<button type="button" onclick="setInventoryCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${c}</button>`,
     )
     .join(
       "",
-    )}</div><input data-focus="inventory" value="${esc(q)}" oninput="search('inventory',this.value)" placeholder="Бараа хайх (нэр, баркод)..." class="w-full px-4 py-3 bg-secondary rounded"></div>${tab === "stock" ? stockGrid(list) : stockTable(list, tab)}</div>`;
+    )}</div><input data-focus="inventory" value="${esc(q)}" oninput="search('inventory',this.value)" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-secondary rounded app-input"></div>${tab === "stock" ? stockGrid(list) : stockActionList(list, tab)}</div>`;
+}
+function stockActionRow(p, tab) {
+  const isIn = tab === "in",
+    label = isIn ? "Орлого" : "Зарлага",
+    btnClass = isIn
+      ? "inventory-stock-row__btn inventory-stock-row__btn--in"
+      : "inventory-stock-row__btn inventory-stock-row__btn--out";
+  return `<div class="inventory-stock-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-thumb inventory-stock-row__thumb"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${p.name}</p><p class="inventory-stock-row__barcode">${p.barcode || "-"}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock} ${p.unit || "ш"}</b></span></div><div class="inventory-stock-row__controls"><label class="inventory-stock-row__qty-label"><span>Тоо</span><input id="qty-${p.id}" type="number" min="1" value="1" inputmode="numeric" class="inventory-stock-row__qty app-input"></label><button type="button" onclick="applyStock('${p.id}','${tab}')" class="${btnClass}">${label}</button></div></div>`;
+}
+function stockActionList(list, tab) {
+  const hint =
+    tab === "in"
+      ? "Агуулах руу нэмэх барааны тоог оруулаад «Орлого» дарна"
+      : "Гаргах барааны тоог оруулаад «Зарлага» дарна";
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">${hint}</div><div class="divide-y divide-border">${list.length ? list.map((p) => stockActionRow(p, tab)).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockGrid(list) {
   return `<div class="bg-card rounded overflow-hidden"><div class="hidden md:grid grid-cols-[1fr_140px_140px_120px] gap-3 px-4 py-3 bg-secondary/50 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span>Төрөл</span><span>Баркод</span><span class="text-right">Үлдэгдэл</span></div><div class="divide-y divide-border">${list.length ? list.map((p) => `<div class="p-4 grid grid-cols-1 md:grid-cols-[1fr_140px_140px_120px] gap-3 md:items-center"><div><p class="font-medium">${p.name}</p><p class="md:hidden text-xs text-muted-foreground mt-1">${p.category} · ${p.barcode}</p></div><span class="hidden md:block text-sm">${p.category}</span><span class="hidden md:block text-sm font-mono">${p.barcode}</span><b class="md:text-right">${p.stock} ${p.unit}</b></div>`).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
-}
-function stockTable(list, tab) {
-  return `<div class="bg-card rounded overflow-hidden"><div class="overflow-x-auto"><table class="w-full"><tbody class="divide-y divide-border">${list.map((p) => `<tr><td class="px-6 py-4 font-medium">${p.name}</td><td class="px-6 py-4 text-sm font-mono">${p.barcode}</td><td class="px-6 py-4 font-semibold">${p.stock} ${p.unit}</td><td class="px-6 py-4 text-right"><input id="qty-${p.id}" type="number" min="1" value="1" class="w-20 text-center px-3 py-2 bg-secondary rounded"><button onclick="applyStock('${p.id}','${tab}')" class="ml-2 px-4 py-2 rounded text-white ${tab === "in" ? "bg-emerald-500" : "bg-red-500"}">${tab === "in" ? "Орлого" : "Зарлага"}</button></td></tr>`).join("")}</tbody></table></div></div>`;
 }
 function countView() {
   const q = state.searches.count || "",
@@ -519,9 +888,11 @@ function countView() {
       (p) =>
         p.name.toLowerCase().includes(q.toLowerCase()) || p.barcode.includes(q),
     ),
-    counted = Object.keys(state.countQty).filter((id) => countValue(id) !== null).length,
+    counted = Object.keys(state.countQty).filter(
+      (id) => countValue(id) !== null,
+    ).length,
     mismatches = countMismatches();
-  return `<div class="space-y-5"><div><h2 class="text-lg font-bold">Тооллог</h2><p class="text-sm text-muted-foreground mt-1">Агуулахад байгаа бүртгэлтэй бараа</p></div><div class="grid grid-cols-1 sm:grid-cols-3 gap-3">${card("Тоолсон бараа", counted)}${card("Зөрүүтэй", mismatches.length, mismatches.length ? "text-red-600" : "text-emerald-600")}${card("Нийт бүртгэл", state.products.length)}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Бараа хайх..." class="w-full px-4 py-3 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="count-list divide-y divide-border">${list.map(countRow).join("")}</div></div><div class="grid sm:grid-cols-[1fr_auto] gap-2"><button onclick="finishCount()" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Тооллого дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="px-4 py-3 bg-card rounded font-medium">Шинэ тооллого</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
+  return `<div class="space-y-4">${pageHead("Тооллогo")}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Нийт", state.products.length)}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="count-list divide-y divide-border">${list.map(countRow).join("")}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="py-3 bg-card rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
   const value = countValue(p.id),
@@ -530,8 +901,8 @@ function countRow(p) {
     diffClass =
       diff === null || diff === 0
         ? "text-muted-foreground"
-        : "text-red-600 font-semibold";
-  return `<div class="count-row"><img src="${productImage(p)}" class="product-thumb" alt="${esc(p.name)}"><div><p class="font-medium">${p.name}</p><p class="text-xs text-muted-foreground">${p.category} · бүртгэл ${p.stock} ${p.unit}</p></div><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="Тоолсон" type="number" class="px-3 py-2 bg-secondary rounded text-center"><span class="text-sm ${diffClass}">Зөрүү ${diffText}</span></div>`;
+        : "text-tone-danger font-semibold";
+  return `<div class="count-row"><img src="${productImage(p)}" class="product-thumb" alt="${esc(p.name)}"><div class="min-w-0"><p class="font-medium text-sm">${p.name}</p><p class="text-xs text-muted-foreground count-row__meta">Бүрт ${p.stock} ${p.unit}</p></div><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="0" type="number" class="px-2 py-2 bg-secondary rounded text-center w-16"><span class="text-sm ${diffClass} count-row__diff">${diffText}</span></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -556,7 +927,7 @@ function countMismatches() {
     .filter((row) => row && row.diff !== 0);
 }
 function countResult(mismatches) {
-  return `<div class="bg-card rounded overflow-hidden"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p></div>${mismatches.length ? `<div class="divide-y divide-border">${mismatches.map(({ product, counted, diff }) => `<div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-[1fr_90px_90px_90px] gap-2 text-sm"><span class="font-medium">${product.name}</span><span>Бүртгэл: <b>${product.stock}</b></span><span>Тоолсон: <b>${counted}</b></span><span class="${diff === 0 ? "text-muted-foreground" : "text-red-600 font-semibold"}">Зөрүү: ${diff > 0 ? `+${diff}` : diff}</span></div>`).join("")}</div>` : `<div class="p-4 text-sm text-emerald-600 font-medium">Зөрүүтэй бараа байхгүй</div>`}</div>`;
+  return `<div class="bg-card rounded overflow-hidden"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p></div>${mismatches.length ? `<div class="divide-y divide-border">${mismatches.map(({ product, counted, diff }) => `<div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-[1fr_90px_90px_90px] gap-2 text-sm"><span class="font-medium">${product.name}</span><span>Бүртгэл: <b>${product.stock}</b></span><span>Тоолсон: <b>${counted}</b></span><span class="${diff === 0 ? "text-muted-foreground" : "text-tone-danger font-semibold"}">Зөрүү: ${diff > 0 ? `+${diff}` : diff}</span></div>`).join("")}</div>` : `<div class="p-4 text-sm text-tone-success font-medium">Зөрүүтэй бараа байхгүй</div>`}</div>`;
 }
 function finishCount() {
   if (!Object.keys(state.countQty).some((id) => countValue(id) !== null)) {
@@ -589,21 +960,26 @@ function reportsView() {
         commission: (sum * e.commissionRate) / 100,
       };
     });
-  return `<div class="space-y-5"><div class="flex justify-between"><div><h2 class="text-lg font-bold">Тайлан</h2><p class="text-sm text-muted-foreground mt-1">Борлуулалт, төлбөр, урамшуулал</p></div><button onclick="csv('report.csv',[[${total},${paid}]])" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Тайлан татах</button></div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">${card("Нийт борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-emerald-600")}${card("Төлөөгүй", fmt(total - paid), "text-red-600")}${card("Барааны үлдэгдэл", fmt(stock))}</div><div class="bg-card rounded overflow-hidden"><div class="px-4 py-3 bg-secondary/50"><h3 class="text-sm font-semibold">Төлбөрийн хяналт</h3></div>${state.orders.length ? state.orders.map(paymentRow).join("") : `<div class="p-6 text-sm text-muted-foreground">Захиалга байхгүй</div>`}</div><div class="bg-card rounded overflow-hidden"><div class="px-4 py-3 bg-secondary/50"><h3 class="text-sm font-semibold">Ажилтны борлуулалт</h3></div>${sales.map((e, i) => `<div class="px-4 py-3 border-t"><div class="flex justify-between"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div><p class="text-sm text-muted-foreground">${e.count} баримт · Урамшуулал ${fmt(e.commission)}</p></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Тайлан", `<button onclick="csv('report.csv',[[${total},${paid}]])" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">Татах</button>`)}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(total - paid), "text-tone-danger")}${card("Үлдэгдэл", fmt(stock))}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Төлбөр</div>${state.orders.length ? state.orders.map(paymentRow).join("") : `<div class="p-4 text-sm text-muted-foreground">Захиалга байхгүй</div>`}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Ажилтан</div>${sales.map((e, i) => `<div class="px-3 py-2 border-t flex justify-between gap-2"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
-  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><p class="font-medium">${o.customerName}</p><p class="text-xs text-muted-foreground">#${o.id} · ${o.employeeName || "-"} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${o.isPaid ? "text-emerald-600" : "text-red-600"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${o.isPaid ? "bg-emerald-100 text-emerald-700" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!o.isPaid ? "bg-red-100 text-red-700" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
+  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><p class="font-medium">${o.customerName}</p><p class="text-xs text-muted-foreground">#${o.id} · ${o.employeeName || "-"} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${o.isPaid ? "tone tone--success" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!o.isPaid ? "tone tone--danger" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
 }
 function promotionsView() {
   const tab = state.filters.promotionTab,
     qty = state.promotionRules.quantity || [],
     price = state.promotionRules.price || [];
-  return `<div class="space-y-5"><div class="flex justify-between gap-3"><div><h2 class="text-lg font-bold">Урамшуулал</h2><p class="text-sm text-muted-foreground mt-1">Тоо ширхэг болон үнийн хөнгөлөлт</p></div><button onclick="go('admin')" class="px-4 py-2 bg-card rounded text-sm">Админ руу буцах</button></div><div class="grid grid-cols-2 gap-2 bg-card rounded p-2"><button onclick="state.filters.promotionTab='quantity';render()" class="py-3 rounded font-medium ${tab === "quantity" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Тоо ширхгийн урамшуулал</button><button onclick="state.filters.promotionTab='price';render()" class="py-3 rounded font-medium ${tab === "price" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Үнийн дүнгийн урамшуулал</button></div>${tab === "quantity" ? promotionQuantityPanel(qty) : promotionPricePanel(price)}</div>`;
+  return `<div class="space-y-4">${pageHead("Урамшуулал", `<button onclick="go('admin')" class="px-3 py-2 bg-card rounded text-sm shrink-0">←</button>`)}<div class="grid grid-cols-2 gap-2 bg-card rounded p-2"><button onclick="state.filters.promotionTab='quantity';render()" class="py-2.5 rounded font-medium text-sm ${tab === "quantity" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Тоо ширхэг</button><button onclick="state.filters.promotionTab='price';render()" class="py-2.5 rounded font-medium text-sm ${tab === "price" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Үнийн хөнгөлөлт</button></div>${tab === "quantity" ? promotionQuantityPanel(qty) : promotionPricePanel(price)}</div>`;
 }
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
 }
-function promotionProductPickerBlock(fieldName, title, selectedId = "", opts = null) {
+function promotionProductPickerBlock(
+  fieldName,
+  title,
+  selectedId = "",
+  opts = null,
+) {
   const variant = opts?.variant || "",
     excludeId = opts?.excludeId || "",
     placeholder = opts?.placeholder || "Нэр, баркод бичээд хайна уу...",
@@ -620,8 +996,7 @@ function promotionProductPickerBlock(fieldName, title, selectedId = "", opts = n
               p.category.toLowerCase().includes(q)),
         )
       : [],
-    duplicate =
-      selectedId && excludeId && selectedId === excludeId,
+    duplicate = selectedId && excludeId && selectedId === excludeId,
     listHtml = q
       ? products.length
         ? `<div class="promo-product-list">${products.map((p) => promotionProductPickRow(p, fieldName, selectedId)).join("")}</div>`
@@ -630,7 +1005,12 @@ function promotionProductPickerBlock(fieldName, title, selectedId = "", opts = n
         ? `<div class="promo-product-list">${promotionProductPickRow(selected, fieldName, selectedId)}</div>`
         : "",
     qtyHtml = opts?.qty
-      ? promotionQtyField(opts.qty.name, opts.qty.label, opts.qty.defaultValue, true)
+      ? promotionQtyField(
+          opts.qty.name,
+          opts.qty.label,
+          opts.qty.defaultValue,
+          true,
+        )
       : "",
     searchInput = `<input data-promo-search="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
     inputRow = opts?.qty
@@ -653,7 +1033,9 @@ function promotionQtyField(name, label, defaultValue, inline = false) {
     defaultValue !== undefined && defaultValue !== ""
       ? ` value="${defaultValue}"`
       : "";
-  const cls = inline ? "promo-qty-field promo-qty-field--inline" : "promo-qty-field";
+  const cls = inline
+    ? "promo-qty-field promo-qty-field--inline"
+    : "promo-qty-field";
   const wrap = inline ? "" : `<div class="promo-qty-inline">`;
   const wrapEnd = inline ? "" : `</div>`;
   return `${wrap}<label class="${cls}"><span class="block text-xs text-muted-foreground mb-1">${label}</span><input name="${name}" type="number" min="1" required${val} placeholder="1" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
@@ -703,10 +1085,10 @@ function promotionQuantityPanel(rows) {
 function promotionQtyRuleCard(r, i) {
   const buy = state.products.find((p) => p.id === r.buyProductId) || {},
     free = state.products.find((p) => p.id === r.freeProductId) || {};
-  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><img src="${productImage(buy)}" class="product-thumb"><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${buy.name || "-"}</p><p class="text-muted-foreground">${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><img src="${productImage(free)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${free.name || "-"}</p><p class="text-emerald-600">${r.freeQty || 1} ш үнэгүй</p></div></div><button onclick="removePromotionRule('quantity',${i})" class="px-3 py-2 bg-red-100 text-red-700 rounded text-sm shrink-0">Устгах</button></div>`;
+  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><img src="${productImage(buy)}" class="product-thumb"><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${buy.name || "-"}</p><p class="text-muted-foreground">${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><img src="${productImage(free)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${free.name || "-"}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<button onclick="removePromotionRule('quantity',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
 }
 function promotionPricePanel(rows) {
-  return `<div class="space-y-3"><button onclick="promotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => `<div class="p-4 flex justify-between gap-3 text-sm"><div><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${r.category ? "Ангилал: " + r.category + " · " : "Бүх ангилал · "}${r.discountPercent}% хөнгөлөлт</p></div><button onclick="removePromotionRule('price',${i})" class="px-3 py-2 bg-red-100 text-red-700 rounded text-sm">Устгах</button></div>`).join("") : `<div class="p-6 text-sm text-muted-foreground">Үнийн дүнгийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><button onclick="promotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => `<div class="p-4 flex justify-between gap-3 text-sm"><div><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${r.category ? "Ангилал: " + r.category + " · " : "Бүх ангилал · "}${r.discountPercent}% хөнгөлөлт</p></div>${canDelete() ? `<button onclick="removePromotionRule('price',${i})" class="px-3 py-2 tone tone--danger rounded text-sm">Устгах</button>` : ""}</div>`).join("") : `<div class="p-6 text-sm text-muted-foreground">Үнийн дүнгийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function openPromotionQtyModal() {
   state.promoPick = { buyProductId: "", freeProductId: "" };
@@ -727,7 +1109,11 @@ function promotionQtyModal() {
 function promotionPriceModal() {
   box(
     "Үнийн дүнгийн урамшуулал",
-    `<form onsubmit="savePromotionPrice(event)" class="p-5 space-y-3"><select name="category" class="w-full px-3 py-3 bg-secondary rounded"><option value="">Бүх ангилал</option>${cats().map((c) => `<option>${esc(c)}</option>`).join("")}</select><input name="discountPercent" type="number" min="1" max="100" required placeholder="Хөнгөлөлт %" class="w-full px-3 py-3 bg-secondary rounded"><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form onsubmit="savePromotionPrice(event)" class="p-5 space-y-3"><select name="category" class="w-full px-3 py-3 bg-secondary rounded"><option value="">Бүх ангилал</option>${cats()
+      .map((c) => `<option>${esc(c)}</option>`)
+      .join(
+        "",
+      )}</select><input name="discountPercent" type="number" min="1" max="100" required placeholder="Хөнгөлөлт %" class="w-full px-3 py-3 bg-secondary rounded"><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-md",
   );
 }
@@ -784,7 +1170,9 @@ function applyQuantityPromotions(lines) {
     const grant = sets * freeQty;
     const product = state.products.find((p) => p.id === freeId);
     if (!product) return;
-    const existing = result.find((l) => l.productId === freeId && l.isPromoFree);
+    const existing = result.find(
+      (l) => l.productId === freeId && l.isPromoFree,
+    );
     if (existing) {
       existing.quantity += grant;
       existing.total = 0;
@@ -829,26 +1217,59 @@ function savePromotionPrice(e) {
   render();
 }
 function removePromotionRule(type, index) {
+  if (!canDelete()) return;
   state.promotionRules[type].splice(index, 1);
   render();
 }
 function employeesView() {
-  return `<div class="space-y-5"><div class="flex justify-between"><div><h2 class="text-lg font-bold">Ажилтан</h2><p class="text-sm text-muted-foreground mt-1">Ажилтан нэмэх, устгах, нууц үг тохируулах</p></div><button onclick="employeeModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Ажилтан нэмэх</button></div><div class="bg-card rounded overflow-hidden"><table class="w-full"><tbody class="divide-y divide-border">${state.employees.map((e) => `<tr><td class="px-4 py-3 font-medium">${e.name}</td><td class="px-4 py-3 text-sm font-mono">${e.password}</td><td class="px-4 py-3 text-sm">${role(e.role)}</td><td class="px-4 py-3 text-right"><button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 bg-red-100 text-red-700 rounded text-sm">Устгах</button></td></tr>`).join("")}</tbody></table></div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div>${canDelete() ? `<button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">×</button>` : ""}</div>`).join("")}</div></div>`;
+}
+function getSavedLogin() {
+  try {
+    const raw = localStorage.getItem("tomuda-login");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+function saveLoginCredentials(email, password, remember) {
+  if (!remember) {
+    localStorage.removeItem("tomuda-login");
+    return;
+  }
+  localStorage.setItem(
+    "tomuda-login",
+    JSON.stringify({ email, password, remember: true }),
+  );
+}
+function toggleLoginPassword() {
+  const input = document.getElementById("loginPassword");
+  const btn = document.getElementById("loginPasswordToggle");
+  if (!input || !btn) return;
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  btn.textContent = show ? "Нуух" : "Харах";
+  btn.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харах");
 }
 function loginView() {
-  const installBtn = isStandalonePwa()
+  const saved = getSavedLogin();
+  const remember = !!saved?.remember;
+  const installBtn = isNativeApp()
     ? ""
-    : `<button type="button" onclick="openPwaInstallModal()" class="w-full mt-4 py-3 bg-primary/10 text-primary rounded font-medium text-sm">${pwaInstallLabel()}</button>`;
-  return `<div class="min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-sm"><div class="mb-5"><h1 class="text-lg font-bold">Ажилчин нэвтрэх</h1><p class="text-sm text-muted-foreground mt-1">Админаас өгсөн нууц үгээ оруулна уу</p></div><form onsubmit="login(event)" class="bg-card rounded p-5 space-y-4"><input id="password" autofocus type="password" placeholder="Нууц үг" class="w-full px-4 py-3 bg-secondary rounded"><div id="loginError"></div><button class="w-full h-12 rounded text-base font-semibold bg-primary text-primary-foreground">Нэвтрэх</button>${installBtn}</form><div class="mt-5 text-center text-sm text-muted-foreground bg-card rounded p-3"><p>Борлуулалт: <b class="font-mono text-foreground">hasan</b></p><p>Админ: <b class="font-mono text-foreground">admin</b></p></div></div></div>`;
+    : `<button type="button" onclick="installAppOnPhone()" class="w-full mt-4 py-3 bg-primary text-primary-foreground rounded font-semibold text-sm">${pwaInstallLabel()}</button>`;
+  return `<div class="min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-sm"><div class="login-brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="login-brand__logo"><h1 class="text-lg font-bold text-center">ТОМУДА</h1></div><form onsubmit="login(event)" class="bg-card rounded p-4 space-y-3 mt-4"><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="Email" value="${esc(saved?.email || "")}" class="w-full px-4 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Нууц үг" value="${esc(saved?.password || "")}" class="w-full px-4 py-3 bg-secondary rounded app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нууц үг санах</span></label><div id="loginError"></div><button class="w-full h-12 rounded text-base font-semibold bg-primary text-primary-foreground">Нэвтрэх</button>${installBtn}</form></div></div>`;
 }
 function workerOrdersList() {
-  let list = state.orders.filter((o) => o.customerId === state.workerCustomer);
-  if (!list.length) list = [...state.orders];
+  let list = [...state.orders];
+  if (state.currentEmployee?.role === "sales") {
+    list = list.filter((o) => o.employeeId === state.currentEmployee.id);
+  }
   const pay = state.filters.workerPay;
   if (pay === "paid") list = list.filter((o) => o.isPaid);
   if (pay === "unpaid") list = list.filter((o) => !o.isPaid);
   const day = state.filters.workerDate;
-  if (day) list = list.filter((o) => isoDay(o.createdAt) === day);
+  if (day) list = list.filter((o) => orderDay(o) === day);
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 function workerView() {
@@ -865,7 +1286,15 @@ function openWorkerNewTab() {
 }
 function openWorkerOrdersTab() {
   state.filters.worker = "orders";
-  if (!state.filters.workerDate) state.filters.workerDate = tomorrowIso();
+  render();
+  requestAnimationFrame(scrollWorkerOrdersToDate);
+}
+function clearWorkerOrderDate() {
+  state.filters.workerDate = "";
+  render();
+}
+function setWorkerOrderDate(day) {
+  state.filters.workerDate = day;
   render();
   requestAnimationFrame(scrollWorkerOrdersToDate);
 }
@@ -880,7 +1309,7 @@ function warehouseView() {
   const orders = state.selectedWorkers.length
     ? state.orders.filter((o) => state.selectedWorkers.includes(o.employeeId))
     : [];
-  return `<div class="space-y-4"><div><h2 class="text-lg font-bold">Агуулах</h2><p class="text-sm text-muted-foreground mt-1">Ажилтнаар шүүж захиалгын баримт, барааны нэгтгэл харна</p></div><div class="grid grid-cols-1 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.4fr)] gap-4 items-start">${workerChooser(orders)}${warehouseReceiptsButton()}</div></div>`;
+  return `<div class="space-y-3">${pageHead("Агуулах")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}${warehouseReceiptsButton()}</div></div>`;
 }
 function warehouseReceiptsView() {
   const employeeIds = state.selectedWorkers.length ? state.selectedWorkers : [];
@@ -889,7 +1318,7 @@ function warehouseReceiptsView() {
 function warehouseReceiptsButton() {
   const count = state.orders.length,
     total = state.orders.reduce((s, o) => s + o.total, 0);
-  return `<button onclick="go('warehouseReceipts')" class="bg-card rounded p-5 text-left hover:bg-secondary/40 w-full"><div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><p class="text-lg font-bold">Захиалгын баримтууд</p><p class="text-sm text-muted-foreground mt-1">Дэлгүүрийн захиалгуудыг харах</p></div><div class="text-left sm:text-right"><p class="text-sm text-muted-foreground">${count} захиалга</p><p class="font-semibold text-primary">${fmt(total)}</p></div></div></button>`;
+  return `<button onclick="go('warehouseReceipts')" class="bg-card rounded p-4 text-left hover:bg-secondary/40 w-full flex items-center justify-between gap-3"><div><p class="font-semibold">Баримтууд</p><p class="text-sm text-muted-foreground">${count} зах · ${fmt(total)}</p></div><span class="text-primary text-lg">→</span></button>`;
 }
 function workerChooser(orders) {
   const qty = orders
@@ -901,7 +1330,7 @@ function workerChooser(orders) {
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders);
-  return `<section class="bg-card rounded p-4 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3"><p class="font-semibold">Ажилтан сонгох</p><p class="text-sm text-muted-foreground mt-1">${names || "Сонгоогүй"}</p></button><div class="grid sm:grid-cols-2 gap-2 bg-secondary/50 rounded p-3"><label><span class="block text-xs text-muted-foreground mb-1">Түгээгчийн нэр</span><input value="${esc(state.deliveryName)}" oninput="state.deliveryName=this.value" placeholder="Нэр" class="w-full px-3 py-2 bg-card rounded text-sm"></label><label><span class="block text-xs text-muted-foreground mb-1">Түгээгчийн утас</span><input value="${esc(state.deliveryPhone)}" oninput="state.deliveryPhone=this.value" placeholder="Утас" class="w-full px-3 py-2 bg-card rounded text-sm"></label></div>${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-3"><div><p class="text-muted-foreground">Ажилтан</p><b>${state.selectedWorkers.length}</b></div><div><p class="text-muted-foreground">Ширхэг</p><b>${qty}</b></div><div><p class="text-muted-foreground">Дүн</p><b class="text-primary">${fmt(total)}</b></div></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[54px_1fr_62px_82px_76px_56px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Зураг</span><span>Нэр</span><span>Нэгж</span><span>Үнэ</span><span>Үлдэгдэл</span><span class="text-right">Тоо</span></div>${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground">Сонгосон ажилтанд захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Excel татах</button>` : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Ажилтан сонгоно уу</div>`}</section>`;
+  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Ажилтан</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button><div class="grid grid-cols-2 gap-2"><input value="${esc(state.deliveryName)}" oninput="state.deliveryName=this.value" placeholder="Түгээгч" class="w-full px-3 py-2 bg-secondary rounded text-sm"><input value="${esc(state.deliveryPhone)}" oninput="state.deliveryPhone=this.value" placeholder="Утас" inputmode="tel" class="w-full px-3 py-2 bg-secondary rounded text-sm"></div>${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Ажилтан сонгоно уу</div>`}</section>`;
 }
 function qtyDetail(orders) {
   const map = {};
@@ -918,29 +1347,35 @@ function qtyDetail(orders) {
     .sort((a, b) => b.qty - a.qty);
 }
 function detailRow(x) {
-  const p = x.product,
-    img = `<img src="${productImage(p)}" class="w-10 h-10 rounded object-cover">`;
-  return `<div class="grid grid-cols-[54px_1fr_62px_82px_76px_56px] gap-2 items-center px-3 py-2 border-t text-sm">${img}<div class="min-w-0"><p class="font-medium truncate">${p.name || "-"}</p><p class="text-xs text-muted-foreground truncate">${p.category || ""}</p></div><span>${p.unit || "-"}</span><span>${fmt(p.price)}</span><span>${p.stock ?? "-"}</span><b class="text-right">${x.qty}</b></div>`;
+  const p = x.product;
+  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImage(p)}" class="w-9 h-9 rounded object-cover shrink-0"><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${x.qty} ш</b></div>`;
 }
 function workerStoreSummary(c) {
-  if (!c) return `<p class="text-sm text-muted-foreground">Дэлгүүр сонгоогүй</p>`;
+  if (!c)
+    return `<p class="text-sm text-muted-foreground">Дэлгүүр сонгоогүй</p>`;
   const addr = [c.province, c.district, c.khoroo, c.address]
     .filter(Boolean)
     .join(", ");
-  const link = mapsLink(c.latitude, c.longitude);
-  return `<div class="rounded bg-primary/10 p-3 space-y-1 text-sm"><p class="font-semibold">${c.name}</p><p class="text-muted-foreground">${c.companyName || "-"}</p><p>${c.phone1 || "-"}</p><p class="text-xs">${addr || "-"}</p>${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary text-xs underline">Байршил харах</a>` : ""}</div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold">${c.name}</p><p>${c.phone1 || "-"}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${addr || ""}</p></div>`;
 }
 function filterWorkerStores() {
   const q = (state.searches.workerStore || "").toLowerCase();
   return state.customers.filter((c) =>
-    [c.name, c.companyName, c.phone1, c.phone2, c.address, c.province, c.district]
-      .some((v) => (v || "").toLowerCase().includes(q)),
+    [
+      c.name,
+      c.companyName,
+      c.phone1,
+      c.phone2,
+      c.address,
+      c.province,
+      c.district,
+    ].some((v) => (v || "").toLowerCase().includes(q)),
   );
 }
 function workerStorePickStep() {
   const q = state.searches.workerStore || "",
     rows = filterWorkerStores();
-  return `<div class="space-y-5 worker-store-step"><div><h2 class="text-lg font-bold">Дэлгүүр сонгох</h2><p class="text-muted-foreground mt-1">Захиалга авах дэлгүүрээ сонгоно уу</p></div><input data-focus="workerStore" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, компани, утасаар хайх..." class="w-full px-4 py-3 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="hidden lg:grid grid-cols-[1.1fr_140px_1.4fr_190px] gap-3 px-4 py-3 bg-secondary/50 text-xs font-semibold text-muted-foreground"><span>Харилцагч</span><span>Дугаар</span><span>Хаяг</span><span class="text-right">Үйлдэл</span></div><div class="worker-store-list divide-y divide-border/60">${rows.length ? rows.map(workerStoreRow).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Дэлгүүр олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-3">${pageHead("Дэлгүүр")}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="workerStore" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Хайх..." class="list-panel__search app-input"></div><div class="list-panel__table worker-store-list">${customerListHead()}<div class="list-panel__body divide-y divide-border/60">${rows.length ? rows.map(workerStoreRow).join("") : `<div class="list-panel__empty">Олдсонгүй</div>`}</div></div></div></div>`;
 }
 function pickWorkerStore(id) {
   state.workerCustomer = id;
@@ -963,11 +1398,11 @@ function workerNew(cart) {
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${line.productName}</p><p class="text-xs text-emerald-600 mt-1">Урамшуулал · үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${line.productName}</p><p class="text-xs text-tone-success mt-1">Урамшуулал · үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
-  return `<div><span class="block text-sm text-muted-foreground mb-2">Төлбөрийн нөхцөл</span><div class="grid grid-cols-2 gap-2"><button type="button" onclick="setPaymentTerm('cash')" class="py-3 rounded font-medium ${term === "cash" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Бэлэн</button><button type="button" onclick="setPaymentTerm('credit')" class="py-3 rounded font-medium ${term === "credit" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Зээлээр</button></div></div>`;
+  return `<div><div class="grid grid-cols-2 gap-2"><button type="button" onclick="setPaymentTerm('cash')" class="py-2.5 rounded font-medium text-sm ${term === "cash" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Бэлэн</button><button type="button" onclick="setPaymentTerm('credit')" class="py-2.5 rounded font-medium text-sm ${term === "credit" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Зээл</button></div></div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
@@ -982,37 +1417,41 @@ function workerNewOrderStep(cart) {
     listHtml =
       paidProducts.map(workerSelectedRow).join("") +
       (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "");
-  return `<section class="bg-card rounded overflow-hidden"><div class="p-4 border-b border-border flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div class="flex-1">${workerStoreSummary(customer)}</div><button type="button" onclick="clearWorkerStore()" class="px-3 py-2 bg-secondary rounded text-sm whitespace-nowrap">Дэлгүүр солих</button></div><div class="p-4 space-y-4"><div class="flex items-stretch gap-3"><div class="grid grid-cols-3 gap-2 flex-1 text-sm rounded bg-secondary/50 p-3"><div><p class="text-muted-foreground">Бараа</p><p class="font-semibold">${cart.skuCount}</p></div><div><p class="text-muted-foreground">Ширхэг</p><p class="font-semibold">${cart.pieceQty}</p></div><div><p class="text-muted-foreground">Дүн</p><p class="font-semibold text-primary">${fmt(cart.total)}</p></div></div><button type="button" onclick="pickerModal()" class="worker-add-plus" aria-label="Бараа нэмэх" title="Бараа нэмэх">+</button></div>${cart.promo.length ? `<p class="text-xs text-emerald-600">Урамшууллаар ${cart.promo.reduce((s, l) => s + l.quantity, 0)} ш үнэгүй нэмэгдлээ.</p>` : ""}<label><span class="block text-sm text-muted-foreground mb-1">Хүргэлтийн огноо</span><input type="date" value="${deliveryDay}" onchange="state.deliveryDate=this.value;render()" class="w-full px-3 py-3 bg-secondary rounded"></label><label><span class="block text-sm text-muted-foreground mb-1">Захиалга авах ажилтан</span><select onchange="state.orderEmployee=this.value" class="w-full px-3 py-3 bg-secondary rounded">${state.employees
-    .filter((e) => e.role === "sales")
-    .map(
-      (e) =>
-        `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${e.name}</option>`,
-    )
-    .join("")}</select></label></div><div class="px-4 py-3 bg-secondary/50 text-sm"><span class="font-medium">Сонгосон бараа</span></div><div class="divide-y divide-border">${listHtml || `<div class="p-8 text-center text-sm text-muted-foreground"><p class="font-medium text-foreground mb-1">Бараа сонгоогүй байна</p><p>+ товч дээр дарж бараа нэмнэ үү.</p></div>`}</div><div class="sticky bottom-0 bg-card p-4 border-t border-border space-y-3">${paymentTermPicker()}<button onclick="saveWorker()" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium ${cart.paid.length ? "" : "opacity-50"}">Захиалга хадгалах</button></div></section>`;
+  const employeeField =
+    state.currentEmployee?.role === "sales"
+      ? `<div class="rounded bg-secondary/50 p-2 text-sm font-semibold">${state.currentEmployee.name}</div>`
+      : `<select onchange="state.orderEmployee=this.value" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${state.employees
+          .filter((e) => e.role === "sales")
+          .map(
+            (e) =>
+              `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${e.name}</option>`,
+          )
+          .join("")}</select>`;
+  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-start justify-between gap-2"><div class="flex-1 min-w-0">${workerStoreSummary(customer)}</div><button type="button" onclick="clearWorkerStore()" class="px-2 py-1.5 bg-secondary rounded text-sm shrink-0">Солих</button></div><div class="p-3 space-y-3"><div class="flex items-stretch gap-2"><div class="grid grid-cols-3 gap-1 flex-1 text-sm rounded bg-secondary/50 p-2 text-center"><div><b>${cart.skuCount}</b><p class="text-xs text-muted-foreground">Бараа</p></div><div><b>${cart.pieceQty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(cart.total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><button type="button" onclick="openPickerModal()" class="worker-add-plus" aria-label="Бараа нэмэх">+</button></div><input type="date" value="${deliveryDay}" onchange="state.deliveryDate=this.value;render()" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${employeeField}</div><div class="divide-y divide-border">${listHtml || `<div class="p-6 text-center text-sm text-muted-foreground">+ дарж бараа нэмнэ</div>`}</div><div class="sticky bottom-0 bg-card p-3 border-t border-border space-y-2">${paymentTermPicker()}<button onclick="saveWorker()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium ${cart.paid.length ? "" : "opacity-50"}">Хадгалах</button></div></section>`;
 }
 function workerSelectedRow(p) {
-  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${p.name}</p><p class="text-xs text-muted-foreground mt-1">${p.category} · ${p.barcode} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="text-sm font-semibold text-primary mt-1">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button onclick="setWorkerQty('${p.id}',${p.qty - 1})">-</button><input onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number"><button onclick="setWorkerQty('${p.id}',${p.qty + 1})">+</button></div></div>`;
+  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0 flex-1"><p class="font-medium truncate">${p.name}</p><p class="worker-row-meta text-xs text-muted-foreground">${p.category} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button onclick="setWorkerQty('${p.id}',${p.qty - 1})">-</button><input onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number"><button onclick="setWorkerQty('${p.id}',${p.qty + 1})">+</button></div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + o.total, 0),
     paid = orders.filter((o) => o.isPaid).reduce((s, o) => s + o.total, 0),
     unpaid = total - paid,
-    day = state.filters.workerDate || tomorrowIso(),
-    pay = state.filters.workerPay;
-  return `<section class="bg-card rounded p-5 space-y-4"><div class="grid grid-cols-3 gap-2 text-sm">${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-emerald-600")}${card("Төлөөгүй", fmt(unpaid), "text-red-600")}</div><div class="flex flex-col sm:flex-row gap-2"><input type="date" value="${day}" onchange="state.filters.workerDate=this.value;render();requestAnimationFrame(scrollWorkerOrdersToDate)" class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2.5 bg-secondary rounded text-sm"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><p class="font-semibold">Өмнөх захиалгууд</p><div class="max-h-[55vh] overflow-y-auto space-y-2">${orders.length ? orders.map((o) => `<button data-order-day="${isoDay(o.createdAt)}" onclick="workerOrderDetail('${o.id}')" class="w-full text-left bg-secondary/50 rounded p-4"><div class="flex justify-between gap-2"><p class="font-medium">${o.customerName}</p><span class="text-xs font-medium ${o.isPaid ? "text-emerald-600" : "text-red-600"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span></div><p class="text-sm text-muted-foreground mt-1">${dte(o.createdAt)} · ${o.items.length} бараа · ${fmt(o.total)} · ${status(o.status)}</p></button>`).join("") : `<p class="text-sm text-muted-foreground">Захиалга байхгүй</p>`}</div></section>`;
+    day = state.filters.workerDate || "",
+    pay = state.filters.workerPay,
+    today = todayIso();
+  return `<section class="bg-card rounded p-3 space-y-3"><div class="grid grid-cols-3 gap-2">${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}</div><div class="flex flex-wrap gap-2"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="max-h-[55vh] overflow-y-auto space-y-2">${orders.length ? orders.map((o) => `<button data-order-day="${orderDay(o)}" onclick="workerOrderDetail('${o.id}')" class="w-full text-left bg-secondary/50 rounded p-3"><div class="flex justify-between gap-2"><p class="font-medium truncate">${o.customerName}</p><b class="text-sm shrink-0">${fmt(o.total)}</b></div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)} · ${o.items.length} бараа · ${orderDay(o) !== isoDay(o.createdAt) ? `Хүргэлт ${orderDay(o)} · ` : ""}<span class="${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span></p></button>`).join("") : `<p class="text-sm text-muted-foreground text-center py-4">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
-  const o = state.orders.find((x) => x.id === id);
-  box(
-    o.customerName,
-    `<div class="p-6 space-y-4"><div class="grid grid-cols-2 gap-2 text-sm bg-secondary/50 rounded p-3"><div><p class="text-muted-foreground">Огноо</p><b>${dte(o.createdAt)}</b></div><div><p class="text-muted-foreground">Төлбөр</p><b>${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</b></div><div><p class="text-muted-foreground">Төлөв</p><b>${status(o.status)}</b></div><div><p class="text-muted-foreground">Дүн</p><b class="text-primary">${fmt(o.total)}</b></div></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[1fr_70px_100px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span class="text-right">Тоо</span><span class="text-right">Дүн</span></div>${o.items.map((i) => `<div class="grid grid-cols-[1fr_70px_100px] gap-2 px-3 py-3 border-t border-border text-sm"><span class="font-medium">${i.productName}</span><b class="text-right">${i.quantity}</b><span class="text-right">${fmt(i.total)}</span></div>`).join("")}</div></div>`,
-    "max-w-2xl",
-  );
+  orderReceiptModal(id);
 }
 function render() {
   if (!state.isLoggedIn) {
     app.innerHTML = loginView();
     return;
+  }
+  const r = currentRole();
+  if (!canAccessView(state.currentView, r)) {
+    state.currentView = defaultViewForRole(r);
   }
   const map = {
     admin: adminView,
@@ -1039,20 +1478,67 @@ function box(title, body, max = "max-w-2xl") {
 }
 function closeModal() {
   stopBarcodeScan();
+  destroyCustomerMap();
   state.promoPick = null;
+  state.filters.workerCategory = "";
+  state.searches.workerProduct = "";
+  state.pickerStatus = "";
   modal.innerHTML = "";
+}
+function destroyCustomerMap() {
+  if (window.customerMapInitTimer) {
+    clearTimeout(window.customerMapInitTimer);
+    window.customerMapInitTimer = null;
+  }
+  if (window.customerMapResizeTimer) {
+    clearTimeout(window.customerMapResizeTimer);
+    window.customerMapResizeTimer = null;
+  }
+  cleanupCustomerMapInstance();
+  const el = document.getElementById("customerMap");
+  if (el) {
+    el.removeAttribute("data-leaflet-id");
+    el._leaflet_id = undefined;
+    el.innerHTML = "";
+  }
+}
+function cleanupCustomerMapInstance() {
+  if (window.customerMap?.remove) {
+    try {
+      window.customerMap.off();
+      window.customerMap.remove();
+    } catch (e) {}
+  }
+  window.customerMap = null;
+  window.customerMapMarker = null;
+  window.customerTileLayer = null;
+  window.customerTileFallback = false;
+}
+function scheduleCustomerMapResize() {
+  const fix = () => {
+    if (window.customerMap) window.customerMap.invalidateSize(true);
+  };
+  fix();
+  requestAnimationFrame(fix);
+  clearTimeout(window.customerMapResizeTimer);
+  window.customerMapResizeTimer = setTimeout(fix, 150);
+  setTimeout(fix, 350);
 }
 function field(name, label, value = "", type = "text") {
   return `<label><span class="block text-sm font-medium mb-2">${label}</span><input name="${name}" type="${type}" value="${esc(value)}" class="w-full px-4 py-3 bg-secondary rounded"></label>`;
 }
 function customerModal(id) {
+  destroyCustomerMap();
   const c = state.customers.find((x) => x.id === id) || {};
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
     `<form onsubmit="saveCustomer(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${field("registrationNumber", "Регистрийн дугаар", c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${field("province", "Аймаг/Хот", c.province)}${field("district", "Дүүрэг/Сум", c.district)}</div>${field("khoroo", "Хороо", c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="flex items-center justify-between gap-3 mb-2"><span class="block text-sm font-medium">Байршил</span><span id="customerMapStatus" class="text-xs text-muted-foreground">Map дээр дарж pin тавина</span></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div>${field("locationText", "Location тайлбар", c.locationText || "")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
-  setTimeout(() => initCustomerMap(c.latitude, c.longitude), 50);
+  window.customerMapInitTimer = setTimeout(() => {
+    window.customerMapInitTimer = null;
+    initCustomerMap(c.latitude, c.longitude);
+  }, 120);
 }
 function loadLeaflet(cb) {
   if (window.L) return cb();
@@ -1090,11 +1576,12 @@ function initCustomerMap(lat, lng) {
     loadLeaflet(() => initCustomerMap(lat, lng));
     return;
   }
-  if (window.customerMap?.remove) {
-    try {
-      window.customerMap.remove();
-    } catch (e) {}
-  }
+  cleanupCustomerMapInstance();
+  if (!document.getElementById("customerMap")) return;
+  const mapEl = document.getElementById("customerMap");
+  mapEl.removeAttribute("data-leaflet-id");
+  mapEl._leaflet_id = undefined;
+  mapEl.innerHTML = "";
   const has =
       lat !== undefined &&
       lng !== undefined &&
@@ -1103,33 +1590,47 @@ function initCustomerMap(lat, lng) {
       !Number.isNaN(Number(lat)) &&
       !Number.isNaN(Number(lng)),
     start = [has ? Number(lat) : 47.9189, has ? Number(lng) : 106.9176];
-  window.customerMap = L.map(el).setView(start, has ? 15 : 12);
+  window.customerMap = L.map(mapEl, {
+    tap: true,
+    zoomControl: true,
+  }).setView(start, has ? 15 : 12);
   window.customerTileFallback = false;
-  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap",
-  }).addTo(window.customerMap);
-  tiles.on("tileerror", () => {
-    if (window.customerTileFallback) return;
-    window.customerTileFallback = true;
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  window.customerTileLayer = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap &copy; CARTO",
-    }).addTo(window.customerMap);
+      attribution: "&copy; OpenStreetMap",
+    },
+  ).addTo(window.customerMap);
+  window.customerTileLayer.on("tileerror", () => {
+    if (window.customerTileFallback || !window.customerMap) return;
+    window.customerTileFallback = true;
+    if (window.customerTileLayer?.remove) window.customerTileLayer.remove();
+    window.customerTileLayer = L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap &copy; CARTO",
+      },
+    ).addTo(window.customerMap);
   });
-  let marker;
   const setPoint = (la, ln) => {
+    if (!window.customerMap) return;
     const fixedLat = Number(la).toFixed(6),
       fixedLng = Number(ln).toFixed(6);
-    latInput.value = fixedLat;
-    lngInput.value = fixedLng;
-    if (marker) marker.setLatLng([fixedLat, fixedLng]);
-    else marker = L.marker([fixedLat, fixedLng]).addTo(window.customerMap);
+    if (latInput) latInput.value = fixedLat;
+    if (lngInput) lngInput.value = fixedLng;
+    if (window.customerMapMarker)
+      window.customerMapMarker.setLatLng([fixedLat, fixedLng]);
+    else
+      window.customerMapMarker = L.marker([fixedLat, fixedLng]).addTo(
+        window.customerMap,
+      );
     if (status) status.textContent = `Pin: ${fixedLat}, ${fixedLng}`;
   };
   if (has) setPoint(start[0], start[1]);
   window.customerMap.on("click", (e) => setPoint(e.latlng.lat, e.latlng.lng));
-  setTimeout(() => window.customerMap.invalidateSize(), 120);
+  scheduleCustomerMapResize();
 }
 function saveCustomer(e, id) {
   e.preventDefault();
@@ -1151,11 +1652,12 @@ function customerDetail(id) {
     link = mapsLink(c.latitude, c.longitude);
   box(
     c.name,
-    `<div class="p-6 space-y-4"><p class="text-muted-foreground">${c.companyName}</p><p><b>Дугаар:</b> ${c.phone1 || "-"}</p><p><b>Хаяг:</b> ${addr}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<button onclick="closeModal();customerModal('${id}')" class="w-full py-3 bg-primary text-primary-foreground rounded">Засах</button></div>`,
+    `<div class="p-6 space-y-4"><p class="text-muted-foreground">${c.companyName}</p><p><b>Дугаар:</b> ${c.phone1 || "-"}</p><p><b>Хаяг:</b> ${addr}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<div class="grid ${canDelete() ? "grid-cols-2" : "grid-cols-1"} gap-2">${canDelete() ? `<button onclick="closeModal();confirmDelete('customer','${id}')" class="py-3 tone tone--danger rounded font-medium">Устгах</button>` : ""}<button onclick="closeModal();customerModal('${id}')" class="py-3 bg-primary text-primary-foreground rounded">Засах</button></div></div>`,
     "max-w-xl",
   );
 }
 function productModal(id) {
+  if (!isAdmin()) return;
   const p = state.products.find((x) => x.id === id) || {
     unit: "ширхэг",
     boxQuantity: 1,
@@ -1167,7 +1669,7 @@ function productModal(id) {
   };
   box(
     id ? "Бараа засах" : "Бараа бүртгэх",
-    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline muted></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" class="category-scroll w-full px-4 py-2 bg-secondary rounded" size="6">${[...(p.category ? [p.category] : []), ...cats().filter((c) => c !== p.category)].map((c) => `<option ${p.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" class="category-scroll w-full px-4 py-2 bg-secondary rounded" size="6">${[...(p.category ? [p.category] : []), ...cats().filter((c) => c !== p.category)].map((c) => `<option ${p.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
 function handleProductImage(input) {
@@ -1200,17 +1702,13 @@ function productNameFromBarcodeData(product) {
 function productCategoryFromBarcodeData(product) {
   const tag = product.categories_tags?.[0],
     category = cleanExternalText(tag || product.categories);
-  return category
-    ? category.charAt(0).toUpperCase() + category.slice(1)
-    : "";
+  return category ? category.charAt(0).toUpperCase() + category.slice(1) : "";
 }
 function productCountryFromBarcodeData(product) {
   const country = cleanExternalText(
     product.countries_tags?.[0] || product.countries,
   );
-  return country
-    ? country.charAt(0).toUpperCase() + country.slice(1)
-    : "";
+  return country ? country.charAt(0).toUpperCase() + country.slice(1) : "";
 }
 function productUnitFromBarcodeData(product) {
   const quantity = String(product.quantity || "").toLowerCase();
@@ -1264,6 +1762,7 @@ async function fillProductFromBarcode(code) {
   }
 }
 function saveProduct(e, id) {
+  if (!isAdmin()) return;
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   if (data.category === "__new__") {
@@ -1286,6 +1785,7 @@ function saveProduct(e, id) {
   render();
 }
 function categoryModal() {
+  if (!isAdmin()) return;
   box(
     "Төрөл нэмэх",
     `<form onsubmit="event.preventDefault();state.extraCategories.push(this.category.value);closeModal();render()" class="p-6 space-y-4"><input name="category" autofocus required class="w-full px-4 py-3 bg-secondary rounded"><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
@@ -1293,9 +1793,10 @@ function categoryModal() {
   );
 }
 function employeeModal() {
+  if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded"><input name="phone" placeholder="Утас" class="w-full px-3 py-3 bg-secondary rounded"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded"><select name="role" class="w-full px-3 py-3 bg-secondary rounded"><option value="sales">Борлуулалт</option><option value="warehouse">Агуулах</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">HT (Борлуулалт)</option><option value="warehouse">Агуулах</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
     "max-w-md",
   );
 }
@@ -1337,6 +1838,7 @@ function saveOrder(e) {
     employeeId: emp.id || "",
     employeeName: emp.name || "",
     employeePhone: emp.phone || "",
+    ...orderEmailFields(emp),
     isPaid: false,
     createdAt: new Date().toISOString(),
   });
@@ -1344,21 +1846,44 @@ function saveOrder(e) {
   closeModal();
   render();
 }
-function orderDetail(id) {
+function orderReceiptModal(id) {
   const o = state.orders.find((x) => x.id === id);
+  if (!o) return;
   box(
-    o.customerName,
-    `<div class="p-6 no-print"><table class="w-full"><tbody>${o.items.map((i) => `<tr><td class="py-2">${i.productName}</td><td class="text-right">${i.quantity}</td><td class="text-right font-medium">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t mt-4 pt-4"><span>Нийт</span><b class="text-primary">${fmt(o.total)}</b></div></div>`,
-    "max-w-3xl",
+    `Баримт #${o.id}`,
+    `<div class="p-5 space-y-4"><div class="rounded bg-secondary/50 p-3 space-y-1 text-sm"><p class="font-semibold">${esc(o.customerName)}</p><p class="text-muted-foreground">${esc(o.employeeName || "-")} · ${dte(o.createdAt)}</p><p><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></p></div><table class="w-full text-sm"><tbody>${o.items.map((i) => `<tr class="border-t border-border"><td class="py-2 pr-2">${esc(i.productName)}</td><td class="py-2 text-right whitespace-nowrap">${i.quantity}</td><td class="py-2 text-right font-medium whitespace-nowrap">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t pt-3 font-semibold"><span>Нийт</span><span class="text-primary">${fmt(o.total)}</span></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Баримт хэвлэх</button></div>`,
+    "max-w-lg",
   );
 }
-function receiptDetail(id) {
+function printRootEl() {
+  let root = document.getElementById("print-root");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "print-root";
+    root.setAttribute("aria-hidden", "true");
+    document.body.appendChild(root);
+  }
+  return root;
+}
+function printOrderReceipt(id) {
   const o = state.orders.find((x) => x.id === id);
-  box(
-    o.customerName,
-    `<div class="p-6 no-print"><table class="w-full"><tbody>${o.items.map((i) => `<tr><td class="py-2">${i.productName}</td><td class="text-right">${i.quantity}</td><td class="text-right font-medium">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t mt-4 pt-4"><span>Нийт</span><b class="text-primary">${fmt(o.total)}</b></div><button onclick="window.print()" class="mt-5 w-full py-3 bg-secondary rounded font-medium">Зарлагын баримт хэвлэх</button></div>${receipt(o)}`,
-    "max-w-3xl",
-  );
+  if (!o) return;
+  const root = printRootEl();
+  root.innerHTML = receipt(o);
+  const cleanup = () => {
+    root.innerHTML = "";
+  };
+  window.addEventListener("afterprint", cleanup, { once: true });
+  setTimeout(() => {
+    window.print();
+    setTimeout(cleanup, 1500);
+  }, 120);
+}
+function orderDetail(id) {
+  orderReceiptModal(id);
+}
+function receiptDetail(id) {
+  orderReceiptModal(id);
 }
 function receipt(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
@@ -1374,16 +1899,19 @@ function receipt(o) {
     salesName = o.employeeName || sales.name || "-",
     salesPhone = o.employeePhone || sales.phone || "-",
     deliveryName =
+      o.deliveryName ||
       state.deliveryName ||
       (state.currentEmployee?.role === "warehouse"
         ? state.currentEmployee.name
         : "-"),
     deliveryPhone =
+      o.deliveryPhone ||
       state.deliveryPhone ||
       (state.currentEmployee?.role === "warehouse"
         ? state.currentEmployee.phone
-        : "-");
-  return `<div class="print-receipt hidden"><div class="receipt-page"><header class="receipt-header"><div class="receipt-logo">TD</div><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(o.createdAt)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${o.id}</h2><section class="receipt-info"><div><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p></div><div><p><span>Харилцагч:</span><b>${c.name || o.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${c.registrationNumber || "-"}</b></p><p><span>Компанийн нэр:</span><b>${c.companyName || "-"}</b></p><p><span>Утасны дугаар:</span><b>${c.phone1 || "-"}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${addr}</b></p></div></section><section class="receipt-bank-grid"><div><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${o.items
+        : "-"),
+    deliveryDay = o.deliveryDate || o.createdAt;
+  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${o.id}</h2><section class="receipt-info"><div><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p></div><div><p><span>Харилцагч:</span><b>${c.name || o.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${c.registrationNumber || "-"}</b></p><p><span>Компанийн нэр:</span><b>${c.companyName || "-"}</b></p><p><span>Утасны дугаар:</span><b>${c.phone1 || "-"}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${addr}</b></p></div></section><section class="receipt-bank-grid"><div><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${o.items
     .map((i, n) => {
       const p = state.products.find((x) => x.id === i.productId) || {};
       return `<tr><td>${n + 1}</td><td>${i.productName}</td><td>${p.unit || "ш"}</td><td>${p.barcode || "-"}</td><td>${i.quantity}</td><td>${i.price.toLocaleString()}</td><td>${i.total.toLocaleString()}</td></tr>`;
@@ -1414,9 +1942,12 @@ function applyStock(id, type) {
 }
 function setWorkerQty(id, qty) {
   const p = state.products.find((x) => x.id === id);
+  if (!p) return;
   state.workerQty[id] = Math.max(0, Math.min(Number(qty) || 0, p.stock));
   if (!state.workerQty[id]) delete state.workerQty[id];
+  const keepPicker = pickerOpen() || !!state.filters.workerCategory;
   render();
+  if (keepPicker) pickerModal();
 }
 function applyPickerBarcode(value, scanned = false) {
   const code = String(value || "").trim();
@@ -1452,23 +1983,101 @@ function clearPickerFilter() {
   pickerModal();
 }
 function handleScannedBarcode(code) {
+  const value = String(code || "").trim();
+  if (!value || !barcodeScanning) return;
+  barcodeScanning = false;
   if (barcodeScanTarget === "product") {
     const input = document.getElementById("productBarcodeInput");
     if (input) {
-      input.value = code;
+      input.value = value;
       input.dispatchEvent(new Event("input", { bubbles: true }));
     }
-    fillProductFromBarcode(code);
+    fillProductFromBarcode(value);
     stopBarcodeScan();
     return;
   }
-  applyPickerBarcode(code, true);
+  applyPickerBarcode(value, true);
+}
+function loadZxingBrowser() {
+  if (window.ZXingBrowser?.BrowserMultiFormatReader)
+    return Promise.resolve(window.ZXingBrowser);
+  if (window.zxingBrowserLoading) {
+    return new Promise((resolve, reject) => {
+      const wait = setInterval(() => {
+        if (window.ZXingBrowser?.BrowserMultiFormatReader) {
+          clearInterval(wait);
+          resolve(window.ZXingBrowser);
+        }
+      }, 100);
+      setTimeout(() => {
+        clearInterval(wait);
+        reject(new Error("ZXing load timeout"));
+      }, 15000);
+    });
+  }
+  window.zxingBrowserLoading = true;
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src =
+      "https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js";
+    script.onload = () => {
+      window.zxingBrowserLoading = false;
+      if (window.ZXingBrowser?.BrowserMultiFormatReader)
+        resolve(window.ZXingBrowser);
+      else reject(new Error("ZXing unavailable"));
+    };
+    script.onerror = () => {
+      window.zxingBrowserLoading = false;
+      reject(new Error("ZXing load failed"));
+    };
+    document.head.appendChild(script);
+  });
+}
+async function startNativeBarcodeScan(video, status) {
+  barcodeStream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: "environment" } },
+    audio: false,
+  });
+  video.srcObject = barcodeStream;
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  await video.play();
+  barcodeScanning = true;
+  const detector = new BarcodeDetector({
+    formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
+  });
+  const scan = async () => {
+    if (!barcodeScanning) return;
+    try {
+      const codes = await detector.detect(video);
+      if (codes.length) {
+        handleScannedBarcode(codes[0].rawValue);
+        return;
+      }
+      status.textContent = "Баркодоо camera-д ойртуулна уу";
+    } catch (e) {
+      status.textContent = "Scan уншиж чадсангүй";
+    }
+    barcodeScanFrame = requestAnimationFrame(scan);
+  };
+  scan();
+}
+async function startZxingBarcodeScan(video, status) {
+  const { BrowserMultiFormatReader } = await loadZxingBrowser();
+  zxingReader = new BrowserMultiFormatReader();
+  barcodeScanning = true;
+  status.textContent = "Баркодоо camera-д ойртуулна уу";
+  zxingControls = await zxingReader.decodeFromVideoDevice(
+    undefined,
+    video,
+    (result) => {
+      if (result) handleScannedBarcode(result.getText());
+    },
+  );
 }
 async function startBarcodeScan(target = "picker") {
   if (!navigator.mediaDevices?.getUserMedia)
     return alert("Энэ browser camera scan дэмжихгүй байна.");
-  if (!("BarcodeDetector" in window))
-    return alert("Энэ browser barcode scan дэмжихгүй байна. Баркодоо гараар оруулна уу.");
   stopBarcodeScan();
   barcodeScanTarget = target;
   const panel = document.getElementById("barcodeScanner");
@@ -1477,69 +2086,81 @@ async function startBarcodeScan(target = "picker") {
   if (!panel || !video) return;
   panel.hidden = false;
   status.textContent = "Camera нээгдэж байна...";
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   try {
-    barcodeStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" },
-      audio: false,
-    });
-    video.srcObject = barcodeStream;
-    await video.play();
-    barcodeScanning = true;
-    const detector = new BarcodeDetector({
-      formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
-    });
-    const scan = async () => {
-      if (!barcodeScanning) return;
-      try {
-        const codes = await detector.detect(video);
-        if (codes.length) {
-          handleScannedBarcode(codes[0].rawValue);
-          return;
-        }
-        status.textContent = "Баркодоо camera-д ойртуулна уу";
-      } catch (e) {
-        status.textContent = "Scan уншиж чадсангүй";
-      }
-      barcodeScanFrame = requestAnimationFrame(scan);
-    };
-    scan();
+    if ("BarcodeDetector" in window)
+      await startNativeBarcodeScan(video, status);
+    else await startZxingBarcodeScan(video, status);
   } catch (e) {
+    console.warn("Barcode scan failed", e);
     stopBarcodeScan();
-    alert("Camera нээгдсэнгүй. Browser permission-оо зөвшөөрөөд дахин оролдоно уу.");
+    alert(
+      "Camera нээгдсэнгүй. Browser-д camera зөвшөөрөл өгөөд дахин оролдоно уу.",
+    );
   }
 }
 function stopBarcodeScan() {
   barcodeScanning = false;
   if (barcodeScanFrame) cancelAnimationFrame(barcodeScanFrame);
   barcodeScanFrame = 0;
+  if (zxingControls?.stop) {
+    try {
+      zxingControls.stop();
+    } catch (e) {}
+    zxingControls = null;
+  }
+  if (zxingReader?.reset) {
+    try {
+      zxingReader.reset();
+    } catch (e) {}
+    zxingReader = null;
+  }
   if (barcodeStream) {
     barcodeStream.getTracks().forEach((track) => track.stop());
     barcodeStream = null;
   }
   const panel = document.getElementById("barcodeScanner");
   const video = document.getElementById("barcodeVideo");
-  if (video) video.srcObject = null;
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
   if (panel) panel.hidden = true;
+}
+function openPickerModal() {
+  state.filters.workerCategory = "";
+  state.searches.workerProduct = "";
+  state.pickerStatus = "";
+  pickerModal();
+}
+function pickerCategoryBtn(c) {
+  return `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-btn picker-cat-btn--step1">${esc(c)}</button>`;
 }
 function pickerModal() {
   const cat = state.filters.workerCategory,
-    q = (state.searches.workerProduct || "").toLowerCase(),
+    categories = cats();
+  if (!cat) {
+    box(
+      "Бараа нэмэх",
+      `<div class="picker-step1 p-5 space-y-4 modal-scroll" data-picker-root><p class="text-sm font-medium shrink-0">Төрөл сонгоно уу</p><div class="picker-categories picker-categories--step1">${categories.length ? categories.map((c) => pickerCategoryBtn(c)).join("") : `<div class="p-6 text-center text-sm text-muted-foreground">Төрөл байхгүй</div>`}</div><button type="button" onclick="closeModal()" class="w-full py-3 bg-secondary rounded font-medium shrink-0">Болих</button></div>`,
+      "max-w-lg",
+    );
+    return;
+  }
+  const q = (state.searches.workerProduct || "").toLowerCase(),
     selected = state.products
       .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
       .filter((p) => p.qty > 0),
     selectedQty = selected.reduce((s, p) => s + p.qty, 0),
     selectedTotal = selected.reduce((s, p) => s + p.qty * p.price, 0),
-    categories = cats(),
     products = state.products.filter(
       (p) =>
-        (!cat || p.category === cat) &&
-        (p.name.toLowerCase().includes(q) ||
-          p.barcode.includes(q) ||
-          p.category.toLowerCase().includes(q)),
+        p.category === cat &&
+        (p.name.toLowerCase().includes(q) || String(p.barcode).includes(q)),
     );
   box(
     "Бараа нэмэх",
-    `<div class="p-5 space-y-4"><div class="picker-summary"><div><p>Сонгосон</p><b>${selected.length}</b></div><div><p>Ширхэг</p><b>${selectedQty}</b></div><div><p>Нийт дүн</p><b>${fmt(selectedTotal)}</b></div></div><div class="picker-search-tools"><input data-picker-search value="${esc(state.searches.workerProduct || "")}" oninput="pickerSearch(this.value)" placeholder="Нэр, баркод, төрлөөр хайх..." class="w-full px-3 py-3 bg-secondary rounded"><button type="button" onclick="clearPickerFilter()" class="px-4 py-3 bg-secondary rounded text-sm whitespace-nowrap">Цэвэрлэх</button></div>${state.pickerStatus ? `<div class="picker-status">${esc(state.pickerStatus)}</div>` : ""}<div class="picker-layout"><div class="picker-categories"><button type="button" onclick="setPickerCategory('')" class="picker-cat-btn ${cat ? "" : "is-active"}">Бүгд</button>${categories.map((c) => `<button type="button" onclick="setPickerCategory('${esc(c)}')" class="picker-cat-btn ${cat === c ? "is-active" : ""}">${c}</button>`).join("")}</div><div class="picker-list">${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Бараа олдсонгүй</div>`}</div></div><div class="picker-footer"><button onclick="state.workerQty={};pickerModal()" class="py-3 bg-secondary rounded font-medium ${selected.length ? "" : "opacity-50"}">Цэвэрлэх</button><button onclick="closeModal();render()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button></div></div>`,
+    `<div class="picker-step2" data-picker-root><div class="picker-step2__scroll"><div class="picker-step-head"><button type="button" data-picker-back class="picker-back-btn">← Төрөл</button><span class="picker-step-cat">${esc(cat)}</span></div><div class="picker-search-tools"><input data-picker-search value="${esc(state.searches.workerProduct || "")}" oninput="pickerSearch(this.value)" placeholder="Хайх..." class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" data-picker-clear-search class="px-4 py-3 bg-secondary rounded text-sm whitespace-nowrap">Цэвэрлэх</button></div>${state.pickerStatus ? `<div class="picker-status">${esc(state.pickerStatus)}</div>` : ""}<div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Бараа олдсонгүй</div>`}</div></div><div class="picker-step2__bottom"><div class="picker-summary"><div><p>Сонгосон</p><b>${selected.length}</b></div><div><p>Ширхэг</p><b>${selectedQty}</b></div><div><p>Нийт</p><b>${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="py-3 bg-secondary rounded font-medium ${selected.length ? "" : "opacity-50"}">Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button></div></div></div>`,
     "max-w-4xl",
   );
   const el = document.querySelector("[data-picker-search]");
@@ -1548,19 +2169,52 @@ function pickerModal() {
     el.setSelectionRange(el.value.length, el.value.length);
   }
 }
+function backToPickerCategories() {
+  state.filters.workerCategory = "";
+  state.searches.workerProduct = "";
+  state.pickerStatus = "";
+  pickerModal();
+}
+function clearPickerSearch() {
+  state.searches.workerProduct = "";
+  state.pickerStatus = "";
+  pickerModal();
+}
+function clearPickerCart() {
+  state.workerQty = {};
+  render();
+  pickerModal();
+}
 function pickerRow(p) {
   const q = state.workerQty[p.id] || 0,
-    left = p.stock - q;
-  return `<div class="picker-row ${q ? "is-selected" : ""}"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="text-sm font-medium truncate">${p.name}</p><p class="text-xs text-muted-foreground">${p.category} · ${p.barcode}</p><div class="flex flex-wrap gap-2 mt-2 text-xs"><span class="px-2 py-1 rounded bg-card font-semibold">${fmt(p.price)}</span><span class="px-2 py-1 rounded bg-card text-muted-foreground">Үлд ${left}</span>${q ? `<span class="px-2 py-1 rounded bg-primary text-primary-foreground">${fmt(q * p.price)}</span>` : ""}</div></div>${q ? `<div class="qty-stepper"><button onclick="setWorkerQty('${p.id}',${q - 1});pickerModal()">-</button><input onchange="setWorkerQty('${p.id}',Number(this.value));pickerModal()" value="${q}" type="number"><button onclick="setWorkerQty('${p.id}',${q + 1});pickerModal()">+</button></div>` : `<button onclick="setWorkerQty('${p.id}',1);pickerModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm ${p.stock ? "" : "opacity-50"}">Нэмэх</button>`}</div>`;
+    left = p.stock - q,
+    id = esc(p.id);
+  return `<div class="picker-row ${q ? "is-selected" : ""}"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="text-sm font-medium truncate">${p.name}</p><p class="text-xs text-muted-foreground">${esc(p.barcode)}</p><div class="flex flex-wrap gap-2 mt-2 text-xs"><span class="px-2 py-1 rounded bg-card font-semibold">${fmt(p.price)}</span><span class="px-2 py-1 rounded bg-card text-muted-foreground">Үлд ${left}</span>${q ? `<span class="px-2 py-1 rounded bg-primary text-primary-foreground">${fmt(q * p.price)}</span>` : ""}</div></div>${q ? `<div class="qty-stepper"><button type="button" data-picker-qty data-product-id="${id}" data-qty="${q - 1}">-</button><input data-picker-qty-input data-product-id="${id}" value="${q}" type="number" min="0" max="${p.stock}" class="app-input"><button type="button" data-picker-qty data-product-id="${id}" data-qty="${q + 1}">+</button></div>` : `<button type="button" data-picker-qty data-product-id="${id}" data-qty="1" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm ${p.stock ? "" : "opacity-50"}" ${p.stock ? "" : "disabled"}>Нэмэх</button>`}</div>`;
 }
 function setPickerCategory(cat) {
+  if (!cat) return;
   state.filters.workerCategory = cat;
+  state.searches.workerProduct = "";
+  state.pickerStatus = "";
   pickerModal();
 }
 function pickerSearch(value) {
   state.searches.workerProduct = value;
-  if (!value.trim()) state.filters.workerCategory = "";
-  pickerModal();
+  const list = modal.querySelector("[data-picker-products]");
+  if (!list || !state.filters.workerCategory) {
+    pickerModal();
+    return;
+  }
+  const q = (value || "").toLowerCase(),
+    cat = state.filters.workerCategory,
+    products = state.products.filter(
+      (p) =>
+        p.category === cat &&
+        (p.name.toLowerCase().includes(q) || String(p.barcode).includes(q)),
+    );
+  list.innerHTML = products.length
+    ? products.map((p) => pickerRow(p)).join("")
+    : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Бараа олдсонгүй</div>`;
 }
 function toggleWorker(id) {
   state.selectedWorkers = state.selectedWorkers.includes(id)
@@ -1656,11 +2310,20 @@ function employeeExcel() {
     [],
     ["№", "Бараа", "Ангилал", "Баркод", "Тоо", "Дүн"],
     ...rows.map((x, i) => {
-      const p = state.products.find((product) => product.id === x.productId) || {
+      const p = state.products.find(
+        (product) => product.id === x.productId,
+      ) || {
         category: "",
         barcode: "",
       };
-      return [i + 1, x.productName, p.category || "-", p.barcode || "", x.quantity, x.total];
+      return [
+        i + 1,
+        x.productName,
+        p.category || "-",
+        p.barcode || "",
+        x.quantity,
+        x.total,
+      ];
     }),
   ];
   excel("ajiltny-zahialga.xls", sheetRows);
@@ -1669,7 +2332,7 @@ function employeeExcel() {
 function saveWorker() {
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
   const c = state.customers.find((x) => x.id === state.workerCustomer),
-    e = state.employees.find((x) => x.id === state.orderEmployee),
+    e = orderActor(),
     items = workerOrderLines();
   if (!workerPaidLines().length) return alert("Бараа сонгоно уу");
   state.orders.push({
@@ -1682,9 +2345,12 @@ function saveWorker() {
     employeeId: e.id,
     employeeName: e.name,
     employeePhone: e.phone || "",
+    ...orderEmailFields(e),
     isPaid: false,
     paymentTerm: state.paymentTerm,
     deliveryDate: state.deliveryDate || tomorrowIso(),
+    deliveryName: state.deliveryName || "",
+    deliveryPhone: state.deliveryPhone || "",
     createdAt: new Date().toISOString(),
   });
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
@@ -1694,26 +2360,30 @@ function saveWorker() {
 }
 function login(e) {
   e.preventDefault();
+  ensureEmployeeEmails();
+  const email = normalizeEmail(document.getElementById("loginEmail").value),
+    password = document.getElementById("loginPassword").value.trim();
   const emp = state.employees.find(
-    (x) => x.password === document.getElementById("password").value.trim(),
+    (x) => normalizeEmail(x.email) === email && x.password === password,
   );
   if (!emp)
     return (document.getElementById("loginError").innerHTML =
-      `<div class="bg-red-100 text-red-700 text-sm p-3 rounded text-center">Нууц үг буруу байна</div>`);
+      `<div class="tone tone--danger text-sm p-3 rounded text-center">Email эсвэл нууц үг буруу байна</div>`);
+  saveLoginCredentials(
+    email,
+    password,
+    document.getElementById("loginRemember")?.checked,
+  );
   state.currentEmployee = emp;
   state.isLoggedIn = true;
+  state.orderEmployee = emp.id;
   if (emp.role === "warehouse") {
     state.selectedWorkers = [];
     state.selectedWarehouseOrderId = "";
     state.deliveryName = "";
     state.deliveryPhone = "";
   }
-  state.currentView =
-    emp.role === "admin"
-      ? "admin"
-      : emp.role === "warehouse"
-        ? "warehouse"
-        : "worker";
+  state.currentView = defaultViewForRole(emp.role);
   render();
 }
 function logout() {
@@ -1722,11 +2392,20 @@ function logout() {
   render();
 }
 function saveEmployee(e) {
+  if (!isAdmin()) return;
   e.preventDefault();
   const f = Object.fromEntries(new FormData(e.target));
+  if (
+    state.employees.some(
+      (e) => normalizeEmail(e.email) === normalizeEmail(f.email),
+    )
+  ) {
+    return alert("Энэ email аль хэдийн бүртгэгдсэн байна");
+  }
   state.employees.push({
     id: "employee-" + Date.now(),
     ...f,
+    email: normalizeEmail(f.email),
     totalSales: 0,
     commissionRate: 0,
   });
@@ -1734,34 +2413,52 @@ function saveEmployee(e) {
   render();
 }
 function confirmDelete(type, id) {
+  if (!canDelete()) return;
   const item =
-      type === "product"
-        ? state.products.find((p) => p.id === id)
-        : state.employees.find((e) => e.id === id),
-    name = item?.name || "энэ мөр";
+    type === "product"
+      ? state.products.find((p) => p.id === id)
+      : type === "employee"
+        ? state.employees.find((e) => e.id === id)
+        : type === "customer"
+          ? state.customers.find((c) => c.id === id)
+          : null;
+  const name =
+    item?.name || (type === "customer" ? item?.companyName : null) || "энэ мөр";
   box(
     "Устгах уу?",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${name}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p><div class="grid grid-cols-2 gap-2"><button onclick="closeModal()" class="py-3 bg-secondary rounded">Болих</button><button onclick="deleteNow('${type}','${id}')" class="py-3 bg-red-600 text-white rounded font-medium">Устгах</button></div></div>`,
+    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p><div class="grid grid-cols-2 gap-2"><button onclick="closeModal()" class="py-3 bg-secondary rounded">Болих</button><button onclick="deleteNow('${type}','${id}')" class="py-3 btn-solid--danger rounded font-medium">Устгах</button></div></div>`,
     "max-w-md",
   );
 }
 function deleteNow(type, id) {
+  if (!canDelete()) return;
   if (type === "product")
     state.products = state.products.filter((p) => p.id !== id);
   if (type === "employee")
     state.employees = state.employees.filter((e) => e.id !== id);
+  if (type === "customer") {
+    state.customers = state.customers.filter((c) => c.id !== id);
+    if (state.workerCustomer === id) {
+      state.workerCustomer = "";
+      state.workerStoreReady = false;
+      state.workerQty = {};
+    }
+  }
   closeModal();
   render();
 }
 function delEmployee(id) {
+  if (!canDelete()) return;
   state.employees = state.employees.filter((e) => e.id !== id);
   render();
 }
 function delProduct(id) {
+  if (!canDelete()) return;
   state.products = state.products.filter((p) => p.id !== id);
   render();
 }
 function setOrder(id, s) {
+  if (s === "cancelled" && !canDelete()) return;
   state.orders.find((o) => o.id === id).status = s;
   render();
 }
@@ -1812,12 +2509,18 @@ Object.assign(window, {
   orderModal,
   saveOrder,
   orderDetail,
+  orderReceiptModal,
   receiptDetail,
+  printOrderReceipt,
   workerOrderDetail,
   applyStock,
   setInventoryCategory,
   setWorkerQty,
+  openPickerModal,
   pickerModal,
+  backToPickerCategories,
+  clearPickerSearch,
+  clearPickerCart,
   pickerSearch,
   setPickerCategory,
   applyPickerBarcode,
@@ -1838,6 +2541,8 @@ Object.assign(window, {
   clearWorkerStore,
   openWorkerNewTab,
   openWorkerOrdersTab,
+  clearWorkerOrderDate,
+  setWorkerOrderDate,
   scrollWorkerOrdersToDate,
   openPromotionQtyModal,
   promotionQtyModal,
@@ -1850,6 +2555,7 @@ Object.assign(window, {
   excel,
   saveWorker,
   login,
+  toggleLoginPassword,
   logout,
   saveEmployee,
   confirmDelete,
@@ -1865,6 +2571,11 @@ Object.assign(window, {
   saveBackendState,
   installPwaApp,
   dismissPwaInstall,
+  installAppOnPhone,
+  downloadAndroidApk,
+  dismissIosInstallCoach: dismissInstallCoach,
+  dismissInstallCoach,
+  showAndroidInstallCoach,
   openPwaInstallModal,
   openInChrome,
   copyAppLink,

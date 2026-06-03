@@ -1,9 +1,12 @@
 ТОМУДА — Deploy link (HTTPS)
+Шинэчлэгдсэн: 2026-06-03
 
-https://brought-retained-lifetime-geographical.trycloudflare.com
+https://lancaster-alternatives-advise-advisors.trycloudflare.com
 
-GitHub repo:
-https://github.com/Batt866/tomuda-commerce
+Локал: http://127.0.0.1:8011/
+GitHub: https://github.com/Batt866/tomuda-commerce
 
-⚠️ Cloudflare link: компьютер + server ажиллаж байх үед л идэвхтэй
-✅ Render deploy: render.com дээр Web Service үүсгэсний дараа байнгын link авна
+⚠️ Энэ link түр зуурын (trycloudflare). Компьютер + tunnel асаалттай байх үед л ажиллана.
+Дахин асаах: ./scripts/start-tomuda.sh
+
+Тогтвортой link (24/7): Render дээр deploy — DEPLOY.md харна уу.

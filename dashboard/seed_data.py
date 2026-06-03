@@ -198,6 +198,7 @@ EMPLOYEES = [
     {
         "id": "emp-hasan",
         "name": "Хасан",
+        "email": "ht@tomuda.mn",
         "phone": "88001111",
         "password": "hasan",
         "role": "sales",
@@ -207,6 +208,7 @@ EMPLOYEES = [
     {
         "id": "emp-galsan",
         "name": "Галсанцэрэн",
+        "email": "ht.galsan@tomuda.mn",
         "phone": "99191848",
         "password": "galsan",
         "role": "sales",
@@ -216,6 +218,7 @@ EMPLOYEES = [
     {
         "id": "emp-munkh",
         "name": "Мөнх-Эрдэнэ",
+        "email": "ht.munkh@tomuda.mn",
         "phone": "88001234",
         "password": "munkh",
         "role": "sales",
@@ -225,6 +228,7 @@ EMPLOYEES = [
     {
         "id": "emp-dulam",
         "name": "Дуламсүрэн",
+        "email": "aguulah@tomuda.mn",
         "phone": "99076727",
         "password": "dulam",
         "role": "warehouse",
@@ -234,6 +238,7 @@ EMPLOYEES = [
     {
         "id": "admin",
         "name": "Админ",
+        "email": "admin@tomuda.mn",
         "phone": "99000000",
         "password": "admin",
         "role": "admin",

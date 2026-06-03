@@ -3,7 +3,8 @@
 <html lang="mn">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#16899a" />
     <meta name="description" content="Борлуулалт, агуулах, захиалга удирдах систем" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -12,6 +13,8 @@
     <meta name="apple-mobile-web-app-title" content="ТОМУДА" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tomuda/icons/icon-180.png' %}" />
+    <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
     <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
     <title>ТОМУДА - Борлуулалт, агуулах</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -34,6 +37,10 @@
               "sidebar-primary-foreground": "#ffffff",
               "sidebar-accent": "#252d3d",
               "sidebar-border": "#353d4e",
+              success: "#16899a",
+              danger: "#c43c52",
+              warning: "#b07a1a",
+              info: "#1a7a94",
             },
           },
         },
@@ -45,16 +52,17 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260601-inapp-fix"
+      href="{% static 'tomuda/styles.css' %}?v=20260602-unified-colors"
     />
   </head>
   <body>
     <div id="app"></div>
     <div id="modal"></div>
+    <div id="print-root" aria-hidden="true"></div>
     <script
       src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"
     ></script>
     <script src="{% static 'tomuda/data.js' %}?v=20260527-menu-icon"></script>
-    <script src="{% static 'tomuda/app.js' %}?v=20260601-inapp-fix"></script>
+    <script src="{% static 'tomuda/app.js' %}?v=20260602-unified-colors"></script>
   </body>
 </html>
