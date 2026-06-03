@@ -29,7 +29,7 @@ def get_state(request):
         key="main",
         defaults={"data": default_state()},
     )
-    return {"ok": True, "state": row.data}
+    return {"ok": True, "state": row.data, "updatedAt": row.updated_at.isoformat()}
 
 
 @api.post("/state")

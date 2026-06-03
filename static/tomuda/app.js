@@ -70,6 +70,10 @@ const persistKeys = [
 let backendReady = false;
 let backendSaveTimer = null;
 let backendLastSaved = "";
+let serverUpdatedAt = "";
+let backendSaving = false;
+let backendPollTimer = null;
+const BACKEND_POLL_MS = 4000;
 const fmt = (n) => "₮" + Number(n || 0).toLocaleString();
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
@@ -124,8 +128,65 @@ const esc = (s = "") =>
         "'": "&#039;",
       })[c],
   );
-function receiptNo(id, size = "md") {
-  return `<span class="receipt-no receipt-no--${size}">№${esc(String(id))}</span>`;
+function receiptMonthKey(o) {
+  const day = isoDay(o?.createdAt || o?.deliveryDate || "");
+  return day ? day.slice(0, 7) : "";
+}
+function orderReceiptNum(o) {
+  if (!o) return "";
+  const seq = Number(o.receiptSeq);
+  if (seq > 0) return seq;
+  return o.id;
+}
+function nextReceiptSeq(month) {
+  let max = 0;
+  for (const o of state.orders) {
+    const m = o.receiptMonth || receiptMonthKey(o);
+    if (m !== month) continue;
+    const seq = Number(o.receiptSeq);
+    if (seq > max) max = seq;
+  }
+  return max + 1;
+}
+function normalizeOrderReceiptNumbers() {
+  if (!Array.isArray(state.orders)) return;
+  const sorted = [...state.orders].sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+  );
+  const byMonth = {};
+  for (const o of sorted) {
+    const month = receiptMonthKey(o);
+    if (!month) continue;
+    o.receiptMonth = month;
+    const seq = Number(o.receiptSeq);
+    if (seq > 0) byMonth[month] = Math.max(byMonth[month] || 0, seq);
+  }
+  for (const o of sorted) {
+    const month = receiptMonthKey(o);
+    if (!month) continue;
+    if (Number(o.receiptSeq) > 0 && o.receiptMonth === month) continue;
+    byMonth[month] = (byMonth[month] || 0) + 1;
+    o.receiptSeq = byMonth[month];
+    o.receiptMonth = month;
+  }
+}
+function buildNewOrder(fields) {
+  const createdAt = fields.createdAt || new Date().toISOString();
+  const receiptMonth = receiptMonthKey({ createdAt });
+  return {
+    id: String(state.orders.length + 1),
+    receiptMonth,
+    receiptSeq: nextReceiptSeq(receiptMonth),
+    createdAt,
+    ...fields,
+  };
+}
+function receiptNo(order, size = "md") {
+  const n =
+    typeof order === "object" && order !== null
+      ? orderReceiptNum(order)
+      : order;
+  return `<span class="receipt-no receipt-no--${size}">№${esc(String(n))}</span>`;
 }
 const pickerOpen = () => !!modal.querySelector("[data-picker-root]");
 const cats = () => [
@@ -198,6 +259,12 @@ function orderActor() {
     {}
   );
 }
+function orderEmployeeChoices() {
+  const sales = state.employees.filter((e) => e.role === "sales");
+  if (!isAdmin()) return sales;
+  const admins = state.employees.filter((e) => e.role === "admin");
+  return [...admins, ...sales];
+}
 function orderEmailFields(emp) {
   const actor = emp || state.currentEmployee || {};
   return {
@@ -243,7 +310,93 @@ function applyPersistentState(data) {
   if (!state.promotionRules?.quantity)
     state.promotionRules = { quantity: [], price: [] };
   ensureSettings();
+  normalizeOrderReceiptNumbers();
   return true;
+}
+function localStateDirty() {
+  return JSON.stringify({ state: persistentState() }) !== backendLastSaved;
+}
+function captureSessionSnapshot() {
+  return {
+    isLoggedIn: state.isLoggedIn,
+    currentEmployee: state.currentEmployee,
+    currentView: state.currentView,
+    mobileOpen: state.mobileOpen,
+    searches: { ...state.searches },
+    filters: { ...state.filters },
+    selectedWorkers: [...(state.selectedWorkers || [])],
+    selectedWarehouseOrderId: state.selectedWarehouseOrderId,
+    workerStoreReady: state.workerStoreReady,
+    pickerStatus: state.pickerStatus,
+    pickerBarcode: state.pickerBarcode,
+    deliveryName: state.deliveryName,
+    deliveryPhone: state.deliveryPhone,
+  };
+}
+function restoreSessionSnapshot(session) {
+  Object.assign(state, session);
+}
+function syncBackendMarkers(payload, stateData) {
+  if (stateData) applyPersistentState(stateData);
+  backendLastSaved = JSON.stringify({ state: persistentState() });
+  if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
+}
+function applyRemoteState(payload) {
+  if (!payload?.state) return false;
+  const session = captureSessionSnapshot();
+  const pickerCategory = state.filters.workerCategory;
+  const reopenPicker = pickerOpen();
+  applyPersistentState(payload.state);
+  restoreSessionSnapshot(session);
+  ensureEmployeeEmails();
+  normalizeOrderReceiptNumbers();
+  backendLastSaved = JSON.stringify({ state: persistentState() });
+  if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+  render();
+  if (reopenPicker && pickerCategory) {
+    state.filters.workerCategory = pickerCategory;
+    pickerModal();
+  }
+  return true;
+}
+async function fetchBackendPayload() {
+  const res = await fetch(`${API_BASE}/state`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+async function pollBackendState() {
+  if (!backendReady || backendSaving || backendSaveTimer || localStateDirty())
+    return;
+  try {
+    const payload = await fetchBackendPayload();
+    if (!payload?.updatedAt) return;
+    if (!serverUpdatedAt) {
+      serverUpdatedAt = payload.updatedAt;
+      return;
+    }
+    if (payload.updatedAt === serverUpdatedAt) return;
+    applyRemoteState(payload);
+  } catch (error) {
+    console.warn("Backend poll failed", error);
+  }
+}
+function startBackendPoll() {
+  stopBackendPoll();
+  backendPollTimer = setInterval(pollBackendState, BACKEND_POLL_MS);
+  document.addEventListener("visibilitychange", onVisibilityPoll);
+  window.addEventListener("focus", onVisibilityPoll);
+}
+function stopBackendPoll() {
+  if (backendPollTimer) clearInterval(backendPollTimer);
+  backendPollTimer = null;
+  document.removeEventListener("visibilitychange", onVisibilityPoll);
+  window.removeEventListener("focus", onVisibilityPoll);
+}
+function onVisibilityPoll() {
+  if (document.visibilityState === "visible") pollBackendState();
 }
 async function boot() {
   app.innerHTML = `<div class="min-h-screen grid place-items-center bg-background text-foreground"><div class="bg-card rounded p-6 text-center"><p class="font-semibold">ТОМУДА ачаалж байна</p><p class="text-sm text-muted-foreground mt-1">Backend-ээс мэдээлэл татаж байна...</p></div></div>`;
@@ -253,7 +406,7 @@ async function boot() {
     });
     if (res.ok) {
       const payload = await res.json();
-      applyPersistentState(payload.state);
+      syncBackendMarkers(payload, payload.state);
     }
   } catch (error) {
     console.warn("Backend state load failed", error);
@@ -261,12 +414,14 @@ async function boot() {
   backendReady = true;
   ensureEmployeeEmails();
   ensureSettings();
+  normalizeOrderReceiptNumbers();
   initNoZoom();
   initPickerModalActions();
   initQtyStepperButtons();
   initAppBack();
   render();
   initPwa();
+  startBackendPoll();
 }
 function handleAppBack() {
   if (!state.isLoggedIn) return false;
@@ -362,10 +517,31 @@ function bindCapacitorBackButton() {
 function initQtyStepperButtons() {
   if (document.documentElement.dataset.qtyStepperBound) return;
   document.documentElement.dataset.qtyStepperBound = "1";
+  const onStepperButton = (e) => {
+    const btn = e.target.closest(".qty-stepper button");
+    if (!btn) return;
+    e.preventDefault();
+    const active = document.activeElement;
+    if (active?.closest?.(".qty-stepper")) active.blur();
+  };
+  document.addEventListener("mousedown", onStepperButton, true);
+  document.addEventListener("touchstart", onStepperButton, {
+    capture: true,
+    passive: false,
+  });
   document.addEventListener(
-    "mousedown",
+    "focusin",
     (e) => {
-      if (e.target.closest(".qty-stepper button")) e.preventDefault();
+      const input = e.target.closest?.(".qty-stepper input");
+      if (input) input.readOnly = false;
+    },
+    true,
+  );
+  document.addEventListener(
+    "focusout",
+    (e) => {
+      const input = e.target.closest?.(".qty-stepper input");
+      if (input) input.readOnly = true;
     },
     true,
   );
@@ -383,6 +559,7 @@ function initPickerModalActions() {
     if (qtyBtn?.disabled) return;
     if (qtyBtn) {
       e.preventDefault();
+      document.activeElement?.blur?.();
       setWorkerQty(
         qtyBtn.getAttribute("data-product-id") || "",
         Number(qtyBtn.getAttribute("data-qty")),
@@ -730,6 +907,7 @@ function scheduleBackendSave() {
 async function saveBackendState() {
   const body = JSON.stringify({ state: persistentState() });
   if (body === backendLastSaved) return;
+  backendSaving = true;
   try {
     const res = await fetch(`${API_BASE}/state`, {
       method: "POST",
@@ -738,10 +916,17 @@ async function saveBackendState() {
         Accept: "application/json",
       },
       body,
+      cache: "no-store",
     });
-    if (res.ok) backendLastSaved = body;
+    if (res.ok) {
+      const payload = await res.json();
+      backendLastSaved = body;
+      if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+    }
   } catch (error) {
     console.warn("Backend state save failed", error);
+  } finally {
+    backendSaving = false;
   }
 }
 
@@ -861,10 +1046,10 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   if (!rows.length) state.selectedWarehouseOrderId = "";
   const selected = rows.find((o) => o.id === state.selectedWarehouseOrderId),
     total = rows.reduce((s, o) => s + o.total, 0);
-  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2><div class="flex items-center gap-2 shrink-0"><b class="text-primary">${fmt(total)}</b><button onclick="go('warehouse')" class="px-2 py-1.5 bg-secondary rounded text-sm">←</button></div></div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(state.searches[searchKey] || "")}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] border-t border-border"><div class="border-b lg:border-b-0 lg:border-r border-border max-h-[520px] overflow-y-auto">${rows.length ? rows.map((o) => `<button onclick="selectWarehouseOrder('${o.id}')" class="w-full text-left px-4 py-3 border-b border-border hover:bg-secondary/40 ${state.selectedWarehouseOrderId === o.id ? "bg-primary/10" : ""}"><div class="receipt-list-item">${receiptNo(o.id, "sm")}<div class="min-w-0 flex-1"><p class="font-semibold truncate">${esc(o.customerName)}</p><p class="text-xs text-muted-foreground mt-0.5">${fmt(o.total)} · ${dte(o.createdAt)}</p></div></div></button>`).join("") : `<div class="p-6 text-sm text-muted-foreground text-center">Захиалга олдсонгүй</div>`}</div>${selected ? warehouseOrderDetail(selected) : `<div class="p-8 text-sm text-muted-foreground text-center">Баримт сонгоно уу</div>`}</div></section>`;
+  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2><div class="flex items-center gap-2 shrink-0"><b class="text-primary">${fmt(total)}</b><button onclick="go('warehouse')" class="px-2 py-1.5 bg-secondary rounded text-sm">←</button></div></div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(state.searches[searchKey] || "")}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] border-t border-border"><div class="border-b lg:border-b-0 lg:border-r border-border max-h-[520px] overflow-y-auto">${rows.length ? rows.map((o) => `<button onclick="selectWarehouseOrder('${o.id}')" class="w-full text-left px-4 py-3 border-b border-border hover:bg-secondary/40 ${state.selectedWarehouseOrderId === o.id ? "bg-primary/10" : ""}"><div class="receipt-list-item">${receiptNo(o, "sm")}<div class="min-w-0 flex-1"><p class="font-semibold truncate">${esc(o.customerName)}</p><p class="text-xs text-muted-foreground mt-0.5">${fmt(o.total)} · ${dte(o.createdAt)}</p></div></div></button>`).join("") : `<div class="p-6 text-sm text-muted-foreground text-center">Захиалга олдсонгүй</div>`}</div>${selected ? warehouseOrderDetail(selected) : `<div class="p-8 text-sm text-muted-foreground text-center">Баримт сонгоно уу</div>`}</div></section>`;
 }
 function warehouseOrderDetail(o) {
-  return `<div class="p-4 space-y-4"><div class="receipt-detail-head"><span class="receipt-detail-head__type">Зарлагын баримт</span>${receiptNo(o.id, "lg")}</div><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><p class="text-sm text-muted-foreground">Захиалгын дүн</p><p class="text-2xl font-bold text-primary">${fmt(o.total)}</p></div><div class="flex flex-wrap gap-2"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Хэвлэх</button></div></div><div><h3 class="font-semibold">${esc(o.customerName)}</h3><p class="text-sm text-muted-foreground">${esc(o.employeeName || "-")} · ${dte(o.createdAt)}</p></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span class="text-right">Тоо</span><span class="text-right">Дүн</span></div>${o.items.map((i) => `<div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-3 border-t border-border text-sm"><span class="font-medium">${esc(i.productName)}</span><b class="text-right">${i.quantity}</b><span class="text-right">${fmt(i.total)}</span></div>`).join("")}</div></div>`;
+  return `<div class="p-4 space-y-4"><div class="receipt-detail-head"><span class="receipt-detail-head__type">Зарлагын баримт</span>${receiptNo(o, "lg")}</div><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><p class="text-sm text-muted-foreground">Захиалгын дүн</p><p class="text-2xl font-bold text-primary">${fmt(o.total)}</p></div><div class="flex flex-wrap gap-2"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Хэвлэх</button></div></div><div><h3 class="font-semibold">${esc(o.customerName)}</h3><p class="text-sm text-muted-foreground">${esc(o.employeeName || "-")} · ${dte(o.createdAt)}</p></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span class="text-right">Тоо</span><span class="text-right">Дүн</span></div>${o.items.map((i) => `<div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-3 border-t border-border text-sm"><span class="font-medium">${esc(i.productName)}</span><b class="text-right">${i.quantity}</b><span class="text-right">${fmt(i.total)}</span></div>`).join("")}</div></div>`;
 }
 function orderRow(o) {
   const pendingActions =
@@ -875,7 +1060,7 @@ function orderRow(o) {
     o.status === "confirmed"
       ? `<button onclick="setOrder('${o.id}','delivered')" class="px-3 py-1.5 tone tone--info rounded text-sm">Хүргэсэн</button>`
       : "";
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o.id, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${pendingActions}${deliveredAction}</div></td></tr>`;
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${pendingActions}${deliveredAction}</div></td></tr>`;
 }
 function customerListHead() {
   return `<div class="customer-row customer-row--head" aria-hidden="true"><div class="customer-row__name"><span>Харилцагч</span></div><div class="customer-row__phone"><span>Дугаар</span></div><div class="customer-row__address"><span>Хаяг</span></div><div class="customer-row__actions"><span class="customer-row__actions-label">Үйлдэл</span></div></div>`;
@@ -1067,7 +1252,7 @@ function reportsView() {
   return `<div class="space-y-4">${pageHead("Тайлан", `<button onclick="csv('report.csv',[[${total},${paid}]])" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">Татах</button>`)}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(total - paid), "text-tone-danger")}${card("Үлдэгдэл", fmt(stock))}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Төлбөр</div>${state.orders.length ? state.orders.map(paymentRow).join("") : `<div class="p-4 text-sm text-muted-foreground">Захиалга байхгүй</div>`}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Ажилтан</div>${sales.map((e, i) => `<div class="px-3 py-2 border-t flex justify-between gap-2"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
-  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><p class="font-medium">${o.customerName}</p><p class="text-xs text-muted-foreground">#${o.id} · ${o.employeeName || "-"} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${o.isPaid ? "tone tone--success" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!o.isPaid ? "tone tone--danger" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
+  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${esc(o.employeeName || "-")} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${o.isPaid ? "tone tone--success" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!o.isPaid ? "tone tone--danger" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
 }
 function promotionsView() {
   const tab = state.filters.promotionTab,
@@ -1524,17 +1709,16 @@ function workerNewOrderStep(cart) {
   const employeeField =
     state.currentEmployee?.role === "sales"
       ? `<div class="rounded bg-secondary/50 p-2 text-sm font-semibold">${state.currentEmployee.name}</div>`
-      : `<select onchange="state.orderEmployee=this.value" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${state.employees
-          .filter((e) => e.role === "sales")
+      : `<select onchange="state.orderEmployee=this.value" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${orderEmployeeChoices()
           .map(
             (e) =>
-              `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${e.name}</option>`,
+              `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${esc(e.name)}</option>`,
           )
           .join("")}</select>`;
   return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-start justify-between gap-2"><div class="flex-1 min-w-0">${workerStoreSummary(customer)}</div><button type="button" onclick="clearWorkerStore()" class="px-2 py-1.5 bg-secondary rounded text-sm shrink-0">Солих</button></div><div class="p-3 space-y-3"><div class="flex items-stretch gap-2"><div class="grid grid-cols-3 gap-1 flex-1 text-sm rounded bg-secondary/50 p-2 text-center"><div><b>${cart.skuCount}</b><p class="text-xs text-muted-foreground">Бараа</p></div><div><b>${cart.pieceQty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(cart.total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><button type="button" onclick="openPickerModal()" class="worker-add-plus" aria-label="Бараа нэмэх">+</button></div><input type="date" value="${deliveryDay}" onchange="state.deliveryDate=this.value;render()" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${employeeField}</div><div class="divide-y divide-border">${listHtml || `<div class="p-6 text-center text-sm text-muted-foreground">+ дарж бараа нэмнэ</div>`}</div><div class="sticky bottom-0 bg-card p-3 border-t border-border space-y-2">${paymentTermPicker()}<button onclick="saveWorker()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium ${cart.paid.length ? "" : "opacity-50"}">Хадгалах</button></div></section>`;
 }
 function workerSelectedRow(p) {
-  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${p.name}</p><p class="worker-row-meta text-xs text-muted-foreground">${p.category} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty - 1})">−</button><input onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${p.stock}" class="app-input"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty + 1})" ${p.qty >= p.stock ? "disabled" : ""}>+</button></div></div>`;
+  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${p.name}</p><p class="worker-row-meta text-xs text-muted-foreground">${p.category} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty - 1})">−</button><input readonly onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${p.stock}" class="app-input qty-stepper__input"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty + 1})" ${p.qty >= p.stock ? "disabled" : ""}>+</button></div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + o.total, 0),
@@ -1543,7 +1727,7 @@ function workerOrders(orders) {
     day = state.filters.workerDate || "",
     pay = state.filters.workerPay,
     today = todayIso();
-  return `<section class="bg-card rounded p-3 space-y-3"><div class="grid grid-cols-3 gap-2">${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}</div><div class="flex flex-wrap gap-2"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="max-h-[55vh] overflow-y-auto space-y-2">${orders.length ? orders.map((o) => `<button data-order-day="${orderDay(o)}" onclick="workerOrderDetail('${o.id}')" class="w-full text-left bg-secondary/50 rounded p-3"><div class="flex justify-between gap-2"><p class="font-medium truncate">${o.customerName}</p><b class="text-sm shrink-0">${fmt(o.total)}</b></div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)} · ${o.items.length} бараа · ${orderDay(o) !== isoDay(o.createdAt) ? `Хүргэлт ${orderDay(o)} · ` : ""}<span class="${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span></p></button>`).join("") : `<p class="text-sm text-muted-foreground text-center py-4">Захиалга байхгүй</p>`}</div></section>`;
+  return `<section class="bg-card rounded p-3 space-y-3"><div class="grid grid-cols-3 gap-2">${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}</div><div class="flex flex-wrap gap-2"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="max-h-[55vh] overflow-y-auto space-y-2">${orders.length ? orders.map((o) => `<button data-order-day="${orderDay(o)}" onclick="workerOrderDetail('${o.id}')" class="w-full text-left bg-secondary/50 rounded p-3"><div class="flex justify-between gap-2 items-start"><div class="flex items-center gap-2 min-w-0 flex-1">${receiptNo(o, "xs")}<p class="font-medium truncate">${esc(o.customerName)}</p></div><b class="text-sm shrink-0">${fmt(o.total)}</b></div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)} · ${o.items.length} бараа · ${orderDay(o) !== isoDay(o.createdAt) ? `Хүргэлт ${orderDay(o)} · ` : ""}<span class="${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span></p></button>`).join("") : `<p class="text-sm text-muted-foreground text-center py-4">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   orderReceiptModal(id);
@@ -1932,20 +2116,20 @@ function saveOrder(e) {
       })
       .filter(Boolean);
   if (!items.length) return alert("Бараа сонгоно уу");
-  state.orders.push({
-    id: String(state.orders.length + 1),
-    customerId: c.id,
-    customerName: c.companyName,
-    items,
-    total: items.reduce((s, i) => s + i.total, 0),
-    status: "pending",
-    employeeId: emp.id || "",
-    employeeName: emp.name || "",
-    employeePhone: emp.phone || "",
-    ...orderEmailFields(emp),
-    isPaid: false,
-    createdAt: new Date().toISOString(),
-  });
+  state.orders.push(
+    buildNewOrder({
+      customerId: c.id,
+      customerName: c.companyName,
+      items,
+      total: items.reduce((s, i) => s + i.total, 0),
+      status: "pending",
+      employeeId: emp.id || "",
+      employeeName: emp.name || "",
+      employeePhone: emp.phone || "",
+      ...orderEmailFields(emp),
+      isPaid: false,
+    }),
+  );
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
   closeModal();
   render();
@@ -1954,7 +2138,7 @@ function orderReceiptModal(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
   box(
-    `<span class="flex flex-wrap items-center gap-2">Зарлагын баримт ${receiptNo(o.id, "sm")}</span>`,
+    `<span class="flex flex-wrap items-center gap-2">Зарлагын баримт ${receiptNo(o, "sm")}</span>`,
     `<div class="p-5 space-y-4"><div class="rounded bg-secondary/50 p-3 space-y-1 text-sm"><p class="font-semibold">${esc(o.customerName)}</p><p class="text-muted-foreground">${esc(o.employeeName || "-")} · ${dte(o.createdAt)}</p><p><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></p></div><table class="w-full text-sm"><tbody>${o.items.map((i) => `<tr class="border-t border-border"><td class="py-2 pr-2">${esc(i.productName)}</td><td class="py-2 text-right whitespace-nowrap">${i.quantity}</td><td class="py-2 text-right font-medium whitespace-nowrap">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t pt-3 font-semibold"><span>Нийт</span><span class="text-primary">${fmt(o.total)}</span></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Баримт хэвлэх</button></div>`,
     "max-w-lg",
   );
@@ -2015,7 +2199,7 @@ function receipt(o) {
         ? state.currentEmployee.phone
         : "-"),
     deliveryDay = o.deliveryDate || o.createdAt;
-  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${o.id}</h2><section class="receipt-info"><div><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p></div><div><p><span>Харилцагч:</span><b>${c.name || o.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${c.registrationNumber || "-"}</b></p><p><span>Компанийн нэр:</span><b>${c.companyName || "-"}</b></p><p><span>Утасны дугаар:</span><b>${c.phone1 || "-"}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${addr}</b></p></div></section><section class="receipt-bank-grid"><div><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${o.items
+  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${orderReceiptNum(o)}</h2><section class="receipt-info"><div><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p></div><div><p><span>Харилцагч:</span><b>${c.name || o.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${c.registrationNumber || "-"}</b></p><p><span>Компанийн нэр:</span><b>${c.companyName || "-"}</b></p><p><span>Утасны дугаар:</span><b>${c.phone1 || "-"}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${addr}</b></p></div></section><section class="receipt-bank-grid"><div><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${o.items
     .map((i, n) => {
       const p = state.products.find((x) => x.id === i.productId) || {};
       return `<tr><td>${n + 1}</td><td>${i.productName}</td><td>${p.unit || "ш"}</td><td>${p.barcode || "-"}</td><td>${i.quantity}</td><td>${i.price.toLocaleString()}</td><td>${i.total.toLocaleString()}</td></tr>`;
@@ -2047,6 +2231,8 @@ function applyStock(id, type) {
 function setWorkerQty(id, qty) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
+  if (document.activeElement?.closest?.(".qty-stepper"))
+    document.activeElement.blur();
   state.workerQty[id] = Math.max(0, Math.min(Number(qty) || 0, p.stock));
   if (!state.workerQty[id]) delete state.workerQty[id];
   const keepPicker = pickerOpen() || !!state.filters.workerCategory;
@@ -2240,7 +2426,7 @@ function openPickerModal() {
 function pickerCategoryBtn(c) {
   return `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-btn picker-cat-btn--step1">${esc(c)}</button>`;
 }
-function pickerModal() {
+function pickerModal({ focusSearch = false } = {}) {
   const cat = state.filters.workerCategory,
     categories = cats();
   if (!cat) {
@@ -2267,10 +2453,12 @@ function pickerModal() {
     `<div class="picker-step2" data-picker-root><div class="picker-step2__scroll"><div class="picker-step-head"><button type="button" data-picker-back class="picker-back-btn">← Төрөл</button><span class="picker-step-cat">${esc(cat)}</span></div><div class="picker-search-tools"><input data-picker-search value="${esc(state.searches.workerProduct || "")}" oninput="pickerSearch(this.value)" placeholder="Хайх..." class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" data-picker-clear-search class="px-4 py-3 bg-secondary rounded text-sm whitespace-nowrap">Цэвэрлэх</button></div>${state.pickerStatus ? `<div class="picker-status">${esc(state.pickerStatus)}</div>` : ""}<div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Бараа олдсонгүй</div>`}</div></div><div class="picker-step2__bottom"><div class="picker-summary"><div><p>Сонгосон</p><b>${selected.length}</b></div><div><p>Ширхэг</p><b>${selectedQty}</b></div><div><p>Нийт</p><b>${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="py-3 bg-secondary rounded font-medium ${selected.length ? "" : "opacity-50"}">Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button></div></div></div>`,
     "max-w-4xl",
   );
-  const el = document.querySelector("[data-picker-search]");
-  if (el) {
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+  if (focusSearch) {
+    const el = document.querySelector("[data-picker-search]");
+    if (el) {
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
   }
 }
 function backToPickerCategories() {
@@ -2293,7 +2481,7 @@ function pickerQtyStepper(p, q) {
   const id = esc(p.id);
   const prev = Math.max(0, q - 1);
   const next = Math.min(p.stock, q + 1);
-  return `<div class="qty-stepper picker-qty-stepper"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${prev}">−</button><input data-picker-qty-input data-product-id="${id}" value="${q}" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="${p.stock}" class="app-input"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${next}" ${q >= p.stock ? "disabled" : ""}>+</button></div>`;
+  return `<div class="qty-stepper picker-qty-stepper"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${prev}">−</button><input readonly data-picker-qty-input data-product-id="${id}" value="${q}" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="${p.stock}" class="app-input qty-stepper__input"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${next}" ${q >= p.stock ? "disabled" : ""}>+</button></div>`;
 }
 function pickerRow(p) {
   const q = state.workerQty[p.id] || 0,
@@ -2307,7 +2495,7 @@ function setPickerCategory(cat) {
   state.filters.workerCategory = cat;
   state.searches.workerProduct = "";
   state.pickerStatus = "";
-  pickerModal();
+  pickerModal({ focusSearch: true });
 }
 function pickerSearch(value) {
   state.searches.workerProduct = value;
@@ -2446,24 +2634,24 @@ function saveWorker() {
     e = orderActor(),
     items = workerOrderLines();
   if (!workerPaidLines().length) return alert("Бараа сонгоно уу");
-  state.orders.push({
-    id: String(state.orders.length + 1),
-    customerId: c.id,
-    customerName: c.name,
-    items,
-    total: items.reduce((s, i) => s + i.total, 0),
-    status: "pending",
-    employeeId: e.id,
-    employeeName: e.name,
-    employeePhone: e.phone || "",
-    ...orderEmailFields(e),
-    isPaid: false,
-    paymentTerm: state.paymentTerm,
-    deliveryDate: state.deliveryDate || tomorrowIso(),
-    deliveryName: state.deliveryName || "",
-    deliveryPhone: state.deliveryPhone || "",
-    createdAt: new Date().toISOString(),
-  });
+  state.orders.push(
+    buildNewOrder({
+      customerId: c.id,
+      customerName: c.name,
+      items,
+      total: items.reduce((s, i) => s + i.total, 0),
+      status: "pending",
+      employeeId: e.id,
+      employeeName: e.name,
+      employeePhone: e.phone || "",
+      ...orderEmailFields(e),
+      isPaid: false,
+      paymentTerm: state.paymentTerm,
+      deliveryDate: state.deliveryDate || tomorrowIso(),
+      deliveryName: state.deliveryName || "",
+      deliveryPhone: state.deliveryPhone || "",
+    }),
+  );
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
   state.workerQty = {};
   state.filters.worker = "orders";
