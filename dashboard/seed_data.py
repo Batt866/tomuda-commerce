@@ -236,6 +236,16 @@ EMPLOYEES = [
         "commissionRate": 0,
     },
     {
+        "id": "emp-tugeegch",
+        "name": "Батбаяр",
+        "email": "tugeegch@tomuda.mn",
+        "phone": "99112233",
+        "password": "tugeegch",
+        "role": "delivery",
+        "totalSales": 0,
+        "commissionRate": 0,
+    },
+    {
         "id": "admin",
         "name": "Админ",
         "email": "admin@tomuda.mn",
@@ -266,8 +276,9 @@ def default_state() -> dict:
             "paymentTerm": "cash",
             "selectedWorkers": [],
             "selectedWarehouseOrderId": "",
-            "deliveryName": "Дуламсүрэн",
-            "deliveryPhone": "99076727",
+            "selectedDeliveryId": "emp-tugeegch",
+            "deliveryName": "Батбаяр",
+            "deliveryPhone": "99112233",
             "workerQty": {},
             "settings": {
                 "stockAlertEnabled": True,

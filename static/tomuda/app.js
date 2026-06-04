@@ -33,9 +33,12 @@ const state = {
   isPaid: false,
   selectedWorkers: [],
   selectedWarehouseOrderId: "",
+  selectedDeliveryId: "",
   deliveryName: "",
   deliveryPhone: "",
   workerQty: {},
+  pickerActiveId: "",
+  workerOrderActiveId: "",
   extraCategories: [],
   inventoryLogs: [],
   countQty: {},
@@ -50,6 +53,30 @@ const BRAND = {
   logoWhite: "/static/tomuda/branding/logo-white.png",
   logoBlue: "/static/tomuda/branding/logo-blue.png",
 };
+const MN_PROVINCES = [
+  "Улаанбаатар",
+  "Архангай",
+  "Баян-Өлгий",
+  "Баянхонгор",
+  "Булган",
+  "Говь-Алтай",
+  "Говьсүмбэр",
+  "Дорноговь",
+  "Дорнод",
+  "Дундговь",
+  "Завхан",
+  "Орхон",
+  "Өвөрхангай",
+  "Сэлэнгэ",
+  "Сүхбаатар",
+  "Төв",
+  "Увс",
+  "Ховд",
+  "Хөвсгөл",
+  "Хэнтий",
+  "Дархан-Уул",
+  "Өмнөговь",
+];
 const persistKeys = [
   "customers",
   "products",
@@ -62,9 +89,12 @@ const persistKeys = [
   "workerCustomer",
   "orderEmployee",
   "paymentTerm",
-  "workerQty",
   "promotionRules",
   "deliveryDate",
+  "selectedDeliveryId",
+  "deliveryName",
+  "deliveryPhone",
+  "selectedWorkers",
   "settings",
 ];
 let backendReady = false;
@@ -111,7 +141,21 @@ const tomorrowIso = () => {
   d.setDate(d.getDate() + 1);
   return isoDay(d);
 };
-const orderDay = (o) => isoDay(o.deliveryDate || o.createdAt);
+function defaultDeliveryDate(from) {
+  const base = new Date(from || Date.now());
+  if (Number.isNaN(base.getTime())) return tomorrowIso();
+  const d = new Date(base);
+  d.setDate(d.getDate() + 1);
+  return isoDay(d);
+}
+function orderDeliveryDay(o) {
+  const created = isoDay(o?.createdAt);
+  const stored = isoDay(o?.deliveryDate);
+  if (stored && created && stored > created) return stored;
+  if (stored && !created) return stored;
+  return defaultDeliveryDate(o?.createdAt);
+}
+const orderDay = (o) => orderDeliveryDay(o);
 const mapsLink = (lat, lng) =>
   lat && lng && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))
     ? `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`
@@ -148,6 +192,32 @@ function nextReceiptSeq(month) {
   }
   return max + 1;
 }
+function paidFromPaymentTerm(term) {
+  return term === "cash";
+}
+function orderIsPaid(o) {
+  if (!o) return false;
+  if (o.paymentTerm === "cash") return true;
+  if (o.paymentTerm === "credit") return !!o.isPaid;
+  return !!o.isPaid;
+}
+function normalizeOrderPayments() {
+  if (!Array.isArray(state.orders)) return;
+  for (const o of state.orders) {
+    if (!o.paymentTerm) o.paymentTerm = "cash";
+    if (o.paymentTerm === "cash") o.isPaid = true;
+    else if (o.paymentTerm === "credit") o.isPaid = !!o.isPaid;
+  }
+}
+function normalizeOrderDeliveryDates() {
+  if (!Array.isArray(state.orders)) return;
+  for (const o of state.orders) {
+    const created = isoDay(o.createdAt);
+    const stored = isoDay(o.deliveryDate);
+    if (!stored || (created && stored <= created))
+      o.deliveryDate = defaultDeliveryDate(o.createdAt);
+  }
+}
 function normalizeOrderReceiptNumbers() {
   if (!Array.isArray(state.orders)) return;
   const sorted = [...state.orders].sort(
@@ -173,12 +243,19 @@ function normalizeOrderReceiptNumbers() {
 function buildNewOrder(fields) {
   const createdAt = fields.createdAt || new Date().toISOString();
   const receiptMonth = receiptMonthKey({ createdAt });
+  const created = isoDay(createdAt);
+  const stored = isoDay(fields.deliveryDate);
+  const deliveryDate =
+    stored && (!created || stored > created)
+      ? fields.deliveryDate
+      : defaultDeliveryDate(createdAt);
   return {
     id: String(state.orders.length + 1),
     receiptMonth,
     receiptSeq: nextReceiptSeq(receiptMonth),
     createdAt,
     ...fields,
+    deliveryDate,
   };
 }
 function receiptNo(order, size = "md") {
@@ -189,6 +266,17 @@ function receiptNo(order, size = "md") {
   return `<span class="receipt-no receipt-no--${size}">№${esc(String(n))}</span>`;
 }
 const pickerOpen = () => !!modal.querySelector("[data-picker-root]");
+const ORDER_PICKER_TITLE = "Захиалгад бараа нэмэх";
+const PRODUCT_NEW_TITLE = "Шинэ бараа";
+const PRODUCT_EDIT_TITLE = "Бараа засах";
+function updateModalTitle(title) {
+  const el = document.getElementById("modal-title");
+  if (el) el.textContent = title;
+}
+function pickerBarcodeToolsHtml() {
+  const code = esc(state.pickerBarcode || state.searches.workerProduct || "");
+  return `<div class="barcode-tools picker-barcode-tools"><label class="sr-only" for="picker-barcode-input">Баркод</label><input id="picker-barcode-input" data-picker-barcode value="${code}" onkeydown="if(event.key==='Enter'){applyPickerBarcodeInput();event.preventDefault()}" placeholder="Баркод оруулах..." class="barcode-tools__input app-input" autocomplete="off"><button type="button" onclick="applyPickerBarcodeInput()" class="btn btn--secondary btn--sm">Оруулах</button><button type="button" onclick="startBarcodeScan('picker')" class="btn btn--primary btn--sm">Scan</button></div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>`;
+}
 const cats = () => [
   ...new Set([
     ...state.products.map((p) => p.category),
@@ -196,7 +284,42 @@ const cats = () => [
   ]),
 ];
 const role = (r) =>
-  ({ admin: "Админ", sales: "HT", warehouse: "Агуулах" })[r] || "Ажилчин";
+  ({
+    admin: "Админ",
+    sales: "HT",
+    warehouse: "Агуулах",
+    delivery: "Түгээгч",
+  })[r] || "Ажилчин";
+function deliveryEmployees() {
+  return state.employees.filter((e) => e.role === "delivery");
+}
+function ensureDeliverySelection() {
+  if (!state.selectedDeliveryId) return;
+  const emp = state.employees.find((e) => e.id === state.selectedDeliveryId);
+  if (emp?.role === "delivery") {
+    state.deliveryName = emp.name;
+    state.deliveryPhone = emp.phone || "";
+    return;
+  }
+  state.selectedDeliveryId = "";
+}
+function resolveOrderDelivery(o = {}) {
+  const id = o.deliveryEmployeeId || state.selectedDeliveryId || "",
+    emp = id ? state.employees.find((e) => e.id === id) : null;
+  return {
+    deliveryEmployeeId: id,
+    deliveryName: o.deliveryName || emp?.name || state.deliveryName || "-",
+    deliveryPhone: o.deliveryPhone || emp?.phone || state.deliveryPhone || "-",
+  };
+}
+function deliveryFieldsForNewOrder() {
+  const d = resolveOrderDelivery();
+  return {
+    deliveryEmployeeId: state.selectedDeliveryId || "",
+    deliveryName: d.deliveryName === "-" ? "" : d.deliveryName,
+    deliveryPhone: d.deliveryPhone === "-" ? "" : d.deliveryPhone,
+  };
+}
 function currentRole() {
   return state.currentEmployee?.role || "";
 }
@@ -208,12 +331,12 @@ function canDelete() {
 }
 function defaultViewForRole(r) {
   if (r === "admin") return "admin";
-  if (r === "warehouse") return "warehouse";
+  if (r === "warehouse" || r === "delivery") return "warehouse";
   return "worker";
 }
 function canAccessView(viewId, r = currentRole()) {
   if (r === "admin") return true;
-  if (r === "warehouse")
+  if (r === "warehouse" || r === "delivery")
     return ["warehouse", "warehouseReceipts"].includes(viewId);
   if (r === "sales")
     return [
@@ -228,7 +351,7 @@ function canAccessView(viewId, r = currentRole()) {
 function allowedNavIds(r = currentRole()) {
   if (r === "admin")
     return ["worker", "customers", "products", "warehouse", "count", "admin"];
-  if (r === "warehouse") return ["warehouse"];
+  if (r === "warehouse" || r === "delivery") return ["warehouse"];
   if (r === "sales") return ["worker", "customers", "products", "warehouse"];
   return ["worker", "customers", "products"];
 }
@@ -238,6 +361,7 @@ const EMPLOYEE_EMAIL_DEFAULTS = {
   "emp-hasan": "ht@tomuda.mn",
   "emp-galsan": "ht.galsan@tomuda.mn",
   "emp-munkh": "ht.munkh@tomuda.mn",
+  "emp-tugeegch": "tugeegch@tomuda.mn",
 };
 function normalizeEmail(value) {
   return String(value || "")
@@ -251,13 +375,19 @@ function ensureEmployeeEmails() {
     }
   });
 }
+function canTakeOrdersRole(r) {
+  return r === "sales" || r === "admin";
+}
 function orderActor() {
-  if (state.currentEmployee?.role === "sales") return state.currentEmployee;
-  return (
-    state.employees.find((x) => x.id === state.orderEmployee) ||
-    state.currentEmployee ||
-    {}
-  );
+  const cur = state.currentEmployee;
+  if (!cur) return {};
+  if (cur.role === "sales") return cur;
+  if (
+    cur.role === "admin" &&
+    (!state.orderEmployee || state.orderEmployee === cur.id)
+  )
+    return cur;
+  return state.employees.find((x) => x.id === state.orderEmployee) || cur || {};
 }
 function orderEmployeeChoices() {
   const sales = state.employees.filter((e) => e.role === "sales");
@@ -290,8 +420,65 @@ const card = (l, v, t = "") =>
   `<div class="stat-card bg-card rounded p-4"><p class="stat-card__label">${l}</p><p class="stat-card__value ${t}">${v}</p></div>`;
 const pageHead = (title, action = "") =>
   action
-    ? `<div class="page-head page-head--row"><h2 class="page-head__title">${title}</h2>${action}</div>`
+    ? `<div class="page-head page-head--row"><h2 class="page-head__title">${title}</h2><div class="page-head__actions">${action}</div></div>`
     : `<h2 class="page-head__title">${title}</h2>`;
+const MOBILE_NAV_SHORT = {
+  worker: "Захиалга",
+  customers: "Харилцагч",
+  products: "Бараа",
+  warehouse: "Агуулах",
+  count: "Тооллого",
+  admin: "Админ",
+};
+const MOBILE_NAV_SVG = {
+  worker:
+    '<path d="M6 6h15l-1.5 9h-12L6 6z"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>',
+  customers: '<path d="M3 9h18v12H3z"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/>',
+  products:
+    '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+  warehouse:
+    '<path d="M9 5H5a2 2 0 0 0-2 2v12h16V7a2 2 0 0 0-2-2h-4"/><path d="M9 5a2 2 0 0 1 4 0v2H9V5z"/>',
+  count: '<path d="M4 7h16M4 12h10M4 17h16"/><path d="M18 10v6M15 13h6"/>',
+  admin:
+    '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+};
+function mobileNavIcon(id) {
+  const paths = MOBILE_NAV_SVG[id];
+  if (!paths)
+    return '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/></svg>';
+  return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+}
+function mobileNavActive(viewId, navId) {
+  if (viewId === navId) return true;
+  if (
+    navId === "admin" &&
+    ["employees", "inventory", "reports", "promotions"].includes(viewId)
+  )
+    return true;
+  if (navId === "warehouse" && viewId === "warehouseReceipts") return true;
+  return false;
+}
+function mobileBottomNav(nav) {
+  if (!nav.length) return "";
+  return `<nav class="mobile-bottom-nav lg:hidden" aria-label="Үндсэн цэс">${nav
+    .map(([id, label]) => {
+      const active = mobileNavActive(state.currentView, id);
+      return `<button type="button" onclick="go('${id}');state.mobileOpen=false;render()" class="mobile-bottom-nav__item ${active ? "is-active" : ""}" aria-current="${active ? "page" : "false"}"><span class="mobile-bottom-nav__icon" aria-hidden="true">${mobileNavIcon(id)}</span><span class="mobile-bottom-nav__label">${MOBILE_NAV_SHORT[id] || label}</span></button>`;
+    })
+    .join("")}</nav>`;
+}
+function currentPageTitle(nav) {
+  const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
+  if (hit) return hit[1];
+  const extra = {
+    employees: "Ажилтан",
+    inventory: "Агуулах",
+    reports: "Тайлан",
+    promotions: "Урамшуулал",
+    warehouseReceipts: "Баримтууд",
+  };
+  return extra[state.currentView] || "ТОМУДА";
+}
 const productImage = (p) =>
   p.image ||
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
@@ -309,8 +496,13 @@ function applyPersistentState(data) {
   });
   if (!state.promotionRules?.quantity)
     state.promotionRules = { quantity: [], price: [] };
+  if (!state.workerQty || typeof state.workerQty !== "object")
+    state.workerQty = {};
   ensureSettings();
+  ensureDeliverySelection();
   normalizeOrderReceiptNumbers();
+  normalizeOrderPayments();
+  normalizeOrderDeliveryDates();
   return true;
 }
 function localStateDirty() {
@@ -326,6 +518,7 @@ function captureSessionSnapshot() {
     filters: { ...state.filters },
     selectedWorkers: [...(state.selectedWorkers || [])],
     selectedWarehouseOrderId: state.selectedWarehouseOrderId,
+    selectedDeliveryId: state.selectedDeliveryId,
     workerStoreReady: state.workerStoreReady,
     pickerStatus: state.pickerStatus,
     pickerBarcode: state.pickerBarcode,
@@ -350,6 +543,8 @@ function applyRemoteState(payload) {
   restoreSessionSnapshot(session);
   ensureEmployeeEmails();
   normalizeOrderReceiptNumbers();
+  normalizeOrderPayments();
+  normalizeOrderDeliveryDates();
   backendLastSaved = JSON.stringify({ state: persistentState() });
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   render();
@@ -414,7 +609,12 @@ async function boot() {
   backendReady = true;
   ensureEmployeeEmails();
   ensureSettings();
+  ensureDeliverySelection();
   normalizeOrderReceiptNumbers();
+  normalizeOrderPayments();
+  normalizeOrderDeliveryDates();
+  state.workerQty = {};
+  restoreAuthSession();
   initNoZoom();
   initPickerModalActions();
   initQtyStepperButtons();
@@ -434,8 +634,7 @@ function handleAppBack() {
   }
 
   if (modal.innerHTML.trim()) {
-    if (pickerOpen() && state.filters.workerCategory) backToPickerCategories();
-    else closeModal();
+    closeModal();
     return true;
   }
 
@@ -453,6 +652,7 @@ function handleAppBack() {
     state.workerStoreReady = false;
     state.workerCustomer = "";
     state.searches.workerStore = "";
+    resetWorkerCart();
     render();
     return true;
   }
@@ -514,37 +714,87 @@ function bindCapacitorBackButton() {
     else tryExitApp();
   });
 }
+function qtyStepperApply(btn) {
+  const action = btn.getAttribute("data-qty-action");
+  const id = btn.getAttribute("data-product-id");
+  if (!action || !id) return;
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
+  const min = Number(btn.closest(".qty-stepper")?.dataset?.qtyMin || 0);
+  let q = getWorkerQty(id);
+  if (action === "inc") q = Math.min(p.stock, q + 1);
+  else if (action === "dec") q = Math.max(min, q - 1);
+  else return;
+  if (btn.closest("[data-picker-root]")) pickerQtyChange(id, q);
+  else setWorkerQty(id, q);
+}
+function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
+  const idAttr = esc(p.id);
+  const decDisabled = q <= min;
+  const incDisabled = q >= p.stock;
+  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""}>−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="pickerQtyInput(this)" onchange="pickerQtyInput(this)" value="${q}" type="text" inputmode="numeric" pattern="[0-9]*" min="${min}" max="${p.stock}" readonly class="app-input qty-stepper__input"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""}>+</button></div>`;
+}
+function ensurePickerActiveId() {
+  if (state.pickerActiveId && getWorkerQty(state.pickerActiveId)) return;
+  state.pickerActiveId = "";
+}
+function workerQtyStepperHtml(p, q) {
+  const idAttr = esc(p.id);
+  const decDisabled = q <= 1;
+  const incDisabled = q >= p.stock;
+  return `<div class="qty-stepper worker-order-qty-stepper" data-qty-min="1"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""}>−</button><input data-product-id="${idAttr}" oninput="workerQtyInput(this)" onchange="workerQtyInput(this)" value="${q}" type="text" inputmode="numeric" pattern="[0-9]*" min="1" max="${p.stock}" readonly class="app-input qty-stepper__input"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""}>+</button></div>`;
+}
+function setWorkerOrderActive(id) {
+  if (!id) return;
+  state.workerOrderActiveId = id;
+  render();
+}
+function finishWorkerOrderEdit() {
+  state.workerOrderActiveId = "";
+  render();
+}
+function finishPickerEdit() {
+  state.pickerActiveId = "";
+  if (pickerOpen() && refreshPickerList()) return;
+  render();
+  if (pickerOpen()) pickerModal();
+}
+function workerOrderQtyHtml(p, q) {
+  const id = esc(p.id);
+  if (state.workerOrderActiveId === p.id)
+    return `<div class="worker-row-edit">${workerQtyStepperHtml(p, q)}<button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
+  return `<button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${q}</span><span class="worker-row-qty__unit">ш</span></button>`;
+}
+function workerQtyInput(el) {
+  setWorkerQty(el.getAttribute("data-product-id") || "", Number(el.value));
+}
 function initQtyStepperButtons() {
   if (document.documentElement.dataset.qtyStepperBound) return;
   document.documentElement.dataset.qtyStepperBound = "1";
-  const onStepperButton = (e) => {
-    const btn = e.target.closest(".qty-stepper button");
-    if (!btn) return;
-    e.preventDefault();
-    const active = document.activeElement;
-    if (active?.closest?.(".qty-stepper")) active.blur();
-  };
-  document.addEventListener("mousedown", onStepperButton, true);
-  document.addEventListener("touchstart", onStepperButton, {
-    capture: true,
-    passive: false,
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      const btn = e.target.closest?.(".qty-stepper__btn[data-qty-action]");
+      if (!btn || btn.disabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      qtyStepperApply(btn);
+    },
+    true,
+  );
+  document.addEventListener("focusin", (e) => {
+    const input = e.target;
+    if (!input.matches?.(".qty-stepper__input[readonly]")) return;
+    input.readOnly = false;
+    input.type = "number";
+    requestAnimationFrame(() => input.select?.());
   });
-  document.addEventListener(
-    "focusin",
-    (e) => {
-      const input = e.target.closest?.(".qty-stepper input");
-      if (input) input.readOnly = false;
-    },
-    true,
-  );
-  document.addEventListener(
-    "focusout",
-    (e) => {
-      const input = e.target.closest?.(".qty-stepper input");
-      if (input) input.readOnly = true;
-    },
-    true,
-  );
+  document.addEventListener("focusout", (e) => {
+    const input = e.target;
+    if (!input.matches?.(".qty-stepper__input")) return;
+    input.readOnly = true;
+    input.type = "text";
+  });
 }
 function initPickerModalActions() {
   if (modal.dataset.pickerBound) return;
@@ -555,22 +805,6 @@ function initPickerModalActions() {
       setPickerCategory(catBtn.getAttribute("data-picker-cat") || "");
       return;
     }
-    const qtyBtn = e.target.closest("[data-picker-qty]");
-    if (qtyBtn?.disabled) return;
-    if (qtyBtn) {
-      e.preventDefault();
-      document.activeElement?.blur?.();
-      setWorkerQty(
-        qtyBtn.getAttribute("data-product-id") || "",
-        Number(qtyBtn.getAttribute("data-qty")),
-      );
-      return;
-    }
-    const backBtn = e.target.closest("[data-picker-back]");
-    if (backBtn) {
-      backToPickerCategories();
-      return;
-    }
     const clearSearchBtn = e.target.closest("[data-picker-clear-search]");
     if (clearSearchBtn) {
       clearPickerSearch();
@@ -579,6 +813,15 @@ function initPickerModalActions() {
     const clearCartBtn = e.target.closest("[data-picker-clear-cart]");
     if (clearCartBtn) {
       clearPickerCart();
+      return;
+    }
+    const editBtn = e.target.closest("[data-picker-edit]");
+    if (editBtn) {
+      const id = editBtn.getAttribute("data-picker-edit") || "";
+      state.pickerActiveId = state.pickerActiveId === id ? "" : id;
+      if (refreshPickerList()) return;
+      pickerModal();
+      return;
     }
   });
   modal.addEventListener("change", (e) => {
@@ -586,19 +829,14 @@ function initPickerModalActions() {
     if (check) {
       const id = check.getAttribute("data-product-id") || "";
       if (check.checked) {
-        const cur = state.workerQty[id] || 0;
+        const cur = getWorkerQty(id);
+        state.pickerActiveId = id;
         setWorkerQty(id, cur > 0 ? cur : 1);
       } else {
+        if (state.pickerActiveId === id) state.pickerActiveId = "";
         setWorkerQty(id, 0);
       }
-      return;
     }
-    const qtyInput = e.target.closest("[data-picker-qty-input]");
-    if (!qtyInput) return;
-    setWorkerQty(
-      qtyInput.getAttribute("data-product-id") || "",
-      Number(qtyInput.value),
-    );
   });
 }
 function initNoZoom() {
@@ -934,6 +1172,7 @@ function go(view) {
   if (!canAccessView(view)) return;
   state.currentView = view;
   state.mobileOpen = false;
+  saveAuthSession();
   render();
 }
 function search(key, value) {
@@ -952,10 +1191,14 @@ function shell(content) {
     ["customers", "Харилцагч"],
     ["products", "Бараа"],
     ["warehouse", "Агуулах"],
-    ["count", "Тооллогo"],
+    ["count", "Тооллого"],
     ["admin", "Админ"],
   ].filter(([id]) => allowedNavIds(userRole).includes(id));
-  return `<div class="min-h-screen bg-background flex"><button onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<aside class="mobile-sidebar fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1></div></div></div><nav class="flex-1 p-4 space-y-1 overflow-y-auto">${nav.map(([id, label]) => `<button onclick="go('${id}')" class="w-full px-4 py-3 rounded text-left ${state.currentView === id ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}${pwaInstallSidebarBtn()}</nav><div class="p-4 border-t border-sidebar-border"><div class="flex items-center gap-3 px-4 py-3 rounded bg-sidebar-accent"><div class="flex-1 min-w-0"><p class="font-medium truncate">${state.currentEmployee?.name || "Нэвтрээгүй"}</p><p class="text-xs text-sidebar-foreground/70 truncate">${state.currentEmployee ? role(state.currentEmployee.role) : ""}</p></div>${state.currentEmployee ? `<button onclick="logout()" class="px-3 py-2 hover:bg-sidebar-border rounded text-sm shrink-0">Гарах</button>` : ""}</div></div></aside><main class="flex-1 p-4 lg:p-8 overflow-auto"><div class="max-w-7xl mx-auto pt-12 lg:pt-0">${["employees", "inventory", "reports", "promotions"].includes(state.currentView) ? `<button onclick="go('admin')" class="mb-2 px-3 py-1.5 bg-card rounded text-sm">← Админ</button>` : ""}${content}</div></main></div>`;
+  const emp = state.currentEmployee,
+    initial = emp?.name ? deliveryInitial(emp.name) : "?",
+    useBottomNav = nav.length >= 2,
+    pageTitle = currentPageTitle(nav);
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden"><p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="mobile-sidebar fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1></div></div></div><nav class="flex-1 p-4 space-y-1 overflow-y-auto lg:block ${useBottomNav ? "hidden" : ""}" aria-label="Үндсэн цэс">${nav.map(([id, label]) => `<button type="button" onclick="go('${id}');state.mobileOpen=false;render()" class="sidebar-nav-btn w-full px-4 py-3 rounded text-left ${mobileNavActive(state.currentView, id) ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}${pwaInstallSidebarBtn()}</nav><div class="p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 p-4 lg:p-8 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${["employees", "inventory", "reports", "promotions"].includes(state.currentView) ? `<button type="button" onclick="go('admin')" class="btn btn--secondary btn--block-mobile mb-3">← Админ</button>` : ""}${content}</div></main>${mobileBottomNav(nav)}</div>`;
 }
 function adminView() {
   ensureSettings();
@@ -1040,34 +1283,72 @@ function orderReceiptsPanel({
     return warehouseReceiptsPanel(rows, { title, searchKey, employeeIds });
   return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2>${showCreate ? `<button onclick="orderModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Шинэ</button>` : ""}</div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(q)}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold">Захиалга</th><th class="px-4 py-3 text-left text-xs font-semibold">Ажилтан</th><th class="px-4 py-3 text-left text-xs font-semibold">Бараа</th><th class="px-4 py-3 text-left text-xs font-semibold">Төлөв</th><th class="px-4 py-3 text-right text-xs font-semibold">Дүн</th><th class="px-4 py-3 text-right text-xs font-semibold">Үйлдэл</th></tr></thead><tbody class="divide-y divide-border">${rows.map(orderRow).join("")}</tbody></table></div>${rows.length ? "" : `<div class="p-12 text-center text-muted-foreground">Захиалга олдсонгүй</div>`}</section>`;
 }
+function warehouseOrderStatusActions(o) {
+  if (o.status === "pending") {
+    let html = `<button type="button" onclick="setOrder('${o.id}','confirmed')" class="btn btn--sm tone tone--success">Батлах</button>`;
+    if (canDelete())
+      html += `<button type="button" onclick="setOrder('${o.id}','cancelled')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
+    return html;
+  }
+  if (o.status === "confirmed")
+    return `<button type="button" onclick="setOrder('${o.id}','delivered')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
+  return "";
+}
+function warehouseReceiptListItem(o) {
+  const active = state.selectedWarehouseOrderId === o.id;
+  return `<button type="button" onclick="selectWarehouseOrder('${o.id}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(o.total)} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button>`;
+}
 function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   if (rows.length && !rows.some((o) => o.id === state.selectedWarehouseOrderId))
     state.selectedWarehouseOrderId = rows[0].id;
   if (!rows.length) state.selectedWarehouseOrderId = "";
   const selected = rows.find((o) => o.id === state.selectedWarehouseOrderId),
-    total = rows.reduce((s, o) => s + o.total, 0);
-  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2><div class="flex items-center gap-2 shrink-0"><b class="text-primary">${fmt(total)}</b><button onclick="go('warehouse')" class="px-2 py-1.5 bg-secondary rounded text-sm">←</button></div></div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(state.searches[searchKey] || "")}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] border-t border-border"><div class="border-b lg:border-b-0 lg:border-r border-border max-h-[520px] overflow-y-auto">${rows.length ? rows.map((o) => `<button onclick="selectWarehouseOrder('${o.id}')" class="w-full text-left px-4 py-3 border-b border-border hover:bg-secondary/40 ${state.selectedWarehouseOrderId === o.id ? "bg-primary/10" : ""}"><div class="receipt-list-item">${receiptNo(o, "sm")}<div class="min-w-0 flex-1"><p class="font-semibold truncate">${esc(o.customerName)}</p><p class="text-xs text-muted-foreground mt-0.5">${fmt(o.total)} · ${dte(o.createdAt)}</p></div></div></button>`).join("") : `<div class="p-6 text-sm text-muted-foreground text-center">Захиалга олдсонгүй</div>`}</div>${selected ? warehouseOrderDetail(selected) : `<div class="p-8 text-sm text-muted-foreground text-center">Баримт сонгоно уу</div>`}</div></section>`;
+    total = rows.reduce((s, o) => s + o.total, 0),
+    listHtml = rows.length
+      ? rows.map(warehouseReceiptListItem).join("")
+      : `<p class="wh-receipt-list__empty">Захиалга олдсонгүй</p>`,
+    detailHtml = selected
+      ? warehouseOrderDetail(selected)
+      : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`;
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside"><span class="wh-receipts__total">${fmt(total)}</span><button type="button" onclick="go('warehouse')" class="btn btn--secondary btn--sm">←</button></div></header><div class="wh-receipts__filters"><input data-focus="${searchKey}" value="${esc(state.searches[searchKey] || "")}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="wh-receipts__search app-input" autocomplete="off"><select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
 }
 function warehouseOrderDetail(o) {
-  return `<div class="p-4 space-y-4"><div class="receipt-detail-head"><span class="receipt-detail-head__type">Зарлагын баримт</span>${receiptNo(o, "lg")}</div><div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3"><div><p class="text-sm text-muted-foreground">Захиалгын дүн</p><p class="text-2xl font-bold text-primary">${fmt(o.total)}</p></div><div class="flex flex-wrap gap-2"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Хэвлэх</button></div></div><div><h3 class="font-semibold">${esc(o.customerName)}</h3><p class="text-sm text-muted-foreground">${esc(o.employeeName || "-")} · ${dte(o.createdAt)}</p></div><div class="bg-secondary/50 rounded overflow-hidden"><div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-2 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span class="text-right">Тоо</span><span class="text-right">Дүн</span></div>${o.items.map((i) => `<div class="grid grid-cols-[1fr_72px_100px] gap-2 px-3 py-3 border-t border-border text-sm"><span class="font-medium">${esc(i.productName)}</span><b class="text-right">${i.quantity}</b><span class="text-right">${fmt(i.total)}</span></div>`).join("")}</div></div>`;
+  const actions = warehouseOrderStatusActions(o),
+    lines = o.items
+      .map(
+        (i) =>
+          `<div class="wh-line"><span class="wh-line__name">${esc(i.productName)}</span><span class="wh-line__qty">${i.quantity} ш</span><span class="wh-line__sum">${fmt(i.total)}</span></div>`,
+      )
+      .join("");
+  return `<div class="wh-receipt-detail"><div class="wh-receipt-detail__top"><div class="wh-receipt-detail__lead"><h3 class="wh-receipt-detail__title">${esc(o.customerName)}</h3><div class="wh-receipt-detail__sub">${receiptNo(o, "sm")}<span> · ${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа</span></div></div><p class="wh-receipt-detail__total">${fmt(o.total)}</p></div><div class="wh-receipt-detail__bar"><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span><div class="wh-receipt-detail__btns">${actions}<button type="button" onclick="printOrderReceipt('${o.id}')" class="btn btn--secondary btn--sm">Хэвлэх</button></div></div><div class="wh-receipt-detail__items">${lines}</div></div>`;
 }
 function orderRow(o) {
-  const pendingActions =
-    o.status === "pending"
-      ? `<button onclick="setOrder('${o.id}','confirmed')" class="px-3 py-1.5 tone tone--success rounded text-sm">Батлах</button>${canDelete() ? `<button onclick="setOrder('${o.id}','cancelled')" class="px-3 py-1.5 tone tone--danger rounded text-sm">Цуцлах</button>` : ""}`
-      : "";
-  const deliveredAction =
-    o.status === "confirmed"
-      ? `<button onclick="setOrder('${o.id}','delivered')" class="px-3 py-1.5 tone tone--info rounded text-sm">Хүргэсэн</button>`
-      : "";
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${pendingActions}${deliveredAction}</div></td></tr>`;
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
+}
+function customerSubtitle(c) {
+  const name = String(c.name || "").trim();
+  const company = String(c.companyName || "").trim();
+  if (!company || company === name) return "";
+  return company;
+}
+function customerCardPhoneIcon() {
+  return `<svg class="ui-icon customer-card__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+}
+function customerCardPinIcon() {
+  return `<svg class="ui-icon customer-card__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
 }
 function customerListHead() {
-  return `<div class="customer-row customer-row--head" aria-hidden="true"><div class="customer-row__name"><span>Харилцагч</span></div><div class="customer-row__phone"><span>Дугаар</span></div><div class="customer-row__address"><span>Хаяг</span></div><div class="customer-row__actions"><span class="customer-row__actions-label">Үйлдэл</span></div></div>`;
+  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Дугаар</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
-  return `<div class="customer-row ${active ? "customer-row--active" : ""}"><div class="customer-row__name min-w-0"><p class="customer-row__title">${esc(c.name)}</p><p class="customer-row__company">${esc(c.companyName || "-")}</p></div><div class="customer-row__phone"><span class="customer-row__label">Дугаар</span><span class="customer-row__value">${esc(c.phone1 || "-")}</span></div><div class="customer-row__address min-w-0"><span class="customer-row__label">Хаяг</span><span class="customer-row__value customer-row__value--address" title="${esc(addr)}">${esc(addr)}</span></div><div class="customer-row__actions">${actionsHtml}</div></div>`;
+  const sub = customerSubtitle(c);
+  const phone = (c.phone1 || "").trim();
+  const initial = deliveryInitial(c.name);
+  const phoneHtml = phone
+    ? `<a href="tel:${encodeURIComponent(phone)}" class="customer-card__line">${customerCardPhoneIcon()}<span>${esc(phone)}</span></a>`
+    : `<span class="customer-card__muted">Утасгүй</span>`;
+  return `<article class="customer-card ${active ? "customer-card--active" : ""}"><header class="customer-card__head"><span class="customer-card__avatar" aria-hidden="true">${esc(initial)}</span><div class="customer-card__identity"><h3 class="customer-card__name">${esc(c.name)}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__phone">${phoneHtml}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function customersView() {
   const q = state.searches.customers || "",
@@ -1076,7 +1357,7 @@ function customersView() {
         (v || "").toLowerCase().includes(q.toLowerCase()),
       ),
     );
-  return `<div class="space-y-4">${pageHead("Харилцагч", `<button type="button" onclick="customerModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Хайх..." class="list-panel__search app-input"></div><div class="list-panel__table">${customerListHead()}<div class="list-panel__body divide-y divide-border/60">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Харилцагч", `<button type="button" onclick="customerModal()" class="btn btn--sm btn--primary shrink-0">+ Нэмэх</button>`)}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Нэр, компани, утсаар хайх..." class="list-panel__search app-input" autocomplete="off"></div><div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function customerAddress(c) {
   return (
@@ -1086,20 +1367,21 @@ function customerAddress(c) {
 }
 function customerRow(c) {
   const deleteBtn = canDelete()
-    ? `<button type="button" onclick="confirmDelete('customer','${c.id}')" class="list-btn list-btn--danger">Устгах</button>`
+    ? `<button type="button" onclick="confirmDelete('customer','${c.id}')" class="customer-card__btn customer-card__btn--danger">Устгах</button>`
     : "";
   return customerListRow(
     c,
-    `<button type="button" onclick="customerDetail('${c.id}')" class="list-btn list-btn--secondary">Харах</button><button type="button" onclick="customerModal('${c.id}')" class="list-btn list-btn--primary">Засах</button>${deleteBtn}`,
+    `<button type="button" onclick="customerDetail('${c.id}')" class="customer-card__btn customer-card__btn--ghost">Харах</button><button type="button" onclick="customerModal('${c.id}')" class="customer-card__btn customer-card__btn--primary">Засах</button>${deleteBtn}`,
   );
 }
-function workerStoreRow(c) {
+function workerPickCard(c) {
   const active = state.workerCustomer === c.id;
-  return customerListRow(
-    c,
-    `<button type="button" onclick="customerDetail('${c.id}')" class="list-btn list-btn--secondary">Харах</button><button type="button" onclick="pickWorkerStore('${c.id}')" class="list-btn list-btn--primary">Сонгох</button>`,
-    active,
-  );
+  const sub = customerSubtitle(c);
+  const phone = (c.phone1 || "").trim();
+  const initial = deliveryInitial(c.name);
+  const id = esc(c.id);
+  const line2 = sub || phone;
+  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')"><span class="worker-pick-card__avatar">${esc(initial)}</span><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
 function productsView() {
   const q = state.searches.products || "",
@@ -1115,13 +1397,18 @@ function productsView() {
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
-    )}</select>${isAdmin() ? `<button onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button>` : ""}</div><div class="bg-card rounded overflow-hidden product-list">${list.length ? list.map(productCard).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+    )}</select>${isAdmin() ? `<button onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Шинэ бараа</button>` : ""}</div><div class="bg-card rounded overflow-hidden product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+}
+function productListHead() {
+  const actions = isAdmin();
+  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span><span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
 }
 function productCard(p) {
   const adminActions = isAdmin()
-    ? `<div class="product-card__actions"><button onclick="productModal('${p.id}')" class="px-3 py-2 bg-secondary rounded text-sm">Засах</button><button onclick="confirmDelete('product','${p.id}')" class="px-3 py-2 tone tone--danger rounded text-sm">Устгах</button></div>`
+    ? `<div class="product-card__actions"><button type="button" onclick="productModal('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" onclick="confirmDelete('product','${p.id}')" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
     : "";
-  return `<article class="product-card">${adminActions}<div class="product-card__body"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-card__img"><div class="product-card__meta"><p class="product-card__title">${p.name}</p><p class="product-card__sub product-card__sub--desktop">${p.category || "-"} · ${p.country || ""}</p><div class="product-card__row"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><p class="product-card__sub product-card__sub--desktop font-mono">${p.barcode || "-"}</p></div></div></article>`;
+  const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
+  return `<article class="product-card"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -1133,14 +1420,14 @@ function inventoryView() {
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
           p.barcode.includes(q)),
     );
-  return `<div class="space-y-4">${pageHead("Агуулах", `<button onclick="csv('inventory.csv',state.inventoryLogs.map(l=>[dte(l.date),l.productName,l.type,l.quantity,l.employeeName]))" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Татах</button>`)}<div class="inventory-tabs grid grid-cols-3 gap-1 p-1 bg-secondary rounded">${[
+  return `<div class="space-y-4">${pageHead("Агуулах", `<button type="button" onclick="csv('inventory.csv',state.inventoryLogs.map(l=>[dte(l.date),l.productName,l.type,l.quantity,l.employeeName]))" class="btn btn--sm btn--secondary shrink-0">Татах</button>`)}<div class="seg-tabs seg-tabs--3">${[
     ["stock", "Үлдэгдэл"],
     ["in", "Орлого авах"],
     ["out", "Зарлага гаргах"],
   ]
     .map(
       (t) =>
-        `<button type="button" onclick="state.filters.inventory='${t[0]}';render()" class="inventory-tab px-2 py-2.5 rounded text-sm font-medium ${tab === t[0] ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}">${t[1]}</button>`,
+        `<button type="button" onclick="state.filters.inventory='${t[0]}';render()" class="seg-tab ${tab === t[0] ? "is-active" : ""}">${t[1]}</button>`,
     )
     .join(
       "",
@@ -1181,7 +1468,7 @@ function countView() {
       (id) => countValue(id) !== null,
     ).length,
     mismatches = countMismatches();
-  return `<div class="space-y-4">${pageHead("Тооллогo")}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Нийт", state.products.length)}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="count-list divide-y divide-border">${list.map(countRow).join("")}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="py-3 bg-card rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
+  return `<div class="space-y-4">${pageHead("Тооллого")}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Нийт", state.products.length)}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="count-list divide-y divide-border">${list.map(countRow).join("")}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="py-3 bg-card rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
   const value = countValue(p.id),
@@ -1234,7 +1521,7 @@ function reportsView() {
       .filter((o) => o.status !== "cancelled")
       .reduce((s, o) => s + o.total, 0),
     paid = state.orders
-      .filter((o) => o.isPaid)
+      .filter((o) => orderIsPaid(o))
       .reduce((s, o) => s + o.total, 0),
     stock = state.products.reduce((s, p) => s + p.stock * p.costPrice, 0);
   const sales = state.employees
@@ -1252,7 +1539,8 @@ function reportsView() {
   return `<div class="space-y-4">${pageHead("Тайлан", `<button onclick="csv('report.csv',[[${total},${paid}]])" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">Татах</button>`)}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(total - paid), "text-tone-danger")}${card("Үлдэгдэл", fmt(stock))}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Төлбөр</div>${state.orders.length ? state.orders.map(paymentRow).join("") : `<div class="p-4 text-sm text-muted-foreground">Захиалга байхгүй</div>`}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Ажилтан</div>${sales.map((e, i) => `<div class="px-3 py-2 border-t flex justify-between gap-2"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
-  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${esc(o.employeeName || "-")} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${o.isPaid ? "tone tone--success" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!o.isPaid ? "tone tone--danger" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
+  const paid = orderIsPaid(o);
+  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${esc(o.employeeName || "-")} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${paid ? "tone tone--success" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!paid ? "tone tone--danger" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
 }
 function promotionsView() {
   const tab = state.filters.promotionTab,
@@ -1315,7 +1603,7 @@ function promotionProductPickerBlock(
   return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block"><input type="hidden" name="${fieldName}" id="promo-${fieldName}" value="${esc(selectedId)}" required>${head}${inputRow}${warn}${listHtml}</div></div>`;
 }
 function promoSectionArrow() {
-  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon">↓</span><span class="promo-section-arrow-text">үнэгүй өгнө</span></div>`;
+  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">үнэгүй өгнө</span></div>`;
 }
 function promotionQtyField(name, label, defaultValue, inline = false) {
   const val =
@@ -1428,7 +1716,7 @@ function savePromotionQty(e) {
 function workerPaidLines() {
   return state.products
     .map((p) => {
-      const q = state.workerQty[p.id] || 0;
+      const q = getWorkerQty(p.id);
       return q
         ? {
             productId: p.id,
@@ -1440,6 +1728,11 @@ function workerPaidLines() {
         : null;
     })
     .filter(Boolean);
+}
+function workerPaidProductsInCart() {
+  return state.products
+    .map((p) => ({ ...p, qty: getWorkerQty(p.id) }))
+    .filter((p) => p.qty > 0);
 }
 function applyQuantityPromotions(lines) {
   const result = lines.map((line) => ({ ...line }));
@@ -1522,6 +1815,61 @@ function getSavedLogin() {
     return null;
   }
 }
+const AUTH_SESSION_KEY = "tomuda-session";
+function applyLoginRoleDefaults(emp) {
+  if (!emp) return;
+  if (emp.role === "warehouse" || emp.role === "delivery") {
+    state.selectedWorkers = [];
+    state.selectedWarehouseOrderId = "";
+    if (emp.role === "delivery") {
+      state.selectedDeliveryId = emp.id;
+      state.deliveryName = emp.name;
+      state.deliveryPhone = emp.phone || "";
+    } else {
+      state.selectedDeliveryId = "";
+      state.deliveryName = "";
+      state.deliveryPhone = "";
+    }
+  }
+}
+function saveAuthSession() {
+  if (!state.isLoggedIn || !state.currentEmployee?.id) {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    return;
+  }
+  localStorage.setItem(
+    AUTH_SESSION_KEY,
+    JSON.stringify({
+      employeeId: state.currentEmployee.id,
+      currentView: state.currentView,
+    }),
+  );
+}
+function restoreAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    const emp = state.employees.find((e) => e.id === data.employeeId);
+    if (!emp) {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      return false;
+    }
+    state.currentEmployee = emp;
+    state.isLoggedIn = true;
+    state.orderEmployee = emp.id;
+    const view = data.currentView;
+    state.currentView =
+      view && canAccessView(view, emp.role)
+        ? view
+        : defaultViewForRole(emp.role);
+    applyLoginRoleDefaults(emp);
+    return true;
+  } catch {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    return false;
+  }
+}
 function saveLoginCredentials(email, password, remember) {
   if (!remember) {
     localStorage.removeItem("tomuda-login");
@@ -1546,8 +1894,8 @@ function loginView() {
   const remember = !!saved?.remember;
   const installBtn = isNativeApp()
     ? ""
-    : `<button type="button" onclick="installAppOnPhone()" class="w-full mt-4 py-3 bg-primary text-primary-foreground rounded font-semibold text-sm">${pwaInstallLabel()}</button>`;
-  return `<div class="min-h-screen flex items-center justify-center p-4"><div class="w-full max-w-sm"><div class="login-brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="login-brand__logo"><h1 class="text-lg font-bold text-center">ТОМУДА</h1></div><form onsubmit="login(event)" class="bg-card rounded p-4 space-y-3 mt-4"><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="Email" value="${esc(saved?.email || "")}" class="w-full px-4 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Нууц үг" value="${esc(saved?.password || "")}" class="w-full px-4 py-3 bg-secondary rounded app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нууц үг санах</span></label><div id="loginError"></div><button class="w-full h-12 rounded text-base font-semibold bg-primary text-primary-foreground">Нэвтрэх</button>${installBtn}</form></div></div>`;
+    : `<button type="button" onclick="installAppOnPhone()" class="btn btn--secondary btn--block">${pwaInstallLabel()}</button>`;
+  return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Борлуулалт, агуулах удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
 }
 function workerOrdersList() {
   let list = [...state.orders];
@@ -1555,8 +1903,8 @@ function workerOrdersList() {
     list = list.filter((o) => o.employeeId === state.currentEmployee.id);
   }
   const pay = state.filters.workerPay;
-  if (pay === "paid") list = list.filter((o) => o.isPaid);
-  if (pay === "unpaid") list = list.filter((o) => !o.isPaid);
+  if (pay === "paid") list = list.filter((o) => orderIsPaid(o));
+  if (pay === "unpaid") list = list.filter((o) => !orderIsPaid(o));
   const day = state.filters.workerDate;
   if (day) list = list.filter((o) => orderDay(o) === day);
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -1564,13 +1912,19 @@ function workerOrdersList() {
 function workerView() {
   const tab = state.filters.worker,
     cart = workerCartSummary(),
-    orders = workerOrdersList();
-  return `<div class="space-y-4"><div class="grid grid-cols-2 gap-2 bg-card rounded p-2"><button onclick="openWorkerNewTab()" class="py-3 rounded font-medium ${tab === "new" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Захиалга авах</button><button onclick="openWorkerOrdersTab()" class="py-3 rounded font-medium ${tab === "orders" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Нийт захиалга</button></div>${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
+    orders = workerOrdersList(),
+    inActiveOrder =
+      tab === "new" && state.workerStoreReady && !!state.workerCustomer,
+    tabsHtml = inActiveOrder
+      ? ""
+      : `<div class="seg-tabs worker-view__tabs"><button type="button" onclick="openWorkerNewTab()" class="seg-tab ${tab === "new" ? "is-active" : ""}">Захиалга авах</button><button type="button" onclick="openWorkerOrdersTab()" class="seg-tab ${tab === "orders" ? "is-active" : ""}">Нийт захиалга</button></div>`;
+  return `<div class="worker-view space-y-3${inActiveOrder ? " worker-view--ordering" : ""}">${tabsHtml}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
 }
 function openWorkerNewTab() {
   state.filters.worker = "new";
   state.workerStoreReady = false;
   state.searches.workerStore = "";
+  resetWorkerCart();
   render();
 }
 function openWorkerOrdersTab() {
@@ -1619,7 +1973,99 @@ function workerChooser(orders) {
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders);
-  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Ажилтан</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button><div class="grid grid-cols-2 gap-2"><input value="${esc(state.deliveryName)}" oninput="state.deliveryName=this.value" placeholder="Түгээгч" class="w-full px-3 py-2 bg-secondary rounded text-sm"><input value="${esc(state.deliveryPhone)}" oninput="state.deliveryPhone=this.value" placeholder="Утас" inputmode="tel" class="w-full px-3 py-2 bg-secondary rounded text-sm"></div>${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Ажилтан сонгоно уу</div>`}</section>`;
+  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">HT ажилтан</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button>${warehouseDeliveryField()}${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Эхлээд HT ажилтан сонгоно уу</div>`}</section>`;
+}
+function deliveryInitial(name) {
+  const n = String(name || "").trim();
+  return (n[0] || "?").toUpperCase();
+}
+function deliveryOptionId(empId) {
+  return `delivery-opt-${String(empId || "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+function deliveryPickerOption(e, selected) {
+  const active = selected === e.id,
+    optId = deliveryOptionId(e.id);
+  return `<button type="button" role="option" id="${optId}" data-delivery-id="${esc(e.id)}" aria-selected="${active}" onclick="selectDeliveryEmployee(this.getAttribute('data-delivery-id'))" class="delivery-picker-option ${active ? "is-active" : ""}"><span class="delivery-picker-option__avatar" aria-hidden="true">${esc(deliveryInitial(e.name))}</span><span class="delivery-picker-option__main"><span class="delivery-picker-option__name">${esc(e.name)}</span><span class="delivery-picker-option__phone">${esc(e.phone || "Утасгүй")}</span></span><span class="delivery-picker-option__check" aria-hidden="true">${active ? "✓" : ""}</span></button>`;
+}
+function deliveryPickerRows(selected = "", q = "") {
+  const query = String(q || "")
+    .trim()
+    .toLowerCase();
+  const list = deliveryEmployees().filter((e) => {
+    if (!query) return true;
+    return (
+      e.name.toLowerCase().includes(query) ||
+      String(e.phone || "").includes(query)
+    );
+  });
+  if (!list.length)
+    return `<p class="delivery-picker-empty" role="status">Түгээгч олдсонгүй</p>`;
+  return list.map((e) => deliveryPickerOption(e, selected)).join("");
+}
+function warehouseDeliveryField() {
+  const name = state.deliveryName || "",
+    phone = state.deliveryPhone || "",
+    has = !!name,
+    initial = deliveryInitial(name || "Т"),
+    hint = has
+      ? phone || "Утас бүртгээгүй"
+      : "Хүргэлт хийх ажилтныг сонгоно уу",
+    valueClass = has ? "" : " delivery-field__value--empty",
+    triggerClass = has ? "" : " delivery-field__trigger--empty";
+  return `<div class="delivery-field"><span id="warehouse-delivery-label" class="delivery-field__label">Түгээгч</span><button type="button" id="warehouse-delivery-trigger" class="delivery-field__trigger${triggerClass}" onclick="deliveryPickerModal()" aria-labelledby="warehouse-delivery-label warehouse-delivery-value" aria-describedby="warehouse-delivery-hint" aria-haspopup="listbox" aria-expanded="false" aria-controls="delivery-picker-list"><span class="delivery-field__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><span class="delivery-field__avatar" aria-hidden="true">${esc(initial)}</span><span class="delivery-field__body"><span id="warehouse-delivery-value" class="delivery-field__value${valueClass}">${has ? esc(name) : "Түгээгч сонгох"}</span><span id="warehouse-delivery-hint" class="delivery-field__hint">${esc(hint)}</span></span><span class="delivery-field__chevron" aria-hidden="true"></span></button></div>`;
+}
+function deliveryPickerSearch(value) {
+  state.searches.deliveryPick = value;
+  const list = document.querySelector("[data-delivery-list]");
+  if (!list) {
+    deliveryPickerModal();
+    return;
+  }
+  list.innerHTML = deliveryPickerRows(
+    state.selectedDeliveryId,
+    state.searches.deliveryPick || "",
+  );
+  const el = document.querySelector('[data-focus="deliveryPick"]');
+  if (el) {
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+}
+function deliveryPickerModal() {
+  const list = deliveryEmployees(),
+    selected = state.selectedDeliveryId,
+    q = state.searches.deliveryPick || "",
+    activeDesc = selected ? deliveryOptionId(selected) : "";
+  const body = list.length
+    ? `<div class="p-5 delivery-picker modal-scroll max-h-[75vh] overflow-y-auto"><p id="delivery-picker-desc" class="delivery-picker__desc">Хүргэлт хийх түгээгчийг сонгоно уу.</p><label class="sr-only" for="delivery-picker-search">Түгээгч хайх</label><div class="delivery-picker__search-wrap"><input id="delivery-picker-search" data-focus="deliveryPick" type="search" inputmode="search" autocomplete="off" value="${esc(q)}" oninput="deliveryPickerSearch(this.value)" placeholder="Нэр, утсаар хайх..." class="delivery-picker__search app-input" aria-describedby="delivery-picker-desc"><span class="delivery-picker__search-icon" aria-hidden="true">⌕</span></div><div role="listbox" id="delivery-picker-list" class="delivery-picker-list" aria-label="Түгээгчүүд"${activeDesc ? ` aria-activedescendant="${activeDesc}"` : ""} data-delivery-list>${deliveryPickerRows(selected, q)}</div><div class="delivery-picker-footer"><button type="button" onclick="clearDeliveryEmployee();render();deliveryPickerModal()" class="delivery-picker-footer__btn delivery-picker-footer__btn--secondary" aria-label="Сонголтыг цэвэрлэх">Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="delivery-picker-footer__btn delivery-picker-footer__btn--primary">Хаах</button></div></div>`
+    : `<div class="p-5 delivery-picker modal-scroll"><div class="delivery-picker-empty-state" role="status"><span class="delivery-picker-empty-state__icon" aria-hidden="true"><svg class="ui-icon ui-icon--lg" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><p class="delivery-picker-empty-state__title">Түгээгч бүртгэлгүй</p><p class="delivery-picker-empty-state__text">Админ → Ажилтан → «Түгээгч» эрхээр нэмнэ.</p></div><button type="button" onclick="closeModal();render()" class="delivery-picker-footer__btn delivery-picker-footer__btn--primary w-full">Хаах</button></div>`;
+  box("Түгээгч сонгох", body, "max-w-md", {
+    dialog: true,
+    titleId: "delivery-picker-title",
+    closeLabel: "Түгээгч сонгох цонхыг хаах",
+  });
+  requestAnimationFrame(() => {
+    const trigger = document.getElementById("warehouse-delivery-trigger");
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
+    const search = document.getElementById("delivery-picker-search");
+    if (search) search.focus();
+  });
+}
+function selectDeliveryEmployee(id) {
+  const emp = state.employees.find((e) => e.id === id && e.role === "delivery");
+  if (!emp) return;
+  state.selectedDeliveryId = emp.id;
+  state.deliveryName = emp.name;
+  state.deliveryPhone = emp.phone || "";
+  closeModal();
+  scheduleBackendSave();
+  render();
+}
+function clearDeliveryEmployee() {
+  state.selectedDeliveryId = "";
+  state.deliveryName = "";
+  state.deliveryPhone = "";
+  scheduleBackendSave();
 }
 function qtyDetail(orders) {
   const map = {};
@@ -1639,13 +2085,31 @@ function detailRow(x) {
   const p = x.product;
   return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImage(p)}" class="w-9 h-9 rounded object-cover shrink-0"><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${x.qty} ш</b></div>`;
 }
-function workerStoreSummary(c) {
+function workerStoreSummary(c, compact = false) {
   if (!c)
-    return `<p class="text-sm text-muted-foreground">Дэлгүүр сонгоогүй</p>`;
+    return `<p class="text-sm text-muted-foreground">Харилцагч сонгоогүй</p>`;
   const addr = [c.province, c.district, c.khoroo, c.address]
     .filter(Boolean)
     .join(", ");
-  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold">${c.name}</p><p>${c.phone1 || "-"}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${addr || ""}</p></div>`;
+  if (compact)
+    return `<div class="worker-order-store"><p class="worker-order-store__name">${esc(c.name)}</p><p class="worker-order-store__phone">${esc(c.phone1 || "")}</p></div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold">${esc(c.name)}</p><p>${esc(c.phone1 || "-")}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
+}
+function workerOrderAgentField() {
+  const canSelf =
+    state.currentEmployee && canTakeOrdersRole(state.currentEmployee.role);
+  if (!canSelf) {
+    return `<label class="worker-order-field"><span class="worker-order-field__label">Борлуулалтын ажилтан</span><select onchange="state.orderEmployee=this.value;render()" class="field-input app-input">${orderEmployeeChoices()
+      .map(
+        (e) =>
+          `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${esc(e.name)} (${role(e.role)})</option>`,
+      )
+      .join("")}</select></label>`;
+  }
+  return `<p class="worker-order-sales">${esc(state.currentEmployee.name)}</p>`;
+}
+function workerOrderEmptyState() {
+  return `<div class="worker-order-empty"><p class="worker-order-empty__text">Бараа байхгүй</p></div>`;
 }
 function filterWorkerStores() {
   const q = (state.searches.workerStore || "").toLowerCase();
@@ -1664,20 +2128,24 @@ function filterWorkerStores() {
 function workerStorePickStep() {
   const q = state.searches.workerStore || "",
     rows = filterWorkerStores();
-  return `<div class="space-y-3">${pageHead("Дэлгүүр")}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="workerStore" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Хайх..." class="list-panel__search app-input"></div><div class="list-panel__table worker-store-list">${customerListHead()}<div class="list-panel__body divide-y divide-border/60">${rows.length ? rows.map(workerStoreRow).join("") : `<div class="list-panel__empty">Олдсонгүй</div>`}</div></div></div></div>`;
+  const countHtml = rows.length
+    ? `<p class="worker-pick__count">${rows.length} харилцагч</p>`
+    : "";
+  return `<section class="worker-pick"><div class="worker-pick__toolbar"><label class="worker-pick__search-wrap"><span class="worker-pick__search-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, утас, компани..." class="worker-pick__search app-input" autocomplete="off"></label>${countHtml}</div>${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
 }
 function pickWorkerStore(id) {
   state.workerCustomer = id;
   state.workerStoreReady = true;
-  state.searches.workerProduct = "";
-  state.filters.workerCategory = "";
+  state.deliveryDate = tomorrowIso();
+  resetWorkerCart();
   render();
 }
 function clearWorkerStore() {
   state.workerStoreReady = false;
   state.workerCustomer = "";
-  state.workerQty = {};
+  state.deliveryDate = "";
   state.searches.workerStore = "";
+  resetWorkerCart();
   render();
 }
 function workerNew(cart) {
@@ -1691,43 +2159,36 @@ function workerPromoRow(line) {
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
-  return `<div><div class="grid grid-cols-2 gap-2"><button type="button" onclick="setPaymentTerm('cash')" class="py-2.5 rounded font-medium text-sm ${term === "cash" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Бэлэн</button><button type="button" onclick="setPaymentTerm('credit')" class="py-2.5 rounded font-medium text-sm ${term === "credit" ? "bg-primary text-primary-foreground" : "bg-secondary/60"}">Зээл</button></div></div>`;
+  return `<div class="seg-tabs worker-payment-tabs"><button type="button" onclick="setPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлэн</button><button type="button" onclick="setPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Зээл</button></div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
+  state.isPaid = paidFromPaymentTerm(term);
   render();
 }
 function workerNewOrderStep(cart) {
   const customer = state.customers.find((c) => c.id === state.workerCustomer),
     deliveryDay = state.deliveryDate || tomorrowIso(),
-    paidProducts = state.products
-      .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
-      .filter((p) => p.qty > 0),
-    listHtml =
-      paidProducts.map(workerSelectedRow).join("") +
-      (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "");
-  const employeeField =
-    state.currentEmployee?.role === "sales"
-      ? `<div class="rounded bg-secondary/50 p-2 text-sm font-semibold">${state.currentEmployee.name}</div>`
-      : `<select onchange="state.orderEmployee=this.value" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${orderEmployeeChoices()
-          .map(
-            (e) =>
-              `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${esc(e.name)}</option>`,
-          )
-          .join("")}</select>`;
-  return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-start justify-between gap-2"><div class="flex-1 min-w-0">${workerStoreSummary(customer)}</div><button type="button" onclick="clearWorkerStore()" class="px-2 py-1.5 bg-secondary rounded text-sm shrink-0">Солих</button></div><div class="p-3 space-y-3"><div class="flex items-stretch gap-2"><div class="grid grid-cols-3 gap-1 flex-1 text-sm rounded bg-secondary/50 p-2 text-center"><div><b>${cart.skuCount}</b><p class="text-xs text-muted-foreground">Бараа</p></div><div><b>${cart.pieceQty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(cart.total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><button type="button" onclick="openPickerModal()" class="worker-add-plus" aria-label="Бараа нэмэх">+</button></div><input type="date" value="${deliveryDay}" onchange="state.deliveryDate=this.value;render()" class="w-full px-3 py-2.5 bg-secondary rounded app-input">${employeeField}</div><div class="divide-y divide-border">${listHtml || `<div class="p-6 text-center text-sm text-muted-foreground">+ дарж бараа нэмнэ</div>`}</div><div class="sticky bottom-0 bg-card p-3 border-t border-border space-y-2">${paymentTermPicker()}<button onclick="saveWorker()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium ${cart.paid.length ? "" : "opacity-50"}">Хадгалах</button></div></section>`;
+    paidProducts = workerPaidProductsInCart(),
+    hasItems = paidProducts.length > 0,
+    listHtml = hasItems
+      ? paidProducts.map(workerSelectedRow).join("") +
+        (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
+      : "";
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div><button type="button" onclick="openPickerModal()" class="worker-order-add-btn"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа нэмэх</span></button><div class="worker-order-meta"><input type="date" value="${deliveryDay}" min="${tomorrowIso()}" onchange="state.deliveryDate=this.value;render()" class="field-input app-input worker-order-date" title="Хүргэх өдөр" aria-label="Хүргэх өдөр">${workerOrderAgentField()}</div></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
 }
 function workerSelectedRow(p) {
-  return `<div class="worker-selected-row"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${p.name}</p><p class="worker-row-meta text-xs text-muted-foreground">${p.category} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div><div class="qty-stepper"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty - 1})">−</button><input readonly onchange="setWorkerQty('${p.id}',Number(this.value))" value="${p.qty}" type="number" inputmode="numeric" pattern="[0-9]*" min="1" max="${p.stock}" class="app-input qty-stepper__input"><button type="button" tabindex="-1" onclick="setWorkerQty('${p.id}',${p.qty + 1})" ${p.qty >= p.stock ? "disabled" : ""}>+</button></div></div>`;
+  const editing = state.workerOrderActiveId === p.id;
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(p.name)}</p><p class="worker-row-meta text-xs text-muted-foreground">${esc(p.category)} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div>${workerOrderQtyHtml(p, p.qty)}</div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + o.total, 0),
-    paid = orders.filter((o) => o.isPaid).reduce((s, o) => s + o.total, 0),
+    paid = orders.filter((o) => orderIsPaid(o)).reduce((s, o) => s + o.total, 0),
     unpaid = total - paid,
     day = state.filters.workerDate || "",
     pay = state.filters.workerPay,
     today = todayIso();
-  return `<section class="bg-card rounded p-3 space-y-3"><div class="grid grid-cols-3 gap-2">${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}</div><div class="flex flex-wrap gap-2"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="max-h-[55vh] overflow-y-auto space-y-2">${orders.length ? orders.map((o) => `<button data-order-day="${orderDay(o)}" onclick="workerOrderDetail('${o.id}')" class="w-full text-left bg-secondary/50 rounded p-3"><div class="flex justify-between gap-2 items-start"><div class="flex items-center gap-2 min-w-0 flex-1">${receiptNo(o, "xs")}<p class="font-medium truncate">${esc(o.customerName)}</p></div><b class="text-sm shrink-0">${fmt(o.total)}</b></div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)} · ${o.items.length} бараа · ${orderDay(o) !== isoDay(o.createdAt) ? `Хүргэлт ${orderDay(o)} · ` : ""}<span class="${o.isPaid ? "text-tone-success" : "text-tone-danger"}">${o.isPaid ? "Төлсөн" : "Төлөөгүй"}</span></p></button>`).join("") : `<p class="text-sm text-muted-foreground text-center py-4">Захиалга байхгүй</p>`}</div></section>`;
+  return `<section class="bg-card rounded p-3 space-y-3"><div class="grid grid-cols-3 gap-2">${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}</div><div class="flex flex-wrap gap-2"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="max-h-[55vh] overflow-y-auto space-y-2">${orders.length ? orders.map((o) => `<button data-order-day="${orderDay(o)}" onclick="workerOrderDetail('${o.id}')" class="w-full text-left bg-secondary/50 rounded p-3"><div class="flex justify-between gap-2 items-start"><div class="flex items-center gap-2 min-w-0 flex-1">${receiptNo(o, "xs")}<p class="font-medium truncate">${esc(o.customerName)}</p></div><b class="text-sm shrink-0">${fmt(o.total)}</b></div><p class="text-xs text-muted-foreground mt-0.5">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${orderIsPaid(o) ? "text-tone-success" : "text-tone-danger"}">${orderIsPaid(o) ? "Төлсөн" : "Төлөөгүй"}</span></p></button>`).join("") : `<p class="text-sm text-muted-foreground text-center py-4">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   orderReceiptModal(id);
@@ -1761,13 +2222,22 @@ function render() {
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
 }
-function box(title, body, max = "max-w-2xl") {
-  modal.innerHTML = `<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div class="bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden"><div class="p-6 border-b flex justify-between"><h3 class="text-lg font-semibold">${title}</h3><button onclick="closeModal()" class="p-2 hover:bg-secondary rounded">✕</button></div>${body}</div></div>`;
+function box(title, body, max = "max-w-2xl", opts = {}) {
+  const titleId = opts.titleId || "modal-title",
+    dialogAttr = opts.dialog
+      ? ` role="dialog" aria-modal="true" aria-labelledby="${titleId}"`
+      : "",
+    closeLabel = esc(opts.closeLabel || "Цонхыг хаах");
+  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${esc(title)}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
 }
 function closeModal() {
   stopBarcodeScan();
   destroyCustomerMap();
   state.promoPick = null;
+  state.customerFormDraft = null;
+  state.searches.deliveryPick = "";
+  const deliveryTrigger = document.getElementById("warehouse-delivery-trigger");
+  if (deliveryTrigger) deliveryTrigger.setAttribute("aria-expanded", "false");
   state.filters.workerCategory = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
@@ -1799,8 +2269,71 @@ function cleanupCustomerMapInstance() {
   }
   window.customerMap = null;
   window.customerMapMarker = null;
+  window.customerUserMarker = null;
+  window.customerUserAccuracy = null;
+  window.customerUserCoords = null;
   window.customerTileLayer = null;
   window.customerTileFallback = false;
+}
+function showCustomerUserLocation(hasCustomerPin) {
+  const status = document.getElementById("customerMapStatus");
+  if (!window.customerMap) return;
+  if (!navigator.geolocation) {
+    if (status && !hasCustomerPin)
+      status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      if (!window.customerMap) return;
+      const la = pos.coords.latitude,
+        ln = pos.coords.longitude;
+      window.customerUserCoords = [la, ln];
+      if (window.customerUserMarker) window.customerUserMarker.remove();
+      window.customerUserMarker = L.circleMarker([la, ln], {
+        radius: 9,
+        fillColor: "#16899a",
+        color: "#ffffff",
+        weight: 3,
+        fillOpacity: 0.95,
+      })
+        .addTo(window.customerMap)
+        .bindTooltip("Таны байршил", { direction: "top" });
+      if (window.customerUserAccuracy) window.customerUserAccuracy.remove();
+      const acc = pos.coords.accuracy;
+      if (acc && acc < 500) {
+        window.customerUserAccuracy = L.circle([la, ln], {
+          radius: acc,
+          color: "#16899a",
+          fillColor: "#16899a",
+          fillOpacity: 0.1,
+          weight: 1,
+        }).addTo(window.customerMap);
+      }
+      if (!hasCustomerPin) {
+        window.customerMap.setView([la, ln], 16);
+      }
+    },
+    () => {
+      if (status && !hasCustomerPin)
+        status.textContent =
+          "Байршил авахын тулд GPS зөвшөөрөл өгнө үү (тохиргоо)";
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+  );
+}
+function centerCustomerMapOnUser() {
+  const status = document.getElementById("customerMapStatus");
+  if (window.customerUserCoords && window.customerMap) {
+    window.customerMap.setView(window.customerUserCoords, 16);
+
+    return;
+  }
+  const latInput = document.getElementById("customerLat"),
+    lngInput = document.getElementById("customerLng");
+  const hasPin = !!(latInput?.value && lngInput?.value);
+  if (status) status.textContent = "Байршил татаж байна...";
+  showCustomerUserLocation(hasPin);
 }
 function scheduleCustomerMapResize() {
   const fix = () => {
@@ -1813,20 +2346,69 @@ function scheduleCustomerMapResize() {
   setTimeout(fix, 350);
 }
 function field(name, label, value = "", type = "text") {
-  return `<label><span class="block text-sm font-medium mb-2">${label}</span><input name="${name}" type="${type}" value="${esc(value)}" class="w-full px-4 py-3 bg-secondary rounded"></label>`;
+  return `<label><span class="block text-sm font-medium mb-2">${label}</span><input name="${name}" type="${type}" value="${esc(value)}" class="w-full px-4 py-3 bg-secondary rounded app-input"></label>`;
 }
-function customerModal(id) {
+function customerRegistrationField(value = "") {
+  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="numeric" autocomplete="off" value="${esc(value)}" oninput="scheduleCustomerRegistryLookup(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
+}
+function customerProvinceField(value = "") {
+  const selected = (value || "").trim() || "Улаанбаатар";
+  const options = MN_PROVINCES.map(
+    (p) =>
+      `<option value="${esc(p)}" ${selected === p ? "selected" : ""}>${esc(p)}</option>`,
+  ).join("");
+  return `<label><span class="block text-sm font-medium mb-2">Аймаг/Хот</span><select name="province" class="w-full px-4 py-3 bg-secondary rounded app-input customer-province-select">${options}</select></label>`;
+}
+function captureCustomerForm() {
+  const form = modal.querySelector("form[data-customer-form]");
+  if (!form) return null;
+  const data = Object.fromEntries(new FormData(form));
+  data.latitude =
+    document.getElementById("customerLat")?.value || data.latitude || "";
+  data.longitude =
+    document.getElementById("customerLng")?.value || data.longitude || "";
+  return data;
+}
+function customerFromDraft(id, draft) {
+  const saved = state.customers.find((x) => x.id === id) || {};
+  if (!draft) return { ...saved };
+  return {
+    ...saved,
+    name: draft.name ?? saved.name,
+    registrationNumber: draft.registrationNumber ?? saved.registrationNumber,
+    companyName: draft.companyName ?? saved.companyName,
+    phone1: draft.phone1 ?? saved.phone1,
+    phone2: draft.phone2 ?? saved.phone2,
+    province: draft.province ?? saved.province,
+    district: draft.district ?? saved.district,
+    khoroo: draft.khoroo ?? saved.khoroo,
+    address: draft.address ?? saved.address,
+    latitude: draft.latitude ?? saved.latitude,
+    longitude: draft.longitude ?? saved.longitude,
+    locationText: draft.locationText ?? saved.locationText,
+  };
+}
+function customerModal(id, draft = null) {
   destroyCustomerMap();
-  const c = state.customers.find((x) => x.id === id) || {};
+  const useDraft = draft || null;
+  if (useDraft)
+    state.customerFormDraft = {
+      ...useDraft,
+      customerId: id || useDraft.customerId || "",
+    };
+  else state.customerFormDraft = null;
+  const c = customerFromDraft(id, useDraft);
+  const cid = esc(id || "");
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form onsubmit="saveCustomer(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${field("registrationNumber", "Регистрийн дугаар", c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${field("province", "Аймаг/Хот", c.province)}${field("district", "Дүүрэг/Сум", c.district)}</div>${field("khoroo", "Хороо", c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="flex items-center justify-between gap-3 mb-2"><span class="block text-sm font-medium">Байршил</span><span id="customerMapStatus" class="text-xs text-muted-foreground">Map дээр дарж pin тавина</span></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div>${field("locationText", "Location тайлбар", c.locationText || "")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${field("district", "Дүүрэг/Сум", c.district)}</div>${field("khoroo", "Хороо", c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" onclick="centerCustomerMapOnUser()" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   window.customerMapInitTimer = setTimeout(() => {
     window.customerMapInitTimer = null;
     initCustomerMap(c.latitude, c.longitude);
   }, 120);
+  loadLesRegistryIndex();
 }
 function loadLeaflet(cb) {
   if (window.L) return cb();
@@ -1918,6 +2500,7 @@ function initCustomerMap(lat, lng) {
   };
   if (has) setPoint(start[0], start[1]);
   window.customerMap.on("click", (e) => setPoint(e.latlng.lat, e.latlng.lng));
+  showCustomerUserLocation(has);
   scheduleCustomerMapResize();
 }
 function saveCustomer(e, id) {
@@ -1956,7 +2539,7 @@ function productModal(id) {
     country: "Монгол",
   };
   box(
-    id ? "Бараа засах" : "Бараа бүртгэх",
+    id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
     `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" class="category-scroll w-full px-4 py-2 bg-secondary rounded" size="6">${[...(p.category ? [p.category] : []), ...cats().filter((c) => c !== p.category)].map((c) => `<option ${p.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("minStock", "Доод үлдэгдэл", p.minStock ?? 0, "number")}${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
@@ -1973,6 +2556,87 @@ function handleProductImage(input) {
   reader.readAsDataURL(file);
 }
 let productBarcodeLookupId = 0;
+let lesRegistryIndex = null;
+let lesRegistryLoadPromise = null;
+let customerRegistryLookupId = 0;
+let customerRegistryLookupTimer = null;
+
+function normalizeRegistrationNumber(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+async function loadLesRegistryIndex() {
+  if (lesRegistryIndex) return lesRegistryIndex;
+  if (!lesRegistryLoadPromise) {
+    lesRegistryLoadPromise = fetch(
+      "/static/tomuda/data/les-registry-index.json",
+      { cache: "force-cache" },
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error("registry load failed");
+        return res.json();
+      })
+      .then((data) => {
+        lesRegistryIndex = data && typeof data === "object" ? data : {};
+        return lesRegistryIndex;
+      })
+      .catch((err) => {
+        console.warn("LES registry index load failed", err);
+        lesRegistryIndex = {};
+        return lesRegistryIndex;
+      });
+  }
+  return lesRegistryLoadPromise;
+}
+
+function scheduleCustomerRegistryLookup(value) {
+  clearTimeout(customerRegistryLookupTimer);
+  customerRegistryLookupTimer = setTimeout(
+    () => fillCustomerFromRegistration(value),
+    350,
+  );
+}
+
+async function fillCustomerFromRegistration(code) {
+  const input = document.getElementById("customerRegistrationInput"),
+    form = input?.closest("form"),
+    status = document.getElementById("customerRegistryLookupStatus"),
+    reg = normalizeRegistrationNumber(code),
+    lookupId = ++customerRegistryLookupId;
+  if (!form) return;
+  if (!reg) {
+    if (status) status.textContent = "";
+    return;
+  }
+  if (reg.length < 6) {
+    if (status) status.textContent = "";
+    return;
+  }
+  if (status) status.textContent = "Регистрээр хайж байна...";
+  try {
+    const index = await loadLesRegistryIndex();
+    if (lookupId !== customerRegistryLookupId) return;
+    const companyName =
+      index[reg] ||
+      index[String(Number(reg))] ||
+      index[reg.replace(/^0+/, "")] ||
+      "";
+    if (!companyName) {
+      if (status) status.textContent = "Энэ регистрээр олдсонгүй";
+      return;
+    }
+    const nameEl = form.elements.name,
+      companyEl = form.elements.companyName;
+    if (companyEl) companyEl.value = companyName;
+    if (nameEl && !String(nameEl.value || "").trim())
+      nameEl.value = companyName;
+    if (status) status.textContent = "";
+  } catch (error) {
+    console.warn("Registry lookup failed", error);
+    if (lookupId === customerRegistryLookupId && status)
+      status.textContent = "Регистрийн жагсаалт ачаалж чадсангүй";
+  }
+}
 const cleanExternalText = (text) =>
   String(text || "")
     .replace(/^en:/, "")
@@ -2084,7 +2748,7 @@ function employeeModal() {
   if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">HT (Борлуулалт)</option><option value="warehouse">Агуулах</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">HT (Борлуулалт)</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
     "max-w-md",
   );
 }
@@ -2128,6 +2792,7 @@ function saveOrder(e) {
       employeePhone: emp.phone || "",
       ...orderEmailFields(emp),
       isPaid: false,
+      ...deliveryFieldsForNewOrder(),
     }),
   );
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
@@ -2139,7 +2804,7 @@ function orderReceiptModal(id) {
   if (!o) return;
   box(
     `<span class="flex flex-wrap items-center gap-2">Зарлагын баримт ${receiptNo(o, "sm")}</span>`,
-    `<div class="p-5 space-y-4"><div class="rounded bg-secondary/50 p-3 space-y-1 text-sm"><p class="font-semibold">${esc(o.customerName)}</p><p class="text-muted-foreground">${esc(o.employeeName || "-")} · ${dte(o.createdAt)}</p><p><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></p></div><table class="w-full text-sm"><tbody>${o.items.map((i) => `<tr class="border-t border-border"><td class="py-2 pr-2">${esc(i.productName)}</td><td class="py-2 text-right whitespace-nowrap">${i.quantity}</td><td class="py-2 text-right font-medium whitespace-nowrap">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t pt-3 font-semibold"><span>Нийт</span><span class="text-primary">${fmt(o.total)}</span></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Баримт хэвлэх</button></div>`,
+    `<div class="p-5 space-y-4"><div class="rounded bg-secondary/50 p-3 space-y-1 text-sm"><p class="font-semibold">${esc(o.customerName)}</p><p class="text-muted-foreground">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="text-muted-foreground">Хүргэлт ${dte(orderDeliveryDay(o))}</p><p><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></p></div><table class="w-full text-sm"><tbody>${o.items.map((i) => `<tr class="border-t border-border"><td class="py-2 pr-2">${esc(i.productName)}</td><td class="py-2 text-right whitespace-nowrap">${i.quantity}</td><td class="py-2 text-right font-medium whitespace-nowrap">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t pt-3 font-semibold"><span>Нийт</span><span class="text-primary">${fmt(o.total)}</span></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Баримт хэвлэх</button></div>`,
     "max-w-lg",
   );
 }
@@ -2186,19 +2851,10 @@ function receipt(o) {
     bank = o.paymentTerm === "credit" && !o.isPaid,
     salesName = o.employeeName || sales.name || "-",
     salesPhone = o.employeePhone || sales.phone || "-",
-    deliveryName =
-      o.deliveryName ||
-      state.deliveryName ||
-      (state.currentEmployee?.role === "warehouse"
-        ? state.currentEmployee.name
-        : "-"),
-    deliveryPhone =
-      o.deliveryPhone ||
-      state.deliveryPhone ||
-      (state.currentEmployee?.role === "warehouse"
-        ? state.currentEmployee.phone
-        : "-"),
-    deliveryDay = o.deliveryDate || o.createdAt;
+    delivery = resolveOrderDelivery(o),
+    deliveryName = delivery.deliveryName,
+    deliveryPhone = delivery.deliveryPhone,
+    deliveryDay = orderDeliveryDay(o);
   return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${orderReceiptNum(o)}</h2><section class="receipt-info"><div><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p></div><div><p><span>Харилцагч:</span><b>${c.name || o.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${c.registrationNumber || "-"}</b></p><p><span>Компанийн нэр:</span><b>${c.companyName || "-"}</b></p><p><span>Утасны дугаар:</span><b>${c.phone1 || "-"}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${addr}</b></p></div></section><section class="receipt-bank-grid"><div><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${o.items
     .map((i, n) => {
       const p = state.products.find((x) => x.id === i.productId) || {};
@@ -2228,14 +2884,89 @@ function applyStock(id, type) {
   });
   render();
 }
+function pickerProductsInView() {
+  const q = (state.searches.workerProduct || "").toLowerCase().trim(),
+    cat = state.filters.workerCategory || "";
+  return state.products
+    .filter((p) => {
+      if (cat && p.category !== cat) return false;
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        String(p.barcode || "").includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const byCat = (a.category || "").localeCompare(b.category || "", "mn");
+      if (byCat) return byCat;
+      return (a.name || "").localeCompare(b.name || "", "mn");
+    });
+}
+function pickerCategoryChipsHtml() {
+  const active = state.filters.workerCategory || "",
+    categories = cats();
+  return `<div class="picker-cat-chips" role="tablist" aria-label="Төрөлөөр шүүх"><button type="button" data-picker-cat="" class="picker-cat-chip${active ? "" : " is-active"}" role="tab" aria-selected="${active ? "false" : "true"}">Бүгд</button>${categories.map((c) => `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-chip${active === c ? " is-active" : ""}" role="tab" aria-selected="${active === c ? "true" : "false"}">${esc(c)}</button>`).join("")}</div>`;
+}
+function updatePickerSummary() {
+  const summary = modal.querySelector(".picker-summary");
+  if (!summary) return;
+  const selected = state.products
+      .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
+      .filter((p) => p.qty > 0),
+    selectedQty = selected.reduce((s, p) => s + p.qty, 0),
+    selectedTotal = selected.reduce((s, p) => s + p.qty * p.price, 0);
+  summary.innerHTML = `<div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${selected.length}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${selectedQty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(selectedTotal)}</b></div>`;
+  const clearBtn = modal.querySelector("[data-picker-clear-cart]");
+  if (clearBtn) {
+    clearBtn.classList.toggle("is-disabled", selected.length === 0);
+    clearBtn.disabled = selected.length === 0;
+  }
+}
+function refreshPickerList() {
+  const list = modal.querySelector("[data-picker-products]");
+  if (!list || !pickerOpen()) return false;
+  ensurePickerActiveId();
+  updateModalTitle(ORDER_PICKER_TITLE);
+  const chips = modal.querySelector(".picker-cat-chips");
+  if (chips) chips.outerHTML = pickerCategoryChipsHtml();
+  const products = pickerProductsInView();
+  list.innerHTML = products.length
+    ? products.map((p) => pickerRow(p)).join("")
+    : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`;
+  updatePickerSummary();
+  return true;
+}
+function getWorkerQty(productId) {
+  const raw = state.workerQty[productId];
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const p = state.products.find((x) => x.id === productId);
+  if (!p) return 0;
+  return Math.min(Math.floor(n), p.stock);
+}
+function resetWorkerCart() {
+  state.workerQty = {};
+  state.pickerActiveId = "";
+  state.workerOrderActiveId = "";
+  state.pickerStatus = "";
+  state.pickerBarcode = "";
+  state.searches.workerProduct = "";
+  state.filters.workerCategory = "";
+}
 function setWorkerQty(id, qty) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  if (document.activeElement?.closest?.(".qty-stepper"))
-    document.activeElement.blur();
-  state.workerQty[id] = Math.max(0, Math.min(Number(qty) || 0, p.stock));
-  if (!state.workerQty[id]) delete state.workerQty[id];
-  const keepPicker = pickerOpen() || !!state.filters.workerCategory;
+  const q = Math.max(0, Math.min(Number(qty) || 0, p.stock));
+  if (q > 0) state.workerQty[id] = Math.floor(q);
+  else {
+    delete state.workerQty[id];
+    if (state.pickerActiveId === id) state.pickerActiveId = "";
+    if (state.workerOrderActiveId === id) state.workerOrderActiveId = "";
+  }
+  const keepPicker = pickerOpen();
+  scheduleBackendSave();
+  if (keepPicker && refreshPickerList()) return;
   render();
   if (keepPicker) pickerModal();
 }
@@ -2254,6 +2985,7 @@ function applyPickerBarcode(value, scanned = false) {
       state.pickerStatus = `${product.name} үлдэгдэл хүрэлцэхгүй байна`;
     } else {
       state.workerQty[product.id] = current + 1;
+      state.pickerActiveId = product.id;
       state.pickerStatus = `${product.name} нэмэгдлээ`;
     }
   } else {
@@ -2418,40 +3150,26 @@ function stopBarcodeScan() {
   if (panel) panel.hidden = true;
 }
 function openPickerModal() {
+  stopBarcodeScan();
   state.filters.workerCategory = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
-  pickerModal();
-}
-function pickerCategoryBtn(c) {
-  return `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-btn picker-cat-btn--step1">${esc(c)}</button>`;
+  state.pickerBarcode = "";
+  pickerModal({ focusSearch: true });
 }
 function pickerModal({ focusSearch = false } = {}) {
-  const cat = state.filters.workerCategory,
-    categories = cats();
-  if (!cat) {
-    box(
-      "Бараа нэмэх",
-      `<div class="picker-step1 p-5 space-y-4 modal-scroll" data-picker-root><p class="text-sm font-medium shrink-0">Төрөл сонгоно уу</p><div class="picker-categories picker-categories--step1">${categories.length ? categories.map((c) => pickerCategoryBtn(c)).join("") : `<div class="p-6 text-center text-sm text-muted-foreground">Төрөл байхгүй</div>`}</div><button type="button" onclick="closeModal()" class="w-full py-3 bg-secondary rounded font-medium shrink-0">Болих</button></div>`,
-      "max-w-lg",
-    );
-    return;
-  }
-  const q = (state.searches.workerProduct || "").toLowerCase(),
-    selected = state.products
+  const selected = state.products
       .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
       .filter((p) => p.qty > 0),
     selectedQty = selected.reduce((s, p) => s + p.qty, 0),
     selectedTotal = selected.reduce((s, p) => s + p.qty * p.price, 0),
-    products = state.products.filter(
-      (p) =>
-        p.category === cat &&
-        (p.name.toLowerCase().includes(q) || String(p.barcode).includes(q)),
-    );
+    products = pickerProductsInView();
+  ensurePickerActiveId();
   box(
-    "Бараа нэмэх",
-    `<div class="picker-step2" data-picker-root><div class="picker-step2__scroll"><div class="picker-step-head"><button type="button" data-picker-back class="picker-back-btn">← Төрөл</button><span class="picker-step-cat">${esc(cat)}</span></div><div class="picker-search-tools"><input data-picker-search value="${esc(state.searches.workerProduct || "")}" oninput="pickerSearch(this.value)" placeholder="Хайх..." class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" data-picker-clear-search class="px-4 py-3 bg-secondary rounded text-sm whitespace-nowrap">Цэвэрлэх</button></div>${state.pickerStatus ? `<div class="picker-status">${esc(state.pickerStatus)}</div>` : ""}<div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Бараа олдсонгүй</div>`}</div></div><div class="picker-step2__bottom"><div class="picker-summary"><div><p>Сонгосон</p><b>${selected.length}</b></div><div><p>Ширхэг</p><b>${selectedQty}</b></div><div><p>Нийт</p><b>${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="py-3 bg-secondary rounded font-medium ${selected.length ? "" : "opacity-50"}">Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button></div></div></div>`,
+    ORDER_PICKER_TITLE,
+    `<div class="picker-step2 picker-panel" data-picker-root><div class="picker-step2__scroll">${pickerCategoryChipsHtml()}${pickerBarcodeToolsHtml()}<div class="picker-search-tools"><input data-picker-search value="${esc(state.searches.workerProduct || "")}" oninput="pickerSearch(this.value)" placeholder="Бараа, баркод, төрлөөр хайх..." class="picker-search-input app-input" autocomplete="off"><button type="button" data-picker-clear-search class="btn btn--secondary btn--sm picker-search-clear">Цэвэрлэх</button></div>${state.pickerStatus ? `<div class="picker-status">${esc(state.pickerStatus)}</div>` : ""}<div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom"><div class="picker-summary"><div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${selected.length}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${selectedQty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${selected.length ? "" : " is-disabled"}" ${selected.length ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer></div>`,
     "max-w-4xl",
+    { titleId: "picker-order-title", dialog: true },
   );
   if (focusSearch) {
     const el = document.querySelector("[data-picker-search]");
@@ -2462,10 +3180,7 @@ function pickerModal({ focusSearch = false } = {}) {
   }
 }
 function backToPickerCategories() {
-  state.filters.workerCategory = "";
-  state.searches.workerProduct = "";
-  state.pickerStatus = "";
-  pickerModal();
+  setPickerCategory("");
 }
 function clearPickerSearch() {
   state.searches.workerProduct = "";
@@ -2473,47 +3188,45 @@ function clearPickerSearch() {
   pickerModal();
 }
 function clearPickerCart() {
-  state.workerQty = {};
+  resetWorkerCart();
   render();
   pickerModal();
 }
-function pickerQtyStepper(p, q) {
+function pickerQtyChange(productId, qty) {
+  setWorkerQty(productId, qty);
+}
+function pickerQtyInput(el) {
+  setWorkerQty(el.getAttribute("data-product-id") || "", Number(el.value));
+}
+function pickerRowAside(p, q, checked, editing) {
   const id = esc(p.id);
-  const prev = Math.max(0, q - 1);
-  const next = Math.min(p.stock, q + 1);
-  return `<div class="qty-stepper picker-qty-stepper"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${prev}">−</button><input readonly data-picker-qty-input data-product-id="${id}" value="${q}" type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="${p.stock}" class="app-input qty-stepper__input"><button type="button" tabindex="-1" data-picker-qty data-product-id="${id}" data-qty="${next}" ${q >= p.stock ? "disabled" : ""}>+</button></div>`;
+  if (!checked)
+    return `<div class="picker-row__aside picker-row__aside--empty"></div>`;
+  if (editing)
+    return `<div class="picker-row__aside">${pickerQtyStepperHtml(p, q)}</div>`;
+  return `<button type="button" class="picker-row__ordered" data-picker-edit="${id}"><span class="picker-row__ordered-label">Захиалагдсан</span><span class="picker-row__ordered-qty">${q} ш</span></button>`;
 }
 function pickerRow(p) {
-  const q = state.workerQty[p.id] || 0,
+  const q = getWorkerQty(p.id),
     checked = q > 0,
+    editing = checked && state.pickerActiveId === p.id,
     left = p.stock - q,
-    id = esc(p.id);
-  return `<div class="picker-row ${checked ? "is-selected" : ""}"><label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.barcode)}</p><div class="flex flex-wrap gap-2 mt-2 text-xs"><span class="px-2 py-1 rounded bg-card font-semibold">${fmt(p.price)}</span><span class="px-2 py-1 rounded bg-card text-muted-foreground">Үлд ${left}</span>${checked ? `<span class="px-2 py-1 rounded bg-primary text-primary-foreground">${fmt(q * p.price)}</span>` : ""}</div></div>${checked ? pickerQtyStepper(p, q) : ""}</div>`;
+    id = esc(p.id),
+    showCat = !state.filters.workerCategory && p.category;
+  return `<article class="picker-row${checked ? " is-selected" : ""}${editing ? " is-editing" : ""}"><div class="picker-row__main"><label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label><img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span></div></div>${pickerRowAside(p, q, checked, editing)}</div></article>`;
 }
 function setPickerCategory(cat) {
-  if (!cat) return;
-  state.filters.workerCategory = cat;
-  state.searches.workerProduct = "";
-  state.pickerStatus = "";
-  pickerModal({ focusSearch: true });
+  state.filters.workerCategory = cat || "";
+  state.pickerActiveId = "";
+  if (refreshPickerList()) return;
+  pickerModal();
 }
 function pickerSearch(value) {
   state.searches.workerProduct = value;
-  const list = modal.querySelector("[data-picker-products]");
-  if (!list || !state.filters.workerCategory) {
-    pickerModal();
-    return;
-  }
-  const q = (value || "").toLowerCase(),
-    cat = state.filters.workerCategory,
-    products = state.products.filter(
-      (p) =>
-        p.category === cat &&
-        (p.name.toLowerCase().includes(q) || String(p.barcode).includes(q)),
-    );
-  list.innerHTML = products.length
-    ? products.map((p) => pickerRow(p)).join("")
-    : `<div class="p-6 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Бараа олдсонгүй</div>`;
+  const input = document.querySelector("[data-picker-barcode]");
+  if (input) input.value = value;
+  if (refreshPickerList()) return;
+  pickerModal();
 }
 function toggleWorker(id) {
   state.selectedWorkers = state.selectedWorkers.includes(id)
@@ -2557,8 +3270,8 @@ function storePickerModal() {
       ),
     );
   box(
-    "Дэлгүүр сонгох",
-    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, компани, утас, хаягаар хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${c.name}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${c.phone1 || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Дэлгүүр олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас дэлгүүр сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
+    "Харилцагч сонгох",
+    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, компани, утас, хаягаар хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${c.name}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${c.phone1 || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
     "max-w-3xl",
   );
   const el = document.querySelector("[data-store-search]");
@@ -2645,15 +3358,17 @@ function saveWorker() {
       employeeName: e.name,
       employeePhone: e.phone || "",
       ...orderEmailFields(e),
-      isPaid: false,
+      isPaid: paidFromPaymentTerm(state.paymentTerm),
       paymentTerm: state.paymentTerm,
       deliveryDate: state.deliveryDate || tomorrowIso(),
-      deliveryName: state.deliveryName || "",
-      deliveryPhone: state.deliveryPhone || "",
+      ...deliveryFieldsForNewOrder(),
     }),
   );
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
-  state.workerQty = {};
+  resetWorkerCart();
+  state.workerStoreReady = false;
+  state.workerCustomer = "";
+  state.deliveryDate = "";
   state.filters.worker = "orders";
   render();
 }
@@ -2676,18 +3391,25 @@ function login(e) {
   state.currentEmployee = emp;
   state.isLoggedIn = true;
   state.orderEmployee = emp.id;
-  if (emp.role === "warehouse") {
-    state.selectedWorkers = [];
-    state.selectedWarehouseOrderId = "";
-    state.deliveryName = "";
-    state.deliveryPhone = "";
-  }
+  applyLoginRoleDefaults(emp);
   state.currentView = defaultViewForRole(emp.role);
+  saveAuthSession();
   render();
+}
+function confirmLogout() {
+  box(
+    "Системээс гарах",
+    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground leading-relaxed">Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.</p><div class="grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="btn btn--secondary btn--block">Болих</button><button type="button" onclick="closeModal();logout()" class="btn btn--danger btn--block">Гарах</button></div></div>`,
+    "max-w-sm",
+    { dialog: true, titleId: "logout-confirm-title", closeLabel: "Хаах" },
+  );
 }
 function logout() {
   state.currentEmployee = null;
   state.isLoggedIn = false;
+  state.mobileOpen = false;
+  localStorage.removeItem(AUTH_SESSION_KEY);
+  closeModal();
   render();
 }
 function saveEmployee(e) {
@@ -2740,7 +3462,7 @@ function deleteNow(type, id) {
     if (state.workerCustomer === id) {
       state.workerCustomer = "";
       state.workerStoreReady = false;
-      state.workerQty = {};
+      resetWorkerCart();
     }
   }
   closeModal();
@@ -2797,11 +3519,18 @@ Object.assign(window, {
   render,
   closeModal,
   customerModal,
+  deliveryPickerModal,
+  deliveryPickerSearch,
+  selectDeliveryEmployee,
+  clearDeliveryEmployee,
+  centerCustomerMapOnUser,
   saveCustomer,
   customerDetail,
   productModal,
   handleProductImage,
   fillProductFromBarcode,
+  fillCustomerFromRegistration,
+  scheduleCustomerRegistryLookup,
   saveProduct,
   categoryModal,
   employeeModal,
@@ -2815,6 +3544,11 @@ Object.assign(window, {
   applyStock,
   setInventoryCategory,
   setWorkerQty,
+  setWorkerOrderActive,
+  finishWorkerOrderEdit,
+  finishPickerEdit,
+  pickerQtyChange,
+  pickerQtyInput,
   openPickerModal,
   pickerModal,
   backToPickerCategories,
@@ -2855,6 +3589,7 @@ Object.assign(window, {
   saveWorker,
   login,
   toggleLoginPassword,
+  confirmLogout,
   logout,
   saveEmployee,
   confirmDelete,
