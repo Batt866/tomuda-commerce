@@ -326,7 +326,7 @@ const cats = () => [
 const role = (r) =>
   ({
     admin: "Админ",
-    sales: "HT",
+    sales: "Худалдааны төлөөлөгч",
     warehouse: "Агуулах",
     delivery: "Түгээгч",
   })[r] || "Ажилчин";
@@ -2029,7 +2029,7 @@ function workerChooser(orders) {
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders);
-  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">HT ажилтан</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button>${warehouseDeliveryField()}${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Эхлээд HT ажилтан сонгоно уу</div>`}</section>`;
+  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button>${warehouseDeliveryField()}${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Эхлээд HT ажилтан сонгоно уу</div>`}</section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -2155,7 +2155,7 @@ function workerOrderAgentField() {
   const canSelf =
     state.currentEmployee && canTakeOrdersRole(state.currentEmployee.role);
   if (!canSelf) {
-    return `<label class="worker-order-field"><span class="worker-order-field__label">Борлуулалтын ажилтан</span><select onchange="state.orderEmployee=this.value;render()" class="field-input app-input">${orderEmployeeChoices()
+    return `<label class="worker-order-field"><span class="worker-order-field__label">Худалдааны төлөөлөгч</span><select onchange="state.orderEmployee=this.value;render()" class="field-input app-input">${orderEmployeeChoices()
       .map(
         (e) =>
           `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${esc(e.name)} (${role(e.role)})</option>`,
@@ -2807,7 +2807,7 @@ function employeeModal() {
   if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">HT (Борлуулалт)</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
     "max-w-md",
   );
 }
