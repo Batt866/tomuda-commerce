@@ -1404,7 +1404,44 @@ function customersView() {
         (v || "").toLowerCase().includes(q.toLowerCase()),
       ),
     );
-  return `<div class="space-y-4">${pageHead("Харилцагч", `<button type="button" onclick="customerModal()" class="btn btn--sm btn--primary shrink-0">+ Нэмэх</button>`)}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Нэр, компани, утсаар хайх..." class="list-panel__search app-input" autocomplete="off"></div><div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Харилцагч", `<button type="button" onclick="customerExcel()" class="btn btn--sm btn--secondary shrink-0">Татах</button><button type="button" onclick="customerModal()" class="btn btn--sm btn--primary shrink-0">+ Нэмэх</button>`)}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Нэр, компани, утсаар хайх..." class="list-panel__search app-input" autocomplete="off"></div><div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+}
+function customerExcel() {
+  if (!state.customers.length) return alert("Харилцагч байхгүй");
+  const rows = [
+    [
+      "№",
+      "Нэр",
+      "РД",
+      "Байгууллагын нэр",
+      "Утас 1",
+      "Утас 2",
+      "Аймаг/Хот",
+      "Дүүрэг/Сум",
+      "Хороо",
+      "Дэлгэрэнгүй хаяг",
+      "Бүрэн хаяг",
+    ],
+    ...[...state.customers]
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "mn"))
+      .map((c, i) => {
+        const fullAddr = customerAddress(c);
+        return [
+          i + 1,
+          c.name || "",
+          c.registrationNumber || "",
+          c.companyName || "",
+          c.phone1 || "",
+          c.phone2 || "",
+          c.province || "",
+          c.district || "",
+          c.khoroo || "",
+          c.address || "",
+          fullAddr === "-" ? "" : fullAddr,
+        ];
+      }),
+  ];
+  excel("hariltsagch.xls", rows);
 }
 function customerAddress(c) {
   return (
@@ -3577,6 +3614,7 @@ Object.assign(window, {
   render,
   closeModal,
   customerModal,
+  customerExcel,
   deliveryPickerModal,
   deliveryPickerSearch,
   selectDeliveryEmployee,
