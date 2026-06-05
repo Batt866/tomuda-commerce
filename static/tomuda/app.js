@@ -307,7 +307,7 @@ function receiptNo(order, size = "md") {
 }
 const pickerOpen = () => !!modal.querySelector("[data-picker-root]");
 const ORDER_PICKER_TITLE = "Захиалгад бараа нэмэх";
-const PRODUCT_NEW_TITLE = "Шинэ бараа";
+const PRODUCT_NEW_TITLE = "Бараа нэмэх";
 const PRODUCT_EDIT_TITLE = "Бараа засах";
 function updateModalTitle(title) {
   const el = document.getElementById("modal-title");
@@ -1444,7 +1444,7 @@ function productsView() {
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
-    )}</select>${isAdmin() ? `<button onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Шинэ бараа</button>` : ""}</div><div class="bg-card rounded overflow-hidden product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+    )}</select>${isAdmin() ? `<button onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button>` : ""}</div><div class="bg-card rounded overflow-hidden product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function productListHead() {
   const actions = isAdmin();
