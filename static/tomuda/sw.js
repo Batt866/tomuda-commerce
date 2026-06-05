@@ -1,5 +1,10 @@
-const CACHE = "tomuda-v8";
-const PRECACHE = ["/", "/static/tomuda/styles.css", "/static/tomuda/data.js"];
+const CACHE = "tomuda-v9";
+const PRECACHE = [
+  "/",
+  "/static/tomuda/styles.css",
+  "/static/tomuda/data.js",
+  "/static/tomuda/vendor/tailwindcdn.js",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

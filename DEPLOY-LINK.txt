@@ -1,12 +1,13 @@
-ТОМУДА — Deploy link (HTTPS)
-Шинэчлэгдсэн: 2026-06-03
+ТОМУДА — Ажиллах link (HTTPS)
 
-https://lancaster-alternatives-advise-advisors.trycloudflare.com
+✅ ҮНДСЭН LINK (24/7, бүх хүнд):
+https://tomuda-commerce.onrender.com
 
-Локал: http://127.0.0.1:8011/
 GitHub: https://github.com/Batt866/tomuda-commerce
 
-⚠️ Энэ link түр зуурын (trycloudflare). Компьютер + tunnel асаалттай байх үед л ажиллана.
-Дахин асаах: ./scripts/start-tomuda.sh
+⚠️ Анхаар:
+- Эхний удаа нээхэд 30–60 секунд хүлээж болно (сервер сэргэж байна).
+- Хуучин trycloudflare link ажиллахгүй — дээрх Render link ашиглана.
+- Локал туршилт: ./scripts/start-tomuda.sh → http://127.0.0.1:8011/
 
-Тогтвортой link (24/7): Render дээр deploy — DEPLOY.md харна уу.
+Шинэчлэгдсэн: 2026-06-05

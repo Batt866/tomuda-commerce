@@ -104,6 +104,46 @@ let serverUpdatedAt = "";
 let backendSaving = false;
 let backendPollTimer = null;
 const BACKEND_POLL_MS = 4000;
+const BOOT_RETRY_MAX = 8;
+const BOOT_RETRY_BASE_MS = 4000;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function setBootStatus(main, sub) {
+  const title = document.getElementById("boot-title");
+  const detail = document.getElementById("boot-detail");
+  if (title) title.textContent = main;
+  if (detail) detail.textContent = sub;
+}
+async function fetchBackendStateWithRetry() {
+  const hints = [
+    "Backend-ээс мэдээлэл татаж байна...",
+    "Сервер сэргэж байна, түр хүлээнэ үү...",
+    "Холболт удаан байна, дахин оролдож байна...",
+  ];
+  for (let attempt = 0; attempt < BOOT_RETRY_MAX; attempt++) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 60000);
+      const res = await fetch(`${API_BASE}/state`, {
+        headers: { Accept: "application/json" },
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) return res.json();
+    } catch (error) {
+      console.warn("Backend state load failed", error, attempt + 1);
+    }
+    if (attempt < BOOT_RETRY_MAX - 1) {
+      setBootStatus(
+        "ТОМУДА ачаалж байна",
+        `${hints[Math.min(attempt, hints.length - 1)]} (${attempt + 1}/${BOOT_RETRY_MAX})`,
+      );
+      await sleep(BOOT_RETRY_BASE_MS + attempt * 1000);
+    }
+  }
+  return null;
+}
 const fmt = (n) => "₮" + Number(n || 0).toLocaleString();
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
@@ -594,17 +634,17 @@ function onVisibilityPoll() {
   if (document.visibilityState === "visible") pollBackendState();
 }
 async function boot() {
-  app.innerHTML = `<div class="min-h-screen grid place-items-center bg-background text-foreground"><div class="bg-card rounded p-6 text-center"><p class="font-semibold">ТОМУДА ачаалж байна</p><p class="text-sm text-muted-foreground mt-1">Backend-ээс мэдээлэл татаж байна...</p></div></div>`;
-  try {
-    const res = await fetch(`${API_BASE}/state`, {
-      headers: { Accept: "application/json" },
-    });
-    if (res.ok) {
-      const payload = await res.json();
-      syncBackendMarkers(payload, payload.state);
-    }
-  } catch (error) {
-    console.warn("Backend state load failed", error);
+  app.innerHTML = `<div class="boot-screen min-h-screen grid place-items-center bg-background text-foreground"><div class="boot-screen__card bg-card rounded p-6 text-center"><p id="boot-title" class="font-semibold">ТОМУДА ачаалж байна</p><p id="boot-detail" class="text-sm text-muted-foreground mt-1">Backend-ээс мэдээлэл татаж байна...</p><button type="button" id="boot-retry" class="boot-screen__retry hidden mt-4 px-4 py-2 bg-primary text-primary-foreground rounded text-sm font-semibold" onclick="location.reload()">Дахин оролдох</button></div></div>`;
+  const payload = await fetchBackendStateWithRetry();
+  if (payload?.state) {
+    syncBackendMarkers(payload, payload.state);
+  } else {
+    setBootStatus(
+      "Холбогдож чадсангүй",
+      "Сервер асаж дуусаагүй байж болно. 1–2 минут хүлээгээд дахин оролдоно уу.",
+    );
+    document.getElementById("boot-retry")?.classList.remove("hidden");
+    return;
   }
   backendReady = true;
   ensureEmployeeEmails();

@@ -1,3 +1,32 @@
+.hidden {
+  display: none !important;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.grid {
+  display: grid;
+}
+
+.place-items-center {
+  place-items: center;
+}
+
+.boot-screen {
+  padding: 24px;
+}
+
+.boot-screen__card {
+  width: min(100%, 360px);
+  box-shadow: 0 8px 24px rgba(16, 22, 35, 0.08);
+}
+
+.boot-screen__retry {
+  width: 100%;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
