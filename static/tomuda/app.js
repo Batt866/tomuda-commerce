@@ -732,7 +732,7 @@ function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
   const idAttr = esc(p.id);
   const decDisabled = q <= min;
   const incDisabled = q >= p.stock;
-  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="pickerQtyInput(this)" onchange="pickerQtyInput(this)" onclick="this.focus();this.select?.()" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" min="${min}" max="${p.stock}" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
+  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
 }
 function ensurePickerActiveId() {
   if (state.pickerActiveId && getWorkerQty(state.pickerActiveId)) return;
@@ -742,7 +742,7 @@ function workerQtyStepperHtml(p, q) {
   const idAttr = esc(p.id);
   const decDisabled = q <= 1;
   const incDisabled = q >= p.stock;
-  return `<div class="qty-stepper worker-order-qty-stepper" data-qty-min="1"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-product-id="${idAttr}" oninput="workerQtyInput(this)" onchange="workerQtyInput(this)" onclick="this.focus();this.select?.()" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" min="1" max="${p.stock}" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
+  return `<div class="qty-stepper worker-order-qty-stepper" data-qty-min="1"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
 }
 function setWorkerOrderActive(id) {
   if (!id) return;
@@ -765,8 +765,28 @@ function workerOrderQtyHtml(p, q) {
     return `<div class="worker-row-edit">${workerQtyStepperHtml(p, q)}<button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
   return `<button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${q}</span><span class="worker-row-qty__unit">ш</span></button>`;
 }
-function workerQtyInput(el) {
-  setWorkerQty(el.getAttribute("data-product-id") || "", Number(el.value));
+function qtyDraft(el) {
+  const id = el.getAttribute("data-product-id") || "";
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
+  const digits = String(el.value || "").replace(/\D/g, "");
+  if (digits !== el.value) el.value = digits;
+  if (!digits) return;
+  const n = Math.min(Number(digits), p.stock);
+  state.workerQty[id] = n;
+  if (String(n) !== digits) el.value = String(n);
+  if (pickerOpen()) updatePickerSummary();
+}
+function qtyCommit(el) {
+  const id = el.getAttribute("data-product-id") || "";
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
+  const digits = String(el.value || "").replace(/\D/g, "");
+  let v = digits ? Number(digits) : 0;
+  if (v < 1) v = 1;
+  v = Math.min(v, p.stock);
+  el.value = String(v);
+  setWorkerQty(id, v);
 }
 function initQtyStepperButtons() {
   if (document.documentElement.dataset.qtyStepperBound) return;
@@ -782,19 +802,6 @@ function initQtyStepperButtons() {
     },
     true,
   );
-  document.addEventListener("focusin", (e) => {
-    const input = e.target;
-    if (!input.matches?.(".qty-stepper__input[readonly]")) return;
-    input.readOnly = false;
-    input.type = "number";
-    requestAnimationFrame(() => input.select?.());
-  });
-  document.addEventListener("focusout", (e) => {
-    const input = e.target;
-    if (!input.matches?.(".qty-stepper__input")) return;
-    input.readOnly = true;
-    input.type = "text";
-  });
 }
 function initPickerModalActions() {
   if (modal.dataset.pickerBound) return;
@@ -3204,9 +3211,6 @@ function clearPickerCart() {
 function pickerQtyChange(productId, qty) {
   setWorkerQty(productId, qty);
 }
-function pickerQtyInput(el) {
-  setWorkerQty(el.getAttribute("data-product-id") || "", Number(el.value));
-}
 function pickerRowAside(p, q, checked, editing) {
   const id = esc(p.id);
   if (!checked)
@@ -3557,7 +3561,8 @@ Object.assign(window, {
   finishWorkerOrderEdit,
   finishPickerEdit,
   pickerQtyChange,
-  pickerQtyInput,
+  qtyDraft,
+  qtyCommit,
   openPickerModal,
   pickerModal,
   backToPickerCategories,
