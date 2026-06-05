@@ -2767,6 +2767,13 @@ input::placeholder, textarea::placeholder {
   border-radius: 8px;
 }
 
+.picker-qty-stepper--compact .qty-stepper__input,
+.worker-order-qty-stepper .qty-stepper__input {
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .picker-qty-stepper--compact .qty-stepper__input {
   min-height: 28px !important;
   height: 28px !important;
@@ -2864,14 +2871,25 @@ input::placeholder, textarea::placeholder {
   color: var(--hex-primary-foreground);
 }
 
+.picker-step2__toolbar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--hex-border);
+  background: var(--hex-card);
+}
+
 .picker-cat-chips {
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
-  margin-bottom: 4px;
+  padding: 2px 0 4px;
+  min-height: 40px;
+  align-items: center;
   scrollbar-width: none;
 }
 
@@ -2884,10 +2902,13 @@ input::placeholder, textarea::placeholder {
   padding: 8px 14px;
   border-radius: 999px;
   background: var(--hex-secondary);
-  border: 1px solid transparent;
+  border: 1px solid var(--hex-border);
+  color: var(--hex-foreground);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
+  min-height: 36px;
+  line-height: 1.2;
 }
 
 .picker-cat-chip.is-active {
@@ -3471,12 +3492,21 @@ input::placeholder, textarea::placeholder {
     padding-bottom: 10px !important;
   }
 
+  .picker-step2__toolbar {
+    padding: 10px 12px 8px;
+    gap: 8px;
+  }
+
+  .picker-cat-chips {
+    min-height: 38px;
+  }
+
   .picker-step2__scroll {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
-    padding: 12px;
+    padding: 10px 12px;
     padding-bottom: calc(170px + env(safe-area-inset-bottom, 0px));
     gap: 10px;
   }
@@ -3634,6 +3664,13 @@ input::placeholder, textarea::placeholder {
     max-width: 168px;
     min-width: 108px;
     grid-template-columns: 1fr 1.1fr 1fr;
+  }
+
+  .picker-qty-stepper--compact .qty-stepper__input,
+  .worker-order-qty-stepper .qty-stepper__input {
+    min-height: 36px !important;
+    height: 36px !important;
+    font-size: 15px !important;
   }
 
   .worker-selected-row .qty-stepper {
