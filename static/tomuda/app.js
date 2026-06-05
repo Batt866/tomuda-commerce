@@ -1539,8 +1539,17 @@ function reportsView() {
   return `<div class="space-y-4">${pageHead("Тайлан", `<button onclick="csv('report.csv',[[${total},${paid}]])" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">Татах</button>`)}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(total - paid), "text-tone-danger")}${card("Үлдэгдэл", fmt(stock))}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Төлбөр</div>${state.orders.length ? state.orders.map(paymentRow).join("") : `<div class="p-4 text-sm text-muted-foreground">Захиалга байхгүй</div>`}</div><div class="bg-card rounded overflow-hidden"><div class="px-3 py-2 bg-secondary/50 font-semibold text-sm">Ажилтан</div>${sales.map((e, i) => `<div class="px-3 py-2 border-t flex justify-between gap-2"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
-  const paid = orderIsPaid(o);
-  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_190px] gap-3 md:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${esc(o.employeeName || "-")} · ${o.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн"}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Төлсөн" : "Төлөөгүй"}</span><div class="grid grid-cols-2 gap-2"><button onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm ${paid ? "tone tone--success" : "bg-secondary"}">Төлсөн</button><button onclick="setPaid('${o.id}',false)" class="px-3 py-2 rounded text-sm ${!paid ? "tone tone--danger" : "bg-secondary"}">Төлөөгүй</button></div></div>`;
+  const paid = orderIsPaid(o),
+    term =
+      o.paymentTerm === "credit"
+        ? "Төлөөгүй"
+        : o.paymentTerm === "cash"
+          ? "Төлсөн"
+          : "Бэлэн",
+    actions = paid
+      ? ""
+      : `<button type="button" onclick="setPaid('${o.id}',true)" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Төлсөн болгох</button>`;
+  return `<div class="px-4 py-3 border-t grid grid-cols-1 md:grid-cols-[1fr_130px_130px_160px] gap-3 md:items-center"><div><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${esc(o.employeeName || "-")} · ${term}</p></div><b class="text-sm">${fmt(o.total)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Төлсөн" : "Төлөөгүй"}</span><div class="payment-row__actions">${actions}</div></div>`;
 }
 function promotionsView() {
   const tab = state.filters.promotionTab,
