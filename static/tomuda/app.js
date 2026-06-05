@@ -2283,8 +2283,11 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
     dialogAttr = opts.dialog
       ? ` role="dialog" aria-modal="true" aria-labelledby="${titleId}"`
       : "",
-    closeLabel = esc(opts.closeLabel || "Цонхыг хаах");
-  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${esc(title)}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
+    closeLabel = esc(opts.closeLabel || "Цонхыг хаах"),
+    titleHtml = opts.titleHtml
+      ? title
+      : esc(title);
+  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
 }
 function closeModal() {
   stopBarcodeScan();
@@ -2862,6 +2865,7 @@ function orderReceiptModal(id) {
     `<span class="flex flex-wrap items-center gap-2">Зарлагын баримт ${receiptNo(o, "sm")}</span>`,
     `<div class="p-5 space-y-4"><div class="rounded bg-secondary/50 p-3 space-y-1 text-sm"><p class="font-semibold">${esc(o.customerName)}</p><p class="text-muted-foreground">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="text-muted-foreground">Хүргэлт ${dte(orderDeliveryDay(o))}</p><p><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></p></div><table class="w-full text-sm"><tbody>${o.items.map((i) => `<tr class="border-t border-border"><td class="py-2 pr-2">${esc(i.productName)}</td><td class="py-2 text-right whitespace-nowrap">${i.quantity}</td><td class="py-2 text-right font-medium whitespace-nowrap">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t pt-3 font-semibold"><span>Нийт</span><span class="text-primary">${fmt(o.total)}</span></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Баримт хэвлэх</button></div>`,
     "max-w-lg",
+    { titleHtml: true },
   );
 }
 function printRootEl() {
