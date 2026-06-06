@@ -4635,9 +4635,17 @@ input::placeholder, textarea::placeholder {
   .receipt-info b, .receipt-bank-grid b { font-weight: 800; }
   .receipt-address { align-items: start; }
   .receipt-check { font-size: 13px; }
-  .receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; table-layout: fixed; }
+  .receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 0; table-layout: fixed; }
+  .receipt-table thead { display: table-header-group; }
+  .receipt-table tbody { display: table-row-group; }
+  .receipt-table tr { break-inside: avoid; page-break-inside: avoid; }
   .receipt-table th, .receipt-table td { border: 1px solid #777; padding: 1.15mm 1mm; text-align: left; vertical-align: middle; }
   .receipt-table th { font-weight: 800; text-align: center; background: #f3f3f3; }
+  .receipt-footer-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    -webkit-region-break-inside: avoid;
+  }
   .receipt-table th:nth-child(1), .receipt-table td:nth-child(1) { width: 7mm; text-align: right; }
   .receipt-table th:nth-child(2), .receipt-table td:nth-child(2) { width: 66mm; }
   .receipt-table th:nth-child(3), .receipt-table td:nth-child(3) { width: 24mm; }
