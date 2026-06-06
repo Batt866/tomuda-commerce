@@ -6,8 +6,9 @@ https://tomuda-commerce.onrender.com
 GitHub: https://github.com/Batt866/tomuda-commerce
 
 ⚠️ Анхаар:
-- Эхний удаа нээхэд 30–60 секунд хүлээж болно (сервер сэргэж байна).
-- Хуучин trycloudflare link ажиллахгүй — дээрх Render link ашиглана.
+- Эхний удаа нээхэд 1–2 минут хүлээж болно (сервер сэргэж байна) — «Дахин оролдох» дарна.
+- Хуучин trycloudflare link ажиллахгүй — зөвхөн дээрх Render link өгнө.
+- Орохгүй бол: Wi‑Fi солих, Chrome/Safari ашиглах, хуудас дахин ачаалах.
 - Локал туршилт: ./scripts/start-tomuda.sh → http://127.0.0.1:8011/
 
-Шинэчлэгдсэн: 2026-06-05
+Шинэчлэгдсэн: 2026-06-06

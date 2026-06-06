@@ -108,8 +108,10 @@ let serverUpdatedAt = "";
 let backendSaving = false;
 let backendPollTimer = null;
 const BACKEND_POLL_MS = 4000;
-const BOOT_RETRY_MAX = 8;
-const BOOT_RETRY_BASE_MS = 4000;
+const BOOT_WAKE_MAX = 18;
+const BOOT_WAKE_BASE_MS = 5000;
+const BOOT_STATE_MAX = 6;
+const BOOT_STATE_BASE_MS = 3000;
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -119,31 +121,61 @@ function setBootStatus(main, sub) {
   if (title) title.textContent = main;
   if (detail) detail.textContent = sub;
 }
-async function fetchBackendStateWithRetry() {
+async function fetchJsonWithTimeout(url, ms = 90000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: ctrl.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function wakeBackendWithRetry() {
   const hints = [
-    "Backend-ээс мэдээлэл татаж байна...",
-    "Сервер сэргэж байна, түр хүлээнэ үү...",
-    "Холболт удаан байна, дахин оролдож байна...",
+    "Сервер асаж байна, түр хүлээнэ үү...",
+    "Эхний удаа удаан байж болно (1–2 минут)...",
+    "Дахин холбогож байна...",
   ];
-  for (let attempt = 0; attempt < BOOT_RETRY_MAX; attempt++) {
+  for (let attempt = 0; attempt < BOOT_WAKE_MAX; attempt++) {
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 60000);
-      const res = await fetch(`${API_BASE}/state`, {
-        headers: { Accept: "application/json" },
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (res.ok) return res.json();
+      const payload = await fetchJsonWithTimeout(`${API_BASE}/health`, 90000);
+      if (payload?.ok) return true;
+    } catch (error) {
+      console.warn("Backend wake failed", error, attempt + 1);
+    }
+    if (attempt < BOOT_WAKE_MAX - 1) {
+      setBootStatus(
+        "ТОМУДА ачаалж байна",
+        `${hints[Math.min(attempt, hints.length - 1)]} (${attempt + 1}/${BOOT_WAKE_MAX})`,
+      );
+      await sleep(BOOT_WAKE_BASE_MS + attempt * 800);
+    }
+  }
+  return false;
+}
+async function fetchBackendStateWithRetry() {
+  setBootStatus("ТОМУДА ачаалж байна", "Серверт холбогож байна...");
+  if (!(await wakeBackendWithRetry())) return null;
+  setBootStatus("ТОМУДА ачаалж байна", "Мэдээлэл татаж байна...");
+  for (let attempt = 0; attempt < BOOT_STATE_MAX; attempt++) {
+    try {
+      const payload = await fetchJsonWithTimeout(`${API_BASE}/state`, 90000);
+      if (payload?.state) return payload;
     } catch (error) {
       console.warn("Backend state load failed", error, attempt + 1);
     }
-    if (attempt < BOOT_RETRY_MAX - 1) {
+    if (attempt < BOOT_STATE_MAX - 1) {
       setBootStatus(
         "ТОМУДА ачаалж байна",
-        `${hints[Math.min(attempt, hints.length - 1)]} (${attempt + 1}/${BOOT_RETRY_MAX})`,
+        `Мэдээлэл татаж байна... (${attempt + 1}/${BOOT_STATE_MAX})`,
       );
-      await sleep(BOOT_RETRY_BASE_MS + attempt * 1000);
+      await sleep(BOOT_STATE_BASE_MS + attempt * 1000);
     }
   }
   return null;
@@ -694,7 +726,7 @@ async function boot() {
   } else {
     setBootStatus(
       "Холбогдож чадсангүй",
-      "Сервер асаж дуусаагүй байж болно. 1–2 минут хүлээгээд дахин оролдоно уу.",
+      "Сервер асаж дуусаагүй байж болно. 2 минут хүлээгээд «Дахин оролдох» дарна уу.",
     );
     document.getElementById("boot-retry")?.classList.remove("hidden");
     return;
