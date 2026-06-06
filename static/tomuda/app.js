@@ -31,6 +31,10 @@ const state = {
   deliveryDate: "",
   paymentTerm: "cash",
   isPaid: false,
+  settlementAgreed: false,
+  settlementMonth: "",
+  settlementDay: "",
+  applyPercentDiscount: false,
   selectedWorkers: [],
   selectedWarehouseOrderId: "",
   selectedDeliveryId: "",
@@ -216,11 +220,60 @@ function receiptMonthKey(o) {
   const day = isoDay(o?.createdAt || o?.deliveryDate || "");
   return day ? day.slice(0, 7) : "";
 }
+const RECEIPT_PERCENT_DISCOUNT = 3;
 function orderReceiptNum(o) {
   if (!o) return "";
   const seq = Number(o.receiptSeq);
   if (seq > 0) return seq;
   return o.id;
+}
+function formatReceiptNumber(o) {
+  const seq = orderReceiptNum(o);
+  const month = o.receiptMonth || receiptMonthKey(o);
+  if (month) {
+    const [y, m] = month.split("-");
+    return `${String(y).slice(-2)}${m}-${seq}`;
+  }
+  return String(seq);
+}
+function receiptMoney(n) {
+  return Number(n || 0).toLocaleString();
+}
+function orderGrossTotal(o) {
+  if (o.grossTotal != null) return Number(o.grossTotal);
+  return (o.items || [])
+    .filter((i) => !i.isPromoFree)
+    .reduce((s, i) => s + (i.total || 0), 0);
+}
+function orderDiscountAmount(o) {
+  if (o.discountAmount != null) return Number(o.discountAmount);
+  const gross = orderGrossTotal(o);
+  const pct = o.applyPercentDiscount
+    ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+    : 0;
+  return Math.round(gross * pct / 100);
+}
+function orderPayableTotal(o) {
+  const gross = orderGrossTotal(o);
+  return gross - orderDiscountAmount(o);
+}
+function settlementNoteText(o) {
+  if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
+  return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлэхээр тохиролцов`;
+}
+function settlementMonthOptions(selected) {
+  const cur = selected || String(new Date().getMonth() + 1);
+  return Array.from({ length: 12 }, (_, i) => {
+    const m = String(i + 1);
+    return `<option value="${m}" ${cur === m ? "selected" : ""}>${m} сар</option>`;
+  }).join("");
+}
+function settlementDayOptions(selected) {
+  const cur = selected || String(new Date().getDate());
+  return Array.from({ length: 31 }, (_, i) => {
+    const d = String(i + 1);
+    return `<option value="${d}" ${cur === d ? "selected" : ""}>${d}</option>`;
+  }).join("");
 }
 function nextReceiptSeq(month) {
   let max = 0;
@@ -1871,12 +1924,18 @@ function workerOrderLines() {
 function workerCartSummary() {
   const paid = workerPaidLines(),
     all = workerOrderLines(),
-    promo = all.filter((l) => l.isPromoFree);
+    promo = all.filter((l) => l.isPromoFree),
+    gross = paid.reduce((s, l) => s + l.total, 0),
+    discount = state.applyPercentDiscount
+      ? Math.round(gross * RECEIPT_PERCENT_DISCOUNT / 100)
+      : 0;
   return {
     paid,
     all,
     promo,
-    total: all.reduce((s, l) => s + l.total, 0),
+    gross,
+    discount,
+    total: gross - discount,
     skuCount: paid.length,
     pieceQty: all.reduce((s, l) => s + l.quantity, 0),
   };
@@ -2238,6 +2297,10 @@ function clearWorkerStore() {
   state.workerCustomer = "";
   state.deliveryDate = "";
   state.searches.workerStore = "";
+  state.settlementAgreed = false;
+  state.settlementMonth = "";
+  state.settlementDay = "";
+  state.applyPercentDiscount = false;
   resetWorkerCart();
   render();
 }
@@ -2254,6 +2317,11 @@ function paymentTermPicker() {
   const term = state.paymentTerm;
   return `<div class="seg-tabs worker-payment-tabs"><button type="button" onclick="setPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлэн</button><button type="button" onclick="setPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Зээл</button></div>`;
 }
+function workerOrderOptionsHtml(cart) {
+  const sm = state.settlementMonth || String(new Date().getMonth() + 1),
+    sd = state.settlementDay || String(new Date().getDate());
+  return `<div class="worker-order-options"><label class="worker-order-option"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()"><span>Тооцоо нийлэх өдөр</span></label>${state.settlementAgreed ? `<div class="worker-order-settlement-pickers"><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></div>` : ""}<label class="worker-order-option"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()"><span>Хувь тооцох (${RECEIPT_PERCENT_DISCOUNT}%)</span></label>${state.applyPercentDiscount ? `<p class="worker-order-discount-preview">Хөнгөлөлт: ${fmt(cart.discount)} · Төлөх: <b>${fmt(cart.total)}</b></p>` : ""}</div>`;
+}
 function setPaymentTerm(term) {
   state.paymentTerm = term;
   state.isPaid = paidFromPaymentTerm(term);
@@ -2268,7 +2336,7 @@ function workerNewOrderStep(cart) {
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
       : "";
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div><button type="button" onclick="openPickerModal()" class="worker-order-add-btn"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа нэмэх</span></button><div class="worker-order-meta"><input type="date" value="${deliveryDay}" min="${tomorrowIso()}" onchange="state.deliveryDate=this.value;render()" class="field-input app-input worker-order-date" title="Хүргэх өдөр" aria-label="Хүргэх өдөр">${workerOrderAgentField()}</div></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div><button type="button" onclick="openPickerModal()" class="worker-order-add-btn"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа нэмэх</span></button><div class="worker-order-meta"><input type="date" value="${deliveryDay}" min="${tomorrowIso()}" onchange="state.deliveryDate=this.value;render()" class="field-input app-input worker-order-date" title="Хүргэх өдөр" aria-label="Хүргэх өдөр">${workerOrderAgentField()}</div></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
@@ -2939,28 +3007,47 @@ function receiptDetail(id) {
 function receipt(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
-    sub = o.total / 1.1,
-    vat = o.total - sub,
+    gross = orderGrossTotal(o),
+    discount = orderDiscountAmount(o),
+    payable = orderPayableTotal(o),
+    sub = payable / 1.1,
+    vat = payable - sub,
     addr =
       [c.province, c.district, c.khoroo, c.address]
         .filter(Boolean)
         .join(", ") || "-",
     paid = o.paymentTerm === "cash" || o.isPaid,
     bank = o.paymentTerm === "credit" && !o.isPaid,
-    salesName = o.employeeName || sales.name || "-",
-    salesPhone = o.employeePhone || sales.phone || "-",
+    salesName = esc(o.employeeName || sales.name || "-"),
+    salesPhone = esc(o.employeePhone || sales.phone || "-"),
     delivery = resolveOrderDelivery(o),
-    deliveryName = delivery.deliveryName,
-    deliveryPhone = delivery.deliveryPhone,
-    deliveryDay = orderDeliveryDay(o);
-  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${orderReceiptNum(o)}</h2><section class="receipt-info"><div><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p></div><div><p><span>Харилцагч:</span><b>${c.name || o.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${c.registrationNumber || "-"}</b></p><p><span>Компанийн нэр:</span><b>${c.companyName || "-"}</b></p><p><span>Утасны дугаар:</span><b>${c.phone1 || "-"}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${addr}</b></p></div></section><section class="receipt-bank-grid"><div><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${o.items
-    .map((i, n) => {
-      const p = state.products.find((x) => x.id === i.productId) || {};
-      return `<tr><td>${n + 1}</td><td>${i.productName}</td><td>${p.unit || "ш"}</td><td>${p.barcode || "-"}</td><td>${i.quantity}</td><td>${i.price.toLocaleString()}</td><td>${i.total.toLocaleString()}</td></tr>`;
-    })
-    .join(
-      "",
-    )}</tbody></table><div class="receipt-return"><b>Буцаалтын тэмдэглэгээ:</b><span></span></div><section class="receipt-summary"><p><b>Урамшуулал</b><span>Үнэтрүүлэгч</span><strong>0</strong></p><p><span></span><span></span><strong>0</strong></p><p><b>Бараа ажил үйлчилгээний дүн</b><span></span><strong>${sub.toFixed(2)}</strong></p><p><b>НӨАТ</b><span></span><strong>${vat.toFixed(2)}</strong></p><p class="receipt-grand"><b>Таны нийт төлөх дүн</b><span></span><strong>${o.total.toLocaleString()}</strong></p></section><section class="receipt-warning"><p>Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.</p><p><b>Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.</b></p><p>Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p><b>Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</b></p></section><footer class="receipt-sign"><p><span>Хүлээлгэн өгсөн ажилтны гарын үсэг:</span><b></b></p><p><span>Хүлээн авсан ажилтны гарын үсэг:</span><b></b></p></footer></div></div>`;
+    deliveryName = esc(delivery.deliveryName),
+    deliveryPhone = esc(delivery.deliveryPhone),
+    deliveryDay = orderDeliveryDay(o),
+    settlement = settlementNoteText(o),
+    promoItems = (o.items || []).filter((i) => i.isPromoFree),
+    pct = o.applyPercentDiscount
+      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+      : 0,
+    grandLabel = pct
+      ? `Таны нийт төлөх дүн (Бэлэн төлөлтийн ${pct}% хасагдав)`
+      : "Таны нийт төлөх дүн",
+    itemRows = (o.items || [])
+      .filter((i) => !i.isPromoFree)
+      .map((i, n) => {
+        const p = state.products.find((x) => x.id === i.productId) || {};
+        return `<tr><td>${n + 1}</td><td>${esc(i.productName)}</td><td>${esc(p.unit || "ш")}</td><td>${esc(p.barcode || "-")}</td><td>${i.quantity}</td><td>${receiptMoney(i.price)}</td><td>${receiptMoney(i.total)}</td></tr>`;
+      })
+      .join(""),
+    promoRows = promoItems.length
+      ? promoItems
+          .map(
+            (i) =>
+              `<div class="receipt-promo-row"><span>${esc(i.productName)}</span><span>${i.quantity} ш</span><strong>0</strong></div>`,
+          )
+          .join("")
+      : `<div class="receipt-promo-row receipt-promo-row--empty"><span></span><span></span><strong>0</strong></div>`;
+  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</h2><section class="receipt-info"><div class="receipt-info__col"><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div><div class="receipt-info__col"><p><span>Харилцагч:</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистрийн дугаар:</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Компанийн нэр:</span><b>${esc(c.companyName || "-")}</b></p><p><span>Утасны дугаар:</span><b>${esc(c.phone1 || "-")}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${esc(addr)}</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${itemRows}</tbody></table><div class="receipt-gross-bar"><span>Хувь хасагдаагүй нийт үнийн дүн</span><strong>${receiptMoney(gross)}</strong></div>${settlement ? `<div class="receipt-settlement-note">${esc(settlement)}</div>` : ""}<section class="receipt-promo-block"><div class="receipt-promo-head"><b>Урамшуулал</b><span>Үнэтрүүлэгч</span><span>Дүн</span></div>${promoRows}</section><section class="receipt-totals"><div class="receipt-total-line"><b>Бараа ажил үйлчилгээний дүн</b><strong>${receiptMoney(sub)}</strong></div><div class="receipt-total-line"><b>НӨАТ</b><strong>${receiptMoney(vat)}</strong></div>${discount ? `<div class="receipt-total-line"><b>Хөнгөлөлт (${pct}%)</b><strong>-${receiptMoney(discount)}</strong></div>` : ""}<div class="receipt-grand-total"><span class="receipt-grand-total__label">${grandLabel}</span><strong class="receipt-grand-total__amount">${receiptMoney(payable)}</strong></div></section><section class="receipt-warning"><p>Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.</p><p><b>Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.</b></p><p>Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p><b>Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</b></p></section><footer class="receipt-sign"><p><span>Хүлээлгэн өгсөн ажилтны гарын үсэг:</span><b></b></p><p><span>Хүлээн авсан ажилтны гарын үсэг:</span><b></b></p></footer></div></div>`;
 }
 function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);
@@ -3442,12 +3529,25 @@ function saveWorker() {
     e = orderActor(),
     items = workerOrderLines();
   if (!workerPaidLines().length) return alert("Бараа сонгоно уу");
+  const grossTotal = items
+      .filter((i) => !i.isPromoFree)
+      .reduce((s, i) => s + i.total, 0),
+    percentDiscount = state.applyPercentDiscount ? RECEIPT_PERCENT_DISCOUNT : 0,
+    discountAmount = Math.round(grossTotal * percentDiscount / 100),
+    total = grossTotal - discountAmount;
   state.orders.push(
     buildNewOrder({
       customerId: c.id,
       customerName: c.name,
       items,
-      total: items.reduce((s, i) => s + i.total, 0),
+      grossTotal,
+      applyPercentDiscount: !!state.applyPercentDiscount,
+      percentDiscount,
+      discountAmount,
+      total,
+      settlementAgreed: !!state.settlementAgreed,
+      settlementMonth: state.settlementAgreed ? state.settlementMonth : "",
+      settlementDay: state.settlementAgreed ? state.settlementDay : "",
       status: "pending",
       employeeId: e.id,
       employeeName: e.name,
@@ -3464,6 +3564,10 @@ function saveWorker() {
   state.workerStoreReady = false;
   state.workerCustomer = "";
   state.deliveryDate = "";
+  state.settlementAgreed = false;
+  state.settlementMonth = "";
+  state.settlementDay = "";
+  state.applyPercentDiscount = false;
   state.filters.worker = "orders";
   render();
 }
