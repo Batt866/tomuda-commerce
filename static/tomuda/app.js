@@ -609,6 +609,14 @@ function mobileNavActive(viewId, navId) {
   if (navId === "warehouse" && viewId === "warehouseReceipts") return true;
   return false;
 }
+function sidebarNavItems(nav) {
+  return nav
+    .map(([id, label]) => {
+      const active = mobileNavActive(state.currentView, id);
+      return `<button type="button" onclick="go('${id}');state.mobileOpen=false;render()" class="sidebar-nav-btn ${active ? "is-active" : ""}" aria-current="${active ? "page" : "false"}"><span class="sidebar-nav-btn__icon" aria-hidden="true">${mobileNavIcon(id)}</span><span class="sidebar-nav-btn__label">${esc(label)}</span></button>`;
+    })
+    .join("");
+}
 function mobileBottomNav(nav) {
   if (!nav.length) return "";
   return `<nav class="mobile-bottom-nav lg:hidden" aria-label="Үндсэн цэс">${nav
@@ -1274,7 +1282,7 @@ function initPwa() {
 }
 function pwaInstallSidebarBtn() {
   if (isNativeApp()) return "";
-  return `<button onclick="installAppOnPhone()" class="w-full px-4 py-3 rounded text-left hover:bg-sidebar-accent border border-sidebar-primary/30"><span class="font-medium text-sidebar-primary">${pwaInstallLabel()}</span></button>`;
+  return `<button type="button" onclick="installAppOnPhone()" class="sidebar-pwa-btn"><span>${pwaInstallLabel()}</span></button>`;
 }
 function showUnifiedInstallBanner() {
   if (isNativeApp() || document.getElementById("pwa-install")) return;
@@ -1358,8 +1366,16 @@ function shell(content) {
   const emp = state.currentEmployee,
     initial = emp?.name ? deliveryInitial(emp.name) : "?",
     useBottomNav = nav.length >= 2,
-    pageTitle = currentPageTitle(nav);
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden"><p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="mobile-sidebar fixed lg:static inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1></div></div></div><nav class="flex-1 p-4 space-y-1 overflow-y-auto lg:block ${useBottomNav ? "hidden" : ""}" aria-label="Үндсэн цэс">${nav.map(([id, label]) => `<button type="button" onclick="go('${id}');state.mobileOpen=false;render()" class="sidebar-nav-btn w-full px-4 py-3 rounded text-left ${mobileNavActive(state.currentView, id) ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}"><span class="font-medium">${label}</span></button>`).join("")}${pwaInstallSidebarBtn()}</nav><div class="p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 p-4 lg:p-8 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${["employees", "inventory", "reports", "promotions"].includes(state.currentView) ? `<button type="button" onclick="go('admin')" class="btn btn--secondary btn--block-mobile mb-3">← Админ</button>` : ""}${content}</div></main>${mobileBottomNav(nav)}</div>`;
+    pageTitle = currentPageTitle(nav),
+    navClass = useBottomNav
+      ? "app-sidebar-nav hidden lg:flex"
+      : "app-sidebar-nav flex",
+    adminBack = ["employees", "inventory", "reports", "promotions"].includes(
+      state.currentView,
+    )
+      ? `<button type="button" onclick="go('admin')" class="btn btn--secondary btn--block-mobile mb-3">← Админ</button>`
+      : "";
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden"><p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="${navClass} flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(nav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${adminBack}${content}</div></main>${mobileBottomNav(nav)}</div>`;
 }
 function adminView() {
   ensureSettings();

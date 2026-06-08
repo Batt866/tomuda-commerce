@@ -17,9 +17,9 @@
     <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
     <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
     <title>ТОМУДА - Борлуулалт, агуулах</title>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260608-order-options" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260608-order-options" as="script" />
-    <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260608-order-options"></script>
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260608-web-sidebar" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260608-web-sidebar" as="script" />
+    <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260608-web-sidebar"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -54,7 +54,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260608-order-options"
+      href="{% static 'tomuda/styles.css' %}?v=20260608-web-sidebar"
     />
   </head>
   <body>
@@ -65,6 +65,6 @@
       src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"
     ></script>
     <script src="{% static 'tomuda/data.js' %}?v=20260527-menu-icon"></script>
-    <script src="{% static 'tomuda/app.js' %}?v=20260608-order-options"></script>
+    <script src="{% static 'tomuda/app.js' %}?v=20260608-web-sidebar"></script>
   </body>
 </html>
