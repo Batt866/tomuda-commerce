@@ -50,6 +50,7 @@ const state = {
   settings: {
     stockAlertEnabled: true,
     stockAlertMin: 10,
+    percentDiscountRate: 3,
   },
 };
 const API_BASE = window.TOMUDA_API_BASE || "/api";
@@ -181,14 +182,40 @@ async function fetchBackendStateWithRetry() {
   return null;
 }
 const fmt = (n) => "₮" + Number(n || 0).toLocaleString();
+const RECEIPT_PERCENT_DISCOUNT = 3;
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
-    state.settings = { stockAlertEnabled: true, stockAlertMin: 10 };
+    state.settings = {
+      stockAlertEnabled: true,
+      stockAlertMin: 10,
+      percentDiscountRate: RECEIPT_PERCENT_DISCOUNT,
+    };
     return;
   }
   if (state.settings.stockAlertEnabled == null)
     state.settings.stockAlertEnabled = true;
   if (state.settings.stockAlertMin == null) state.settings.stockAlertMin = 10;
+  if (state.settings.percentDiscountRate == null)
+    state.settings.percentDiscountRate = RECEIPT_PERCENT_DISCOUNT;
+}
+function percentDiscountRate() {
+  ensureSettings();
+  const n = Number(state.settings.percentDiscountRate);
+  return Number.isFinite(n) && n >= 0 ? n : RECEIPT_PERCENT_DISCOUNT;
+}
+function canApplyPercentDiscount(emp = state.currentEmployee) {
+  if (!emp) return false;
+  if (emp.role === "admin") return percentDiscountRate() > 0;
+  if (emp.role !== "sales") return false;
+  if (emp.allowPercentDiscount === false) return false;
+  if (emp.allowPercentDiscount == null) return percentDiscountRate() > 0;
+  return !!emp.allowPercentDiscount && percentDiscountRate() > 0;
+}
+function ensureEmployeePercentDiscount() {
+  state.employees.forEach((e) => {
+    if (e.role === "sales" && e.allowPercentDiscount == null)
+      e.allowPercentDiscount = true;
+  });
 }
 function stockAlertLevel(p) {
   return Math.max(0, Number(p?.minStock ?? 0));
@@ -252,7 +279,6 @@ function receiptMonthKey(o) {
   const day = isoDay(o?.createdAt || o?.deliveryDate || "");
   return day ? day.slice(0, 7) : "";
 }
-const RECEIPT_PERCENT_DISCOUNT = 3;
 function orderReceiptNum(o) {
   if (!o) return "";
   const seq = Number(o.receiptSeq);
@@ -624,6 +650,7 @@ function applyPersistentState(data) {
   if (!state.workerQty || typeof state.workerQty !== "object")
     state.workerQty = {};
   ensureSettings();
+  ensureEmployeePercentDiscount();
   ensureDeliverySelection();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
@@ -667,6 +694,7 @@ function applyRemoteState(payload) {
   applyPersistentState(payload.state);
   restoreSessionSnapshot(session);
   ensureEmployeeEmails();
+  ensureEmployeePercentDiscount();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
@@ -734,6 +762,7 @@ async function boot() {
   backendReady = true;
   ensureEmployeeEmails();
   ensureSettings();
+  ensureEmployeePercentDiscount();
   ensureDeliverySelection();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
@@ -1346,7 +1375,32 @@ function adminView() {
     ["reports", "Тайлан"],
     ["promotions", "Урамшуулал"],
   ];
-  return `<div class="space-y-4">${pageHead("Админ")}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Хүлээгдэж", pending)}${card("Дутуу үлд", low, low && alertOn ? "text-tone-warning" : "text-tone-success")}${card("Харилцагч", state.customers.length)}${card("Ажилтан", sales)}</div><div class="grid grid-cols-2 md:grid-cols-3 gap-2">${actions.map((a) => `<button type="button" onclick="go('${a[0]}')" class="admin-action bg-card rounded p-4 text-left font-semibold hover:bg-secondary/40">${a[1]}</button>`).join("")}<button type="button" onclick="stockAlertModal()" class="admin-action bg-card rounded p-4 text-left font-semibold hover:bg-secondary/40">Үлдэгдэл сануулга</button></div></div>`;
+  return `<div class="space-y-4">${pageHead("Админ")}<div class="grid grid-cols-2 lg:grid-cols-4 gap-2">${card("Хүлээгдэж", pending)}${card("Дутуу үлд", low, low && alertOn ? "text-tone-warning" : "text-tone-success")}${card("Харилцагч", state.customers.length)}${card("Ажилтан", sales)}</div><div class="grid grid-cols-2 md:grid-cols-3 gap-2">${actions.map((a) => `<button type="button" onclick="go('${a[0]}')" class="admin-action bg-card rounded p-4 text-left font-semibold hover:bg-secondary/40">${a[1]}</button>`).join("")}<button type="button" onclick="stockAlertModal()" class="admin-action bg-card rounded p-4 text-left font-semibold hover:bg-secondary/40">Үлдэгдэл сануулга</button><button type="button" onclick="percentDiscountSettingsModal()" class="admin-action bg-card rounded p-4 text-left font-semibold hover:bg-secondary/40">Хувь тооцох (${percentDiscountRate()}%)</button></div></div>`;
+}
+function percentDiscountSettingsModal() {
+  if (!isAdmin()) return;
+  ensureSettings();
+  const rate = percentDiscountRate();
+  box(
+    "Хувь тооцох тохиргоо",
+    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалга дээр «Хувь тооцох» сонголтын хувь. Ажилтан бүрт зөвшөөрөл нь Ажилтан цэснээс тохируулна.</p><label class="block text-sm font-medium">Хөнгөлөлтийн хувь (%)</label><input name="percentDiscountRate" type="number" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    "max-w-md",
+  );
+}
+function savePercentDiscountSettings(e) {
+  if (!isAdmin()) return;
+  e.preventDefault();
+  ensureSettings();
+  const raw = Number(new FormData(e.target).get("percentDiscountRate"));
+  state.settings.percentDiscountRate = Math.min(
+    100,
+    Math.max(0, Number.isFinite(raw) ? raw : RECEIPT_PERCENT_DISCOUNT),
+  );
+  if (!canApplyPercentDiscount()) state.applyPercentDiscount = false;
+  closeModal();
+  scheduleBackendSave();
+  render();
+  showInstallToast("Хувь тооцох тохиргоо хадгалагдлаа");
 }
 function stockAlertModal() {
   if (!isAdmin()) return;
@@ -1958,9 +2012,10 @@ function workerCartSummary() {
     all = workerOrderLines(),
     promo = all.filter((l) => l.isPromoFree),
     gross = paid.reduce((s, l) => s + l.total, 0),
-    discount = state.applyPercentDiscount
-      ? Math.round(gross * RECEIPT_PERCENT_DISCOUNT / 100)
-      : 0;
+    discount =
+      state.applyPercentDiscount && canApplyPercentDiscount()
+        ? Math.round((gross * percentDiscountRate()) / 100)
+        : 0;
   return {
     paid,
     all,
@@ -1987,8 +2042,28 @@ function removePromotionRule(type, index) {
   state.promotionRules[type].splice(index, 1);
   render();
 }
+function employeePercentDiscountToggle(e) {
+  if (e.role !== "sales") return "";
+  const on = !!e.allowPercentDiscount;
+  return `<label class="employee-pct-toggle shrink-0 flex items-center gap-1.5 text-xs cursor-pointer" title="Хувь тооцох зөвшөөрөл"><input type="checkbox" ${on ? "checked" : ""} onchange="toggleEmployeePercentDiscount('${e.id}',this.checked)" class="w-4 h-4 rounded"><span class="${on ? "text-tone-success" : "text-muted-foreground"}">Хувь</span></label>`;
+}
+function toggleEmployeePercentDiscount(id, allowed) {
+  if (!isAdmin()) return;
+  const emp = state.employees.find((e) => e.id === id);
+  if (!emp || emp.role !== "sales") return;
+  emp.allowPercentDiscount = !!allowed;
+  if (state.currentEmployee?.id === id) {
+    state.currentEmployee.allowPercentDiscount = !!allowed;
+    if (!allowed) state.applyPercentDiscount = false;
+  }
+  scheduleBackendSave();
+  render();
+}
 function employeesView() {
-  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div>${canDelete() ? `<button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">×</button>` : ""}</div>`).join("")}</div></div>`;
+  const pctNote = isAdmin()
+    ? `<p class="text-sm text-muted-foreground">Худалдааны төлөөлөгчид «Хувь» зөвшөөрөл — захиалга дээр ${percentDiscountRate()}% хөнгөлөлт ашиглах эрх. Хувийг Админ → Хувь тооцох-оос өөрчилнө.</p>`
+    : "";
+  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}${pctNote}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -2000,8 +2075,15 @@ function getSavedLogin() {
   }
 }
 const AUTH_SESSION_KEY = "tomuda-session";
+function syncEmployeePctField() {
+  const roleEl = document.getElementById("employeeRoleSelect");
+  const field = document.getElementById("employeePctField");
+  if (!roleEl || !field) return;
+  field.classList.toggle("hidden", roleEl.value !== "sales");
+}
 function applyLoginRoleDefaults(emp) {
   if (!emp) return;
+  if (!canApplyPercentDiscount(emp)) state.applyPercentDiscount = false;
   if (emp.role === "warehouse" || emp.role === "delivery") {
     state.selectedWorkers = [];
     state.selectedWarehouseOrderId = "";
@@ -2351,8 +2433,13 @@ function paymentTermPicker() {
 }
 function workerOrderOptionsHtml(cart) {
   const sm = state.settlementMonth || String(new Date().getMonth() + 1),
-    sd = state.settlementDay || String(new Date().getDate());
-  return `<div class="worker-order-options"><label class="worker-order-option"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()"><span>Тооцоо нийлэх өдөр</span></label>${state.settlementAgreed ? `<div class="worker-order-settlement-pickers"><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></div>` : ""}<label class="worker-order-option"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()"><span>Хувь тооцох (${RECEIPT_PERCENT_DISCOUNT}%)</span></label>${state.applyPercentDiscount ? `<p class="worker-order-discount-preview">Хөнгөлөлт: ${fmt(cart.discount)} · Төлөх: <b>${fmt(cart.total)}</b></p>` : ""}</div>`;
+    sd = state.settlementDay || String(new Date().getDate()),
+    pct = percentDiscountRate(),
+    pctAllowed = canApplyPercentDiscount(),
+    pctHtml = pctAllowed
+      ? `<label class="worker-order-option"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()"><span>Хувь тооцох (${pct}%)</span></label>${state.applyPercentDiscount ? `<p class="worker-order-discount-preview">Хөнгөлөлт: ${fmt(cart.discount)} · Төлөх: <b>${fmt(cart.total)}</b></p>` : ""}`
+      : "";
+  return `<div class="worker-order-options"><label class="worker-order-option"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()"><span>Тооцоо нийлэх өдөр</span></label>${state.settlementAgreed ? `<div class="worker-order-settlement-pickers"><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></div>` : ""}${pctHtml}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
@@ -2945,9 +3032,10 @@ function employeeModal() {
   if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
     "max-w-md",
   );
+  setTimeout(syncEmployeePctField, 0);
 }
 function orderModal() {
   box(
@@ -3561,10 +3649,15 @@ function saveWorker() {
     e = orderActor(),
     items = workerOrderLines();
   if (!workerPaidLines().length) return alert("Бараа сонгоно уу");
+  if (state.applyPercentDiscount && !canApplyPercentDiscount())
+    state.applyPercentDiscount = false;
   const grossTotal = items
       .filter((i) => !i.isPromoFree)
       .reduce((s, i) => s + i.total, 0),
-    percentDiscount = state.applyPercentDiscount ? RECEIPT_PERCENT_DISCOUNT : 0,
+    percentDiscount =
+      state.applyPercentDiscount && canApplyPercentDiscount()
+        ? percentDiscountRate()
+        : 0,
     discountAmount = Math.round(grossTotal * percentDiscount / 100),
     total = grossTotal - discountAmount;
   state.orders.push(
@@ -3660,6 +3753,8 @@ function saveEmployee(e) {
     email: normalizeEmail(f.email),
     totalSales: 0,
     commissionRate: 0,
+    allowPercentDiscount:
+      f.role === "sales" && f.allowPercentDiscount === "on",
   });
   closeModal();
   render();
@@ -3837,6 +3932,10 @@ Object.assign(window, {
   setCountQty,
   saveStockAlertSettings,
   stockAlertModal,
+  percentDiscountSettingsModal,
+  savePercentDiscountSettings,
+  toggleEmployeePercentDiscount,
+  syncEmployeePctField,
   saveBackendState,
   installPwaApp,
   dismissPwaInstall,

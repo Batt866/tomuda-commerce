@@ -283,6 +283,7 @@ def default_state() -> dict:
             "settings": {
                 "stockAlertEnabled": True,
                 "stockAlertMin": 10,
+                "percentDiscountRate": 3,
             },
         }
     )
