@@ -2436,10 +2436,17 @@ function workerOrderOptionsHtml(cart) {
     sd = state.settlementDay || String(new Date().getDate()),
     pct = percentDiscountRate(),
     pctAllowed = canApplyPercentDiscount(),
-    pctHtml = pctAllowed
-      ? `<label class="worker-order-option"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()"><span>Хувь тооцох (${pct}%)</span></label>${state.applyPercentDiscount ? `<p class="worker-order-discount-preview">Хөнгөлөлт: ${fmt(cart.discount)} · Төлөх: <b>${fmt(cart.total)}</b></p>` : ""}`
+    settlementBody = state.settlementAgreed
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Сар</span><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select></label><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Өдөр</span><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></label></div></div>`
+      : "",
+    pctBody =
+      state.applyPercentDiscount && pctAllowed
+        ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.discount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
+        : "",
+    pctRow = pctAllowed
+      ? `<div class="worker-order-opt${state.applyPercentDiscount ? " is-open" : ""}"><label class="worker-order-opt__head"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge">${pct}%</span></label>${pctBody}</div>`
       : "";
-  return `<div class="worker-order-options"><label class="worker-order-option"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()"><span>Тооцоо нийлэх өдөр</span></label>${state.settlementAgreed ? `<div class="worker-order-settlement-pickers"><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></div>` : ""}${pctHtml}</div>`;
+  return `<div class="worker-order-options"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;

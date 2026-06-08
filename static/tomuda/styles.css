@@ -2370,43 +2370,115 @@ input::placeholder, textarea::placeholder {
 .worker-order-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--hex-secondary);
+  gap: 0;
+  border-radius: 12px;
+  border: 1px solid var(--hex-border);
+  background: var(--hex-card);
+  overflow: hidden;
 }
 
-.worker-order-option {
+.worker-order-opt {
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.worker-order-opt:last-child {
+  border-bottom: none;
+}
+
+.worker-order-opt__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 12px;
+  margin: 0;
+  cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  color: var(--hex-foreground);
 }
 
-.worker-order-option input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+.worker-order-opt__head input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+  accent-color: var(--hex-primary);
+  margin: 0;
 }
 
-.worker-order-settlement-pickers {
+.worker-order-opt__title {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.worker-order-opt__badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.worker-order-opt__body {
+  padding: 0 12px 12px;
+}
+
+.worker-order-opt__fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  padding-left: 26px;
+}
+
+.worker-order-opt__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.worker-order-opt__field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+}
+
+.worker-order-opt__field .app-input {
+  min-height: var(--field-h);
 }
 
 .worker-order-discount-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
   margin: 0;
-  padding-left: 26px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--hex-secondary);
   font-size: 13px;
   color: var(--hex-muted-foreground);
 }
 
-.worker-order-discount-preview b {
-  color: var(--hex-primary);
-  font-size: 15px;
+.worker-order-discount-preview strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--hex-foreground);
+}
+
+.worker-order-discount-preview__total {
+  color: var(--hex-primary) !important;
+  font-size: 16px !important;
+}
+
+.worker-order-discount-preview__sep {
+  color: var(--hex-border);
+  font-weight: 700;
 }
 
 .worker-payment-tabs {
