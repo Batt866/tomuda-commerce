@@ -309,7 +309,7 @@ function orderDiscountAmount(o) {
   const pct = o.applyPercentDiscount
     ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
     : 0;
-  return Math.round(gross * pct / 100);
+  return Math.round((gross * pct) / 100);
 }
 function orderPayableTotal(o) {
   const gross = orderGrossTotal(o);
@@ -1625,7 +1625,9 @@ function customerExcel() {
       "Бүрэн хаяг",
     ],
     ...[...state.customers]
-      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "mn"))
+      .sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+      )
       .map((c, i) => {
         const fullAddr = customerAddress(c);
         return [
@@ -2123,10 +2125,7 @@ function toggleEmployeePercentDiscount(id, allowed) {
   render();
 }
 function employeesView() {
-  const pctNote = isAdmin()
-    ? `<p class="text-sm text-muted-foreground">Худалдааны төлөөлөгчид «Хувь» зөвшөөрөл — захиалга дээр ${percentDiscountRate()}% хөнгөлөлт ашиглах эрх. Хувийг Админ → Хувь тооцох-оос өөрчилнө.</p>`
-    : "";
-  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}${pctNote}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -2533,7 +2532,9 @@ function workerSelectedRow(p) {
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + o.total, 0),
-    paid = orders.filter((o) => orderIsPaid(o)).reduce((s, o) => s + o.total, 0),
+    paid = orders
+      .filter((o) => orderIsPaid(o))
+      .reduce((s, o) => s + o.total, 0),
     unpaid = total - paid,
     day = state.filters.workerDate || "",
     pay = state.filters.workerPay,
@@ -2578,9 +2579,7 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
       ? ` role="dialog" aria-modal="true" aria-labelledby="${titleId}"`
       : "",
     closeLabel = esc(opts.closeLabel || "Цонхыг хаах"),
-    titleHtml = opts.titleHtml
-      ? title
-      : esc(title);
+    titleHtml = opts.titleHtml ? title : esc(title);
   modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
 }
 function closeModal() {
@@ -2893,7 +2892,14 @@ function productModal(id) {
   };
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats().map((c) => `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("minStock", "Доод үлдэгдэл", p.minStock ?? 0, "number")}${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><div class="grid sm:grid-cols-2 gap-4">${field("boxQuantity", "Хайрцаг (тоо)", p.boxQuantity, "number")}</div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
+      .map(
+        (c) =>
+          `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
+      )
+      .join(
+        "",
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="w-20 h-20 rounded object-cover bg-card"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("minStock", "Доод үлдэгдэл", p.minStock ?? 0, "number")}${field("stock", "Тоо ширхэг", p.stock, "number")}<button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
 function handleProductImage(input) {
@@ -3688,7 +3694,10 @@ function employeeExcel() {
       .map((e) => e.name)
       .join(", "),
     rows = Object.values(map).sort((a, b) =>
-      String(a.productName || "").localeCompare(String(b.productName || ""), "mn"),
+      String(a.productName || "").localeCompare(
+        String(b.productName || ""),
+        "mn",
+      ),
     ),
     totalQty = rows.reduce((sum, row) => sum + row.quantity, 0),
     totalAmount = rows.reduce((sum, row) => sum + row.total, 0),
@@ -3737,7 +3746,7 @@ function saveWorker() {
       state.applyPercentDiscount && canApplyPercentDiscount()
         ? percentDiscountRate()
         : 0,
-    discountAmount = Math.round(grossTotal * percentDiscount / 100),
+    discountAmount = Math.round((grossTotal * percentDiscount) / 100),
     total = grossTotal - discountAmount;
   state.orders.push(
     buildNewOrder({
@@ -3832,8 +3841,7 @@ function saveEmployee(e) {
     email: normalizeEmail(f.email),
     totalSales: 0,
     commissionRate: 0,
-    allowPercentDiscount:
-      f.role === "sales" && f.allowPercentDiscount === "on",
+    allowPercentDiscount: f.role === "sales" && f.allowPercentDiscount === "on",
   });
   closeModal();
   render();
