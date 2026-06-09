@@ -3611,46 +3611,6 @@ function toggleWorkerOnly(id) {
     : [...state.selectedWorkers, id];
   workerSelectModal();
 }
-function excelEsc(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-function excelHtmlStyles() {
-  return `
-    body { margin: 0; }
-    table { border-collapse: collapse; font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #182032; }
-    .sheet-title { font-size: 18pt; font-weight: 700; color: #16899a; padding: 2px 0 4px; }
-    .sheet-subtitle { font-size: 10pt; color: #687386; padding: 0 0 16px; }
-    .summary { width: 100%; margin-bottom: 18px; }
-    .summary th { background: #16899a; color: #ffffff; font-weight: 700; text-align: center; padding: 10px 12px; border: 1px solid #127a88; white-space: nowrap; }
-    .summary td { background: #ffffff; text-align: center; padding: 11px 12px; border: 1px solid #d8dee6; font-weight: 600; vertical-align: middle; }
-    .summary td.summary-employees { text-align: left; }
-    .items { width: 100%; }
-    .items th { background: #101623; color: #ffffff; font-weight: 700; padding: 10px 8px; border: 1px solid #353d4e; text-align: center; white-space: nowrap; }
-    .items td { padding: 8px 10px; border: 1px solid #d8dee6; vertical-align: middle; }
-    .items td.text { text-align: left; }
-    .items td.center { text-align: center; }
-    .items td.num { text-align: right; mso-number-format: "#,##0"; }
-    .items td.money { text-align: right; mso-number-format: "#,##0"; font-weight: 600; color: #16899a; }
-    .items tr.alt td { background: #f5f7f9; }
-    .items tr.total td { background: #eef2f5; font-weight: 700; border-top: 2px solid #16899a; }
-    .items tr.total td.num,
-    .items tr.total td.money { color: #182032; font-size: 12pt; }
-  `;
-}
-function excelHtmlDownload(name, html) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(
-    new Blob(["\uFEFF" + html], {
-      type: "application/vnd.ms-excel;charset=utf-8",
-    }),
-  );
-  a.download = name;
-  a.click();
-}
 function employeeExcel() {
   if (!state.selectedWorkers.length) return alert("Ажилтан сонгоно уу");
   const orders = state.orders.filter((o) =>
@@ -3681,20 +3641,33 @@ function employeeExcel() {
     totalQty = rows.reduce((sum, row) => sum + row.quantity, 0),
     totalAmount = rows.reduce((sum, row) => sum + row.total, 0),
     reportDate = dte(new Date()),
-    itemRows = rows
-      .map((x, i) => {
+    sheetRows = [
+      ["ТОМУДА — Агуулахын захиалга"],
+      [`Тайлан огноо: ${reportDate}`],
+      [],
+      ["Ажилтан", "Огноо", "Захиалга", "Нийт ширхэг", "Нийт дүн (₮)"],
+      [names, reportDate, orders.length, totalQty, totalAmount],
+      [],
+      ["№", "Бараа", "Ангилал", "Баркод", "Тоо", "Дүн (₮)"],
+      ...rows.map((x, i) => {
         const p = state.products.find(
           (product) => product.id === x.productId,
         ) || {
           category: "",
           barcode: "",
         };
-        const alt = i % 2 === 1 ? " alt" : "";
-        return `<tr class="${alt}"><td class="center">${i + 1}</td><td class="text">${excelEsc(x.productName)}</td><td class="text">${excelEsc(p.category || "-")}</td><td class="center">${excelEsc(p.barcode || "-")}</td><td class="num">${x.quantity}</td><td class="money">${x.total}</td></tr>`;
-      })
-      .join("");
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><style>${excelHtmlStyles()}</style></head><body><table border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td colspan="6" class="sheet-title">ТОМУДА — Агуулахын захиалга</td></tr><tr><td colspan="6" class="sheet-subtitle">Тайлан огноо: ${excelEsc(reportDate)}</td></tr></table><table class="summary" border="0" cellpadding="0" cellspacing="0"><tr><th>Ажилтан</th><th>Огноо</th><th>Захиалга</th><th>Нийт ширхэг</th><th>Нийт дүн</th></tr><tr><td class="summary-employees">${excelEsc(names)}</td><td>${excelEsc(reportDate)}</td><td>${orders.length}</td><td>${totalQty}</td><td>${excelEsc(fmt(totalAmount))}</td></tr></table><table class="items" border="0" cellpadding="0" cellspacing="0"><tr><th>№</th><th>Бараа</th><th>Ангилал</th><th>Баркод</th><th>Тоо</th><th>Дүн (₮)</th></tr>${itemRows || `<tr><td colspan="6" class="text" style="text-align:center;padding:16px;color:#687386;">Бараа байхгүй</td></tr>`}<tr class="total"><td colspan="4" class="text" style="text-align:right;padding-right:12px;">НИЙТ</td><td class="num">${totalQty}</td><td class="money">${totalAmount}</td></tr></table></body></html>`;
-  excelHtmlDownload("aguulah-zahialga.xls", html);
+        return [
+          i + 1,
+          x.productName,
+          p.category || "-",
+          p.barcode || "",
+          x.quantity,
+          x.total,
+        ];
+      }),
+      ["", "", "", "НИЙТ", totalQty, totalAmount],
+    ];
+  excel("aguulah-zahialga.csv", sheetRows);
   alert("Excel файл татагдлаа");
 }
 function saveWorker() {
@@ -3885,8 +3858,8 @@ function csv(name, rows) {
 function excel(name, rows) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(
-    new Blob(["\uFEFF" + rows.map(csvRow).join("\n")], {
-      type: "application/vnd.ms-excel;charset=utf-8",
+    new Blob(["\uFEFF" + rows.map(csvRow).join("\r\n")], {
+      type: "text/csv;charset=utf-8",
     }),
   );
   a.download = name;
