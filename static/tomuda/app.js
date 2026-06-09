@@ -890,7 +890,7 @@ function qtyStepperApply(btn) {
   if (btn.closest("[data-picker-root]")) pickerQtyChange(id, q);
   else setWorkerQty(id, q);
 }
-function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
+function pickerQtyStepperHtml(p, q, { min = 1 } = {}) {
   const idAttr = esc(p.id);
   const decDisabled = q <= min;
   const incDisabled = q >= p.stock;
@@ -912,10 +912,28 @@ function setWorkerOrderActive(id) {
   render();
 }
 function finishWorkerOrderEdit() {
+  const id = state.workerOrderActiveId;
+  if (id) {
+    const input = document.querySelector(
+      `.worker-order-qty-stepper input[data-product-id="${id}"]`,
+    );
+    if (input) qtyCommit(input);
+    else if (!getWorkerQty(id)) {
+      const p = state.products.find((x) => x.id === id);
+      if (p) state.workerQty[id] = 1;
+    }
+  }
   state.workerOrderActiveId = "";
   render();
 }
 function finishPickerEdit() {
+  const id = state.pickerActiveId;
+  if (id) {
+    const input = document.querySelector(
+      `[data-picker-qty-input][data-product-id="${id}"]`,
+    );
+    if (input) qtyCommit(input);
+  }
   state.pickerActiveId = "";
   if (pickerOpen() && refreshPickerList()) return;
   render();
@@ -931,10 +949,12 @@ function qtyDraft(el) {
   const id = el.getAttribute("data-product-id") || "";
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
+  const min = Number(el.closest(".qty-stepper")?.dataset?.qtyMin ?? 0);
   const digits = String(el.value || "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
   if (!digits) return;
   const n = Math.min(Number(digits), p.stock);
+  if (n < min) return;
   state.workerQty[id] = n;
   if (String(n) !== digits) el.value = String(n);
   if (pickerOpen()) updatePickerSummary();
@@ -943,9 +963,10 @@ function qtyCommit(el) {
   const id = el.getAttribute("data-product-id") || "";
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
+  const min = Number(el.closest(".qty-stepper")?.dataset?.qtyMin ?? 0);
   const digits = String(el.value || "").replace(/\D/g, "");
   let v = digits ? Number(digits) : 0;
-  if (v < 1) v = 1;
+  if (v < min) v = min;
   v = Math.min(v, p.stock);
   el.value = String(v);
   setWorkerQty(id, v);
