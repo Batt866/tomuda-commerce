@@ -890,7 +890,7 @@ function qtyStepperApply(btn) {
   if (btn.closest("[data-picker-root]")) pickerQtyChange(id, q);
   else setWorkerQty(id, q);
 }
-function pickerQtyStepperHtml(p, q, { min = 1 } = {}) {
+function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
   const idAttr = esc(p.id);
   const decDisabled = q <= min;
   const incDisabled = q >= p.stock;
@@ -1004,28 +1004,6 @@ function initPickerModalActions() {
     if (clearCartBtn) {
       clearPickerCart();
       return;
-    }
-    const editBtn = e.target.closest("[data-picker-edit]");
-    if (editBtn) {
-      const id = editBtn.getAttribute("data-picker-edit") || "";
-      state.pickerActiveId = state.pickerActiveId === id ? "" : id;
-      if (refreshPickerList()) return;
-      pickerModal();
-      return;
-    }
-  });
-  modal.addEventListener("change", (e) => {
-    const check = e.target.closest("[data-picker-check]");
-    if (check) {
-      const id = check.getAttribute("data-product-id") || "";
-      if (check.checked) {
-        const cur = getWorkerQty(id);
-        state.pickerActiveId = id;
-        setWorkerQty(id, cur > 0 ? cur : 1);
-      } else {
-        if (state.pickerActiveId === id) state.pickerActiveId = "";
-        setWorkerQty(id, 0);
-      }
     }
   });
 }
@@ -3544,22 +3522,15 @@ function clearPickerCart() {
 function pickerQtyChange(productId, qty) {
   setWorkerQty(productId, qty);
 }
-function pickerRowAside(p, q, checked, editing) {
-  const id = esc(p.id);
-  if (!checked)
-    return `<div class="picker-row__aside picker-row__aside--empty"></div>`;
-  if (editing)
-    return `<div class="picker-row__aside">${pickerQtyStepperHtml(p, q)}</div>`;
-  return `<button type="button" class="picker-row__ordered" data-picker-edit="${id}"><span class="picker-row__ordered-label">Захиалагдсан</span><span class="picker-row__ordered-qty">${q} ш</span></button>`;
+function pickerRowAside(p, q) {
+  return `<div class="picker-row__aside">${pickerQtyStepperHtml(p, q)}</div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
-    checked = q > 0,
-    editing = checked && state.pickerActiveId === p.id,
+    selected = q > 0,
     left = p.stock - q,
-    id = esc(p.id),
     showCat = !state.filters.workerCategory && p.category;
-  return `<article class="picker-row${checked ? " is-selected" : ""}${editing ? " is-editing" : ""}"><div class="picker-row__main"><label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label><img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span></div></div>${pickerRowAside(p, q, checked, editing)}</div></article>`;
+  return `<article class="picker-row${selected ? " is-selected" : ""}"><div class="picker-row__main"><img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span>${selected ? `<span class="picker-tag picker-tag--total">${fmt(p.price * q)}</span>` : ""}</div></div>${pickerRowAside(p, q)}</div></article>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";

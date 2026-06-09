@@ -1366,7 +1366,6 @@ input, select, textarea, button { box-shadow: none; }
 .modal-close,
 .worker-add-plus,
 .delivery-field__trigger,
-.picker-row__checkbox,
 .seg-tab,
 .list-btn {
   min-height: unset;
@@ -2985,8 +2984,8 @@ input::placeholder, textarea::placeholder {
 
 .picker-row__main {
   display: grid;
-  grid-template-columns: 26px 48px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
   min-width: 0;
 }
@@ -3029,43 +3028,7 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 96px;
-}
-
-.picker-row__aside--empty {
-  width: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.picker-row__ordered {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  padding: 2px 4px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--hex-foreground);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: none !important;
-}
-
-.picker-row__ordered-label {
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--hex-primary);
-  white-space: nowrap;
-}
-
-.picker-row__ordered-qty {
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
+  min-width: 108px;
 }
 
 .picker-qty-stepper--compact {
@@ -3128,35 +3091,14 @@ input::placeholder, textarea::placeholder {
   color: var(--hex-primary-foreground);
 }
 
-.picker-row__check {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  cursor: pointer;
-}
-
-.picker-row__checkbox {
-  width: 22px;
-  height: 22px;
-  accent-color: var(--hex-primary);
-  cursor: pointer;
-}
-
 .picker-qty-stepper input {
   font-weight: 700;
 }
 
 
-.picker-row.is-selected:not(.is-editing) {
+.picker-row.is-selected {
   border-color: color-mix(in srgb, var(--hex-primary) 22%, var(--hex-border));
   background: color-mix(in srgb, var(--hex-primary-soft) 55%, var(--hex-card));
-}
-
-.picker-row.is-editing {
-  border-color: color-mix(in srgb, var(--hex-primary) 38%, var(--hex-border));
-  background: color-mix(in srgb, var(--hex-primary-soft) 80%, var(--hex-card));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hex-primary) 10%, transparent);
 }
 
 .picker-layout {
@@ -3967,8 +3909,8 @@ input::placeholder, textarea::placeholder {
   }
 
   .picker-row__main {
-    grid-template-columns: 24px 40px minmax(0, 1fr) auto;
-    gap: 6px;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 8px;
   }
 
   .picker-row__thumb {
