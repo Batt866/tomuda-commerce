@@ -3008,6 +3008,10 @@ input::placeholder, textarea::placeholder {
   min-width: 0;
 }
 
+.picker-row__main--no-check {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+}
+
 .picker-row__thumb {
   width: 52px;
   height: 52px;
@@ -3985,6 +3989,10 @@ input::placeholder, textarea::placeholder {
   .picker-row__main {
     grid-template-columns: 24px 40px minmax(0, 1fr) auto;
     gap: 6px;
+  }
+
+  .picker-row__main--no-check {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
   }
 
   .picker-row__thumb {

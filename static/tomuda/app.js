@@ -3570,6 +3570,12 @@ function clearPickerCart() {
 function pickerQtyChange(productId, qty) {
   setWorkerQty(productId, qty);
 }
+function pickerRowCheck(p, q, editing) {
+  const id = esc(p.id);
+  if (q > 0 && !editing) return "";
+  const checked = q > 0;
+  return `<label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label>`;
+}
 function pickerRowAside(p, q, checked, editing) {
   const id = esc(p.id);
   if (!checked)
@@ -3583,9 +3589,8 @@ function pickerRow(p) {
     checked = q > 0,
     editing = checked && state.pickerActiveId === p.id,
     left = p.stock - q,
-    id = esc(p.id),
     showCat = !state.filters.workerCategory && p.category;
-  return `<article class="picker-row${checked ? " is-selected" : ""}${editing ? " is-editing" : ""}"><div class="picker-row__main"><label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label><img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span></div></div>${pickerRowAside(p, q, checked, editing)}</div></article>`;
+  return `<article class="picker-row${checked ? " is-selected" : ""}${editing ? " is-editing" : ""}"><div class="picker-row__main${checked && !editing ? " picker-row__main--no-check" : ""}">${pickerRowCheck(p, q, editing)}<img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span></div></div>${pickerRowAside(p, q, checked, editing)}</div></article>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
