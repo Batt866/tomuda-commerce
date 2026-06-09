@@ -1544,7 +1544,24 @@ input, select, textarea, button { box-shadow: none; }
 }
 
 .app-sidebar-nav {
+  display: none;
   flex-direction: column;
+}
+
+@media (min-width: 1024px) {
+  .app-sidebar-nav {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-shell--bottom-nav .app-sidebar-nav {
+    display: none !important;
+  }
+
+  .app-shell:not(.app-shell--bottom-nav) .app-sidebar-nav {
+    display: flex !important;
+  }
 }
 
 .sidebar-foot {

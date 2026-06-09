@@ -579,6 +579,10 @@ const MOBILE_NAV_SHORT = {
   products: "Бараа",
   warehouse: "Агуулах",
   count: "Тооллого",
+  employees: "Ажилтан",
+  inventory: "Бүртгэл",
+  reports: "Тайлан",
+  promotions: "Урамшуулал",
   admin: "Админ",
 };
 const MOBILE_NAV_SVG = {
@@ -590,9 +594,50 @@ const MOBILE_NAV_SVG = {
   warehouse:
     '<path d="M9 5H5a2 2 0 0 0-2 2v12h16V7a2 2 0 0 0-2-2h-4"/><path d="M9 5a2 2 0 0 1 4 0v2H9V5z"/>',
   count: '<path d="M4 7h16M4 12h10M4 17h16"/><path d="M18 10v6M15 13h6"/>',
+  employees:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  inventory:
+    '<path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/><path d="M12 12v6"/>',
+  reports:
+    '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 17V9"/><path d="M12 17V7"/><path d="M16 17v-4"/>',
+  promotions:
+    '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
   admin:
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
+function sidebarNavForRole(role) {
+  if (role === "admin")
+    return [
+      ["worker", "Захиалга үүсгэх"],
+      ["customers", "Харилцагч"],
+      ["products", "Бараа"],
+      ["warehouse", "Агуулах"],
+      ["count", "Тооллого"],
+      ["employees", "Ажилтан"],
+      ["inventory", "Агуулахын бүртгэл"],
+      ["reports", "Тайлан"],
+      ["promotions", "Урамшуулал"],
+      ["admin", "Админ"],
+    ];
+  return [
+    ["worker", "Захиалга үүсгэх"],
+    ["customers", "Харилцагч"],
+    ["products", "Бараа"],
+    ["warehouse", "Агуулах"],
+    ["count", "Тооллого"],
+    ["admin", "Админ"],
+  ].filter(([id]) => allowedNavIds(role).includes(id));
+}
+function bottomNavForRole(role) {
+  const mobileIds = {
+    admin: ["worker", "customers", "products", "warehouse", "count", "admin"],
+    sales: ["worker", "customers", "products", "warehouse"],
+    warehouse: ["warehouse"],
+    delivery: ["warehouse"],
+  };
+  const ids = mobileIds[role] || mobileIds.sales;
+  return sidebarNavForRole(role).filter(([id]) => ids.includes(id));
+}
 function mobileNavIcon(id) {
   const paths = MOBILE_NAV_SVG[id];
   if (!paths)
@@ -601,11 +646,6 @@ function mobileNavIcon(id) {
 }
 function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
-  if (
-    navId === "admin" &&
-    ["employees", "inventory", "reports", "promotions"].includes(viewId)
-  )
-    return true;
   if (navId === "warehouse" && viewId === "warehouseReceipts") return true;
   return false;
 }
@@ -1354,27 +1394,13 @@ function search(key, value) {
 }
 function shell(content) {
   const userRole = currentRole();
-  const nav = [
-    ["worker", "Захиалга үүсгэх"],
-    ["customers", "Харилцагч"],
-    ["products", "Бараа"],
-    ["warehouse", "Агуулах"],
-    ["count", "Тооллого"],
-    ["admin", "Админ"],
-  ].filter(([id]) => allowedNavIds(userRole).includes(id));
+  const sidebarNav = sidebarNavForRole(userRole);
+  const bottomNav = bottomNavForRole(userRole);
   const emp = state.currentEmployee,
     initial = emp?.name ? deliveryInitial(emp.name) : "?",
-    useBottomNav = nav.length >= 2,
-    pageTitle = currentPageTitle(nav),
-    navClass = useBottomNav
-      ? "app-sidebar-nav hidden lg:flex"
-      : "app-sidebar-nav flex",
-    adminBack = ["employees", "inventory", "reports", "promotions"].includes(
-      state.currentView,
-    )
-      ? `<button type="button" onclick="go('admin')" class="btn btn--secondary btn--block-mobile mb-3">← Админ</button>`
-      : "";
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden"><p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="${navClass} flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(nav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${adminBack}${content}</div></main>${mobileBottomNav(nav)}</div>`;
+    useBottomNav = bottomNav.length >= 2,
+    pageTitle = currentPageTitle(sidebarNav);
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden"><p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
 }
 function adminView() {
   ensureSettings();
