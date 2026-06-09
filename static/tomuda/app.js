@@ -424,10 +424,6 @@ function updateModalTitle(title) {
   const el = document.getElementById("modal-title");
   if (el) el.textContent = title;
 }
-function pickerBarcodeToolsHtml() {
-  const code = esc(state.pickerBarcode || state.searches.workerProduct || "");
-  return `<div class="barcode-tools picker-barcode-tools"><label class="sr-only" for="picker-barcode-input">Баркод</label><input id="picker-barcode-input" data-picker-barcode value="${code}" onkeydown="if(event.key==='Enter'){applyPickerBarcodeInput();event.preventDefault()}" placeholder="Баркод оруулах..." class="barcode-tools__input app-input" autocomplete="off" inputmode="numeric"><button type="button" onclick="applyPickerBarcodeInput()" class="btn btn--secondary btn--sm">Оруулах</button></div>`;
-}
 const cats = () => [
   ...new Set([
     ...state.products.map((p) => p.category),
@@ -1033,11 +1029,6 @@ function initPickerModalActions() {
     const catBtn = e.target.closest("[data-picker-cat]");
     if (catBtn) {
       setPickerCategory(catBtn.getAttribute("data-picker-cat") || "");
-      return;
-    }
-    const clearSearchBtn = e.target.closest("[data-picker-clear-search]");
-    if (clearSearchBtn) {
-      clearPickerSearch();
       return;
     }
     const clearCartBtn = e.target.closest("[data-picker-clear-cart]");
@@ -3266,18 +3257,9 @@ function applyStock(id, type) {
   render();
 }
 function pickerProductsInView() {
-  const q = (state.searches.workerProduct || "").toLowerCase().trim(),
-    cat = state.filters.workerCategory || "";
+  const cat = state.filters.workerCategory || "";
   return state.products
-    .filter((p) => {
-      if (cat && p.category !== cat) return false;
-      if (!q) return true;
-      return (
-        p.name.toLowerCase().includes(q) ||
-        String(p.barcode || "").includes(q) ||
-        (p.category || "").toLowerCase().includes(q)
-      );
-    })
+    .filter((p) => !cat || p.category === cat)
     .sort((a, b) => {
       const byCat = (a.category || "").localeCompare(b.category || "", "mn");
       if (byCat) return byCat;
@@ -3354,29 +3336,22 @@ function setWorkerQty(id, qty) {
 function applyPickerBarcode(value, scanned = false) {
   const code = String(value || "").trim();
   if (!code) return;
-  state.pickerBarcode = code;
-  state.searches.workerProduct = code;
   state.filters.workerCategory = "";
   const product =
     state.products.find((p) => String(p.barcode) === code) ||
     state.products.find((p) => String(p.barcode).includes(code));
   if (product) {
     const current = state.workerQty[product.id] || 0;
-    if (current >= product.stock) {
-      state.pickerStatus = `${product.name} үлдэгдэл хүрэлцэхгүй байна`;
-    } else {
+    if (current < product.stock) {
       state.workerQty[product.id] = current + 1;
       state.pickerActiveId = product.id;
-      state.pickerStatus = `${product.name} нэмэгдлээ`;
     }
-  } else {
-    state.pickerStatus = `${code} баркодтой бараа олдсонгүй`;
   }
   if (scanned) stopBarcodeScan();
-  pickerModal();
-}
-function applyPickerBarcodeInput() {
-  applyPickerBarcode(document.querySelector("[data-picker-barcode]")?.value);
+  scheduleBackendSave();
+  if (pickerOpen() && refreshPickerList()) return;
+  render();
+  if (pickerOpen()) pickerModal();
 }
 function clearPickerFilter() {
   state.searches.workerProduct = "";
@@ -3538,7 +3513,7 @@ function openPickerModal() {
   state.pickerBarcode = "";
   pickerModal();
 }
-function pickerModal({ focusSearch = false } = {}) {
+function pickerModal() {
   const selected = state.products
       .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
       .filter((p) => p.qty > 0),
@@ -3548,25 +3523,13 @@ function pickerModal({ focusSearch = false } = {}) {
   ensurePickerActiveId();
   box(
     ORDER_PICKER_TITLE,
-    `<div class="picker-step2 picker-panel" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}${pickerBarcodeToolsHtml()}<div class="picker-search-tools"><input data-picker-search value="${esc(state.searches.workerProduct || "")}" oninput="pickerSearch(this.value)" placeholder="Бараа, баркод, төрлөөр хайх..." class="picker-search-input app-input" autocomplete="off"><button type="button" data-picker-clear-search class="btn btn--secondary btn--sm picker-search-clear">Цэвэрлэх</button></div>${state.pickerStatus ? `<div class="picker-status">${esc(state.pickerStatus)}</div>` : ""}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom"><div class="picker-summary"><div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${selected.length}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${selectedQty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${selected.length ? "" : " is-disabled"}" ${selected.length ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer></div>`,
+    `<div class="picker-step2 picker-panel" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom"><div class="picker-summary"><div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${selected.length}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${selectedQty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${selected.length ? "" : " is-disabled"}" ${selected.length ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer></div>`,
     "max-w-4xl",
     { titleId: "picker-order-title", dialog: true },
   );
-  if (focusSearch) {
-    const el = document.querySelector("[data-picker-search]");
-    if (el) {
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-    }
-  }
 }
 function backToPickerCategories() {
   setPickerCategory("");
-}
-function clearPickerSearch() {
-  state.searches.workerProduct = "";
-  state.pickerStatus = "";
-  pickerModal();
 }
 function clearPickerCart() {
   resetWorkerCart();
@@ -3601,13 +3564,6 @@ function pickerRow(p) {
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
   state.pickerActiveId = "";
-  if (refreshPickerList()) return;
-  pickerModal();
-}
-function pickerSearch(value) {
-  state.searches.workerProduct = value;
-  const input = document.querySelector("[data-picker-barcode]");
-  if (input) input.value = value;
   if (refreshPickerList()) return;
   pickerModal();
 }
@@ -3967,12 +3923,9 @@ Object.assign(window, {
   openPickerModal,
   pickerModal,
   backToPickerCategories,
-  clearPickerSearch,
   clearPickerCart,
-  pickerSearch,
   setPickerCategory,
   applyPickerBarcode,
-  applyPickerBarcodeInput,
   clearPickerFilter,
   startBarcodeScan,
   stopBarcodeScan,
