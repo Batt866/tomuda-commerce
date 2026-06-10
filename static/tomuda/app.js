@@ -2317,7 +2317,7 @@ function workerChooser(orders) {
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders);
-  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button>${warehouseDeliveryField()}${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Эхлээд HT ажилтан сонгоно уу</div>`}</section>`;
+  return `<section class="bg-card rounded p-3 space-y-3"><button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button>${warehouseDeliveryField()}${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="employeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">Excel</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Худалдааны төлөөлөгчөө сонгоно уу</div>`}</section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -3206,12 +3206,14 @@ function receiptEditDraftOrder() {
   };
 }
 function orderReceiptEditRows() {
-  return (state.receiptEditItems || []).map((i, idx) => {
-    if (i.isPromoFree) {
-      return `<tr class="receipt-edit-row receipt-edit-row--promo"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum">0</td></tr>`;
-    }
-    return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" oninput="receiptEditQtyDraft(this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(i.total)}</td></tr>`;
-  }).join("");
+  return (state.receiptEditItems || [])
+    .map((i, idx) => {
+      if (i.isPromoFree) {
+        return `<tr class="receipt-edit-row receipt-edit-row--promo"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum">0</td></tr>`;
+      }
+      return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" oninput="receiptEditQtyDraft(this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(i.total)}</td></tr>`;
+    })
+    .join("");
 }
 function refreshReceiptEditTotals() {
   const draft = receiptEditDraftOrder();
@@ -3239,7 +3241,10 @@ function receiptEditQtyCommit(el) {
   const idx = Number(el.getAttribute("data-receipt-qty"));
   const item = state.receiptEditItems?.[idx];
   if (!item || item.isPromoFree) return;
-  let q = Math.max(0, Math.floor(Number(String(el.value || "").replace(/\D/g, "")) || 0));
+  let q = Math.max(
+    0,
+    Math.floor(Number(String(el.value || "").replace(/\D/g, "")) || 0),
+  );
   item.quantity = q;
   item.total = q * (item.price || 0);
   el.value = String(q);
