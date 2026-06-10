@@ -43,6 +43,8 @@ const state = {
   workerQty: {},
   pickerActiveId: "",
   workerOrderActiveId: "",
+  receiptEditOrderId: "",
+  receiptEditItems: null,
   extraCategories: [],
   inventoryLogs: [],
   countQty: {},
@@ -424,6 +426,20 @@ function updateModalTitle(title) {
   const el = document.getElementById("modal-title");
   if (el) el.textContent = title;
 }
+function pickerModalCustomer() {
+  return state.customers.find((c) => c.id === state.workerCustomer) || null;
+}
+function pickerModalTitleHtml() {
+  const c = pickerModalCustomer();
+  return c ? workerStoreSummary(c, true) : esc(ORDER_PICKER_TITLE);
+}
+function updatePickerModalTitle() {
+  const el = document.getElementById("picker-order-title");
+  if (!el) return;
+  const c = pickerModalCustomer();
+  if (c) el.innerHTML = workerStoreSummary(c, true);
+  else el.textContent = ORDER_PICKER_TITLE;
+}
 const cats = () => [
   ...new Set([
     ...state.products.map((p) => p.category),
@@ -663,6 +679,14 @@ function mobileBottomNav(nav) {
     .join("")}</nav>`;
 }
 function currentPageTitle(nav) {
+  if (
+    state.currentView === "worker" &&
+    state.filters.worker === "new" &&
+    state.workerCustomer
+  ) {
+    const c = state.customers.find((x) => x.id === state.workerCustomer);
+    if (c?.name) return c.name;
+  }
   const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
   if (hit) return hit[1];
   const extra = {
@@ -993,7 +1017,7 @@ function qtyDraft(el) {
   if (n < min) return;
   state.workerQty[id] = n;
   if (String(n) !== digits) el.value = String(n);
-  if (pickerOpen()) updatePickerSummary();
+  if (pickerOpen()) updatePickerClearBtn();
 }
 function qtyCommit(el) {
   const id = el.getAttribute("data-product-id") || "";
@@ -1660,7 +1684,7 @@ function workerPickCard(c) {
   const initial = deliveryInitial(c.name);
   const id = esc(c.id);
   const line2 = sub || phone;
-  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')"><span class="worker-pick-card__avatar">${esc(initial)}</span><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
+  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}"><span class="worker-pick-card__avatar">${esc(initial)}</span><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
 function productsView() {
   const q = state.searches.products || "",
@@ -2242,6 +2266,7 @@ function workerView() {
 function openWorkerNewTab() {
   state.filters.worker = "new";
   state.workerStoreReady = false;
+  state.workerCustomer = "";
   state.searches.workerStore = "";
   resetWorkerCart();
   render();
@@ -2446,14 +2471,24 @@ function filterWorkerStores() {
 }
 function workerStorePickStep() {
   const q = state.searches.workerStore || "",
-    rows = filterWorkerStores();
+    rows = filterWorkerStores(),
+    selected = state.workerCustomer
+      ? state.customers.find((c) => c.id === state.workerCustomer)
+      : null;
   const countHtml = rows.length
     ? `<p class="worker-pick__count">${rows.length} харилцагч</p>`
     : "";
-  return `<section class="worker-pick"><div class="worker-pick__toolbar"><label class="worker-pick__search-wrap"><span class="worker-pick__search-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, утас, компани..." class="worker-pick__search app-input" autocomplete="off"></label>${countHtml}</div>${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
+  const selectedBanner = selected
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Сонгосон харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
+  return `<section class="worker-pick"><div class="worker-pick__toolbar"><label class="worker-pick__search-wrap"><span class="worker-pick__search-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, утас, компани..." class="worker-pick__search app-input" autocomplete="off"></label>${countHtml}</div>${selectedBanner}${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
 }
 function pickWorkerStore(id) {
-  state.workerCustomer = id;
+  state.workerCustomer = state.workerCustomer === id ? "" : id;
+  render();
+}
+function confirmWorkerStore() {
+  if (!state.workerCustomer) return;
   state.workerStoreReady = true;
   state.deliveryDate = tomorrowIso();
   resetWorkerCart();
@@ -2497,9 +2532,9 @@ function workerOrderOptionsHtml(cart) {
         ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.discount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
         : "",
     pctRow = pctAllowed
-      ? `<div class="worker-order-opt${state.applyPercentDiscount ? " is-open" : ""}"><label class="worker-order-opt__head"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge">${pct}%</span></label>${pctBody}</div>`
+      ? `<div class="worker-order-opt${state.applyPercentDiscount ? " is-open" : ""}" aria-expanded="${state.applyPercentDiscount ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
-  return `<div class="worker-order-options"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
+  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
@@ -2511,11 +2546,15 @@ function workerNewOrderStep(cart) {
     deliveryDay = state.deliveryDate || tomorrowIso(),
     paidProducts = workerPaidProductsInCart(),
     hasItems = paidProducts.length > 0,
+    paidPieceQty = cart.paid.reduce((s, l) => s + l.quantity, 0),
     listHtml = hasItems
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
+      : "",
+    summaryHtml = hasItems
+      ? `<div class="worker-order-summary">${pickerSummaryHtml(cart.skuCount, paidPieceQty, cart.gross, true)}</div>`
       : "";
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div><button type="button" onclick="openPickerModal()" class="worker-order-add-btn"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа нэмэх</span></button><div class="worker-order-meta"><input type="date" value="${deliveryDay}" min="${tomorrowIso()}" onchange="state.deliveryDate=this.value;render()" class="field-input app-input worker-order-date" title="Хүргэх өдөр" aria-label="Хүргэх өдөр">${workerOrderAgentField()}</div></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа нэмэх</span></button><div class="worker-order-meta"><input type="date" value="${deliveryDay}" min="${tomorrowIso()}" onchange="state.deliveryDate=this.value;render()" class="field-input app-input worker-order-date" title="Хүргэх өдөр" aria-label="Хүргэх өдөр">${workerOrderAgentField()}</div></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div>${summaryHtml}</div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
@@ -2584,6 +2623,7 @@ function closeModal() {
   state.filters.workerCategory = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
+  clearReceiptEdit();
   modal.innerHTML = "";
 }
 function destroyCustomerMap() {
@@ -3151,14 +3191,83 @@ function saveOrder(e) {
   closeModal();
   render();
 }
+function clearReceiptEdit() {
+  state.receiptEditOrderId = "";
+  state.receiptEditItems = null;
+}
+function receiptEditDraftOrder() {
+  const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
+  if (!o || !state.receiptEditItems) return o;
+  return {
+    ...o,
+    items: state.receiptEditItems,
+    grossTotal: null,
+    discountAmount: null,
+  };
+}
+function orderReceiptEditRows() {
+  return (state.receiptEditItems || []).map((i, idx) => {
+    if (i.isPromoFree) {
+      return `<tr class="receipt-edit-row receipt-edit-row--promo"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum">0</td></tr>`;
+    }
+    return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" oninput="receiptEditQtyDraft(this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(i.total)}</td></tr>`;
+  }).join("");
+}
+function refreshReceiptEditTotals() {
+  const draft = receiptEditDraftOrder();
+  if (!draft) return;
+  (state.receiptEditItems || []).forEach((item, idx) => {
+    const el = document.querySelector(`[data-receipt-line-total="${idx}"]`);
+    if (el) el.textContent = item.isPromoFree ? "0" : fmt(item.total);
+  });
+  const totalEl = document.getElementById("receipt-edit-total");
+  if (totalEl) totalEl.textContent = fmt(orderPayableTotal(draft));
+}
+function receiptEditQtyDraft(el) {
+  const idx = Number(el.getAttribute("data-receipt-qty"));
+  const item = state.receiptEditItems?.[idx];
+  if (!item || item.isPromoFree) return;
+  const digits = String(el.value || "").replace(/\D/g, "");
+  if (digits !== el.value) el.value = digits;
+  if (!digits) return;
+  const q = Number(digits);
+  item.quantity = q;
+  item.total = q * (item.price || 0);
+  refreshReceiptEditTotals();
+}
+function receiptEditQtyCommit(el) {
+  const idx = Number(el.getAttribute("data-receipt-qty"));
+  const item = state.receiptEditItems?.[idx];
+  if (!item || item.isPromoFree) return;
+  let q = Math.max(0, Math.floor(Number(String(el.value || "").replace(/\D/g, "")) || 0));
+  item.quantity = q;
+  item.total = q * (item.price || 0);
+  el.value = String(q);
+  refreshReceiptEditTotals();
+}
+function applyReceiptEditToOrder() {
+  const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
+  if (!o || !state.receiptEditItems) return false;
+  o.items = state.receiptEditItems.map((i) => ({ ...i }));
+  const gross = orderGrossTotal(o);
+  const discount = orderDiscountAmount(o);
+  o.grossTotal = gross;
+  o.discountAmount = discount;
+  o.total = gross - discount;
+  scheduleBackendSave();
+  return true;
+}
 function orderReceiptModal(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
+  state.receiptEditOrderId = id;
+  state.receiptEditItems = o.items.map((i) => ({ ...i }));
+  const draft = receiptEditDraftOrder();
   box(
-    `<span class="flex flex-wrap items-center gap-2">Зарлагын баримт ${receiptNo(o, "sm")}</span>`,
-    `<div class="p-5 space-y-4"><div class="rounded bg-secondary/50 p-3 space-y-1 text-sm"><p class="font-semibold">${esc(o.customerName)}</p><p class="text-muted-foreground">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="text-muted-foreground">Хүргэлт ${dte(orderDeliveryDay(o))}</p><p><span class="inline-flex px-2 py-0.5 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></p></div><table class="w-full text-sm"><tbody>${o.items.map((i) => `<tr class="border-t border-border"><td class="py-2 pr-2">${esc(i.productName)}</td><td class="py-2 text-right whitespace-nowrap">${i.quantity}</td><td class="py-2 text-right font-medium whitespace-nowrap">${fmt(i.total)}</td></tr>`).join("")}</tbody></table><div class="flex justify-between border-t pt-3 font-semibold"><span>Нийт</span><span class="text-primary">${fmt(o.total)}</span></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Баримт хэвлэх</button></div>`,
+    `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
+    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="receipt-edit-store__meta">Хүргэлт ${dte(orderDeliveryDay(o))}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="btn btn--primary btn--block btn--lg">Баримт хэвлэх</button></div>`,
     "max-w-lg",
-    { titleHtml: true },
+    { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
 }
 function printRootEl() {
@@ -3172,6 +3281,10 @@ function printRootEl() {
   return root;
 }
 function printOrderReceipt(id) {
+  if (state.receiptEditOrderId === id && state.receiptEditItems) {
+    applyReceiptEditToOrder();
+    render();
+  }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
   const root = printRootEl();
@@ -3266,38 +3379,36 @@ function pickerProductsInView() {
       return (a.name || "").localeCompare(b.name || "", "mn");
     });
 }
+function pickerSummaryHtml(skuCount, qty, total, compact = false) {
+  const mod = compact ? " picker-summary--compact" : "";
+  return `<div class="picker-summary${mod}"><div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${skuCount}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${qty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(total)}</b></div></div>`;
+}
 function pickerCategoryChipsHtml() {
   const active = state.filters.workerCategory || "",
     categories = cats();
   return `<div class="picker-cat-chips" role="tablist" aria-label="Төрөлөөр шүүх"><button type="button" data-picker-cat="" class="picker-cat-chip${active ? "" : " is-active"}" role="tab" aria-selected="${active ? "false" : "true"}">Бүгд</button>${categories.map((c) => `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-chip${active === c ? " is-active" : ""}" role="tab" aria-selected="${active === c ? "true" : "false"}">${esc(c)}</button>`).join("")}</div>`;
 }
-function updatePickerSummary() {
-  const summary = modal.querySelector(".picker-summary");
-  if (!summary) return;
-  const selected = state.products
-      .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
-      .filter((p) => p.qty > 0),
-    selectedQty = selected.reduce((s, p) => s + p.qty, 0),
-    selectedTotal = selected.reduce((s, p) => s + p.qty * p.price, 0);
-  summary.innerHTML = `<div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${selected.length}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${selectedQty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(selectedTotal)}</b></div>`;
+function updatePickerClearBtn() {
   const clearBtn = modal.querySelector("[data-picker-clear-cart]");
-  if (clearBtn) {
-    clearBtn.classList.toggle("is-disabled", selected.length === 0);
-    clearBtn.disabled = selected.length === 0;
-  }
+  if (!clearBtn) return;
+  const hasSelected = state.products.some(
+    (p) => (state.workerQty[p.id] || 0) > 0,
+  );
+  clearBtn.classList.toggle("is-disabled", !hasSelected);
+  clearBtn.disabled = !hasSelected;
 }
 function refreshPickerList() {
   const list = modal.querySelector("[data-picker-products]");
   if (!list || !pickerOpen()) return false;
   ensurePickerActiveId();
-  updateModalTitle(ORDER_PICKER_TITLE);
+  updatePickerModalTitle();
   const chips = modal.querySelector(".picker-cat-chips");
   if (chips) chips.outerHTML = pickerCategoryChipsHtml();
   const products = pickerProductsInView();
   list.innerHTML = products.length
     ? products.map((p) => pickerRow(p)).join("")
     : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`;
-  updatePickerSummary();
+  updatePickerClearBtn();
   return true;
 }
 function getWorkerQty(productId) {
@@ -3514,18 +3625,20 @@ function openPickerModal() {
   pickerModal();
 }
 function pickerModal() {
-  const selected = state.products
-      .map((p) => ({ ...p, qty: state.workerQty[p.id] || 0 }))
-      .filter((p) => p.qty > 0),
-    selectedQty = selected.reduce((s, p) => s + p.qty, 0),
-    selectedTotal = selected.reduce((s, p) => s + p.qty * p.price, 0),
+  const hasSelected = state.products.some(
+      (p) => (state.workerQty[p.id] || 0) > 0,
+    ),
     products = pickerProductsInView();
   ensurePickerActiveId();
   box(
-    ORDER_PICKER_TITLE,
-    `<div class="picker-step2 picker-panel" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom"><div class="picker-summary"><div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${selected.length}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${selectedQty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(selectedTotal)}</b></div></div><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${selected.length ? "" : " is-disabled"}" ${selected.length ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer></div>`,
+    pickerModalTitleHtml(),
+    `<div class="picker-step2 picker-panel" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions"><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer></div>`,
     "max-w-4xl",
-    { titleId: "picker-order-title", dialog: true },
+    {
+      titleId: "picker-order-title",
+      dialog: true,
+      titleHtml: !!pickerModalCustomer(),
+    },
   );
 }
 function backToPickerCategories() {
@@ -3551,7 +3664,7 @@ function pickerRowAside(p, q, checked, editing) {
     return `<div class="picker-row__aside picker-row__aside--empty"></div>`;
   if (editing)
     return `<div class="picker-row__aside">${pickerQtyStepperHtml(p, q)}</div>`;
-  return `<button type="button" class="picker-row__ordered" data-picker-edit="${id}"><span class="picker-row__ordered-label">Захиалагдсан</span><span class="picker-row__ordered-qty">${q} ш</span></button>`;
+  return `<button type="button" class="picker-row__ordered" data-picker-edit="${id}"><span class="picker-row__ordered-qty">${q} ш</span></button>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
@@ -3908,6 +4021,8 @@ Object.assign(window, {
   saveOrder,
   orderDetail,
   orderReceiptModal,
+  receiptEditQtyDraft,
+  receiptEditQtyCommit,
   receiptDetail,
   printOrderReceipt,
   workerOrderDetail,
@@ -3939,6 +4054,7 @@ Object.assign(window, {
   storePickerSearch,
   selectWorkerCustomer,
   pickWorkerStore,
+  confirmWorkerStore,
   clearWorkerStore,
   openWorkerNewTab,
   openWorkerOrdersTab,

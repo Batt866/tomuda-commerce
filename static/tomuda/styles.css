@@ -318,6 +318,40 @@ a.customer-card__line .customer-card__icon {
   color: var(--hex-muted-foreground);
 }
 
+.worker-pick__hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--hex-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+  text-align: center;
+}
+
+.worker-pick-selected {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--hex-primary);
+  background: var(--hex-primary-soft);
+}
+
+.worker-pick-selected__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hex-primary);
+}
+
+.worker-pick-selected__store .worker-order-store__name {
+  font-size: 17px;
+}
+
 .worker-pick-list {
   display: flex;
   flex-direction: column;
@@ -363,7 +397,13 @@ a.customer-card__line .customer-card__icon {
 
 .worker-pick-card.is-selected {
   border-color: var(--hex-primary);
+  border-width: 2px;
   background: var(--hex-primary-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hex-primary) 18%, transparent);
+}
+
+.worker-pick-card.is-selected .worker-pick-card__avatar {
+  box-shadow: 0 0 0 2px var(--hex-card);
 }
 
 .worker-pick-card__avatar {
@@ -1761,6 +1801,124 @@ input, select, textarea, button { box-shadow: none; }
   font-size: 1.05rem;
 }
 
+#picker-order-title {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+#picker-order-title .worker-order-store__name {
+  font-size: 1.05rem;
+}
+
+#picker-order-title .worker-order-store__phone {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.receipt-edit-head {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.receipt-edit-modal {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(90vh - 72px);
+  overflow-y: auto;
+}
+
+.receipt-edit-store {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--hex-secondary);
+}
+
+.receipt-edit-store__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.receipt-edit-store__meta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--hex-muted-foreground);
+  line-height: 1.35;
+}
+
+.receipt-edit-store__pill {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.receipt-edit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.receipt-edit-row + .receipt-edit-row {
+  border-top: 1px solid var(--hex-border);
+}
+
+.receipt-edit-row__name {
+  padding: 10px 8px 10px 0;
+  vertical-align: middle;
+}
+
+.receipt-edit-row__qty {
+  width: 72px;
+  padding: 8px 4px;
+  text-align: right;
+  vertical-align: middle;
+}
+
+.receipt-edit-row__sum {
+  width: 96px;
+  padding: 10px 0 10px 8px;
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.receipt-edit-qty {
+  width: 56px;
+  min-height: 34px !important;
+  height: 34px;
+  padding: 0 6px !important;
+  text-align: center;
+  font-size: 14px !important;
+  font-weight: 700;
+}
+
+.receipt-edit-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hex-border);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.receipt-edit-total strong {
+  color: var(--hex-primary);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 1023px) {
   .modal-panel.shadow-lg {
     box-shadow: 0 -12px 40px rgba(16, 22, 35, 0.12) !important;
@@ -2405,8 +2563,35 @@ input::placeholder, textarea::placeholder {
 .worker-order-lines-wrap {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-height: 0;
+}
+
+.worker-order-summary {
+  padding-top: 4px;
+}
+
+.picker-summary--compact {
+  gap: 6px;
+}
+
+.picker-summary--compact .picker-summary__item {
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+
+.picker-summary--compact .picker-summary__label {
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.picker-summary--compact .picker-summary__value {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.picker-summary--compact .picker-summary__item--total .picker-summary__value {
+  font-size: 13px;
 }
 
 .worker-order-stats {
@@ -2563,98 +2748,114 @@ input::placeholder, textarea::placeholder {
 .worker-order-options {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  border-radius: 12px;
-  border: 1px solid var(--hex-border);
-  background: var(--hex-card);
-  overflow: hidden;
+  gap: 6px;
+  border: none;
+  background: transparent;
 }
 
 .worker-order-opt {
-  border-bottom: 1px solid var(--hex-border);
+  border: 1px solid var(--hex-border);
+  border-radius: 10px;
+  background: var(--hex-card);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
-.worker-order-opt:last-child {
-  border-bottom: none;
+.worker-order-opt.is-open {
+  border-color: color-mix(in srgb, var(--hex-primary) 35%, var(--hex-border));
+  background: color-mix(in srgb, var(--hex-primary-soft) 40%, var(--hex-card));
 }
 
 .worker-order-opt__head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 10px 12px;
+  gap: 8px;
+  min-height: 0;
+  padding: 7px 10px;
   margin: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--hex-foreground);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.worker-order-opt.is-open .worker-order-opt__head {
+  padding-bottom: 6px;
 }
 
 .worker-order-opt__head input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   accent-color: var(--hex-primary);
   margin: 0;
+  cursor: pointer;
 }
 
 .worker-order-opt__title {
   flex: 1;
   min-width: 0;
-  line-height: 1.35;
+  line-height: 1.25;
+  font-size: 13px;
 }
 
 .worker-order-opt__badge {
   flex-shrink: 0;
-  padding: 3px 10px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: var(--hex-primary-soft);
   color: var(--hex-primary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .worker-order-opt__body {
-  padding: 0 12px 12px;
+  padding: 0 10px 8px;
 }
 
 .worker-order-opt__fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
 .worker-order-opt__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
 .worker-order-opt__field-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--hex-muted-foreground);
 }
 
 .worker-order-opt__field .app-input {
-  min-height: var(--field-h);
+  min-height: 36px !important;
+  height: 36px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  font-size: 13px !important;
 }
 
 .worker-order-discount-preview {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
+  gap: 4px 6px;
   margin: 0;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
   background: var(--hex-secondary);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--hex-muted-foreground);
 }
 
@@ -3061,12 +3262,11 @@ input::placeholder, textarea::placeholder {
 
 .picker-row__ordered {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  padding: 2px 4px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 6px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--hex-foreground);
   cursor: pointer;
@@ -3074,19 +3274,12 @@ input::placeholder, textarea::placeholder {
   box-shadow: none !important;
 }
 
-.picker-row__ordered-label {
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--hex-primary);
-  white-space: nowrap;
-}
-
 .picker-row__ordered-qty {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
+  color: var(--hex-primary);
 }
 
 .picker-qty-stepper--compact {
@@ -3348,6 +3541,10 @@ input::placeholder, textarea::placeholder {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.picker-step2__bottom--actions {
+  gap: 0;
 }
 
 .picker-list {
