@@ -1771,7 +1771,7 @@ function countView() {
       (id) => countValue(id) !== null,
     ).length,
     mismatches = countMismatches();
-  return `<div class="space-y-4">${pageHead("Тооллого")}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Нийт", state.products.length)}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-card rounded"><div class="bg-card rounded overflow-hidden"><div class="count-list divide-y divide-border">${list.map(countRow).join("")}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="py-3 bg-card rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
+  return `<div class="space-y-4">${pageHead("Тооллого")}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Нийт", state.products.length)}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="w-full px-3 py-2.5 bg-card rounded app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="count-list__empty">Бараа олдсонгүй</p>`}</div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="py-3 bg-card rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
   const value = countValue(p.id),
@@ -1781,7 +1781,7 @@ function countRow(p) {
       diff === null || diff === 0
         ? "text-muted-foreground"
         : "text-tone-danger font-semibold";
-  return `<div class="count-row"><img src="${productImage(p)}" class="product-thumb" alt="${esc(p.name)}"><div class="min-w-0"><p class="font-medium text-sm">${p.name}</p><p class="text-xs text-muted-foreground count-row__meta">Бүрт ${p.stock} ${p.unit}</p></div><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="0" type="number" class="px-2 py-2 bg-secondary rounded text-center w-16"><span class="text-sm ${diffClass} count-row__diff">${diffText}</span></div>`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta">Бүрт ${p.stock} ${esc(p.unit || "ш")}</p></div><div class="count-row__actions"><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} тоолсон"><span class="count-row__diff ${diffClass}">${diffText}</span></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
