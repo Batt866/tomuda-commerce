@@ -957,8 +957,20 @@ function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
   return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
 }
 function ensurePickerActiveId() {
-  if (state.pickerActiveId && getWorkerQty(state.pickerActiveId)) return;
-  state.pickerActiveId = "";
+  if (
+    state.pickerActiveId &&
+    !state.products.some((p) => p.id === state.pickerActiveId)
+  ) {
+    state.pickerActiveId = "";
+  }
+}
+function finishPickerEditFor(id) {
+  if (!id) return;
+  const input = document.querySelector(
+    `[data-picker-qty-input][data-product-id="${id}"]`,
+  );
+  if (input) qtyCommit(input);
+  if (state.pickerActiveId === id) state.pickerActiveId = "";
 }
 function workerQtyStepperHtml(p, q) {
   const idAttr = esc(p.id);
@@ -987,14 +999,7 @@ function finishWorkerOrderEdit() {
   render();
 }
 function finishPickerEdit() {
-  const id = state.pickerActiveId;
-  if (id) {
-    const input = document.querySelector(
-      `[data-picker-qty-input][data-product-id="${id}"]`,
-    );
-    if (input) qtyCommit(input);
-  }
-  state.pickerActiveId = "";
+  if (state.pickerActiveId) finishPickerEditFor(state.pickerActiveId);
   if (pickerOpen() && refreshPickerList()) return;
   render();
   if (pickerOpen()) pickerModal();
@@ -1063,6 +1068,9 @@ function initPickerModalActions() {
     const editBtn = e.target.closest("[data-picker-edit]");
     if (editBtn) {
       const id = editBtn.getAttribute("data-picker-edit") || "";
+      if (state.pickerActiveId && state.pickerActiveId !== id) {
+        finishPickerEditFor(state.pickerActiveId);
+      }
       state.pickerActiveId = state.pickerActiveId === id ? "" : id;
       if (refreshPickerList()) return;
       pickerModal();
@@ -1074,12 +1082,17 @@ function initPickerModalActions() {
     if (check) {
       const id = check.getAttribute("data-product-id") || "";
       if (check.checked) {
-        const cur = getWorkerQty(id);
+        if (state.pickerActiveId && state.pickerActiveId !== id) {
+          finishPickerEditFor(state.pickerActiveId);
+        }
         state.pickerActiveId = id;
-        setWorkerQty(id, cur > 0 ? cur : 1);
+        if (refreshPickerList()) return;
+        pickerModal();
       } else {
-        if (state.pickerActiveId === id) state.pickerActiveId = "";
+        finishPickerEditFor(id);
         setWorkerQty(id, 0);
+        if (refreshPickerList()) return;
+        pickerModal();
       }
     }
   });
@@ -2614,6 +2627,8 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
 }
 function closeModal() {
   stopBarcodeScan();
+  if (state.pickerActiveId) finishPickerEditFor(state.pickerActiveId);
+  state.pickerActiveId = "";
   destroyCustomerMap();
   state.promoPick = null;
   state.customerFormDraft = null;
@@ -3440,7 +3455,6 @@ function setWorkerQty(id, qty) {
   if (q > 0) state.workerQty[id] = Math.floor(q);
   else {
     delete state.workerQty[id];
-    if (state.pickerActiveId === id) state.pickerActiveId = "";
     if (state.workerOrderActiveId === id) state.workerOrderActiveId = "";
   }
   const keepPicker = pickerOpen();
@@ -3657,15 +3671,15 @@ function clearPickerCart() {
 function pickerQtyChange(productId, qty) {
   setWorkerQty(productId, qty);
 }
-function pickerRowCheck(p, q, editing) {
+function pickerRowCheck(p, q, inCart, editing) {
   const id = esc(p.id);
-  if (q > 0 && !editing) return "";
-  const checked = q > 0;
+  if (inCart && !editing) return "";
+  const checked = inCart || editing;
   return `<label class="picker-row__check"><input type="checkbox" data-picker-check data-product-id="${id}" ${checked ? "checked" : ""} ${p.stock ? "" : "disabled"} class="picker-row__checkbox"></label>`;
 }
-function pickerRowAside(p, q, checked, editing) {
+function pickerRowAside(p, q, inCart, editing) {
   const id = esc(p.id);
-  if (!checked)
+  if (!inCart && !editing)
     return `<div class="picker-row__aside picker-row__aside--empty"></div>`;
   if (editing)
     return `<div class="picker-row__aside">${pickerQtyStepperHtml(p, q)}</div>`;
@@ -3673,11 +3687,11 @@ function pickerRowAside(p, q, checked, editing) {
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
-    checked = q > 0,
-    editing = checked && state.pickerActiveId === p.id,
+    editing = state.pickerActiveId === p.id,
+    inCart = q > 0,
     left = p.stock - q,
     showCat = !state.filters.workerCategory && p.category;
-  return `<article class="picker-row${checked ? " is-selected" : ""}${editing ? " is-editing" : ""}"><div class="picker-row__main${checked && !editing ? " picker-row__main--no-check" : ""}">${pickerRowCheck(p, q, editing)}<img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span></div></div>${pickerRowAside(p, q, checked, editing)}</div></article>`;
+  return `<article class="picker-row${inCart || editing ? " is-selected" : ""}${editing ? " is-editing" : ""}"><div class="picker-row__main${inCart && !editing ? " picker-row__main--no-check" : ""}">${pickerRowCheck(p, q, inCart, editing)}<img src="${productImage(p)}" class="picker-row__thumb product-thumb" alt=""><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__barcode">${esc(p.barcode || "-")}</p><div class="picker-row__tags">${showCat ? `<span class="picker-tag picker-tag--muted">${esc(p.category)}</span>` : ""}<span class="picker-tag">${fmt(p.price)}</span><span class="picker-tag picker-tag--muted">Үлд ${left}</span></div></div>${pickerRowAside(p, q, inCart, editing)}</div></article>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
