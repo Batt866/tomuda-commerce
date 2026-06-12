@@ -45,6 +45,7 @@ const state = {
   workerOrderActiveId: "",
   receiptEditOrderId: "",
   receiptEditItems: null,
+  receiptEditOriginalItems: null,
   extraCategories: [],
   inventoryLogs: [],
   countQty: {},
@@ -490,7 +491,12 @@ function isAdmin() {
   return currentRole() === "admin";
 }
 function canDelete() {
-  return isAdmin();
+  return state.isLoggedIn && state.currentEmployee?.role === "admin";
+}
+function requireAdminDelete() {
+  if (canDelete()) return true;
+  alert("Зөвхөн админ устгах эрхтэй.");
+  return false;
 }
 function defaultViewForRole(r) {
   if (r === "admin") return "admin";
@@ -707,6 +713,47 @@ function persistentState() {
     data[key] = state[key];
     return data;
   }, {});
+}
+function protectDeletionsForNonAdmin(data) {
+  if (canDelete()) return data;
+  let baseline = null;
+  try {
+    baseline = JSON.parse(backendLastSaved).state;
+  } catch {
+    return data;
+  }
+  if (!baseline) return data;
+  const protectedData = { ...data };
+  for (const key of ["customers", "products", "employees"]) {
+    const current = protectedData[key] || [];
+    const base = baseline[key] || [];
+    const currentIds = new Set(current.map((x) => x.id));
+    const restored = base.filter((x) => !currentIds.has(x.id));
+    if (restored.length) protectedData[key] = [...current, ...restored];
+  }
+  const baseRules = baseline.promotionRules || { quantity: [], price: [] };
+  const nextRules = protectedData.promotionRules || { quantity: [], price: [] };
+  protectedData.promotionRules = {
+    quantity:
+      (nextRules.quantity || []).length < (baseRules.quantity || []).length
+        ? [...(baseRules.quantity || [])]
+        : [...(nextRules.quantity || [])],
+    price:
+      (nextRules.price || []).length < (baseRules.price || []).length
+        ? [...(baseRules.price || [])]
+        : [...(nextRules.price || [])],
+  };
+  if (baseline.orders && protectedData.orders) {
+    const baseMap = Object.fromEntries(baseline.orders.map((o) => [o.id, o]));
+    protectedData.orders = protectedData.orders.map((o) => {
+      const base = baseMap[o.id];
+      if (base && base.status !== "cancelled" && o.status === "cancelled") {
+        return { ...o, status: base.status };
+      }
+      return o;
+    });
+  }
+  return protectedData;
 }
 function applyPersistentState(data) {
   if (!data || typeof data !== "object") return false;
@@ -1401,7 +1448,16 @@ function scheduleBackendSave() {
   backendSaveTimer = setTimeout(saveBackendState, 350);
 }
 async function saveBackendState() {
-  const body = JSON.stringify({ state: persistentState() });
+  let data = persistentState();
+  const protectedData = protectDeletionsForNonAdmin(data);
+  if (JSON.stringify(protectedData) !== JSON.stringify(data)) {
+    const session = captureSessionSnapshot();
+    applyPersistentState(protectedData);
+    restoreSessionSnapshot(session);
+    render();
+    data = protectedData;
+  }
+  const body = JSON.stringify({ state: data });
   if (body === backendLastSaved) return;
   backendSaving = true;
   try {
@@ -1564,7 +1620,7 @@ function warehouseOrderStatusActions(o) {
   if (o.status === "pending") {
     let html = `<button type="button" onclick="setOrder('${o.id}','confirmed')" class="btn btn--sm tone tone--success">Батлах</button>`;
     if (canDelete())
-      html += `<button type="button" onclick="setOrder('${o.id}','cancelled')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
+      html += `<button type="button" onclick="confirmCancelOrder('${o.id}')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
     return html;
   }
   if (o.status === "confirmed")
@@ -1709,7 +1765,7 @@ function productsView() {
         (cat === "all" || p.category === cat),
     ),
     low = lowStockProducts().length;
-  return `<div class="space-y-4">${pageHead("Бараа", `<button onclick="csv('products.csv',state.products.map(p=>[p.barcode,p.name,p.category,p.price,p.stock,p.unit]))" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Татах</button>`)}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Дутуу", low, low ? "text-tone-warning" : "text-tone-success")}</div><div class="bg-card rounded p-3 products-toolbar"><input data-focus="products" value="${esc(q)}" oninput="search('products',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded"><select onchange="state.filters.category=this.value;render()" class="px-3 py-2.5 bg-secondary rounded"><option value="all">Бүх төрөл</option>${cats()
+  return `<div class="space-y-4">${pageHead("Бараа", `<button onclick="csv('products.csv',state.products.map(p=>[p.barcode,p.name,p.category,p.price,p.stock,p.unit]))" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Татах</button>`)}<div class="mobile-stats grid grid-cols-3 gap-2">${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}</div><div class="bg-card rounded p-3 products-toolbar"><input data-focus="products" value="${esc(q)}" oninput="search('products',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded"><select onchange="state.filters.category=this.value;render()" class="px-3 py-2.5 bg-secondary rounded"><option value="all">Бүх төрөл</option>${cats()
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
@@ -1987,10 +2043,10 @@ function promotionQuantityPanel(rows) {
 function promotionQtyRuleCard(r, i) {
   const buy = state.products.find((p) => p.id === r.buyProductId) || {},
     free = state.products.find((p) => p.id === r.freeProductId) || {};
-  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><img src="${productImage(buy)}" class="product-thumb"><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${buy.name || "-"}</p><p class="text-muted-foreground">${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><img src="${productImage(free)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${free.name || "-"}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<button onclick="removePromotionRule('quantity',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
+  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><img src="${productImage(buy)}" class="product-thumb"><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${buy.name || "-"}</p><p class="text-muted-foreground">${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><img src="${productImage(free)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${free.name || "-"}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('quantity',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
 }
 function promotionPricePanel(rows) {
-  return `<div class="space-y-3"><button onclick="promotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => `<div class="p-4 flex justify-between gap-3 text-sm"><div><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${r.category ? "Ангилал: " + r.category + " · " : "Бүх ангилал · "}${r.discountPercent}% хөнгөлөлт</p></div>${canDelete() ? `<button onclick="removePromotionRule('price',${i})" class="px-3 py-2 tone tone--danger rounded text-sm">Устгах</button>` : ""}</div>`).join("") : `<div class="p-6 text-sm text-muted-foreground">Үнийн дүнгийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><button onclick="promotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => `<div class="p-4 flex justify-between gap-3 text-sm"><div><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${r.category ? "Ангилал: " + r.category + " · " : "Бүх ангилал · "}${r.discountPercent}% хөнгөлөлт</p></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('price',${i})" class="px-3 py-2 tone tone--danger rounded text-sm">Устгах</button>` : ""}</div>`).join("") : `<div class="p-6 text-sm text-muted-foreground">Үнийн дүнгийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function openPromotionQtyModal() {
   state.promoPick = { buyProductId: "", freeProductId: "" };
@@ -2131,9 +2187,23 @@ function savePromotionPrice(e) {
   render();
 }
 function removePromotionRule(type, index) {
-  if (!canDelete()) return;
+  if (!requireAdminDelete()) return;
   state.promotionRules[type].splice(index, 1);
   render();
+}
+function confirmRemovePromotionRule(type, index) {
+  if (!requireAdminDelete()) return;
+  const label = type === "quantity" ? "Тоо ширхэг" : "Үнийн хөнгөлөлт";
+  box(
+    "Устгах уу?",
+    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${label}</b> дүрмийг устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p>${confirmDialogActions(`removePromotionRuleNow('${type}',${index})`, "Устгах", { danger: true })}</div>`,
+    "max-w-md",
+    { dialog: true },
+  );
+}
+function removePromotionRuleNow(type, index) {
+  removePromotionRule(type, index);
+  closeModal();
 }
 function employeePercentDiscountToggle(e) {
   if (e.role !== "sales") return "";
@@ -3209,6 +3279,21 @@ function saveOrder(e) {
 function clearReceiptEdit() {
   state.receiptEditOrderId = "";
   state.receiptEditItems = null;
+  state.receiptEditOriginalItems = null;
+}
+function receiptEditHasChanges() {
+  const orig = state.receiptEditOriginalItems;
+  const cur = state.receiptEditItems;
+  if (!orig || !cur) return false;
+  if (orig.length !== cur.length) return true;
+  return cur.some((item, i) => {
+    const o = orig[i];
+    return (
+      item.productId !== o.productId ||
+      item.quantity !== o.quantity ||
+      item.total !== o.total
+    );
+  });
 }
 function receiptEditDraftOrder() {
   const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
@@ -3277,17 +3362,31 @@ function applyReceiptEditToOrder() {
   scheduleBackendSave();
   return true;
 }
-function orderReceiptModal(id) {
+function orderReceiptModal(id, keepDraft = false) {
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
   state.receiptEditOrderId = id;
-  state.receiptEditItems = o.items.map((i) => ({ ...i }));
+  if (!keepDraft || !state.receiptEditItems) {
+    state.receiptEditOriginalItems = o.items.map((i) => ({ ...i }));
+    state.receiptEditItems = o.items.map((i) => ({ ...i }));
+  }
   const draft = receiptEditDraftOrder();
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
     `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="receipt-edit-store__meta">Хүргэлт ${dte(orderDeliveryDay(o))}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="btn btn--primary btn--block btn--lg">Баримт хэвлэх</button></div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
+  );
+}
+function orderReceiptModalKeepDraft(id) {
+  orderReceiptModal(id, true);
+}
+function receiptEditConfirmModal(id) {
+  box(
+    "Батлах",
+    `<div class="receipt-edit-confirm p-5 space-y-4"><p class="receipt-edit-confirm__text text-sm text-muted-foreground">Та барааны дүнг өөрчлөх гэж байна.</p><div class="receipt-edit-confirm__actions grid grid-cols-2 gap-2"><button type="button" onclick="printOrderReceiptNow('${id}')" class="py-3 bg-primary text-primary-foreground rounded font-medium">Тийм</button><button type="button" onclick="orderReceiptModalKeepDraft('${id}')" class="py-3 bg-secondary rounded">Болих</button></div></div>`,
+    "max-w-md",
+    { dialog: true },
   );
 }
 function printRootEl() {
@@ -3301,12 +3400,25 @@ function printRootEl() {
   return root;
 }
 function printOrderReceipt(id) {
+  if (
+    state.receiptEditOrderId === id &&
+    state.receiptEditItems &&
+    receiptEditHasChanges()
+  ) {
+    receiptEditConfirmModal(id);
+    return;
+  }
+  printOrderReceiptNow(id);
+}
+function printOrderReceiptNow(id) {
   if (state.receiptEditOrderId === id && state.receiptEditItems) {
     applyReceiptEditToOrder();
+    clearReceiptEdit();
     render();
   }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
+  closeModal();
   const root = printRootEl();
   root.innerHTML = receipt(o);
   const cleanup = () => {
@@ -3896,10 +4008,20 @@ function login(e) {
   saveAuthSession();
   render();
 }
+function confirmDialogActions(
+  confirmOnclick,
+  confirmLabel,
+  { danger = false } = {},
+) {
+  const confirmCls = danger
+    ? "py-3 btn-solid--danger rounded font-medium"
+    : "py-3 bg-primary text-primary-foreground rounded font-medium";
+  return `<div class="grid grid-cols-2 gap-2 confirm-dialog__actions"><button type="button" onclick="${confirmOnclick}" class="${confirmCls}">${esc(confirmLabel)}</button><button type="button" onclick="closeModal()" class="py-3 bg-secondary rounded">Болих</button></div>`;
+}
 function confirmLogout() {
   box(
     "Системээс гарах",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground leading-relaxed">Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.</p><div class="grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="btn btn--secondary btn--block">Болих</button><button type="button" onclick="closeModal();logout()" class="btn btn--danger btn--block">Гарах</button></div></div>`,
+    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground leading-relaxed">Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.</p>${confirmDialogActions("closeModal();logout()", "Гарах", { danger: true })}</div>`,
     "max-w-sm",
     { dialog: true, titleId: "logout-confirm-title", closeLabel: "Хаах" },
   );
@@ -3935,7 +4057,7 @@ function saveEmployee(e) {
   render();
 }
 function confirmDelete(type, id) {
-  if (!canDelete()) return;
+  if (!requireAdminDelete()) return;
   const item =
     type === "product"
       ? state.products.find((p) => p.id === id)
@@ -3948,12 +4070,29 @@ function confirmDelete(type, id) {
     item?.name || (type === "customer" ? item?.companyName : null) || "энэ мөр";
   box(
     "Устгах уу?",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p><div class="grid grid-cols-2 gap-2"><button onclick="closeModal()" class="py-3 bg-secondary rounded">Болих</button><button onclick="deleteNow('${type}','${id}')" class="py-3 btn-solid--danger rounded font-medium">Устгах</button></div></div>`,
+    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p>${confirmDialogActions(`deleteNow('${type}','${id}')`, "Устгах", { danger: true })}</div>`,
     "max-w-md",
+    { dialog: true },
   );
 }
+function confirmCancelOrder(id) {
+  if (!requireAdminDelete()) return;
+  const o = state.orders.find((x) => x.id === id);
+  const name = o?.customerName || "захиалга";
+  box(
+    "Цуцлах уу?",
+    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${esc(name)}</b> захиалгыг цуцлах гэж байна.</p>${confirmDialogActions(`cancelOrderNow('${id}')`, "Тийм", { danger: true })}</div>`,
+    "max-w-md",
+    { dialog: true },
+  );
+}
+function cancelOrderNow(id) {
+  if (!requireAdminDelete()) return;
+  setOrder(id, "cancelled");
+  closeModal();
+}
 function deleteNow(type, id) {
-  if (!canDelete()) return;
+  if (!requireAdminDelete()) return;
   if (type === "product")
     state.products = state.products.filter((p) => p.id !== id);
   if (type === "employee")
@@ -3970,17 +4109,13 @@ function deleteNow(type, id) {
   render();
 }
 function delEmployee(id) {
-  if (!canDelete()) return;
-  state.employees = state.employees.filter((e) => e.id !== id);
-  render();
+  confirmDelete("employee", id);
 }
 function delProduct(id) {
-  if (!canDelete()) return;
-  state.products = state.products.filter((p) => p.id !== id);
-  render();
+  confirmDelete("product", id);
 }
 function setOrder(id, s) {
-  if (s === "cancelled" && !canDelete()) return;
+  if (s === "cancelled" && !requireAdminDelete()) return;
   state.orders.find((o) => o.id === id).status = s;
   render();
 }
@@ -4044,6 +4179,8 @@ Object.assign(window, {
   receiptEditQtyCommit,
   receiptDetail,
   printOrderReceipt,
+  printOrderReceiptNow,
+  orderReceiptModalKeepDraft,
   workerOrderDetail,
   applyStock,
   setInventoryCategory,
@@ -4088,6 +4225,8 @@ Object.assign(window, {
   savePromotionQty,
   savePromotionPrice,
   removePromotionRule,
+  confirmRemovePromotionRule,
+  removePromotionRuleNow,
   excel,
   saveWorker,
   login,
@@ -4096,6 +4235,8 @@ Object.assign(window, {
   logout,
   saveEmployee,
   confirmDelete,
+  confirmCancelOrder,
+  cancelOrderNow,
   deleteNow,
   delEmployee,
   delProduct,
