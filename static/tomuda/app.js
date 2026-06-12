@@ -2199,7 +2199,7 @@ function confirmRemovePromotionRule(type, index) {
     `<b class="text-foreground">${label}</b> дүрмийг устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
     {
       confirmLabel: "Устгах",
-      confirmOnclick: `removePromotionRuleNow('${type}',${index})`,
+      confirmOnclick: `closeConfirmCard();removePromotionRuleNow('${type}',${index})`,
       danger: true,
     },
   );
@@ -2700,6 +2700,7 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
   modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
 }
 function closeModal() {
+  closeConfirmCard();
   stopBarcodeScan();
   if (state.pickerActiveId) finishPickerEditFor(state.pickerActiveId);
   state.pickerActiveId = "";
@@ -3388,8 +3389,8 @@ function orderReceiptModalKeepDraft(id) {
 function receiptEditConfirmModal(id) {
   confirmModal("Батлах", "Та барааны дүнг өөрчлөх гэж байна.", {
     confirmLabel: "Тийм",
-    confirmOnclick: `printOrderReceiptNow('${id}')`,
-    cancelOnclick: `orderReceiptModalKeepDraft('${id}')`,
+    confirmOnclick: `closeConfirmCard();printOrderReceiptNow('${id}')`,
+    cancelOnclick: `closeConfirmCard();orderReceiptModalKeepDraft('${id}')`,
   });
 }
 function printRootEl() {
@@ -4011,27 +4012,43 @@ function login(e) {
   saveAuthSession();
   render();
 }
-function confirmDialogActions(
-  confirmOnclick,
+function closeConfirmCard() {
+  document.getElementById("confirm-card-overlay")?.remove();
+}
+function showConfirmCard({
+  title,
+  message,
   confirmLabel,
-  { danger = false, cancelOnclick = "closeModal()" } = {},
-) {
+  cancelLabel = "Үгүй",
+  confirmOnclick,
+  cancelOnclick = "closeConfirmCard()",
+  danger = false,
+  single = false,
+}) {
+  closeConfirmCard();
+  const overlay = document.createElement("div");
+  overlay.id = "confirm-card-overlay";
+  overlay.className = "confirm-card-overlay";
   const confirmCls = danger
-    ? "btn btn--danger py-3 rounded font-medium"
-    : "btn btn--primary py-3 rounded font-medium";
-  return `<div class="confirm-modal__actions grid grid-cols-2 gap-2"><button type="button" onclick="${confirmOnclick}" class="${confirmCls}">${esc(confirmLabel)}</button><button type="button" onclick="${cancelOnclick}" class="btn btn--secondary py-3 rounded">Болих</button></div>`;
+    ? "confirm-card__btn confirm-card__btn--danger"
+    : "confirm-card__btn confirm-card__btn--confirm";
+  const actionsHtml = single
+    ? `<button type="button" class="${confirmCls} confirm-card__btn--full" onclick="${confirmOnclick}">${esc(confirmLabel)}</button>`
+    : `<button type="button" class="${confirmCls}" onclick="${confirmOnclick}">${esc(confirmLabel)}</button><button type="button" class="confirm-card__btn confirm-card__btn--cancel" onclick="${cancelOnclick}">${esc(cancelLabel)}</button>`;
+  overlay.innerHTML = `<div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-card-title"><h3 id="confirm-card-title" class="confirm-card__title">${esc(title)}</h3><p class="confirm-card__message">${message}</p><div class="confirm-card__actions${single ? " confirm-card__actions--single" : ""}">${actionsHtml}</div></div>`;
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeConfirmCard();
+  });
+  document.body.appendChild(overlay);
 }
 function alertModal(title, messageHtml) {
-  box(
-    esc(title),
-    `<div class="confirm-modal"><p class="confirm-modal__text">${messageHtml}</p><button type="button" onclick="closeModal()" class="btn btn--primary btn--block py-3">Ойлголоо</button></div>`,
-    "max-w-sm",
-    {
-      dialog: true,
-      titleId: "alert-modal-title",
-      panelClass: "modal-panel--confirm",
-    },
-  );
+  showConfirmCard({
+    title,
+    message: messageHtml,
+    confirmLabel: "Ойлголоо",
+    confirmOnclick: "closeConfirmCard()",
+    single: true,
+  });
 }
 function confirmModal(
   title,
@@ -4039,16 +4056,14 @@ function confirmModal(
   { confirmLabel, confirmOnclick, danger = false, cancelOnclick } = {},
 ) {
   if (!confirmLabel || !confirmOnclick) return;
-  box(
-    esc(title),
-    `<div class="confirm-modal"><p class="confirm-modal__text">${messageHtml}</p>${confirmDialogActions(confirmOnclick, confirmLabel, { danger, cancelOnclick })}</div>`,
-    "max-w-sm",
-    {
-      dialog: true,
-      titleId: "confirm-modal-title",
-      panelClass: "modal-panel--confirm",
-    },
-  );
+  showConfirmCard({
+    title,
+    message: messageHtml,
+    confirmLabel,
+    confirmOnclick,
+    cancelOnclick: cancelOnclick || "closeConfirmCard()",
+    danger,
+  });
 }
 function confirmLogout() {
   confirmModal(
@@ -4056,7 +4071,7 @@ function confirmLogout() {
     `Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.`,
     {
       confirmLabel: "Гарах",
-      confirmOnclick: "closeModal();logout()",
+      confirmOnclick: "closeConfirmCard();closeModal();logout()",
       danger: true,
     },
   );
@@ -4108,7 +4123,7 @@ function confirmDelete(type, id) {
     `<b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
     {
       confirmLabel: "Устгах",
-      confirmOnclick: `deleteNow('${type}','${id}')`,
+      confirmOnclick: `closeConfirmCard();deleteNow('${type}','${id}')`,
       danger: true,
     },
   );
@@ -4122,7 +4137,7 @@ function confirmCancelOrder(id) {
     `<b class="text-foreground">${esc(name)}</b> захиалгыг цуцлах гэж байна.`,
     {
       confirmLabel: "Тийм",
-      confirmOnclick: `cancelOrderNow('${id}')`,
+      confirmOnclick: `closeConfirmCard();cancelOrderNow('${id}')`,
       danger: true,
     },
   );
@@ -4273,6 +4288,7 @@ Object.assign(window, {
   login,
   toggleLoginPassword,
   confirmLogout,
+  closeConfirmCard,
   logout,
   saveEmployee,
   confirmDelete,

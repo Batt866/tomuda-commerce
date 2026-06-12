@@ -1835,6 +1835,80 @@ input, select, textarea, button { box-shadow: none; }
   font-size: 1rem;
 }
 
+.confirm-card-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(16, 22, 35, 0.52);
+}
+
+.confirm-card {
+  width: 100%;
+  max-width: 22rem;
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 18px 18px;
+  box-shadow: 0 18px 40px rgba(16, 22, 35, 0.22);
+}
+
+.confirm-card__title {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #182032;
+}
+
+.confirm-card__message {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #687386;
+}
+
+.confirm-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.confirm-card__actions--single {
+  grid-template-columns: 1fr;
+}
+
+.confirm-card__btn {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirm-card__btn--confirm {
+  background: #16899a;
+  color: #fff;
+}
+
+.confirm-card__btn--danger {
+  background: #c43c52;
+  color: #fff;
+}
+
+.confirm-card__btn--cancel {
+  background: #f5f7f9;
+  color: #182032;
+}
+
+.confirm-card__btn--full {
+  width: 100%;
+}
+
 .confirm-modal {
   padding: 16px 20px 20px;
 }
