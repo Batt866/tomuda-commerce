@@ -495,7 +495,7 @@ function canDelete() {
 }
 function requireAdminDelete() {
   if (canDelete()) return true;
-  alert("Зөвхөн админ устгах эрхтэй.");
+  alertModal("Эрхгүй", "Зөвхөн админ устгах эрхтэй.");
   return false;
 }
 function defaultViewForRole(r) {
@@ -2194,11 +2194,14 @@ function removePromotionRule(type, index) {
 function confirmRemovePromotionRule(type, index) {
   if (!requireAdminDelete()) return;
   const label = type === "quantity" ? "Тоо ширхэг" : "Үнийн хөнгөлөлт";
-  box(
+  confirmModal(
     "Устгах уу?",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${label}</b> дүрмийг устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p>${confirmDialogActions(`removePromotionRuleNow('${type}',${index})`, "Устгах", { danger: true })}</div>`,
-    "max-w-md",
-    { dialog: true },
+    `<b class="text-foreground">${label}</b> дүрмийг устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
+    {
+      confirmLabel: "Устгах",
+      confirmOnclick: `removePromotionRuleNow('${type}',${index})`,
+      danger: true,
+    },
   );
 }
 function removePromotionRuleNow(type, index) {
@@ -2692,8 +2695,9 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
       ? ` role="dialog" aria-modal="true" aria-labelledby="${titleId}"`
       : "",
     closeLabel = esc(opts.closeLabel || "Цонхыг хаах"),
-    titleHtml = opts.titleHtml ? title : esc(title);
-  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
+    titleHtml = opts.titleHtml ? title : esc(title),
+    panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "";
+  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
 }
 function closeModal() {
   stopBarcodeScan();
@@ -2991,7 +2995,7 @@ function customerDetail(id) {
     link = mapsLink(c.latitude, c.longitude);
   box(
     c.name,
-    `<div class="p-6 space-y-4"><p class="text-muted-foreground">${c.companyName}</p><p><b>Дугаар:</b> ${c.phone1 || "-"}</p><p><b>Хаяг:</b> ${addr}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<div class="grid ${canDelete() ? "grid-cols-2" : "grid-cols-1"} gap-2">${canDelete() ? `<button onclick="closeModal();confirmDelete('customer','${id}')" class="py-3 tone tone--danger rounded font-medium">Устгах</button>` : ""}<button onclick="closeModal();customerModal('${id}')" class="py-3 bg-primary text-primary-foreground rounded">Засах</button></div></div>`,
+    `<div class="p-6 space-y-4"><p class="text-muted-foreground">${c.companyName}</p><p><b>Дугаар:</b> ${c.phone1 || "-"}</p><p><b>Хаяг:</b> ${addr}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<button onclick="closeModal();customerModal('${id}')" class="w-full py-3 bg-primary text-primary-foreground rounded">Засах</button></div>`,
     "max-w-xl",
   );
 }
@@ -3382,12 +3386,11 @@ function orderReceiptModalKeepDraft(id) {
   orderReceiptModal(id, true);
 }
 function receiptEditConfirmModal(id) {
-  box(
-    "Батлах",
-    `<div class="receipt-edit-confirm p-5 space-y-4"><p class="receipt-edit-confirm__text text-sm text-muted-foreground">Та барааны дүнг өөрчлөх гэж байна.</p><div class="receipt-edit-confirm__actions grid grid-cols-2 gap-2"><button type="button" onclick="printOrderReceiptNow('${id}')" class="py-3 bg-primary text-primary-foreground rounded font-medium">Тийм</button><button type="button" onclick="orderReceiptModalKeepDraft('${id}')" class="py-3 bg-secondary rounded">Болих</button></div></div>`,
-    "max-w-md",
-    { dialog: true },
-  );
+  confirmModal("Батлах", "Та барааны дүнг өөрчлөх гэж байна.", {
+    confirmLabel: "Тийм",
+    confirmOnclick: `printOrderReceiptNow('${id}')`,
+    cancelOnclick: `orderReceiptModalKeepDraft('${id}')`,
+  });
 }
 function printRootEl() {
   let root = document.getElementById("print-root");
@@ -4011,19 +4014,51 @@ function login(e) {
 function confirmDialogActions(
   confirmOnclick,
   confirmLabel,
-  { danger = false } = {},
+  { danger = false, cancelOnclick = "closeModal()" } = {},
 ) {
   const confirmCls = danger
-    ? "py-3 btn-solid--danger rounded font-medium"
-    : "py-3 bg-primary text-primary-foreground rounded font-medium";
-  return `<div class="grid grid-cols-2 gap-2 confirm-dialog__actions"><button type="button" onclick="${confirmOnclick}" class="${confirmCls}">${esc(confirmLabel)}</button><button type="button" onclick="closeModal()" class="py-3 bg-secondary rounded">Болих</button></div>`;
+    ? "btn btn--danger py-3 rounded font-medium"
+    : "btn btn--primary py-3 rounded font-medium";
+  return `<div class="confirm-modal__actions grid grid-cols-2 gap-2"><button type="button" onclick="${confirmOnclick}" class="${confirmCls}">${esc(confirmLabel)}</button><button type="button" onclick="${cancelOnclick}" class="btn btn--secondary py-3 rounded">Болих</button></div>`;
+}
+function alertModal(title, messageHtml) {
+  box(
+    esc(title),
+    `<div class="confirm-modal"><p class="confirm-modal__text">${messageHtml}</p><button type="button" onclick="closeModal()" class="btn btn--primary btn--block py-3">Ойлголоо</button></div>`,
+    "max-w-sm",
+    {
+      dialog: true,
+      titleId: "alert-modal-title",
+      panelClass: "modal-panel--confirm",
+    },
+  );
+}
+function confirmModal(
+  title,
+  messageHtml,
+  { confirmLabel, confirmOnclick, danger = false, cancelOnclick } = {},
+) {
+  if (!confirmLabel || !confirmOnclick) return;
+  box(
+    esc(title),
+    `<div class="confirm-modal"><p class="confirm-modal__text">${messageHtml}</p>${confirmDialogActions(confirmOnclick, confirmLabel, { danger, cancelOnclick })}</div>`,
+    "max-w-sm",
+    {
+      dialog: true,
+      titleId: "confirm-modal-title",
+      panelClass: "modal-panel--confirm",
+    },
+  );
 }
 function confirmLogout() {
-  box(
+  confirmModal(
     "Системээс гарах",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground leading-relaxed">Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.</p>${confirmDialogActions("closeModal();logout()", "Гарах", { danger: true })}</div>`,
-    "max-w-sm",
-    { dialog: true, titleId: "logout-confirm-title", closeLabel: "Хаах" },
+    `Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.`,
+    {
+      confirmLabel: "Гарах",
+      confirmOnclick: "closeModal();logout()",
+      danger: true,
+    },
   );
 }
 function logout() {
@@ -4068,22 +4103,28 @@ function confirmDelete(type, id) {
           : null;
   const name =
     item?.name || (type === "customer" ? item?.companyName : null) || "энэ мөр";
-  box(
+  confirmModal(
     "Устгах уу?",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.</p>${confirmDialogActions(`deleteNow('${type}','${id}')`, "Устгах", { danger: true })}</div>`,
-    "max-w-md",
-    { dialog: true },
+    `<b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
+    {
+      confirmLabel: "Устгах",
+      confirmOnclick: `deleteNow('${type}','${id}')`,
+      danger: true,
+    },
   );
 }
 function confirmCancelOrder(id) {
   if (!requireAdminDelete()) return;
   const o = state.orders.find((x) => x.id === id);
   const name = o?.customerName || "захиалга";
-  box(
+  confirmModal(
     "Цуцлах уу?",
-    `<div class="p-5 space-y-4"><p class="text-sm text-muted-foreground"><b class="text-foreground">${esc(name)}</b> захиалгыг цуцлах гэж байна.</p>${confirmDialogActions(`cancelOrderNow('${id}')`, "Тийм", { danger: true })}</div>`,
-    "max-w-md",
-    { dialog: true },
+    `<b class="text-foreground">${esc(name)}</b> захиалгыг цуцлах гэж байна.`,
+    {
+      confirmLabel: "Тийм",
+      confirmOnclick: `cancelOrderNow('${id}')`,
+      danger: true,
+    },
   );
 }
 function cancelOrderNow(id) {
