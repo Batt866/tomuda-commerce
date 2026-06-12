@@ -887,6 +887,8 @@ async function boot() {
   initNoZoom();
   initPickerModalActions();
   initQtyStepperButtons();
+  initConfirmCard();
+  initConfirmDeleteActions();
   initAppBack();
   render();
   initPwa();
@@ -1739,7 +1741,7 @@ function customerAddress(c) {
 }
 function customerRow(c) {
   const deleteBtn = canDelete()
-    ? `<button type="button" onclick="confirmDelete('customer','${c.id}')" class="customer-card__btn customer-card__btn--danger">Устгах</button>`
+    ? `<button type="button" data-confirm-delete="customer" data-id="${esc(c.id)}" class="customer-card__btn customer-card__btn--danger">Устгах</button>`
     : "";
   return customerListRow(
     c,
@@ -1777,7 +1779,7 @@ function productListHead() {
 }
 function productCard(p) {
   const adminActions = isAdmin()
-    ? `<div class="product-card__actions"><button type="button" onclick="productModal('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" onclick="confirmDelete('product','${p.id}')" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
+    ? `<div class="product-card__actions"><button type="button" onclick="productModal('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
     : "";
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
   return `<article class="product-card"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
@@ -2192,14 +2194,17 @@ function removePromotionRule(type, index) {
   render();
 }
 function confirmRemovePromotionRule(type, index) {
-  if (!requireAdminDelete()) return;
+  if (!canDelete()) {
+    alertModal("Эрхгүй", "Зөвхөн админ устгах эрхтэй.");
+    return;
+  }
   const label = type === "quantity" ? "Тоо ширхэг" : "Үнийн хөнгөлөлт";
   confirmModal(
     "Устгах уу?",
     `<b class="text-foreground">${label}</b> дүрмийг устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
     {
       confirmLabel: "Устгах",
-      confirmOnclick: `closeConfirmCard();removePromotionRuleNow('${type}',${index})`,
+      onConfirm: () => removePromotionRule(type, index),
       danger: true,
     },
   );
@@ -2226,7 +2231,7 @@ function toggleEmployeePercentDiscount(id, allowed) {
   render();
 }
 function employeesView() {
-  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button onclick="confirmDelete('employee','${e.id}')" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="bg-card rounded overflow-hidden employee-list">${state.employees.map((e) => `<div class="employee-row px-3 py-3 border-b border-border flex items-center justify-between gap-2"><div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="text-sm text-muted-foreground truncate">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -3389,8 +3394,8 @@ function orderReceiptModalKeepDraft(id) {
 function receiptEditConfirmModal(id) {
   confirmModal("Батлах", "Та барааны дүнг өөрчлөх гэж байна.", {
     confirmLabel: "Тийм",
-    confirmOnclick: `closeConfirmCard();printOrderReceiptNow('${id}')`,
-    cancelOnclick: `closeConfirmCard();orderReceiptModalKeepDraft('${id}')`,
+    onConfirm: () => printOrderReceiptNow(id),
+    onCancel: () => orderReceiptModalKeepDraft(id),
   });
 }
 function printRootEl() {
@@ -4013,55 +4018,98 @@ function login(e) {
   render();
 }
 function closeConfirmCard() {
-  document.getElementById("confirm-card-overlay")?.remove();
+  pendingConfirm = null;
+  const overlay = document.getElementById("confirm-card-overlay");
+  if (overlay) overlay.hidden = true;
 }
+function initConfirmCard() {
+  const overlay = document.getElementById("confirm-card-overlay");
+  if (!overlay || overlay.dataset.bound) return;
+  overlay.dataset.bound = "1";
+  overlay.querySelector("#confirm-card-yes")?.addEventListener("click", () => {
+    const fn = pendingConfirm?.onConfirm;
+    closeConfirmCard();
+    fn?.();
+  });
+  overlay.querySelector("#confirm-card-no")?.addEventListener("click", () => {
+    const fn = pendingConfirm?.onCancel;
+    closeConfirmCard();
+    fn?.();
+  });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeConfirmCard();
+  });
+}
+function initConfirmDeleteActions() {
+  if (document.documentElement.dataset.confirmDeleteBound) return;
+  document.documentElement.dataset.confirmDeleteBound = "1";
+  document.addEventListener(
+    "click",
+    (e) => {
+      const btn = e.target.closest("[data-confirm-delete]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      confirmDelete(btn.getAttribute("data-confirm-delete") || "", btn.getAttribute("data-id") || "");
+    },
+    true,
+  );
+}
+let pendingConfirm = null;
 function showConfirmCard({
   title,
   message,
   confirmLabel,
   cancelLabel = "Үгүй",
-  confirmOnclick,
-  cancelOnclick = "closeConfirmCard()",
+  onConfirm,
+  onCancel,
   danger = false,
   single = false,
 }) {
-  closeConfirmCard();
-  const overlay = document.createElement("div");
-  overlay.id = "confirm-card-overlay";
-  overlay.className = "confirm-card-overlay";
-  const confirmCls = danger
-    ? "confirm-card__btn confirm-card__btn--danger"
-    : "confirm-card__btn confirm-card__btn--confirm";
-  const actionsHtml = single
-    ? `<button type="button" class="${confirmCls} confirm-card__btn--full" onclick="${confirmOnclick}">${esc(confirmLabel)}</button>`
-    : `<button type="button" class="${confirmCls}" onclick="${confirmOnclick}">${esc(confirmLabel)}</button><button type="button" class="confirm-card__btn confirm-card__btn--cancel" onclick="${cancelOnclick}">${esc(cancelLabel)}</button>`;
-  overlay.innerHTML = `<div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-card-title"><h3 id="confirm-card-title" class="confirm-card__title">${esc(title)}</h3><p class="confirm-card__message">${message}</p><div class="confirm-card__actions${single ? " confirm-card__actions--single" : ""}">${actionsHtml}</div></div>`;
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeConfirmCard();
-  });
-  document.body.appendChild(overlay);
+  initConfirmCard();
+  const overlay = document.getElementById("confirm-card-overlay");
+  if (!overlay) return;
+  pendingConfirm = { onConfirm, onCancel };
+  const titleEl = overlay.querySelector("#confirm-card-title");
+  const messageEl = overlay.querySelector("#confirm-card-message");
+  const yesBtn = overlay.querySelector("#confirm-card-yes");
+  const noBtn = overlay.querySelector("#confirm-card-no");
+  const actions = overlay.querySelector(".confirm-card__actions");
+  if (titleEl) titleEl.textContent = title || "";
+  if (messageEl) messageEl.innerHTML = message || "";
+  if (yesBtn) {
+    yesBtn.textContent = confirmLabel || "Тийм";
+    yesBtn.className = `confirm-card__btn ${danger ? "confirm-card__btn--danger" : "confirm-card__btn--confirm"}`;
+  }
+  if (noBtn) {
+    noBtn.hidden = !!single;
+    noBtn.textContent = cancelLabel;
+  }
+  actions?.classList.toggle("confirm-card__actions--single", !!single);
+  overlay.hidden = false;
+  yesBtn?.focus();
 }
 function alertModal(title, messageHtml) {
   showConfirmCard({
     title,
     message: messageHtml,
     confirmLabel: "Ойлголоо",
-    confirmOnclick: "closeConfirmCard()",
+    onConfirm: () => {},
     single: true,
   });
 }
 function confirmModal(
   title,
   messageHtml,
-  { confirmLabel, confirmOnclick, danger = false, cancelOnclick } = {},
+  { confirmLabel, onConfirm, onCancel, danger = false } = {},
 ) {
-  if (!confirmLabel || !confirmOnclick) return;
+  if (!confirmLabel || !onConfirm) return;
   showConfirmCard({
     title,
     message: messageHtml,
     confirmLabel,
-    confirmOnclick,
-    cancelOnclick: cancelOnclick || "closeConfirmCard()",
+    onConfirm,
+    onCancel,
     danger,
   });
 }
@@ -4071,7 +4119,10 @@ function confirmLogout() {
     `Та <b>${esc(state.currentEmployee?.name || "")}</b> хэрэглэгчээр системээс гарах уу? Хадгалаагүй өөрчлөлт алдагдахгүй.`,
     {
       confirmLabel: "Гарах",
-      confirmOnclick: "closeConfirmCard();closeModal();logout()",
+      onConfirm: () => {
+        closeModal();
+        logout();
+      },
       danger: true,
     },
   );
@@ -4107,7 +4158,10 @@ function saveEmployee(e) {
   render();
 }
 function confirmDelete(type, id) {
-  if (!requireAdminDelete()) return;
+  if (!canDelete()) {
+    alertModal("Эрхгүй", "Зөвхөн админ устгах эрхтэй.");
+    return;
+  }
   const item =
     type === "product"
       ? state.products.find((p) => p.id === id)
@@ -4120,35 +4174,37 @@ function confirmDelete(type, id) {
     item?.name || (type === "customer" ? item?.companyName : null) || "энэ мөр";
   confirmModal(
     "Устгах уу?",
-    `<b class="text-foreground">${esc(name)}</b> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
+    `<strong>${esc(name)}</strong> устгах гэж байна. Энэ үйлдлийг буцаах боломжгүй.`,
     {
       confirmLabel: "Устгах",
-      confirmOnclick: `closeConfirmCard();deleteNow('${type}','${id}')`,
+      onConfirm: () => deleteNow(type, id),
       danger: true,
     },
   );
 }
 function confirmCancelOrder(id) {
-  if (!requireAdminDelete()) return;
+  if (!canDelete()) {
+    alertModal("Эрхгүй", "Зөвхөн админ устгах эрхтэй.");
+    return;
+  }
   const o = state.orders.find((x) => x.id === id);
   const name = o?.customerName || "захиалга";
   confirmModal(
     "Цуцлах уу?",
-    `<b class="text-foreground">${esc(name)}</b> захиалгыг цуцлах гэж байна.`,
+    `<strong>${esc(name)}</strong> захиалгыг цуцлах гэж байна.`,
     {
       confirmLabel: "Тийм",
-      confirmOnclick: `closeConfirmCard();cancelOrderNow('${id}')`,
+      onConfirm: () => cancelOrderNow(id),
       danger: true,
     },
   );
 }
 function cancelOrderNow(id) {
-  if (!requireAdminDelete()) return;
+  if (!canDelete()) return;
   setOrder(id, "cancelled");
-  closeModal();
 }
 function deleteNow(type, id) {
-  if (!requireAdminDelete()) return;
+  if (!canDelete()) return;
   if (type === "product")
     state.products = state.products.filter((p) => p.id !== id);
   if (type === "employee")
@@ -4171,7 +4227,7 @@ function delProduct(id) {
   confirmDelete("product", id);
 }
 function setOrder(id, s) {
-  if (s === "cancelled" && !requireAdminDelete()) return;
+  if (s === "cancelled" && !canDelete()) return;
   state.orders.find((o) => o.id === id).status = s;
   render();
 }

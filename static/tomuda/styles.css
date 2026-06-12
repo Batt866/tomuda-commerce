@@ -1835,6 +1835,10 @@ input, select, textarea, button { box-shadow: none; }
   font-size: 1rem;
 }
 
+.confirm-card-overlay[hidden] {
+  display: none !important;
+}
+
 .confirm-card-overlay {
   position: fixed;
   inset: 0;

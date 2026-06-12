@@ -17,9 +17,9 @@
     <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
     <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
     <title>ТОМУДА - Борлуулалт, агуулах</title>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260611-confirm-card" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260611-confirm-card" as="script" />
-    <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260611-confirm-card"></script>
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260611-confirm-fix" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260611-confirm-fix" as="script" />
+    <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260611-confirm-fix"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -54,17 +54,27 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260611-confirm-card"
+      href="{% static 'tomuda/styles.css' %}?v=20260611-confirm-fix"
     />
   </head>
   <body>
     <div id="app"></div>
     <div id="modal"></div>
+    <div id="confirm-card-overlay" class="confirm-card-overlay" hidden>
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-card-title">
+        <h3 id="confirm-card-title" class="confirm-card__title"></h3>
+        <p id="confirm-card-message" class="confirm-card__message"></p>
+        <div class="confirm-card__actions">
+          <button type="button" id="confirm-card-yes" class="confirm-card__btn confirm-card__btn--danger"></button>
+          <button type="button" id="confirm-card-no" class="confirm-card__btn confirm-card__btn--cancel">Үгүй</button>
+        </div>
+      </div>
+    </div>
     <div id="print-root" aria-hidden="true"></div>
     <script
       src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"
     ></script>
     <script src="{% static 'tomuda/data.js' %}?v=20260527-menu-icon"></script>
-    <script src="{% static 'tomuda/app.js' %}?v=20260611-confirm-card"></script>
+    <script src="{% static 'tomuda/app.js' %}?v=20260611-confirm-fix"></script>
   </body>
 </html>
