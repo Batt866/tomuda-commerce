@@ -3380,6 +3380,7 @@ input::placeholder, textarea::placeholder {
   border-radius: 12px;
   background: var(--hex-card);
   border: 1px solid var(--hex-border);
+  overflow: visible;
   transition:
     border-color 0.15s ease,
     background 0.15s ease,
@@ -3388,14 +3389,14 @@ input::placeholder, textarea::placeholder {
 
 .picker-row__main {
   display: grid;
-  grid-template-columns: 26px 48px minmax(0, 1fr) auto;
+  grid-template-columns: 26px 48px minmax(0, 1fr) minmax(118px, max-content);
   gap: 8px;
   align-items: center;
   min-width: 0;
 }
 
 .picker-row__main--no-check {
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) minmax(118px, max-content);
 }
 
 .picker-row__thumb {
@@ -3436,7 +3437,12 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 96px;
+  min-width: 118px;
+  overflow: visible;
+}
+
+.picker-row__aside--stepper {
+  justify-content: center;
 }
 
 .picker-row__aside--empty {
@@ -3469,18 +3475,23 @@ input::placeholder, textarea::placeholder {
 
 .picker-qty-stepper--compact {
   display: grid;
-  grid-template-columns: 32px 36px 32px;
+  grid-template-columns: 36px minmax(40px, 1fr) 36px;
   gap: 4px;
-  width: 108px;
-  min-width: 108px;
+  width: 118px;
+  min-width: 118px;
+  max-width: 118px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .picker-qty-stepper--compact .qty-stepper__btn {
-  min-height: 28px !important;
-  height: 28px !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px !important;
+  height: 32px !important;
   padding: 0 !important;
-  font-size: 16px !important;
+  font-size: 18px !important;
+  line-height: 1;
   border-width: 1px;
   border-radius: 8px;
 }
@@ -3493,10 +3504,12 @@ input::placeholder, textarea::placeholder {
 }
 
 .picker-qty-stepper--compact .qty-stepper__input {
-  min-height: 28px !important;
-  height: 28px !important;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px !important;
+  height: 32px !important;
   padding: 0 2px !important;
-  font-size: 13px !important;
+  font-size: 14px !important;
   text-align: center;
   border-width: 1px;
   border-radius: 8px;
@@ -4375,12 +4388,12 @@ input::placeholder, textarea::placeholder {
   }
 
   .picker-row__main {
-    grid-template-columns: 24px 40px minmax(0, 1fr) auto;
+    grid-template-columns: 24px 40px minmax(0, 1fr) minmax(118px, max-content);
     gap: 6px;
   }
 
   .picker-row__main--no-check {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-columns: 40px minmax(0, 1fr) minmax(118px, max-content);
   }
 
   .picker-row__thumb {
@@ -4396,11 +4409,20 @@ input::placeholder, textarea::placeholder {
     margin-top: 2px;
   }
 
+  .picker-row__aside {
+    min-width: 118px;
+  }
+
   .picker-qty-stepper--compact {
-    width: 100%;
-    max-width: 168px;
-    min-width: 108px;
-    grid-template-columns: 1fr 1.1fr 1fr;
+    width: 118px;
+    min-width: 118px;
+    max-width: 118px;
+    grid-template-columns: 36px minmax(40px, 1fr) 36px;
+  }
+
+  .picker-qty-stepper--compact .qty-stepper__btn {
+    min-height: 36px !important;
+    height: 36px !important;
   }
 
   .picker-qty-stepper--compact .qty-stepper__input,

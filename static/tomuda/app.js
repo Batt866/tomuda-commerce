@@ -1001,9 +1001,11 @@ function qtyStepperApply(btn) {
 }
 function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
   const idAttr = esc(p.id);
+  const nameLabel = esc(p.name);
+  const groupId = `picker-qty-label-${idAttr}`;
   const decDisabled = q <= min;
   const incDisabled = q >= p.stock;
-  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
+  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}" role="group" aria-labelledby="${groupId}"><span id="${groupId}" class="sr-only">${nameLabel} — тоо ширхэг сонгох</span><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${nameLabel} багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${nameLabel} тоо ширхэг" aria-valuenow="${q}" aria-valuemin="${min}" aria-valuemax="${p.stock}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${nameLabel} нэмэх">+</button></div>`;
 }
 function ensurePickerActiveId() {
   if (
@@ -1071,6 +1073,7 @@ function qtyDraft(el) {
   if (n < min) return;
   state.workerQty[id] = n;
   if (String(n) !== digits) el.value = String(n);
+  el.setAttribute("aria-valuenow", String(n));
   if (pickerOpen()) updatePickerClearBtn();
 }
 function qtyCommit(el) {
@@ -1083,6 +1086,7 @@ function qtyCommit(el) {
   if (v < min) v = min;
   v = Math.min(v, p.stock);
   el.value = String(v);
+  el.setAttribute("aria-valuenow", String(v));
   setWorkerQty(id, v);
 }
 function initQtyStepperButtons() {
@@ -3803,8 +3807,8 @@ function pickerRowAside(p, q, inCart, editing) {
   if (!inCart && !editing)
     return `<div class="picker-row__aside picker-row__aside--empty"></div>`;
   if (editing)
-    return `<div class="picker-row__aside">${pickerQtyStepperHtml(p, q)}</div>`;
-  return `<button type="button" class="picker-row__ordered" data-picker-edit="${id}"><span class="picker-row__ordered-qty">${q} ш</span></button>`;
+    return `<div class="picker-row__aside picker-row__aside--stepper">${pickerQtyStepperHtml(p, q)}</div>`;
+  return `<div class="picker-row__aside"><button type="button" class="picker-row__ordered" data-picker-edit="${id}" aria-label="${esc(p.name)} — ${q} ширхэг, засах"><span class="picker-row__ordered-qty" aria-hidden="true">${q} ш</span></button></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
