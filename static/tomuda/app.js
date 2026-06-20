@@ -701,6 +701,21 @@ const badge = (s) =>
   })[s] || "tone tone--danger";
 const metricsNotifyIcon = (active = false) =>
   `<span class="metrics-bar__notify${active ? " metrics-bar__notify--active" : ""}" aria-hidden="true"><svg class="ui-icon metrics-bar__notify-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>`;
+const ADMIN_METRIC_ICONS = {
+  stock:
+    '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+  customers:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  employees:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+};
+function adminMetricCard(label, value, tone = "", { active = false, action = "", icon = "stock" } = {}) {
+  const svg = ADMIN_METRIC_ICONS[icon] || ADMIN_METRIC_ICONS.stock;
+  return `<button type="button" onclick="${action}" class="admin-metric-card${active ? " admin-metric-card--active" : ""}" aria-label="${esc(label)}: ${value}"><span class="admin-metric-card__icon-wrap${active ? " is-active" : ""}"><svg class="ui-icon admin-metric-card__icon" viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>${active ? `<span class="admin-metric-card__dot" aria-hidden="true"></span>` : ""}</span><span class="admin-metric-card__label">${label}</span><b class="admin-metric-card__value ${tone}">${value}</b></button>`;
+}
+function adminMetricsBar(items) {
+  return `<div class="admin-metrics">${items}</div>`;
+}
 const card = (l, v, t = "", opts = null) => {
   const notify = opts && opts.notify,
     notifyActive = notify && !!opts.active;
@@ -1969,7 +1984,7 @@ function adminView() {
     ["promotions", "Урамшуулал"],
     ["warehouseReceipts", "Баримтууд"],
   ];
-  return `<div class="space-y-4">${pageHead("Админ")}${metricsBar(`${card("Таталт хийх шаардлагатай бараа", low, low && alertOn ? "text-tone-warning" : "text-tone-success", { notify: true, active: low > 0 && alertOn })}${card("Харилцагч", state.customers.length, "", { notify: true, active: state.customers.length > 0 })}${card("Ажилтан", sales, "", { notify: true, active: sales > 0 })}`, 3)}<nav class="admin-menu" aria-label="Цэс">${actions.map((a) => `<button type="button" onclick="go('${a[0]}')" class="admin-menu__item">${a[1]}</button>`).join("")}<button type="button" onclick="stockAlertModal()" class="admin-menu__item">Үлдэгдэл сануулга</button><button type="button" onclick="percentDiscountSettingsModal()" class="admin-menu__item">Хувь тооцох (${percentDiscountRate()}%)</button></nav></div>`;
+  return `<div class="space-y-4">${pageHead("Админ")}${adminMetricsBar(`${adminMetricCard("Таталт хийх шаардлагатай бараа", low, low && alertOn ? "text-tone-warning" : "text-tone-success", { active: low > 0 && alertOn, action: "stockAlertModal()", icon: "stock" })}${adminMetricCard("Харилцагч", state.customers.length, "", { active: state.customers.length > 0, action: "go('customers')", icon: "customers" })}${adminMetricCard("Ажилтан", sales, "", { active: sales > 0, action: "go('employees')", icon: "employees" })})}<nav class="admin-menu" aria-label="Цэс">${actions.map((a) => `<button type="button" onclick="go('${a[0]}')" class="admin-menu__item">${a[1]}</button>`).join("")}<button type="button" onclick="stockAlertModal()" class="admin-menu__item">Үлдэгдэл сануулга</button><button type="button" onclick="percentDiscountSettingsModal()" class="admin-menu__item">Хувь тооцох (${percentDiscountRate()}%)</button></nav></div>`;
 }
 function percentDiscountSettingsModal() {
   if (!isAdmin()) return;
