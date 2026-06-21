@@ -25,6 +25,7 @@ const state = {
     warehouseDate: "",
     reportDate: "",
     promotionTab: "price",
+    promotionDetail: "",
   },
   promotionRules: { quantity: [], price: [], payment: [] },
   workerCustomer: "",
@@ -835,6 +836,9 @@ function currentPageTitle(nav) {
   }
   const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
   if (hit) return hit[1];
+  if (state.currentView === "promotions" && state.filters.promotionDetail) {
+    return promotionTypeLabel(state.filters.promotionDetail);
+  }
   const extra = {
     employees: "Ажилтан",
     inventory: "Агуулах",
@@ -1089,6 +1093,9 @@ function canAppBack() {
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     return true;
   }
+  if (state.currentView === "promotions" && state.filters.promotionDetail) {
+    return true;
+  }
   const subAdminViews = [
     "employees",
     "inventory",
@@ -1157,6 +1164,12 @@ function handleAppBack() {
 
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     clearDeliveryStore();
+    return true;
+  }
+
+  if (state.currentView === "promotions" && state.filters.promotionDetail) {
+    state.filters.promotionDetail = "";
+    render();
     return true;
   }
 
@@ -1979,6 +1992,8 @@ function go(view, opts = {}) {
   const changed = state.currentView !== view;
   state.currentView = view;
   state.mobileOpen = false;
+  if (changed && view !== "promotions") state.filters.promotionDetail = "";
+  if (changed && view === "promotions") state.filters.promotionDetail = "";
   saveAuthSession();
   render();
   if (changed && !opts.silent && !suppressHistoryPush) pushAppHistory();
@@ -2708,30 +2723,44 @@ function promotionTypeLabel(type) {
     }[type] || "Урамшуулал"
   );
 }
-function promotionTabsHtml(active) {
-  return `<div class="promo-main-tabs">${[
+function promotionMenuHtml() {
+  const items = [
     ["price", "Нийт үнийн дүнгээс хөнгөлөлт олгох"],
     ["quantity", "Багцын хөнгөлөлт"],
     ["payment", "Төлбөрийн урамшуулал"],
-  ]
-    .map(
-      ([id, label]) =>
-        `<button type="button" onclick="state.filters.promotionTab='${id}';render()" class="promo-main-tab${active === id ? " is-active" : ""}">${label}</button>`,
-    )
-    .join("")}</div>`;
+  ];
+  return `<nav class="admin-menu promo-type-menu" aria-label="Урамшууллын төрөл">${items
+    .map(([id, label]) => {
+      const count = (state.promotionRules[id] || []).length;
+      const badge = count
+        ? `<span class="promo-type-menu__count">${count}</span>`
+        : "";
+      return `<button type="button" onclick="openPromotionPage('${id}')" class="admin-menu__item promo-type-menu__item"><span class="promo-type-menu__label">${esc(label)}</span>${badge}</button>`;
+    })
+    .join("")}</nav>`;
+}
+function openPromotionPage(type) {
+  if (!["price", "quantity", "payment"].includes(type)) return;
+  state.filters.promotionTab = type;
+  state.filters.promotionDetail = type;
+  render();
+  pushAppHistory();
 }
 function promotionsView() {
-  const tab = state.filters.promotionTab,
-    qty = state.promotionRules.quantity || [],
+  const detail = state.filters.promotionDetail;
+  if (!detail) {
+    return `<div class="space-y-4">${pageHead("Урамшуулал")}${promotionMenuHtml()}</div>`;
+  }
+  const qty = state.promotionRules.quantity || [],
     price = state.promotionRules.price || [],
     payment = state.promotionRules.payment || [],
     panel =
-      tab === "quantity"
+      detail === "quantity"
         ? promotionQuantityPanel(qty)
-        : tab === "payment"
+        : detail === "payment"
           ? promotionPaymentPanel(payment)
           : promotionPricePanel(price);
-  return `<div class="space-y-4">${pageHead("Урамшуулал")}${promotionTabsHtml(tab)}${panel}</div>`;
+  return `<div class="space-y-4">${pageHead(promotionTypeLabel(detail))}${panel}</div>`;
 }
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
@@ -5864,6 +5893,7 @@ Object.assign(window, {
   setWarehouseDate,
   scrollWorkerOrdersToDate,
   openPromotionQtyModal,
+  openPromotionPage,
   promotionQtyModal,
   promoProductSearch,
   selectPromoProduct,

@@ -6596,6 +6596,29 @@ input::placeholder, textarea::placeholder {
   font-variant-numeric: tabular-nums;
 }
 
+.promo-type-menu__item {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.promo-type-menu__label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.promo-type-menu__count {
+  flex-shrink: 0;
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .admin-menu {
   display: flex;
   flex-direction: column;
