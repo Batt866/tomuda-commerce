@@ -50,6 +50,7 @@ const state = {
   pickerActiveId: "",
   pickerQtyProductId: "",
   workerOrderActiveId: "",
+  workerOrdersArrived: false,
   receiptEditOrderId: "",
   receiptEditItems: null,
   receiptEditOriginalItems: null,
@@ -1343,7 +1344,7 @@ function readPickerQtyParts(id) {
       : fallback.pieces,
   };
 }
-function pickerPartStepperHtml(p, value, { kind, min = 0, max }) {
+function pickerPartStepperHtml(p, value, { kind, min = 0, max, sheet = false }) {
   const idAttr = esc(p.id);
   const v = Math.max(min, Math.min(max, Math.floor(Number(value) || 0)));
   const decDisabled = v <= min;
@@ -1354,8 +1355,11 @@ function pickerPartStepperHtml(p, value, { kind, min = 0, max }) {
     kind === "pack" ? "data-picker-pack-input" : "data-picker-piece-input";
   const draftFn = kind === "pack" ? "pickerPackDraft" : "pickerPieceDraft";
   const commitFn = kind === "pack" ? "pickerPackCommit" : "pickerPieceCommit";
-  const label = kind === "pack" ? "Багц" : "Ширхэг";
-  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" ${actionAttr}="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${label} багасгах">−</button><input ${inputAttr} data-product-id="${idAttr}" oninput="${draftFn}(this)" onblur="${commitFn}(this)" value="${v}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${label}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" ${actionAttr}="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${label} нэмэх">+</button></div>`;
+  const label = kind === "pack" ? "Багц" : "Тоо ширхэг";
+  const stepperCls = sheet
+    ? "picker-qty-stepper--sheet"
+    : "picker-qty-stepper--compact";
+  return `<div class="qty-stepper picker-qty-stepper ${stepperCls}" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" ${actionAttr}="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${label} багасгах">−</button><input ${inputAttr} data-product-id="${idAttr}" oninput="${draftFn}(this)" onblur="${commitFn}(this)" value="${v}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${label}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" ${actionAttr}="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${label} нэмэх">+</button></div>`;
 }
 function pickerPartStepperApply(btn, kind) {
   const action = btn.getAttribute(
@@ -1454,13 +1458,16 @@ function syncPickerQtySheetUi(id) {
     updatePickerClearBtn();
   }
 }
-function pickerQtyStepperHtml(p, q, { min = 0 } = {}) {
+function pickerQtyStepperHtml(p, q, { min = 0, sheet = false } = {}) {
   const idAttr = esc(p.id);
   const nameLabel = esc(p.name);
   const groupId = `picker-qty-label-${idAttr}`;
   const decDisabled = q <= min;
   const incDisabled = q >= p.stock;
-  return `<div class="qty-stepper picker-qty-stepper picker-qty-stepper--compact" data-qty-min="${min}" role="group" aria-labelledby="${groupId}"><span id="${groupId}" class="sr-only">${nameLabel} — тоо ширхэг сонгох</span><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${nameLabel} багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${nameLabel} тоо ширхэг" aria-valuenow="${q}" aria-valuemin="${min}" aria-valuemax="${p.stock}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${nameLabel} нэмэх">+</button></div>`;
+  const stepperCls = sheet
+    ? "picker-qty-stepper--sheet"
+    : "picker-qty-stepper--compact";
+  return `<div class="qty-stepper picker-qty-stepper ${stepperCls}" data-qty-min="${min}" role="group" aria-labelledby="${groupId}"><span id="${groupId}" class="sr-only">${nameLabel} — тоо ширхэг сонгох</span><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${nameLabel} багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${nameLabel} тоо ширхэг" aria-valuenow="${q}" aria-valuemin="${min}" aria-valuemax="${p.stock}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${nameLabel} нэмэх">+</button></div>`;
 }
 function ensurePickerActiveId() {
   if (
@@ -2033,11 +2040,14 @@ function shell(content) {
   const bottomNav = bottomNavForRole(userRole);
   const emp = state.currentEmployee,
     useBottomNav = bottomNav.length >= 2,
-    pageTitle = currentPageTitle(sidebarNav);
+    pageTitle = currentPageTitle(sidebarNav),
+    workerOrdersList =
+      state.currentView === "worker" && state.filters.worker === "orders",
+    workerOrdersArrived = workerOrdersList && state.workerOrdersArrived;
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
   const svg = ADMIN_METRIC_ICONS[iconKey] || MOBILE_NAV_SVG[view] || ADMIN_METRIC_ICONS.stock;
@@ -2146,7 +2156,7 @@ function stockAlertModal() {
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
     "Үлдэгдэл сануулга",
-    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Дутуу: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Таталт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-xl",
   );
 }
@@ -2155,6 +2165,50 @@ function saveStockAlertSettings(e) {
   e.preventDefault();
   ensureSettings();
   const data = new FormData(e.target);
+  const summary = stockAlertChangeSummary(data);
+  if (!summary.changed) {
+    closeModal();
+    return;
+  }
+  confirmModal(
+    "Үлдэгдэл сануулга хадгалах",
+    summary.html,
+    {
+      confirmLabel: "Хадгалах",
+      onConfirm: () => applyStockAlertSettings(data),
+    },
+  );
+}
+function stockAlertChangeSummary(data) {
+  const lines = [];
+  const alertEnabled = data.get("stockAlertEnabled") === "on";
+  const wasEnabled = state.settings.stockAlertEnabled !== false;
+  if (alertEnabled !== wasEnabled) {
+    lines.push(
+      `<p>Сануулга: <b>${alertEnabled ? "идэвхтэй" : "унтраах"}</b></p>`,
+    );
+  }
+  state.products.forEach((p) => {
+    const raw = data.get(`minStock_${p.id}`);
+    if (raw == null) return;
+    const next = Math.max(0, Number(raw) || 0);
+    const prev = stockAlertLevel(p);
+    if (next !== prev) {
+      lines.push(
+        `<p><b>${esc(p.name)}</b> — доод үлдэгдэл: ${prev} → ${next}</p>`,
+      );
+    }
+  });
+  return {
+    changed: lines.length > 0,
+    html:
+      lines.join("") ||
+      `<p class="text-sm text-muted-foreground">Өөрчлөлт олдсонгүй.</p>`,
+  };
+}
+function applyStockAlertSettings(data) {
+  if (!isAdmin()) return;
+  ensureSettings();
   state.settings.stockAlertEnabled = data.get("stockAlertEnabled") === "on";
   state.products.forEach((p) => {
     const raw = data.get(`minStock_${p.id}`);
@@ -3813,7 +3867,7 @@ function workerView() {
     orders = workerOrdersList(),
     inActiveOrder =
       tab === "new" && state.workerStoreReady && !!state.workerCustomer;
-  return `<div class="worker-view space-y-3${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
+  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
 }
 function openWorkerNewTab() {
   if (state.filters.worker === "new" && !state.workerStoreReady) return;
@@ -5079,29 +5133,38 @@ function refreshReceiptEditTotals() {
   if (totalEl) totalEl.textContent = fmt(orderPayableTotal(draft));
 }
 function receiptEditQtyDraft(el) {
-  const idx = Number(el.getAttribute("data-receipt-qty"));
-  const item = state.receiptEditItems?.[idx];
-  if (!item || item.isPromoFree) return;
   const digits = String(el.value || "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
-  if (!digits) return;
-  const q = Number(digits);
-  item.quantity = q;
-  item.total = q * (item.price || 0);
-  refreshReceiptEditTotals();
 }
 function receiptEditQtyCommit(el) {
   const idx = Number(el.getAttribute("data-receipt-qty"));
   const item = state.receiptEditItems?.[idx];
   if (!item || item.isPromoFree) return;
-  let q = Math.max(
+  const oldQ = item.quantity;
+  const q = Math.max(
     0,
     Math.floor(Number(String(el.value || "").replace(/\D/g, "")) || 0),
   );
-  item.quantity = q;
-  item.total = q * (item.price || 0);
-  el.value = String(q);
-  refreshReceiptEditTotals();
+  if (q === oldQ) return;
+  const name = esc(item.productName);
+  const oldTotal = oldQ * (item.price || 0);
+  const newTotal = q * (item.price || 0);
+  confirmModal(
+    "Тоо өөрчлөх",
+    `<p><b>${name}</b></p><p class="text-sm text-muted-foreground mt-2">Тоо: <b>${oldQ}</b> → <b>${q}</b> ш</p><p class="text-sm text-muted-foreground">Мөрний дүн: ${fmt(oldTotal)} → <b>${fmt(newTotal)}</b></p>`,
+    {
+      confirmLabel: "Тийм",
+      onConfirm: () => {
+        item.quantity = q;
+        item.total = newTotal;
+        el.value = String(q);
+        refreshReceiptEditTotals();
+      },
+      onCancel: () => {
+        el.value = String(oldQ);
+      },
+    },
+  );
 }
 function applyReceiptEditToOrder() {
   const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
@@ -5135,11 +5198,19 @@ function orderReceiptModalKeepDraft(id) {
   orderReceiptModal(id, true);
 }
 function receiptEditConfirmModal(id) {
-  confirmModal("Батлах", "Та барааны дүнг өөрчлөх гэж байна.", {
-    confirmLabel: "Тийм",
-    onConfirm: () => printOrderReceiptNow(id),
-    onCancel: () => orderReceiptModalKeepDraft(id),
-  });
+  const o = state.orders.find((x) => x.id === id);
+  const draft = receiptEditDraftOrder();
+  const oldTotal = o ? orderPayableTotal(o) : 0;
+  const newTotal = draft ? orderPayableTotal(draft) : oldTotal;
+  confirmModal(
+    "Батлах",
+    `<p>Захиалгын дүнг хадгалж баримт хэвлэх үү?</p><p class="text-sm text-muted-foreground mt-2">Нийт: ${fmt(oldTotal)} → <b>${fmt(newTotal)}</b></p>`,
+    {
+      confirmLabel: "Тийм",
+      onConfirm: () => printOrderReceiptNow(id),
+      onCancel: () => orderReceiptModalKeepDraft(id),
+    },
+  );
 }
 function printRootEl() {
   let root = document.getElementById("print-root");
@@ -5575,24 +5646,18 @@ function pickerQtySheetHtml(productId) {
   const packSize = productPackSize(p);
   const { packs, pieces } = pickerQtyToParts(q, p);
   const qtyBody = packSize
-    ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">${packSize} ш/багц</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces) })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Нэмэлт ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs) })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
-    : `<div class="picker-qty-sheet__stepper">${pickerQtyStepperHtml(p, q)}</div>`;
-  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImage(p)}" alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}${packSize ? ` · ${packSize} ш/багц` : ""}</p></div></div>${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Болих</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
+    ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
+    : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
+  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImage(p)}" alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Болих</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
     inCart = q > 0,
     left = p.stock - q,
-    showCat = !state.filters.workerCategory && p.category,
-    metaParts = [
-      showCat ? esc(p.category) : "",
-      fmt(p.price),
-      `Үлд ${left}`,
-    ].filter(Boolean),
     qtyBadge = inCart
       ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
       : "";
-  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><span class="picker-row__thumb-box" aria-hidden="true"><img src="${productImage(p)}" class="picker-row__thumb" alt=""></span><div class="picker-row__info"><p class="picker-row__name">${esc(p.name)}</p><p class="picker-row__meta">${metaParts.join('<span class="picker-row__meta-sep" aria-hidden="true">·</span>')}</p></div>${qtyBadge}</button>`;
+  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><span class="picker-row__thumb-box" aria-hidden="true"><img src="${productImage(p)}" class="picker-row__thumb" alt=""></span><div class="picker-row__info"><div class="picker-row__field picker-row__field--name"><span class="picker-row__label">Нэр</span><span class="picker-row__value picker-row__value--name">${esc(p.name)}</span></div><div class="picker-row__stats"><div class="picker-row__field"><span class="picker-row__label">Үнэ</span><span class="picker-row__value picker-row__value--price">${fmt(p.price)}</span></div><div class="picker-row__field"><span class="picker-row__label">Үлд</span><span class="picker-row__value picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">${left}</span></div></div></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
@@ -5783,8 +5848,16 @@ function saveWorker() {
   state.settlementDay = "";
   state.applyPercentDiscount = false;
   state.filters.worker = "orders";
+  state.workerOrdersArrived = true;
   render();
   pushAppHistory();
+  setTimeout(() => {
+    if (!state.workerOrdersArrived) return;
+    state.workerOrdersArrived = false;
+    if (state.currentView === "worker" && state.filters.worker === "orders") {
+      render();
+    }
+  }, 1400);
 }
 function login(e) {
   e.preventDefault();
