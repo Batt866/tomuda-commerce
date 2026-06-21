@@ -2020,20 +2020,61 @@ function shell(content) {
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
   return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
 }
+function adminHubCard(view, label, iconKey) {
+  const svg = ADMIN_METRIC_ICONS[iconKey] || MOBILE_NAV_SVG[view] || ADMIN_METRIC_ICONS.stock;
+  return `<button type="button" onclick="go('${view}')" class="admin-hub-card"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+}
+function adminHubActionCard(action, label, iconKey) {
+  const svg = ADMIN_METRIC_ICONS[iconKey] || ADMIN_METRIC_ICONS.stock;
+  return `<button type="button" onclick="${action}" class="admin-hub-card admin-hub-card--settings"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+}
+function adminHubHtml() {
+  const main = [
+    ["employees", "Ажилтан", "employees"],
+    ["inventory", "Агуулах", "inventory"],
+    ["reports", "Тайлан", "reports"],
+    ["promotions", "Урамшуулал", "promotions"],
+    ["warehouseReceipts", "Баримтууд", "stock"],
+  ];
+  const settings = [
+    ["stockAlertModal()", "Үлдэгдэл сануулга", "stock"],
+    [
+      "percentDiscountSettingsModal()",
+      `Хувь тооцох (${percentDiscountRate()}%)`,
+      "employees",
+    ],
+  ];
+  return `<section class="admin-hub"><h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__grid">${main.map(([id, label, icon]) => adminHubCard(id, label, icon)).join("")}</div><h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div></section>`;
+}
 function adminView() {
   ensureSettings();
   const lowList = lowStockProducts(),
     low = lowList.length,
     sales = state.employees.length;
   const alertOn = state.settings.stockAlertEnabled !== false;
-  const actions = [
-    ["employees", "Ажилтан"],
-    ["inventory", "Агуулах"],
-    ["reports", "Тайлан"],
-    ["promotions", "Урамшуулал"],
-    ["warehouseReceipts", "Баримтууд"],
-  ];
-  return `<div class="space-y-4">${pageHead("Админ")}${adminMetricsBar(`${adminMetricCard("Таталт хийх шаардлагатай бараа", low, low && alertOn ? "text-tone-warning" : "text-tone-success", { active: low > 0 && alertOn, action: "stockAlertModal()", icon: "stock" })}${adminMetricCard("Харилцагч", state.customers.length, "", { active: state.customers.length > 0, action: "go('customers')", icon: "customers" })}${adminMetricCard("Ажилтан", sales, "", { active: sales > 0, action: "go('employees')", icon: "employees" })})`)}<nav class="admin-menu" aria-label="Цэс">${actions.map((a) => `<button type="button" onclick="go('${a[0]}')" class="admin-menu__item">${a[1]}</button>`).join("")}<button type="button" onclick="stockAlertModal()" class="admin-menu__item">Үлдэгдэл сануулга</button><button type="button" onclick="percentDiscountSettingsModal()" class="admin-menu__item">Хувь тооцох (${percentDiscountRate()}%)</button></nav></div>`;
+  const metrics = adminMetricsBar(
+    adminMetricCard(
+      "Таталт хийх шаардлагатай бараа",
+      low,
+      low && alertOn ? "text-tone-warning" : "text-tone-success",
+      {
+        active: low > 0 && alertOn,
+        action: "stockAlertModal()",
+        icon: "stock",
+      },
+    ) +
+      adminMetricCard("Харилцагч", state.customers.length, "", {
+        active: state.customers.length > 0,
+        action: "go('customers')",
+        icon: "customers",
+      }) +
+      adminMetricCard("Ажилтан", sales, "", {
+        active: sales > 0,
+        action: "go('employees')",
+        icon: "employees",
+      }),
+  );
+  return `<div class="admin-page space-y-4">${pageHead("Админ")}${metrics}${adminHubHtml()}</div>`;
 }
 function percentDiscountSettingsModal() {
   if (!isAdmin()) return;
@@ -2285,6 +2326,61 @@ function warehouseOrderDetail(o) {
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(o.total)}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
 }
+function customerAvatarHtml(c, className = "customer-card__avatar") {
+  if (c?.image) {
+    return `<img src="${esc(c.image)}" alt="" class="${className} customer-card__avatar-img">`;
+  }
+  return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(c.name))}</span>`;
+}
+function customerImageField(c) {
+  const preview = c.image || customerStoreImage(c);
+  return `<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload"><img id="customerImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input type="file" accept="image/*" capture="environment" onchange="handleCustomerImage(this)" class="w-full text-sm"><input id="customerImageValue" name="image" type="hidden" value="${esc(c.image || "")}"><p class="text-xs text-muted-foreground mt-2">Дэлгүүрийн зураг оруулна. JPG, PNG, WEBP.</p>${c.image ? `<button type="button" onclick="clearCustomerImage()" class="btn btn--secondary btn--sm mt-2">Зураг арилгах</button>` : ""}</div></div></div>`;
+}
+function handleCustomerImage(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    alert("Зураг 2MB-аас бага байна");
+    input.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const value = document.getElementById("customerImageValue"),
+      preview = document.getElementById("customerImagePreview");
+    if (value) value.value = reader.result;
+    if (preview) preview.src = reader.result;
+    const removeBtn = input
+      .closest(".customer-image-upload__body")
+      ?.querySelector('[onclick="clearCustomerImage()"]');
+    if (!removeBtn) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn--secondary btn--sm mt-2";
+      btn.textContent = "Зураг арилгах";
+      btn.onclick = clearCustomerImage;
+      input.closest(".customer-image-upload__body")?.appendChild(btn);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+function clearCustomerImage() {
+  const value = document.getElementById("customerImageValue"),
+    preview = document.getElementById("customerImagePreview"),
+    fileInput = document.querySelector(
+      '.customer-image-upload input[type="file"]',
+    );
+  if (value) value.value = "";
+  if (fileInput) fileInput.value = "";
+  if (preview) {
+    const name =
+      document.querySelector('[name="name"]')?.value || "Дэлгүүр";
+    preview.src = customerStoreImage({ name });
+  }
+  document
+    .querySelector('.customer-image-upload__body [onclick="clearCustomerImage()"]')
+    ?.remove();
+}
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
   const company = String(c.companyName || "").trim();
@@ -2307,11 +2403,10 @@ function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
   const phone = (c.phone1 || "").trim();
-  const initial = deliveryInitial(c.name);
   const phoneHtml = phone
     ? `<a href="tel:${encodeURIComponent(phone)}" class="customer-card__line">${customerCardPhoneIcon()}<span>${esc(phone)}</span></a>`
     : `<span class="customer-card__muted">Утасгүй</span>`;
-  return `<article class="customer-card ${active ? "customer-card--active" : ""}"><header class="customer-card__head"><span class="customer-card__avatar" aria-hidden="true">${esc(initial)}</span><div class="customer-card__identity"><h3 class="customer-card__name">${esc(c.name)}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__phone">${phoneHtml}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card ${active ? "customer-card--active" : ""}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><h3 class="customer-card__name">${esc(c.name)}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__phone">${phoneHtml}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function customersView() {
   const q = state.searches.customers || "",
@@ -2832,7 +2927,11 @@ function promotionQtyField(name, label, defaultValue, inline = false) {
     : "promo-qty-field";
   const wrap = inline ? "" : `<div class="promo-qty-inline">`;
   const wrapEnd = inline ? "" : `</div>`;
-  return `${wrap}<label class="${cls}"><span class="block text-xs text-muted-foreground mb-1">${label}</span><input name="${name}" type="number" min="1" required${val} placeholder="1" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
+  const labelHtml = inline
+    ? ""
+    : `<span class="block text-xs text-muted-foreground mb-1">${label}</span>`;
+  const aria = inline ? ` aria-label="${label}"` : "";
+  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="number" min="1" required${val} placeholder="1"${aria} class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
 }
 function promotionProductPickRow(p, fieldName, selectedId) {
   const active = selectedId === p.id;
@@ -3644,6 +3743,7 @@ function customerHasCoords(c) {
   return Number.isFinite(lat) && Number.isFinite(lng);
 }
 function customerStoreImage(c) {
+  if (c?.image) return c.image;
   const name = String(c?.name || "Дэлгүүр").slice(0, 16);
   const hue =
     [...String(c?.name || "Д")].reduce((s, ch) => s + ch.charCodeAt(0), 0) %
@@ -4345,6 +4445,7 @@ function customerFromDraft(id, draft) {
     district: draft.district ?? saved.district,
     khoroo: draft.khoroo ?? saved.khoroo,
     address: draft.address ?? saved.address,
+    image: draft.image ?? saved.image,
     latitude: draft.latitude ?? saved.latitude,
     longitude: draft.longitude ?? saved.longitude,
     locationText: draft.locationText ?? saved.locationText,
@@ -4363,7 +4464,7 @@ function customerModal(id, draft = null) {
   const cid = esc(id || "");
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" onclick="centerCustomerMapOnUser()" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" onclick="centerCustomerMapOnUser()" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   window.customerMapInitTimer = setTimeout(() => {
@@ -4488,7 +4589,7 @@ function customerDetail(id) {
     link = mapsLink(c.latitude, c.longitude);
   box(
     c.name,
-    `<div class="p-6 space-y-4"><p class="text-muted-foreground">${c.companyName}</p><p><b>Дугаар:</b> ${c.phone1 || "-"}</p><p><b>Хаяг:</b> ${addr}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<button onclick="closeModal();customerModal('${id}')" class="w-full py-3 bg-primary text-primary-foreground rounded">Засах</button></div>`,
+    `<div class="p-6 space-y-4">${c.image ? `<img src="${esc(c.image)}" alt="" class="customer-detail__photo">` : ""}<p class="text-muted-foreground">${c.companyName}</p><p><b>Дугаар:</b> ${c.phone1 || "-"}</p><p><b>Хаяг:</b> ${addr}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<button onclick="closeModal();customerModal('${id}')" class="w-full py-3 bg-primary text-primary-foreground rounded">Засах</button></div>`,
     "max-w-xl",
   );
 }
@@ -5808,6 +5909,8 @@ Object.assign(window, {
   render,
   closeModal,
   customerModal,
+  handleCustomerImage,
+  clearCustomerImage,
   onCustomerProvinceChange,
   onCustomerDistrictChange,
   initCustomerAddressFields,

@@ -197,6 +197,45 @@ textarea.text-sm,
   min-width: 0;
 }
 
+.customer-card__avatar-img {
+  object-fit: cover;
+  background: var(--hex-secondary);
+}
+
+.customer-image-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--hex-secondary);
+}
+
+.customer-image-upload__preview {
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: var(--hex-card);
+  border: var(--thumb-border);
+  box-shadow: var(--thumb-shadow);
+}
+
+.customer-image-upload__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.customer-detail__photo {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: var(--thumb-border);
+}
+
 .customer-card__avatar {
   flex-shrink: 0;
   width: var(--avatar-md);
@@ -3709,20 +3748,24 @@ input::placeholder, textarea::placeholder {
 
 .promo-input-row {
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  gap: 8px;
+  align-items: center;
   margin-bottom: 8px;
 }
 
 .promo-search-input {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
-  width: 100%;
 }
 
 .promo-qty-field--inline {
-  flex-shrink: 0;
-  width: 96px;
+  flex: 0 0 52px;
+  width: 52px;
+}
+
+.promo-qty-field--inline .promo-qty-input {
+  padding: 8px 4px;
+  font-size: 13px;
 }
 
 .promo-qty-inline {
@@ -6625,6 +6668,114 @@ input::placeholder, textarea::placeholder {
   border-top: 1px solid var(--hex-border);
 }
 
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-hub__heading {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+}
+
+.admin-hub__heading--settings {
+  margin-top: 4px;
+}
+
+.admin-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-hub__settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-hub-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px solid var(--hex-border);
+  border-radius: 14px;
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(16, 22, 35, 0.06);
+  transition:
+    transform 0.12s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-hub-card:hover,
+.admin-hub-card:focus-visible {
+  border-color: color-mix(in srgb, var(--hex-primary) 35%, var(--hex-border));
+  box-shadow: 0 4px 14px rgba(16, 22, 35, 0.08);
+}
+
+.admin-hub-card:active:not(:disabled) {
+  transform: scale(0.98);
+  background: color-mix(in srgb, var(--hex-primary) 6%, var(--hex-card));
+}
+
+.admin-hub-card--settings {
+  min-height: 52px;
+}
+
+.admin-hub-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--hex-secondary);
+  color: var(--hex-primary);
+}
+
+.admin-hub-card__icon .ui-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-hub-card__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.admin-hub-card__chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--hex-muted-foreground);
+  opacity: 0.7;
+}
+
 .admin-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6635,24 +6786,21 @@ input::placeholder, textarea::placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 108px;
-  padding: 12px 8px;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 112px;
+  padding: 14px 8px 12px;
   border: 1px solid var(--hex-border);
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    var(--hex-card) 0%,
-    color-mix(in srgb, var(--hex-secondary) 45%, var(--hex-card)) 100%
-  );
+  border-radius: 16px;
+  background: var(--hex-card);
   text-align: center;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(16, 22, 35, 0.05);
   transition:
-    transform 0.15s ease,
+    transform 0.12s ease,
     box-shadow 0.15s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
+    border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .admin-metric-card:hover {
@@ -6708,14 +6856,15 @@ input::placeholder, textarea::placeholder {
 }
 
 .admin-metric-card__label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   color: var(--hex-muted-foreground);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-height: 2.6em;
 }
 
 .admin-metric-card__value {
