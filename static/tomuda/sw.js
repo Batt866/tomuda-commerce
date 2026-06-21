@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v10";
+const CACHE = "tomuda-v12";
 const PRECACHE = [
   "/",
   "/static/tomuda/styles.css",
@@ -43,17 +43,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(request)),
-    );
+    event.respondWith(fetch(request));
     return;
   }
 

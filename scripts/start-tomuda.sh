@@ -65,40 +65,28 @@ if ! curl -sf "$URL/api/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Capacitor APK-д ашиглах URL шинэчлэх
-if [ -f "$ROOT/capacitor.config.json" ]; then
-  python3 - "$URL" <<'PY'
-import json, sys
-path = "capacitor.config.json"
-url = sys.argv[1]
-with open(path, encoding="utf-8") as f:
-    data = json.load(f)
-data.setdefault("server", {})["url"] = url
-data["server"]["cleartext"] = False
-with open(path, "w", encoding="utf-8") as f:
-    json.dump(data, f, indent=2, ensure_ascii=False)
-    f.write("\n")
-PY
-fi
+RENDER_URL="https://tomuda-commerce.onrender.com"
 
 cat > "$ROOT/DEPLOY-LINK.txt" <<EOF
 ТОМУДА — Deploy link (HTTPS)
 Шинэчлэгдсэн: $(date)
 
-$URL
+✅ ҮНДСЭН (24/7, утас/APK): $RENDER_URL
+
+🔧 Локал туршилт (tunnel): $URL
+   Компьютер + tunnel асаалттай байх үед л ажиллана.
 
 Локал: http://127.0.0.1:$PORT/
 GitHub: https://github.com/Batt866/tomuda-commerce
 
-⚠️ Энэ link түр зуурын (trycloudflare). Компьютер + tunnel асаалттай байх үед л ажиллана.
 Дахин асаах: ./scripts/start-tomuda.sh
-
-Тогтвортой link (24/7): Render дээр deploy — DEPLOY.md харна уу.
+Шалгах: ./scripts/check-deploy-link.sh
 EOF
 
 echo ""
 echo "============================================"
-echo "  DEPLOY LINK: $URL"
+echo "  Render (24/7): $RENDER_URL"
+echo "  Tunnel (түр):  $URL"
 echo "============================================"
 echo "Backend log: $LOG_DIR/backend.log"
 echo "Tunnel log:  $LOG_DIR/tunnel.log"

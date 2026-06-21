@@ -1,14 +1,15 @@
-ТОМУДА — Ажиллах link (HTTPS)
+ТОМУДА — Deploy link (HTTPS)
+Шинэчлэгдсэн: 2026-06-06
 
-✅ ҮНДСЭН LINK (24/7, бүх хүнд):
+✅ ҮНДСЭН (24/7, утас/APK):
 https://tomuda-commerce.onrender.com
 
 GitHub: https://github.com/Batt866/tomuda-commerce
 
 ⚠️ Анхаар:
 - Эхний удаа нээхэд 1–2 минут хүлээж болно (сервер сэргэж байна) — «Дахин оролдох» дарна.
-- Хуучин trycloudflare link ажиллахгүй — зөвхөн дээрх Render link өгнө.
-- Орохгүй бол: Wi‑Fi солих, Chrome/Safari ашиглах, хуудас дахин ачаалах.
-- Локал туршилт: ./scripts/start-tomuda.sh → http://127.0.0.1:8011/
+- Хуучин trycloudflare link ажиллахгүй — зөвхөн дээрх Render link ашиглана.
+- APK дахин татах: login хуудас → «Утсан дээр суулгах» эсвэл static/tomuda/downloads/TOMUDA.apk
+- Локал туршилт: ./scripts/start-tomuda.sh → tunnel link ( түр зуур )
 
-Шинэчлэгдсэн: 2026-06-06
+Шалгах: ./scripts/check-deploy-link.sh

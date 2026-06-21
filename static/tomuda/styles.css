@@ -15,16 +15,80 @@
 }
 
 .boot-screen {
-  padding: 24px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 24px
+    max(24px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    165deg,
+    #eef2f5 0%,
+    #e6f3f5 100%
+  );
 }
 
 .boot-screen__card {
   width: min(100%, 360px);
+  padding: 28px 24px;
+  border-radius: 16px;
+  border: 1px solid #d8dee6;
+  background: #ffffff;
   box-shadow: 0 8px 24px rgba(16, 22, 35, 0.08);
+  text-align: center;
+}
+
+.boot-screen__logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+  border-radius: 14px;
+}
+
+.boot-screen__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #182032;
+}
+
+.boot-screen__detail {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #687386;
+}
+
+.boot-screen__spinner {
+  width: 28px;
+  height: 28px;
+  margin: 18px auto 0;
+  border: 3px solid #d8dee6;
+  border-top-color: #16899a;
+  border-radius: 50%;
+  animation: boot-spin 0.75s linear infinite;
+}
+
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .boot-screen__retry {
   width: 100%;
+  margin-top: 16px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: #16899a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 html {
@@ -1601,6 +1665,49 @@ button:focus-visible,
   outline: none;
   border-color: var(--hex-primary);
   box-shadow: 0 0 0 3px rgba(22, 137, 154, 0.18);
+}
+
+.promo-main-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.promo-main-tab {
+  min-height: var(--btn-h-md);
+  padding: 12px 14px;
+  border: 1px solid var(--hex-border);
+  border-radius: var(--btn-radius);
+  background: var(--hex-secondary);
+  color: var(--hex-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.promo-main-tab.is-active {
+  border-color: var(--hex-primary);
+  background: var(--hex-primary);
+  color: var(--hex-primary-foreground);
+}
+
+@media (min-width: 640px) {
+  .promo-main-tabs {
+    flex-direction: row;
+  }
+
+  .promo-main-tab {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px 8px;
+  }
 }
 
 .seg-tabs {

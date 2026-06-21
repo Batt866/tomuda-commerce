@@ -3,7 +3,7 @@
   "appName": "TOMUDA",
   "webDir": "static/tomuda",
   "server": {
-    "url": "https://lancaster-alternatives-advise-advisors.trycloudflare.com",
+    "url": "https://tomuda-commerce.onrender.com",
     "cleartext": false
   }
 }

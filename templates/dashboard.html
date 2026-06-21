@@ -9,7 +9,7 @@
     <meta name="description" content="Борлуулалт, агуулах, захиалга удирдах систем" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ТОМУДА" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
@@ -17,9 +17,93 @@
     <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
     <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
     <title>ТОМУДА - Борлуулалт, агуулах</title>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260604-admin-metrics" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260604-admin-metrics" as="script" />
-    <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-admin-metrics"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #eef2f5;
+        color: #182032;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      #app {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+      .boot-screen {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: max(16px, env(safe-area-inset-top, 0px)) 24px
+          max(24px, env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(165deg, #eef2f5 0%, #e6f3f5 100%);
+      }
+      .boot-screen__card {
+        width: min(100%, 360px);
+        padding: 28px 24px;
+        border-radius: 16px;
+        border: 1px solid #d8dee6;
+        background: #fff;
+        box-shadow: 0 8px 24px rgba(16, 22, 35, 0.08);
+        text-align: center;
+      }
+      .boot-screen__logo {
+        display: block;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 12px;
+        border-radius: 14px;
+      }
+      .boot-screen__title {
+        margin: 0;
+        font-size: 1.125rem;
+        font-weight: 800;
+      }
+      .boot-screen__detail {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #687386;
+      }
+      .boot-screen__spinner {
+        width: 28px;
+        height: 28px;
+        margin: 18px auto 0;
+        border: 3px solid #d8dee6;
+        border-top-color: #16899a;
+        border-radius: 50%;
+        animation: boot-spin 0.75s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .boot-screen__retry {
+        display: inline-block;
+        width: 100%;
+        margin-top: 16px;
+        min-height: 44px;
+        padding: 0 16px;
+        border: none;
+        border-radius: 12px;
+        background: #16899a;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260604-syntax-fix" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260604-syntax-fix" as="script" />
+    <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-syntax-fix"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -54,11 +138,27 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260604-admin-metrics"
+      href="{% static 'tomuda/styles.css' %}?v=20260604-syntax-fix"
     />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="boot-screen" aria-live="polite">
+        <div class="boot-screen__card">
+          <img
+            src="{% static 'tomuda/branding/logo-blue.png' %}"
+            alt=""
+            class="boot-screen__logo"
+            width="64"
+            height="64"
+            decoding="async"
+          />
+          <p class="boot-screen__title">ТОМУДА</p>
+          <p class="boot-screen__detail">Ачаалж байна...</p>
+          <div class="boot-screen__spinner" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
     <div id="modal"></div>
     <div id="confirm-card-overlay" class="confirm-card-overlay" hidden>
       <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-card-title">
@@ -75,6 +175,19 @@
       src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"
     ></script>
     <script src="{% static 'tomuda/data.js' %}?v=20260527-menu-icon"></script>
-    <script src="{% static 'tomuda/app.js' %}?v=20260604-admin-metrics"></script>
+    <script>
+      window.__showTomudaFatal = function (msg) {
+        var el = document.getElementById("app");
+        if (!el) return;
+        el.innerHTML =
+          '<div class="boot-screen"><div class="boot-screen__card"><p class="boot-screen__title">Алдаа</p><p class="boot-screen__detail">' +
+          msg +
+          '</p><button type="button" class="boot-screen__retry" onclick="location.reload()">Дахин оролдох</button></div></div>';
+      };
+    </script>
+    <script
+      src="{% static 'tomuda/app.js' %}?v=20260604-syntax-fix"
+      onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
+    ></script>
   </body>
 </html>

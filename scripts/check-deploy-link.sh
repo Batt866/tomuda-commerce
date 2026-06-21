@@ -5,8 +5,10 @@ cd "$(dirname "$0")/.."
 LINK_FILE="DEPLOY-LINK.txt"
 PORT=8011
 
+RENDER_URL="https://tomuda-commerce.onrender.com"
+
 url_from_file() {
-  grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LINK_FILE" 2>/dev/null | head -1
+  grep -oE 'https://[a-z0-9-]+\.(trycloudflare\.com|onrender\.com)' "$LINK_FILE" 2>/dev/null | head -1
 }
 
 echo "=== ТОМУДА deploy шалгалт ==="
@@ -28,26 +30,29 @@ fi
 
 URL="$(url_from_file)"
 if [ -z "$URL" ]; then
-  echo "✗ DEPLOY-LINK.txt дотор URL олдсонгүй"
-  exit 1
+  URL="$RENDER_URL"
 fi
 
 echo ""
-echo "DEPLOY-LINK.txt: $URL"
+echo "Шалгаж байна: $URL"
 if curl -sf "$URL/api/health" >/dev/null 2>&1; then
-  echo "✓ HTTPS deploy link — OK"
+  echo "✓ Deploy link — OK"
   curl -sS "$URL/api/health"
   echo ""
 else
-  echo "✗ HTTPS deploy link — ажиллахгүй (хуучин эсвэл tunnel хаагдсан)"
-  echo "  Засах: ./scripts/start-tomuda.sh"
-  exit 1
+  echo "✗ Deploy link — ажиллахгүй"
+  if [[ "$URL" == *trycloudflare.com* ]]; then
+    echo "  trycloudflare link хуучирсан. Засах: ./scripts/start-tomuda.sh"
+    echo "  Эсвэл тогтвортой link: $RENDER_URL"
+  else
+    echo "  Render сервер сэргэж байж болно — 1–2 минут хүлээгээд дахин шалгана уу"
+  fi
 fi
 
 echo ""
-echo "Render (тогтвортой): https://tomuda-commerce.onrender.com"
-if curl -sf "https://tomuda-commerce.onrender.com/api/health" >/dev/null 2>&1; then
+echo "Render (APK / утас): $RENDER_URL"
+if curl -sf "$RENDER_URL/api/health" >/dev/null 2>&1; then
   echo "✓ Render deploy — OK"
 else
-  echo "✗ Render deploy — хийгдээгүй эсвэл унтраалттай (Dashboard → Blueprint)"
+  echo "✗ Render deploy — унтраалттай эсвэл сэргэж байна (Dashboard → Blueprint)"
 fi

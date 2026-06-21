@@ -271,7 +271,7 @@ def default_state() -> dict:
             "countDone": False,
             "workerCustomer": "cust-green-mart",
             "orderEmployee": "emp-hasan",
-            "promotionRules": {"quantity": [], "price": []},
+            "promotionRules": {"quantity": [], "price": [], "payment": []},
             "deliveryDate": "",
             "paymentTerm": "cash",
             "selectedWorkers": [],
