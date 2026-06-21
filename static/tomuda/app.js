@@ -18,6 +18,7 @@ const state = {
     category: "all",
     inventory: "stock",
     inventoryCategory: "all",
+    countCategory: "all",
     worker: "new",
     workerCategory: "",
     workerPay: "all",
@@ -2031,13 +2032,12 @@ function shell(content) {
   const sidebarNav = sidebarNavForRole(userRole);
   const bottomNav = bottomNavForRole(userRole);
   const emp = state.currentEmployee,
-    initial = emp?.name ? deliveryInitial(emp.name) : "?",
     useBottomNav = bottomNav.length >= 2,
     pageTitle = currentPageTitle(sidebarNav);
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах"><span aria-hidden="true">${esc(initial)}</span></button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user"><span class="sidebar-user__avatar" aria-hidden="true">${esc(initial)}</span><div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
   const svg = ADMIN_METRIC_ICONS[iconKey] || MOBILE_NAV_SVG[view] || ADMIN_METRIC_ICONS.stock;
@@ -2655,30 +2655,77 @@ function inventoryStockModal(id, tab) {
 }
 function applyStockFromModal(e, id, type) {
   e.preventDefault();
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
   const q = Number(new FormData(e.target).get("quantity") || 0);
-  if (applyStock(id, type, q)) closeModal();
+  if (!Number.isFinite(q) || q < 1) {
+    alert("Тоо оруулна уу");
+    return;
+  }
+  if (type === "out" && q > p.stock) {
+    alert("Үлдэгдэл хүрэлцэхгүй байна!");
+    return;
+  }
+  const isIn = type === "in",
+    title = isIn ? "Орлого авах" : "Зарлага гаргах",
+    actionLabel = isIn ? "Орлого" : "Зарлага",
+    afterStock = isIn ? p.stock + q : p.stock - q;
+  confirmModal(
+    title,
+    `<p><b>${esc(p.name)}</b> — <b>${q}</b> ${esc(p.unit || "ш")} ${isIn ? "орлого" : "зарлага"} хийх үү?</p><p class="text-sm text-muted-foreground mt-2">Одоо: ${p.stock} ${esc(p.unit || "ш")} → Дараа: ${afterStock} ${esc(p.unit || "ш")}</p>`,
+    {
+      confirmLabel: actionLabel,
+      danger: !isIn,
+      onConfirm: () => {
+        if (applyStock(id, type, q)) closeModal();
+      },
+    },
+  );
 }
 function stockActionList(list, tab) {
   const hint =
     tab === "in"
-      ? "Бараа дээр дарж тоо оруулаад «Орлого» батална"
-      : "Бараа дээр дарж тоо оруулаад «Зарлага» батална";
+      ? "Бараа дээр дарж тоо оруулаад «Орлого» дарна — баталгаажуулах цонх гарна"
+      : "Бараа дээр дарж тоо оруулаад «Зарлага» дарна — баталгаажуулах цонх гарна";
   return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">${hint}</div><div class="divide-y divide-border">${list.length ? list.map((p) => stockActionRow(p, tab)).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockGrid(list) {
   return `<div class="bg-card rounded overflow-hidden"><div class="hidden md:grid grid-cols-[1fr_140px_140px_120px] gap-3 px-4 py-3 bg-secondary/50 text-xs font-semibold text-muted-foreground"><span>Бараа</span><span>Төрөл</span><span>Баркод</span><span class="text-right">Үлдэгдэл</span></div><div class="divide-y divide-border">${list.length ? list.map((p) => `<div class="p-4 grid grid-cols-1 md:grid-cols-[1fr_140px_140px_120px] gap-3 md:items-center"><div><p class="font-medium">${p.name}</p><p class="md:hidden text-xs text-muted-foreground mt-1">${p.category} · ${p.barcode}</p></div><span class="hidden md:block text-sm">${p.category}</span><span class="hidden md:block text-sm font-mono">${p.barcode}</span><b class="md:text-right">${p.stock} ${p.unit}</b></div>`).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
+function countFilteredProducts() {
+  const q = (state.searches.count || "").toLowerCase().trim(),
+    cat = state.filters.countCategory || "all";
+  return state.products.filter((p) => {
+    if (cat !== "all" && p.category !== cat) return false;
+    if (!q) return true;
+    return (
+      p.name.toLowerCase().includes(q) ||
+      String(p.barcode || "").includes(q)
+    );
+  });
+}
+function countCategoryLabel(cat = state.filters.countCategory || "all") {
+  return cat === "all" ? "Бүх бараа" : cat;
+}
+function setCountCategory(cat) {
+  state.filters.countCategory = cat || "all";
+  state.countDone = false;
+  render();
+}
 function countView() {
   const q = state.searches.count || "",
-    list = state.products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q.toLowerCase()) || p.barcode.includes(q),
-    ),
-    counted = Object.keys(state.countQty).filter(
-      (id) => countValue(id) !== null,
-    ).length,
-    mismatches = countMismatches();
-  return `<div class="space-y-4">${pageHead("Тооллого")}${metricsBar(`${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Нийт", state.products.length)}`, 3)}<div class="line-panel"><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button onclick="state.countQty={};state.countDone=false;render()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
+    cat = state.filters.countCategory || "all",
+    list = countFilteredProducts(),
+    counted = list.filter((p) => countValue(p.id) !== null).length,
+    mismatches = countMismatchesForList(list);
+  return `<div class="space-y-4">${pageHead("Тооллого")}${metricsBar(`${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Бараа", list.length)}`, 3)}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
+    .map(
+      (c) =>
+        `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
+    )
+    .join(
+      "",
+    )}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
   const value = countValue(p.id),
@@ -2712,11 +2759,17 @@ function countMismatches() {
     })
     .filter((row) => row && row.diff !== 0);
 }
+function countMismatchesForList(list) {
+  const ids = new Set(list.map((p) => p.id));
+  return countMismatches().filter((row) => ids.has(row.product.id));
+}
 function countResult(mismatches) {
   return `<div class="bg-card rounded overflow-hidden"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p></div>${mismatches.length ? `<div class="divide-y divide-border">${mismatches.map(({ product, counted, diff }) => `<div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-[1fr_90px_90px_90px] gap-2 text-sm"><span class="font-medium">${product.name}</span><span>Бүртгэл: <b>${product.stock}</b></span><span>Тоолсон: <b>${counted}</b></span><span class="${diff === 0 ? "text-muted-foreground" : "text-tone-danger font-semibold"}">Зөрүү: ${diff > 0 ? `+${diff}` : diff}</span></div>`).join("")}</div>` : `<div class="p-4 text-sm text-tone-success font-medium">Зөрүүтэй бараа байхгүй</div>`}<div class="p-4 border-t border-border"><button type="button" onclick="confirmCountExcel()" class="w-full py-3 bg-secondary rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button></div></div>`;
 }
 function countExcelRows() {
+  const ids = new Set(countFilteredProducts().map((p) => p.id));
   return state.products
+    .filter((p) => ids.has(p.id))
     .map((p) => {
       const counted = countValue(p.id);
       if (counted === null) return null;
@@ -2742,6 +2795,7 @@ function exportCountExcel() {
   excel(`toollogo-${stamp}.csv`, [
     ["ТОМУДА — Тооллого"],
     [`Тайлан огноо: ${dte(new Date())}`],
+    [`Төрөл: ${countCategoryLabel()}`],
     [`Тоолсон бараа: ${rows.length}`],
     [`Зөрүүтэй бараа: ${mismatches.length}`],
     [],
@@ -2761,6 +2815,29 @@ function finishCount() {
   state.countDone = true;
   render();
   confirmCountExcel();
+}
+function resetCountSession() {
+  state.countQty = {};
+  state.countDone = false;
+  render();
+}
+function confirmNewCount() {
+  const hasData =
+    state.countDone ||
+    Object.keys(state.countQty).some((id) => countValue(id) !== null);
+  if (!hasData) {
+    resetCountSession();
+    return;
+  }
+  confirmModal(
+    "Шинэ тооллого",
+    "Та шинэ тооллого эхлүүлэх гэж байна уу? Одоогийн тооллогын өгөгдөл арилна.",
+    {
+      confirmLabel: "Тийм",
+      danger: true,
+      onConfirm: resetCountSession,
+    },
+  );
 }
 function setInventoryCategory(cat) {
   state.filters.inventoryCategory = cat;
@@ -3548,8 +3625,72 @@ function toggleEmployeePercentDiscount(id, allowed) {
   scheduleBackendSave();
   render();
 }
+function employeePlaceholderImage(e = {}) {
+  if (e?.image) return e.image;
+  const initial = deliveryInitial(e.name);
+  const hue =
+    [...String(e?.name || "A")].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 360;
+  const bg = `hsl(${hue} 48% 90%)`;
+  const accent = `hsl(${hue} 58% 40%)`;
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 88 88"><rect width="88" height="88" rx="14" fill="${bg}"/><text x="44" y="54" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" font-weight="800" fill="${accent}">${initial}</text></svg>`)}`;
+}
+function employeeAvatarHtml(e, className = "employee-card__avatar") {
+  if (e?.image) {
+    return `<img src="${esc(e.image)}" alt="" class="${className} employee-card__avatar-img">`;
+  }
+  return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(e?.name))}</span>`;
+}
+function employeeImageField(e = {}) {
+  const preview = e.image || employeePlaceholderImage(e);
+  return `<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload"><img id="employeeImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input type="file" accept="image/*" capture="user" onchange="handleEmployeeImage(this)" class="w-full text-sm"><input id="employeeImageValue" name="image" type="hidden" value="${esc(e.image || "")}"><p class="text-xs text-muted-foreground mt-2">Ажилтны зураг оруулна. JPG, PNG, WEBP.</p>${e.image ? `<button type="button" onclick="clearEmployeeImage()" class="btn btn--secondary btn--sm mt-2">Зураг арилгах</button>` : ""}</div></div></div>`;
+}
+function handleEmployeeImage(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    alert("Зураг 2MB-аас бага байна");
+    input.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const value = document.getElementById("employeeImageValue"),
+      preview = document.getElementById("employeeImagePreview");
+    if (value) value.value = reader.result;
+    if (preview) preview.src = reader.result;
+    const removeBtn = input
+      .closest(".customer-image-upload__body")
+      ?.querySelector('[onclick="clearEmployeeImage()"]');
+    if (!removeBtn) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn--secondary btn--sm mt-2";
+      btn.textContent = "Зураг арилгах";
+      btn.onclick = clearEmployeeImage;
+      input.closest(".customer-image-upload__body")?.appendChild(btn);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+function clearEmployeeImage() {
+  const upload = document
+      .getElementById("employeeImagePreview")
+      ?.closest(".customer-image-upload"),
+    value = document.getElementById("employeeImageValue"),
+    preview = document.getElementById("employeeImagePreview"),
+    fileInput = upload?.querySelector('input[type="file"]');
+  if (value) value.value = "";
+  if (fileInput) fileInput.value = "";
+  if (preview) {
+    const name = document.querySelector('[name="name"]')?.value || "Ажилтан";
+    preview.src = employeePlaceholderImage({ name });
+  }
+  upload
+    ?.querySelector('.customer-image-upload__body [onclick="clearEmployeeImage()"]')
+    ?.remove();
+}
 function employeesView() {
-  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row"><div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -4006,7 +4147,7 @@ function deliveryOptionId(empId) {
 function deliveryPickerOption(e, selected) {
   const active = selected === e.id,
     optId = deliveryOptionId(e.id);
-  return `<button type="button" role="option" id="${optId}" data-delivery-id="${esc(e.id)}" aria-selected="${active}" onclick="selectDeliveryEmployee(this.getAttribute('data-delivery-id'))" class="delivery-picker-option ${active ? "is-active" : ""}"><span class="delivery-picker-option__avatar" aria-hidden="true">${esc(deliveryInitial(e.name))}</span><span class="delivery-picker-option__main"><span class="delivery-picker-option__name">${esc(e.name)}</span><span class="delivery-picker-option__phone">${esc(e.phone || "Утасгүй")}</span></span><span class="delivery-picker-option__check" aria-hidden="true">${active ? "✓" : ""}</span></button>`;
+  return `<button type="button" role="option" id="${optId}" data-delivery-id="${esc(e.id)}" aria-selected="${active}" onclick="selectDeliveryEmployee(this.getAttribute('data-delivery-id'))" class="delivery-picker-option ${active ? "is-active" : ""}">${employeeAvatarHtml(e, "delivery-picker-option__avatar")}<span class="delivery-picker-option__main"><span class="delivery-picker-option__name">${esc(e.name)}</span><span class="delivery-picker-option__phone">${esc(e.phone || "Утасгүй")}</span></span><span class="delivery-picker-option__check" aria-hidden="true">${active ? "✓" : ""}</span></button>`;
 }
 function deliveryPickerRows(selected = "", q = "") {
   const query = String(q || "")
@@ -4623,7 +4764,7 @@ function productModal(id) {
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="product-thumb product-thumb--preview"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div>${field("minStock", "Доод үлдэгдэл", p.minStock ?? 0, "number")}<div class="grid grid-cols-2 gap-4">${field("boxQuantity", "Багц (ширхэг)", p.boxQuantity, "number")}${field("stock", "Тоо ширхэг", p.stock, "number")}</div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="product-thumb product-thumb--preview"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл нь зөвхөн <b>Агуулах → Орлого авах</b> цэснээс нэмэгдэнэ.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
 function handleProductImage(input) {
@@ -4808,15 +4949,19 @@ function saveProduct(e, id) {
     if (!state.extraCategories.includes(data.category))
       state.extraCategories.push(data.category);
   }
-  ["price", "stock", "minStock", "boxQuantity", "costPrice"].forEach(
-    (k) => (data[k] = Number(data[k] || 0)),
-  );
-  id
-    ? Object.assign(
-        state.products.find((p) => p.id === id),
-        data,
-      )
-    : state.products.push({ ...data, id: String(Date.now()) });
+  ["price", "costPrice"].forEach((k) => (data[k] = Number(data[k] || 0)));
+  if (id) {
+    const existing = state.products.find((p) => p.id === id);
+    if (existing) Object.assign(existing, data);
+  } else {
+    state.products.push({
+      ...data,
+      id: String(Date.now()),
+      stock: 0,
+      minStock: 0,
+      boxQuantity: 1,
+    });
+  }
   closeModal();
   render();
 }
@@ -4832,7 +4977,7 @@ function employeeModal() {
   if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3 modal-scroll overflow-y-auto">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
     "max-w-md",
   );
   setTimeout(syncEmployeePctField, 0);
@@ -5798,6 +5943,7 @@ function saveEmployee(e) {
     id: "employee-" + Date.now(),
     ...f,
     email: normalizeEmail(f.email),
+    image: f.image || "",
     totalSales: 0,
     commissionRate: 0,
     allowPercentDiscount: f.role === "sales" && f.allowPercentDiscount === "on",
@@ -5918,6 +6064,8 @@ Object.assign(window, {
   customerModal,
   handleCustomerImage,
   clearCustomerImage,
+  handleEmployeeImage,
+  clearEmployeeImage,
   onCustomerProvinceChange,
   onCustomerDistrictChange,
   initCustomerAddressFields,
@@ -5960,6 +6108,7 @@ Object.assign(window, {
   inventoryStockModal,
   applyStockFromModal,
   setInventoryCategory,
+  setCountCategory,
   setWorkerQty,
   setWorkerOrderActive,
   finishWorkerOrderEdit,
@@ -6045,6 +6194,7 @@ Object.assign(window, {
   setPaymentTerm,
   csv,
   finishCount,
+  confirmNewCount,
   confirmCountExcel,
   exportCountExcel,
   setCountQty,
