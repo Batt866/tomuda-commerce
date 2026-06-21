@@ -826,6 +826,9 @@ function mobileBottomNav(nav) {
     .join("")}</nav>`;
 }
 function currentPageTitle(nav) {
+  if (state.currentView === "worker" && state.filters.worker === "orders") {
+    return "Захиалгын жагсаалт";
+  }
   if (
     state.currentView === "worker" &&
     state.filters.worker === "new" &&
@@ -1111,6 +1114,14 @@ function canAppBack() {
   }
   return false;
 }
+function leaveWorkerOrdersTab() {
+  if (state.currentView !== "worker" || state.filters.worker !== "orders") {
+    return false;
+  }
+  state.filters.worker = "new";
+  render();
+  return true;
+}
 function handleAppBack() {
   if (!state.isLoggedIn) return false;
 
@@ -1137,6 +1148,8 @@ function handleAppBack() {
     render();
     return true;
   }
+
+  if (leaveWorkerOrdersTab()) return true;
 
   if (
     state.currentView === "worker" &&
@@ -1188,12 +1201,6 @@ function handleAppBack() {
   const defaultView = defaultViewForRole(currentRole());
   if (state.currentView !== defaultView) {
     go(defaultView, { silent: true });
-    return true;
-  }
-
-  if (state.currentView === "worker" && state.filters.worker === "orders") {
-    state.filters.worker = "new";
-    render();
     return true;
   }
 
@@ -1990,6 +1997,18 @@ async function saveBackendState() {
 function go(view, opts = {}) {
   if (!canAccessView(view)) return;
   const changed = state.currentView !== view;
+  if (
+    view === "worker" &&
+    state.currentView === "worker" &&
+    state.filters.worker === "orders"
+  ) {
+    state.filters.worker = "new";
+    state.mobileOpen = false;
+    saveAuthSession();
+    render();
+    if (!opts.silent && !suppressHistoryPush) pushAppHistory();
+    return;
+  }
   state.currentView = view;
   state.mobileOpen = false;
   if (changed && view !== "promotions") state.filters.promotionDetail = "";
@@ -3644,13 +3663,16 @@ function workerOrdersList() {
   if (day) list = list.filter((o) => orderDay(o) === day);
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
+function workerViewTabsHtml(tab) {
+  return `<div class="seg-tabs worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Захиалга үүсгэх</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Жагсаалт</button></div>`;
+}
 function workerView() {
   const tab = state.filters.worker,
     cart = workerCartSummary(),
     orders = workerOrdersList(),
     inActiveOrder =
       tab === "new" && state.workerStoreReady && !!state.workerCustomer;
-  return `<div class="worker-view space-y-3${inActiveOrder ? " worker-view--ordering" : ""}">${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
+  return `<div class="worker-view space-y-3${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
 }
 function openWorkerNewTab() {
   if (state.filters.worker === "new" && !state.workerStoreReady) return;
@@ -4189,16 +4211,6 @@ function setPaymentTerm(term) {
   state.isPaid = paidFromPaymentTerm(term);
   render();
 }
-function workerOrderPromoSummary(cart) {
-  const parts = [];
-  if (cart.pricePromoDiscount)
-    parts.push(`Нийт үнийн хөнгөлөлт −${fmt(cart.pricePromoDiscount)}`);
-  if (cart.paymentPromoDiscount)
-    parts.push(`Төлбөрийн урамшуулал −${fmt(cart.paymentPromoDiscount)}`);
-  if (cart.employeeDiscount) parts.push(`Хувь −${fmt(cart.employeeDiscount)}`);
-  if (!parts.length) return "";
-  return `<p class="worker-order-summary__discount text-sm text-tone-success mt-1">${parts.join(" · ")} · Төлөх <strong>${fmt(cart.total)}</strong></p>`;
-}
 function workerNewOrderStep(cart) {
   state.deliveryDate = todayIso();
   const customer = state.customers.find((c) => c.id === state.workerCustomer),
@@ -4209,15 +4221,11 @@ function workerNewOrderStep(cart) {
       : `<div class="worker-order-meta">${workerOrderAgentField()}</div>`,
     paidProducts = workerPaidProductsInCart(),
     hasItems = paidProducts.length > 0,
-    paidPieceQty = cart.paid.reduce((s, l) => s + l.quantity, 0),
     listHtml = hasItems
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
-      : "",
-    summaryHtml = hasItems
-      ? `<div class="worker-order-summary">${pickerSummaryHtml(cart.skuCount, paidPieceQty, cart.gross, true)}${workerOrderPromoSummary(cart)}</div>`
       : "";
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button>${agentMetaHtml}</div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div>${summaryHtml}</div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body"><div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button>${agentMetaHtml}</div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
@@ -5121,10 +5129,6 @@ function pickerProductsInView() {
       return (a.name || "").localeCompare(b.name || "", "mn");
     });
 }
-function pickerSummaryHtml(skuCount, qty, total, compact = false) {
-  const mod = compact ? " picker-summary--compact" : "";
-  return `<div class="picker-summary${mod}"><div class="picker-summary__item"><span class="picker-summary__label">Сонгосон</span><b class="picker-summary__value">${skuCount}</b></div><div class="picker-summary__item"><span class="picker-summary__label">Ширхэг</span><b class="picker-summary__value">${qty}</b></div><div class="picker-summary__item picker-summary__item--total"><span class="picker-summary__label">Нийт</span><b class="picker-summary__value">${fmt(total)}</b></div></div>`;
-}
 function pickerCategoryChipsHtml() {
   const active = state.filters.workerCategory || "",
     categories = cats();
@@ -5635,6 +5639,7 @@ function saveWorker() {
   state.applyPercentDiscount = false;
   state.filters.worker = "orders";
   render();
+  pushAppHistory();
 }
 function login(e) {
   e.preventDefault();

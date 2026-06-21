@@ -3225,33 +3225,6 @@ input::placeholder, textarea::placeholder {
   min-height: 0;
 }
 
-.worker-order-summary {
-  padding-top: 4px;
-}
-
-.picker-summary--compact {
-  gap: 6px;
-}
-
-.picker-summary--compact .picker-summary__item {
-  padding: 6px 4px;
-  border-radius: 0;
-}
-
-.picker-summary--compact .picker-summary__label {
-  font-size: 9px;
-  letter-spacing: 0.02em;
-}
-
-.picker-summary--compact .picker-summary__value {
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.picker-summary--compact .picker-summary__item--total .picker-summary__value {
-  font-size: 13px;
-}
-
 .worker-order-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
