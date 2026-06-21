@@ -1,6 +1,5 @@
-const CACHE = "tomuda-v12";
+const CACHE = "tomuda-v13";
 const PRECACHE = [
-  "/",
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
   "/static/tomuda/vendor/tailwindcdn.js",
@@ -8,15 +7,21 @@ const PRECACHE = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()),
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(PRECACHE))
+      .then(() => self.skipWaiting()),
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+      )
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -26,6 +31,13 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  if (request.mode === "navigate" || url.pathname === "/" || url.pathname === "/sw.js") {
+    event.respondWith(
+      fetch(request).catch(() => caches.match(request)),
+    );
+    return;
+  }
 
   if (url.pathname.includes("/static/tomuda/app.js")) {
     event.respondWith(
@@ -51,7 +63,7 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cached) => {
       const network = fetch(request)
         .then((res) => {
-          if (res.ok && (url.pathname.startsWith("/static/") || url.pathname === "/")) {
+          if (res.ok && url.pathname.startsWith("/static/")) {
             const copy = res.clone();
             caches.open(CACHE).then((cache) => cache.put(request, copy));
           }

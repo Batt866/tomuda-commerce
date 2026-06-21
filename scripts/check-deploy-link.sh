@@ -1,14 +1,25 @@
 #!/bin/bash
 # DEPLOY-LINK.txt доторх URL ажиллаж байгаа эсэхийг шалгах
-set -e
 cd "$(dirname "$0")/.."
 LINK_FILE="DEPLOY-LINK.txt"
 PORT=8011
-
 RENDER_URL="https://tomuda-commerce.onrender.com"
 
-url_from_file() {
-  grep -oE 'https://[a-z0-9-]+\.(trycloudflare\.com|onrender\.com)' "$LINK_FILE" 2>/dev/null | head -1
+wait_http_ok() {
+  local url="$1"
+  local tries="${2:-5}"
+  local i
+  for i in $(seq 1 "$tries"); do
+    if curl -sf --max-time 25 "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
+tunnel_url_from_file() {
+  grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LINK_FILE" 2>/dev/null | head -1
 }
 
 echo "=== ТОМУДА deploy шалгалт ==="
@@ -17,42 +28,37 @@ echo ""
 if curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
   echo "✓ Локал backend (127.0.0.1:$PORT) — OK"
 else
-  echo "✗ Локал backend — ажиллахгүй байна"
-  echo "  Засах: ./scripts/start-tomuda.sh"
+  echo "✗ Локал backend — ажиллахгүй"
+  echo "  Засах: ./scripts/mini-deploy.sh"
 fi
 
-if pgrep -f "cloudflared tunnel --url http://127.0.0.1:$PORT" >/dev/null 2>&1; then
+if pgrep -f "cloudflared tunnel.*http://127.0.0.1:$PORT" >/dev/null 2>&1; then
   echo "✓ cloudflared tunnel — ажиллаж байна"
 else
-  echo "✗ cloudflared tunnel — зогссон (хуучин HTTPS link ажиллахгүй)"
-  echo "  Засах: ./scripts/start-tomuda.sh"
+  echo "✗ cloudflared tunnel — зогссон"
+  echo "  Засах: ./scripts/mini-deploy.sh"
 fi
 
-URL="$(url_from_file)"
-if [ -z "$URL" ]; then
-  URL="$RENDER_URL"
-fi
-
-echo ""
-echo "Шалгаж байна: $URL"
-if curl -sf "$URL/api/health" >/dev/null 2>&1; then
-  echo "✓ Deploy link — OK"
-  curl -sS "$URL/api/health"
+TUNNEL_URL="$(tunnel_url_from_file)"
+if [ -n "$TUNNEL_URL" ]; then
   echo ""
-else
-  echo "✗ Deploy link — ажиллахгүй"
-  if [[ "$URL" == *trycloudflare.com* ]]; then
-    echo "  trycloudflare link хуучирсан. Засах: ./scripts/start-tomuda.sh"
-    echo "  Эсвэл тогтвортой link: $RENDER_URL"
+  echo "Mini deploy: $TUNNEL_URL"
+  if wait_http_ok "$TUNNEL_URL/api/health" 3; then
+    echo "✓ Mini deploy link — OK"
+    curl -sS "$TUNNEL_URL/api/health"
+    echo ""
   else
-    echo "  Render сервер сэргэж байж болно — 1–2 минут хүлээгээд дахин шалгана уу"
+    echo "✗ Mini deploy link — ажиллахгүй (tunnel хаагдсан эсвэл DNS хараахан бэлэн биш)"
+    echo "  Засах: ./scripts/mini-deploy.sh"
   fi
 fi
 
 echo ""
-echo "Render (APK / утас): $RENDER_URL"
-if curl -sf "$RENDER_URL/api/health" >/dev/null 2>&1; then
+echo "Render (24/7): $RENDER_URL"
+if wait_http_ok "$RENDER_URL/api/health" 6; then
   echo "✓ Render deploy — OK"
+  curl -sS "$RENDER_URL/api/health"
+  echo ""
 else
-  echo "✗ Render deploy — унтраалттай эсвэл сэргэж байна (Dashboard → Blueprint)"
+  echo "✗ Render deploy — унтраалттай эсвэл сэргэж байна (1-2 минут хүлээгээд дахин шалгана уу)"
 fi
