@@ -3754,17 +3754,26 @@ input::placeholder, textarea::placeholder {
 }
 
 .promo-search-input {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
+  width: 0;
 }
 
-.promo-qty-field--inline {
-  flex: 0 0 52px;
-  width: 52px;
+.promo-qty-field:not(.promo-qty-field--inline) {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+}
+
+.promo-qty-field.promo-qty-field--inline {
+  flex: 0 0 48px;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
 }
 
 .promo-qty-field--inline .promo-qty-input {
-  padding: 8px 4px;
+  padding: 8px 2px;
   font-size: 13px;
 }
 
@@ -3772,12 +3781,6 @@ input::placeholder, textarea::placeholder {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--hex-border);
-}
-
-.promo-qty-field {
-  display: block;
-  width: 100%;
-  max-width: 200px;
 }
 
 .promo-qty-input {
@@ -3886,11 +3889,12 @@ input::placeholder, textarea::placeholder {
 
 .picker-row {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: var(--picker-row-thumb) minmax(0, 1fr) auto;
+  gap: var(--picker-row-gap);
   align-items: center;
   width: 100%;
-  padding: 8px 0;
+  min-height: calc(var(--picker-row-thumb) + var(--picker-row-pad-y) * 2);
+  padding: var(--picker-row-pad-y) 0;
   margin: 0;
   border: none;
   border-bottom: 1px solid var(--hex-border);
@@ -3909,8 +3913,8 @@ input::placeholder, textarea::placeholder {
 }
 
 .picker-row__thumb-box {
-  width: 72px;
-  height: 72px;
+  width: var(--picker-row-thumb);
+  height: var(--picker-row-thumb);
   flex-shrink: 0;
   border-radius: var(--thumb-radius);
   overflow: hidden;
@@ -3925,7 +3929,7 @@ input::placeholder, textarea::placeholder {
   display: block;
   object-fit: cover;
   object-position: center;
-  transform: scale(1.14);
+  transform: scale(1.1);
   transform-origin: center;
 }
 
@@ -3935,7 +3939,7 @@ input::placeholder, textarea::placeholder {
 
 .picker-row__name {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--picker-row-name);
   font-weight: 700;
   line-height: 1.2;
   overflow: hidden;
@@ -3944,8 +3948,8 @@ input::placeholder, textarea::placeholder {
 }
 
 .picker-row__meta {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: var(--picker-row-meta-mt) 0 0;
+  font-size: var(--picker-row-meta);
   line-height: 1.3;
   color: var(--hex-muted-foreground);
   overflow: hidden;
@@ -3960,12 +3964,12 @@ input::placeholder, textarea::placeholder {
 
 .picker-row__qty {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--picker-row-qty);
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   color: var(--hex-primary);
-  padding-left: 6px;
+  padding-left: 4px;
 }
 
 .picker-qty-stepper--compact {
@@ -4074,8 +4078,8 @@ input::placeholder, textarea::placeholder {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 12px 10px;
+  gap: 8px;
+  padding: 10px 12px 8px;
   border-bottom: 1px solid var(--hex-border);
   background: var(--hex-card);
 }
@@ -4083,11 +4087,11 @@ input::placeholder, textarea::placeholder {
 .picker-cat-chips {
   display: flex;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: 7px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 2px 0 4px;
-  min-height: 40px;
+  padding: 2px 0 3px;
+  min-height: 36px;
   align-items: center;
   scrollbar-width: none;
 }
@@ -4098,15 +4102,15 @@ input::placeholder, textarea::placeholder {
 
 .picker-cat-chip {
   flex: 0 0 auto;
-  padding: 8px 14px;
+  padding: 7px 12px;
   border-radius: 999px;
   background: var(--hex-secondary);
   border: 1px solid var(--hex-border);
   color: var(--hex-foreground);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  min-height: 36px;
+  min-height: 34px;
   line-height: 1.2;
   cursor: pointer;
   transition:
@@ -4503,6 +4507,13 @@ input::placeholder, textarea::placeholder {
 }
 
 .picker-step2 {
+  --picker-row-thumb: 60px;
+  --picker-row-gap: 10px;
+  --picker-row-pad-y: 6px;
+  --picker-row-name: 14px;
+  --picker-row-meta: 12px;
+  --picker-row-meta-mt: 3px;
+  --picker-row-qty: 12px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -5169,13 +5180,30 @@ input::placeholder, textarea::placeholder {
     padding-bottom: 10px !important;
   }
 
+  .picker-step2 {
+    --picker-row-thumb: 58px;
+    --picker-row-gap: 8px;
+    --picker-row-pad-y: 5px;
+    --picker-row-name: 14px;
+    --picker-row-meta: 11px;
+    --picker-row-meta-mt: 2px;
+    --picker-row-qty: 12px;
+  }
+
   .picker-step2__toolbar {
-    padding: 10px 12px 8px;
-    gap: 8px;
+    padding: 8px 12px 6px;
+    gap: 6px;
   }
 
   .picker-cat-chips {
-    min-height: 38px;
+    min-height: 34px;
+    gap: 6px;
+  }
+
+  .picker-cat-chip {
+    padding: 6px 11px;
+    min-height: 32px;
+    font-size: 12px;
   }
 
   .picker-step2__scroll {
@@ -5320,15 +5348,10 @@ input::placeholder, textarea::placeholder {
     height: 32px !important;
   }
 
-  .picker-row {
-    grid-template-columns: 80px minmax(0, 1fr) auto;
-    gap: 10px;
-    padding: 8px 0;
-  }
-
-  .picker-row__thumb-box {
-    width: 80px;
-    height: 80px;
+  .picker-list {
+    gap: 0;
+    max-height: none;
+    overflow: visible;
   }
 
   .picker-qty-stepper--compact {
@@ -5376,12 +5399,6 @@ input::placeholder, textarea::placeholder {
   .picker-cat-btn--step1 {
     min-height: 48px;
     font-size: 13px;
-  }
-
-  .picker-list {
-    gap: 8px;
-    max-height: none;
-    overflow: visible;
   }
 
   .picker-search-tools {

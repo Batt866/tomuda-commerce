@@ -2860,6 +2860,19 @@ function promotionsView() {
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
 }
+function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
+  const qtyHtml = qtyOpts
+    ? promotionQtyField(
+        qtyOpts.name,
+        qtyOpts.label,
+        qtyOpts.defaultValue,
+        true,
+      )
+    : "";
+  return qtyHtml
+    ? `<div class="promo-input-row">${searchInputHtml}${qtyHtml}</div>`
+    : `<div class="mb-2">${searchInputHtml}</div>`;
+}
 function promotionProductPickerBlock(
   fieldName,
   title,
@@ -2893,18 +2906,8 @@ function promotionProductPickerBlock(
       : selected
         ? `<div class="promo-product-list">${promotionProductPickRow(selected, fieldName, selectedId)}</div>`
         : "",
-    qtyHtml = opts?.qty
-      ? promotionQtyField(
-          opts.qty.name,
-          opts.qty.label,
-          opts.qty.defaultValue,
-          true,
-        )
-      : "",
     searchInput = `<input data-promo-search="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
-    inputRow = opts?.qty
-      ? `<div class="promo-input-row">${searchInput}${qtyHtml}</div>`
-      : `<div class="mb-2">${searchInput}</div>`,
+    inputRow = promotionSearchQtyRow(searchInput, opts?.qty || null),
     badge = variant === "buy" ? "1" : variant === "free" ? "2" : "",
     head = badge
       ? `<div class="promo-section-head"><span class="promo-section-badge">${badge}</span><div><p class="promo-section-title">${title}</p>${hint ? `<p class="promo-section-hint">${hint}</p>` : ""}</div></div>`
@@ -2972,9 +2975,8 @@ function promotionMultiBuyPickerBlock(selectedIds, freeId) {
     hiddenInputs = ids
       .map((id) => `<input type="hidden" name="buyProductIds" value="${esc(id)}">`)
       .join(""),
-    searchInput = `<input data-promo-search="buyProductIds" value="${esc(rawQ)}" oninput="promoBuyProductSearch(this.value)" placeholder="Бараа хайж нэмэх..." class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
-    qtyHtml = promotionQtyField("buyQty", "Ширхэг", undefined, true);
-  return `<div class="promo-section promo-section--buy"><div class="promo-product-block">${hiddenInputs}<div class="promo-section-head"><span class="promo-section-badge">1</span><div><p class="promo-section-title">Авах бараа</p><p class="promo-section-hint">Олон бараа сонгож болно · нийт тоо шалгана</p></div></div><div class="promo-input-row">${searchInput}${qtyHtml}</div>${selectedHtml}${searchHtml}</div></div>`;
+    searchInput = `<input data-promo-search="buyProductIds" value="${esc(rawQ)}" oninput="promoBuyProductSearch(this.value)" placeholder="Бараа хайж нэмэх..." class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`;
+  return `<div class="promo-section promo-section--buy"><div class="promo-product-block">${hiddenInputs}<div class="promo-section-head"><span class="promo-section-badge">1</span><div><p class="promo-section-title">Авах бараа</p><p class="promo-section-hint">Олон бараа сонгож болно · нийт тоо шалгана</p></div></div>${promotionSearchQtyRow(searchInput, { name: "buyQty", label: "Ширхэг" })}${selectedHtml}${searchHtml}</div></div>`;
 }
 function promoBuyProductSearch(value) {
   state.searches.promo_buyProductIds = value;
