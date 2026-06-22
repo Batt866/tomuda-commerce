@@ -7469,25 +7469,16 @@ input::placeholder, textarea::placeholder {
 }
 
 .line-list__row--new {
-  background: #d9eef2;
-  animation: worker-order-row-arrive 2.2s ease forwards;
+  background: #e4f4f7;
 }
 
 .line-list__row--new:hover,
 .line-list__row--new:focus-visible {
-  background: #cfe9ee;
+  background: #d9eef2;
 }
 
-@keyframes worker-order-row-arrive {
-  0% {
-    background: #b8e3eb;
-  }
-  70% {
-    background: #e4f4f7;
-  }
-  100% {
-    background: transparent;
-  }
+.line-list__row--new:active:not(:disabled) {
+  background: #cfe9ee;
 }
 
 .line-list__row--static {
