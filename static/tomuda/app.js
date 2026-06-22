@@ -442,6 +442,53 @@ function orderPayableTotal(o) {
   const gross = orderGrossTotal(o);
   return gross - orderDiscountAmount(o);
 }
+function orderGrossFromItems(o) {
+  return (o.items || [])
+    .filter((i) => !i.isPromoFree)
+    .reduce((s, i) => s + (Number(i.total) || 0), 0);
+}
+function recalcOrderTotals(o) {
+  if (!o) return o;
+  const gross = orderGrossFromItems(o);
+  const pctRate = o.applyPercentDiscount
+    ? Number(o.percentDiscount ?? percentDiscountRate())
+    : 0;
+  const employeeDiscount =
+    pctRate > 0 ? Math.round((gross * pctRate) / 100) : 0;
+  const term = o.paymentTerm || "cash";
+  const priceRule = matchingPricePromotionRule(gross);
+  const paymentRule = matchingPaymentPromotionRule(gross, term);
+  const pricePromoDiscount = pricePromotionDiscountAmount(gross, priceRule);
+  const paymentPromoDiscount = paymentPromotionDiscountAmount(gross, paymentRule);
+  const discountAmount = Math.min(
+    gross,
+    employeeDiscount + pricePromoDiscount + paymentPromoDiscount,
+  );
+  o.grossTotal = gross;
+  o.discountAmount = discountAmount;
+  o.total = gross - discountAmount;
+  return o;
+}
+function orderAmount(o) {
+  if (!o) return 0;
+  const liveGross = orderGrossFromItems(o);
+  const cachedGross =
+    o.grossTotal != null ? Number(o.grossTotal) : null;
+  const stored = Number(o.total);
+  if (
+    Number.isFinite(stored) &&
+    (cachedGross == null || Math.abs(cachedGross - liveGross) < 0.01)
+  ) {
+    return stored;
+  }
+  recalcOrderTotals(o);
+  return Number(o.total) || 0;
+}
+function orderCreatedDay(o) {
+  const created = isoDay(o?.createdAt);
+  if (created) return created;
+  return orderDeliveryDay(o);
+}
 function settlementNoteText(o) {
   if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
   return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлэхээр тохиролцов`;
@@ -491,6 +538,20 @@ function normalizeOrderDeliveryDates() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
     if (!isoDay(o.deliveryDate)) o.deliveryDate = isoDay(o.createdAt) || todayIso();
+  }
+}
+function normalizeOrderTotals() {
+  if (!Array.isArray(state.orders)) return;
+  for (const o of state.orders) {
+    const liveGross = orderGrossFromItems(o);
+    const cachedGross =
+      o.grossTotal != null ? Number(o.grossTotal) : null;
+    if (
+      !Number.isFinite(Number(o.total)) ||
+      (cachedGross != null && Math.abs(cachedGross - liveGross) > 0.01)
+    ) {
+      recalcOrderTotals(o);
+    }
   }
 }
 function normalizeOrderReceiptNumbers() {
@@ -934,6 +995,7 @@ function applyPersistentState(data) {
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
+  normalizeOrderTotals();
   return true;
 }
 function localStateDirty() {
@@ -977,6 +1039,7 @@ function applyRemoteState(payload) {
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
+  normalizeOrderTotals();
   backendLastSaved = JSON.stringify({ state: persistentState() });
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   render();
@@ -1053,6 +1116,7 @@ async function boot() {
     normalizeOrderReceiptNumbers();
     normalizeOrderPayments();
     normalizeOrderDeliveryDates();
+    normalizeOrderTotals();
     state.workerQty = {};
     restoreAuthSession();
     initNoZoom();
@@ -2558,10 +2622,10 @@ function confirmInventoryExport() {
 function confirmReportExport() {
   confirmDataExport("Excel татах", () => {
     const orders = reportOrdersFiltered(),
-      total = orders.reduce((s, o) => s + o.total, 0),
+      total = orders.reduce((s, o) => s + orderAmount(o), 0),
       paid = orders
         .filter((o) => orderIsPaid(o))
-        .reduce((s, o) => s + o.total, 0);
+        .reduce((s, o) => s + orderAmount(o), 0);
     csv("report.csv", [[total, paid]]);
   });
 }
@@ -2900,13 +2964,13 @@ function setInventoryCategory(cat) {
 function reportOrdersFiltered() {
   const day = state.filters.reportDate || todayIso();
   return state.orders.filter(
-    (o) => o.status !== "cancelled" && orderDay(o) === day,
+    (o) => o.status !== "cancelled" && orderCreatedDay(o) === day,
   );
 }
 function reportDateFiltersHtml() {
   const day = state.filters.reportDate || todayIso(),
     today = todayIso();
-  return `<div class="line-panel__toolbar report-date-filters"><button type="button" onclick="setReportDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setReportDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо сонгох"><span class="report-date-filters__hint">Хүргэлт: ${dte(day)}</span></div>`;
+  return `<div class="line-panel__toolbar report-date-filters"><button type="button" onclick="setReportDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setReportDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо сонгох"><span class="report-date-filters__hint">Захиалга: ${dte(day)}</span></div>`;
 }
 function setReportDate(day) {
   state.filters.reportDate = day || todayIso();
@@ -2915,16 +2979,16 @@ function setReportDate(day) {
 function reportsView() {
   if (!state.filters.reportDate) state.filters.reportDate = todayIso();
   const orders = reportOrdersFiltered(),
-    total = orders.reduce((s, o) => s + o.total, 0),
+    total = orders.reduce((s, o) => s + orderAmount(o), 0),
     paid = orders
       .filter((o) => orderIsPaid(o))
-      .reduce((s, o) => s + o.total, 0),
-    stock = state.products.reduce((s, p) => s + p.stock * p.costPrice, 0);
+      .reduce((s, o) => s + orderAmount(o), 0),
+    unpaid = total - paid;
   const sales = state.employees
     .filter((e) => e.role === "sales")
     .map((e) => {
       const empOrders = orders.filter((o) => o.employeeId === e.id);
-      const sum = empOrders.reduce((s, o) => s + o.total, 0);
+      const sum = empOrders.reduce((s, o) => s + orderAmount(o), 0);
       return {
         ...e,
         count: empOrders.length,
@@ -2932,10 +2996,11 @@ function reportsView() {
         commission: (sum * e.commissionRate) / 100,
       };
     });
-  return `<div class="space-y-4">${pageHead("Тайлан", `<button onclick="confirmReportExport()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`)}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(total - paid), "text-tone-danger")}${card("Үлдэгдэл", fmt(stock))}`, 4)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр</div><div class="line-list">${orders.length ? orders.map(paymentRow).join("") : `<div class="line-panel__empty">Захиалга байхгүй</div>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Тайлан", `<button onclick="confirmReportExport()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`)}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр</div><div class="line-list">${orders.length ? orders.map(paymentRow).join("") : `<div class="line-panel__empty">Захиалга байхгүй</div>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
   const paid = orderIsPaid(o),
+    amount = orderAmount(o),
     term =
       o.paymentTerm === "credit"
         ? "Төлөөгүй"
@@ -2945,14 +3010,14 @@ function paymentRow(o) {
     actions = paid
       ? ""
       : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Тооцоо дууссан</button>`;
-  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(o.total)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Төлсөн" : "Төлөөгүй"}</span><div class="payment-row__actions">${actions}</div></div>`;
+  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Төлсөн" : "Төлөөгүй"}</span><div class="payment-row__actions">${actions}</div></div>`;
 }
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || orderIsPaid(o)) return;
   confirmModal(
     "Тооцоо баталгаажуулах",
-    `<b>${esc(o.customerName)}</b> захиалгыг (<b>${fmt(o.total)}</b>) тооцоо дууссан болгох уу?`,
+    `<b>${esc(o.customerName)}</b> захиалгыг (<b>${fmt(orderAmount(o))}</b>) тооцоо дууссан болгох уу?`,
     {
       confirmLabel: "Тооцоо дууссан",
       onConfirm: () => setPaid(id, true),
@@ -3534,7 +3599,6 @@ function applyQuantityPromotions(lines) {
         isPromoFree: true,
       });
     }
-    qtyByProduct[freeId] = (qtyByProduct[freeId] || 0) + grant;
   });
   return result;
 }
@@ -3560,7 +3624,10 @@ function workerCartSummary() {
       state.applyPercentDiscount && canApplyPercentDiscount()
         ? Math.round((gross * percentDiscountRate()) / 100)
         : 0,
-    discount = employeeDiscount + pricePromoDiscount + paymentPromoDiscount;
+    discount = Math.min(
+      gross,
+      employeeDiscount + pricePromoDiscount + paymentPromoDiscount,
+    );
   return {
     paid,
     all,
@@ -3847,7 +3914,7 @@ function loginView() {
   return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Борлуулалт, агуулах удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
 }
 function workerOrdersList() {
-  let list = [...state.orders];
+  let list = state.orders.filter((o) => o.status !== "cancelled");
   if (state.currentEmployee?.role === "sales") {
     list = list.filter((o) => o.employeeId === state.currentEmployee.id);
   }
@@ -3855,7 +3922,7 @@ function workerOrdersList() {
   if (pay === "paid") list = list.filter((o) => orderIsPaid(o));
   if (pay === "unpaid") list = list.filter((o) => !orderIsPaid(o));
   const day = state.filters.workerDate;
-  if (day) list = list.filter((o) => orderDay(o) === day);
+  if (day) list = list.filter((o) => orderCreatedDay(o) === day);
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 function workerViewTabsHtml(tab) {
@@ -4427,15 +4494,15 @@ function workerSelectedRow(p) {
   return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(p.name)}</p><p class="worker-row-meta text-xs text-muted-foreground">${esc(p.category)} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div>${workerOrderQtyHtml(p, p.qty)}</div>`;
 }
 function workerOrders(orders) {
-  const total = orders.reduce((s, o) => s + o.total, 0),
+  const total = orders.reduce((s, o) => s + orderAmount(o), 0),
     paid = orders
       .filter((o) => orderIsPaid(o))
-      .reduce((s, o) => s + o.total, 0),
+      .reduce((s, o) => s + orderAmount(o), 0),
     unpaid = total - paid,
     day = state.filters.workerDate || "",
     pay = state.filters.workerPay,
     today = todayIso();
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-day="${orderDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(o.total)}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${orderIsPaid(o) ? "text-tone-success" : "text-tone-danger"}">${orderIsPaid(o) ? "Төлсөн" : "Төлөөгүй"}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${orderIsPaid(o) ? "text-tone-success" : "text-tone-danger"}">${orderIsPaid(o) ? "Төлсөн" : "Төлөөгүй"}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   orderReceiptModal(id);
@@ -5075,6 +5142,7 @@ function saveOrder(e) {
       employeeName: emp.name || "",
       employeePhone: emp.phone || "",
       ...orderEmailFields(emp),
+      paymentTerm: "credit",
       isPaid: false,
       ...deliveryFieldsForNewOrder(),
     }),
@@ -5087,6 +5155,8 @@ function clearReceiptEdit() {
   state.receiptEditOrderId = "";
   state.receiptEditItems = null;
   state.receiptEditOriginalItems = null;
+  receiptEditQtyConfirmOpen = false;
+  receiptEditQtyTimers.clear();
 }
 function receiptEditHasChanges() {
   const orig = state.receiptEditOriginalItems;
@@ -5105,12 +5175,8 @@ function receiptEditHasChanges() {
 function receiptEditDraftOrder() {
   const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
   if (!o || !state.receiptEditItems) return o;
-  return {
-    ...o,
-    items: state.receiptEditItems,
-    grossTotal: null,
-    discountAmount: null,
-  };
+  const draft = { ...o, items: state.receiptEditItems };
+  return recalcOrderTotals(draft);
 }
 function orderReceiptEditRows() {
   return (state.receiptEditItems || [])
@@ -5118,7 +5184,7 @@ function orderReceiptEditRows() {
       if (i.isPromoFree) {
         return `<tr class="receipt-edit-row receipt-edit-row--promo"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum">0</td></tr>`;
       }
-      return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" oninput="receiptEditQtyDraft(this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(i.total)}</td></tr>`;
+      return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" onfocus="receiptEditQtyFocus(this)" oninput="receiptEditQtyDraft(this)" onkeydown="receiptEditQtyKeydown(event, this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(i.total)}</td></tr>`;
     })
     .join("");
 }
@@ -5132,11 +5198,37 @@ function refreshReceiptEditTotals() {
   const totalEl = document.getElementById("receipt-edit-total");
   if (totalEl) totalEl.textContent = fmt(orderPayableTotal(draft));
 }
+let receiptEditQtyConfirmOpen = false;
+const receiptEditQtyTimers = new Map();
+function receiptEditQtyFocus(el) {
+  const idx = el.getAttribute("data-receipt-qty");
+  if (idx != null) receiptEditQtyTimers.delete(String(idx));
+}
+function receiptEditQtyKeydown(e, el) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const idx = el.getAttribute("data-receipt-qty");
+    if (idx != null) receiptEditQtyTimers.delete(String(idx));
+    receiptEditQtyCommit(el);
+  }
+}
 function receiptEditQtyDraft(el) {
   const digits = String(el.value || "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
+  const idx = el.getAttribute("data-receipt-qty");
+  if (idx == null) return;
+  const key = String(idx);
+  clearTimeout(receiptEditQtyTimers.get(key));
+  receiptEditQtyTimers.set(
+    key,
+    setTimeout(() => {
+      receiptEditQtyTimers.delete(key);
+      receiptEditQtyCommit(el);
+    }, 400),
+  );
 }
 function receiptEditQtyCommit(el) {
+  if (receiptEditQtyConfirmOpen) return;
   const idx = Number(el.getAttribute("data-receipt-qty"));
   const item = state.receiptEditItems?.[idx];
   if (!item || item.isPromoFree) return;
@@ -5149,32 +5241,52 @@ function receiptEditQtyCommit(el) {
   const name = esc(item.productName);
   const oldTotal = oldQ * (item.price || 0);
   const newTotal = q * (item.price || 0);
+  receiptEditQtyConfirmOpen = true;
   confirmModal(
     "Тоо өөрчлөх",
     `<p><b>${name}</b></p><p class="text-sm text-muted-foreground mt-2">Тоо: <b>${oldQ}</b> → <b>${q}</b> ш</p><p class="text-sm text-muted-foreground">Мөрний дүн: ${fmt(oldTotal)} → <b>${fmt(newTotal)}</b></p>`,
     {
       confirmLabel: "Тийм",
       onConfirm: () => {
+        receiptEditQtyConfirmOpen = false;
         item.quantity = q;
         item.total = newTotal;
         el.value = String(q);
         refreshReceiptEditTotals();
       },
       onCancel: () => {
+        receiptEditQtyConfirmOpen = false;
         el.value = String(oldQ);
       },
     },
   );
 }
+function adjustReceiptEditStock(beforeItems, afterItems) {
+  const qtyByProduct = (items) => {
+    const map = {};
+    (items || []).forEach((i) => {
+      if (!i?.productId) return;
+      map[i.productId] =
+        (map[i.productId] || 0) + (Number(i.quantity) || 0);
+    });
+    return map;
+  };
+  const before = qtyByProduct(beforeItems);
+  const after = qtyByProduct(afterItems);
+  const ids = new Set([...Object.keys(before), ...Object.keys(after)]);
+  ids.forEach((id) => {
+    const delta = (after[id] || 0) - (before[id] || 0);
+    if (delta > 0) stock(id, delta, "out");
+    else if (delta < 0) stock(id, -delta, "in");
+  });
+}
 function applyReceiptEditToOrder() {
   const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
   if (!o || !state.receiptEditItems) return false;
+  const orig = state.receiptEditOriginalItems || o.items;
+  adjustReceiptEditStock(orig, state.receiptEditItems);
   o.items = state.receiptEditItems.map((i) => ({ ...i }));
-  const gross = orderGrossTotal(o);
-  const discount = orderDiscountAmount(o);
-  o.grossTotal = gross;
-  o.discountAmount = discount;
-  o.total = gross - discount;
+  recalcOrderTotals(o);
   scheduleBackendSave();
   return true;
 }
@@ -5758,7 +5870,7 @@ function employeeExcel() {
       ),
     ),
     totalQty = rows.reduce((sum, row) => sum + row.quantity, 0),
-    totalAmount = rows.reduce((sum, row) => sum + row.total, 0),
+    totalAmount = orders.reduce((sum, o) => sum + orderAmount(o), 0),
     reportDate = dte(new Date()),
     stamp = new Date().toISOString().slice(0, 10),
     sheetRows = [
@@ -5809,10 +5921,12 @@ function saveWorker() {
       state.applyPercentDiscount && canApplyPercentDiscount()
         ? percentDiscountRate()
         : 0,
-    discountAmount =
+    discountAmount = Math.min(
+      grossTotal,
       Math.round((grossTotal * percentDiscount) / 100) +
-      pricePromoDiscount +
-      paymentPromoDiscount,
+        pricePromoDiscount +
+        paymentPromoDiscount,
+    ),
     total = grossTotal - discountAmount;
   state.orders.push(
     buildNewOrder({
@@ -5885,6 +5999,7 @@ function login(e) {
 }
 function closeConfirmCard() {
   pendingConfirm = null;
+  receiptEditQtyConfirmOpen = false;
   const overlay = document.getElementById("confirm-card-overlay");
   if (overlay) overlay.hidden = true;
 }
@@ -5903,7 +6018,10 @@ function initConfirmCard() {
     fn?.();
   });
   overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeConfirmCard();
+    if (e.target !== overlay) return;
+    const fn = pendingConfirm?.onCancel;
+    closeConfirmCard();
+    fn?.();
   });
 }
 function initConfirmDeleteActions() {
@@ -6095,7 +6213,14 @@ function delProduct(id) {
 }
 function setOrder(id, s) {
   if (s === "cancelled" && !canDelete()) return;
-  state.orders.find((o) => o.id === id).status = s;
+  const o = state.orders.find((x) => x.id === id);
+  if (!o) return;
+  if (s === "cancelled" && o.status !== "cancelled") {
+    (o.items || []).forEach((i) => {
+      if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
+    });
+  }
+  o.status = s;
   render();
 }
 function setPaid(id, isPaid) {
@@ -6170,6 +6295,8 @@ Object.assign(window, {
   saveOrder,
   orderDetail,
   orderReceiptModal,
+  receiptEditQtyFocus,
+  receiptEditQtyKeydown,
   receiptEditQtyDraft,
   receiptEditQtyCommit,
   receiptDetail,
