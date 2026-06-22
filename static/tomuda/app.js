@@ -3407,6 +3407,32 @@ function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
     ? `<div class="promo-input-row">${searchInputHtml}${qtyHtml}</div>`
     : `<div class="mb-2">${searchInputHtml}</div>`;
 }
+function promoFormDraftVal(name, fallback = "") {
+  const v = state.promoFormDraft?.[name];
+  return v !== undefined && v !== null ? String(v) : String(fallback ?? "");
+}
+function capturePromoFormDraft() {
+  const form = document.querySelector("[data-promo-modal]");
+  if (!form) return;
+  state.promoFormDraft = state.promoFormDraft || {};
+  form.querySelectorAll("input[name]").forEach((el) => {
+    if (el.type === "hidden" || el.type === "checkbox") return;
+    state.promoFormDraft[el.name] = el.value;
+  });
+}
+function promoFormDraftField(el) {
+  state.promoFormDraft = state.promoFormDraft || {};
+  let v = el.value;
+  if (el.dataset.promoDigits === "1" || el.type === "tel") {
+    v = v.replace(/\D/g, "");
+    if (el.value !== v) el.value = v;
+  }
+  state.promoFormDraft[el.name] = v;
+}
+function promoAmountInputHtml(name, { required = false, placeholder = "", value = "" } = {}) {
+  const req = required ? " required" : "";
+  return `<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1"${req} placeholder="${esc(placeholder)}" value="${esc(String(value ?? ""))}" oninput="promoFormDraftField(this)" class="w-full px-3 py-3 bg-secondary rounded app-input">`;
+}
 function promotionProductPickerBlock(
   fieldName,
   title,
@@ -3455,10 +3481,13 @@ function promoSectionArrow() {
   return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">үнэгүй өгнө</span></div>`;
 }
 function promotionQtyField(name, label, defaultValue, inline = false) {
+  const draftVal = promoFormDraftVal(name, defaultValue ?? "");
   const val =
-    defaultValue !== undefined && defaultValue !== ""
-      ? ` value="${defaultValue}"`
-      : "";
+    draftVal !== ""
+      ? ` value="${esc(draftVal)}"`
+      : defaultValue !== undefined && defaultValue !== ""
+        ? ` value="${esc(String(defaultValue))}"`
+        : "";
   const cls = inline
     ? "promo-qty-field promo-qty-field--inline"
     : "promo-qty-field";
@@ -3468,7 +3497,7 @@ function promotionQtyField(name, label, defaultValue, inline = false) {
     ? ""
     : `<span class="block text-xs text-muted-foreground mb-1">${label}</span>`;
   const aria = inline ? ` aria-label="${label}"` : "";
-  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="number" min="1" required${val} placeholder="1"${aria} class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
+  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1" required${val} placeholder="1"${aria} oninput="promoFormDraftField(this)" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
 }
 function promotionProductPickRow(p, fieldName, selectedId) {
   const active = selectedId === p.id;
@@ -3664,6 +3693,7 @@ function promoProductSearch(fieldName, value) {
   promoPickSearch(fieldName, value);
 }
 function refreshPromoModal() {
+  capturePromoFormDraft();
   if (state.promoModalKind === "price") promotionPriceModal();
   else if (state.promoModalKind === "payment") promotionPaymentModal();
   else promotionQtyModal();
@@ -3769,6 +3799,7 @@ function promotionPriceRuleCard(r, i) {
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
   state.promoPick = { buyProductIds: [], freeProductIds: [] };
+  state.promoFormDraft = {};
   state.searches.promo_buyProductIds = "";
   state.searches.promo_freeProductIds = "";
   promotionQtyModal();
@@ -3802,10 +3833,12 @@ function openPromotionPriceModal() {
   state.promoModalKind = "price";
   state.promoPriceRuleType = "free";
   state.promoPick = { priceFreeProductIds: [] };
+  state.promoFormDraft = {};
   state.searches.promo_priceFreeProductIds = "";
   promotionPriceModal();
 }
 function setPromotionPriceRuleType(type) {
+  capturePromoFormDraft();
   state.promoPriceRuleType = type === "percent" ? "percent" : "free";
   promotionPriceModal();
 }
@@ -3821,7 +3854,7 @@ function promotionPriceModal() {
   const type = state.promoPriceRuleType === "percent" ? "percent" : "free",
     freeIds = state.promoPick.priceFreeProductIds || [],
     typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувийн хөнгөлөлт</button></div>`,
-    amountFields = `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span><input name="minAmount" type="number" min="0" step="1" required placeholder="200000" class="w-full px-3 py-3 bg-secondary rounded app-input"></label><label class="block"><span class="block text-sm font-medium mb-2">Дээд дүн (₮)</span><input name="maxAmount" type="number" min="0" step="1" placeholder="400000" class="w-full px-3 py-3 bg-secondary rounded app-input"><span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label></div>`,
+    amountFields = `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { required: true, placeholder: "200000", value: promoFormDraftVal("minAmount") })}</label><label class="block"><span class="block text-sm font-medium mb-2">Дээд дүн (₮)</span>${promoAmountInputHtml("maxAmount", { placeholder: "400000", value: promoFormDraftVal("maxAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label></div>`,
     freeBlock =
       type === "free"
         ? promotionMultiFreePickerBlock({
@@ -3836,7 +3869,7 @@ function promotionPriceModal() {
         : "",
     percentBlock =
       type === "percent"
-        ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span><input name="discountPercent" type="number" min="1" max="100" required placeholder="5" class="w-full px-3 py-3 bg-secondary rounded app-input"></label>`
+        ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
         : "";
   box(
     "Нийт үнийн дүнгээс хөнгөлөлт олгох",
@@ -3849,14 +3882,17 @@ function openPromotionPaymentModal() {
   state.promoPaymentRuleType = "free";
   state.promoPaymentTerm = "cash";
   state.promoPick = { paymentFreeProductIds: [] };
+  state.promoFormDraft = {};
   state.searches.promo_paymentFreeProductIds = "";
   promotionPaymentModal();
 }
 function setPromotionPaymentRuleType(type) {
+  capturePromoFormDraft();
   state.promoPaymentRuleType = type === "percent" ? "percent" : "free";
   promotionPaymentModal();
 }
 function setPromotionPaymentTerm(term) {
+  capturePromoFormDraft();
   state.promoPaymentTerm = term === "credit" ? "credit" : "cash";
   promotionPaymentModal();
 }
@@ -3874,7 +3910,7 @@ function promotionPaymentModal() {
     freeIds = state.promoPick.paymentFreeProductIds || [],
     termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлнээр</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Дансаар</button></div>`,
     typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувийн хөнгөлөлт</button></div>`,
-    minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span><input name="minAmount" type="number" min="0" step="1" placeholder="0" class="w-full px-3 py-3 bg-secondary rounded app-input"><span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
+    minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { placeholder: "0", value: promoFormDraftVal("minAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
     freeBlock =
       type === "free"
         ? promotionMultiFreePickerBlock({
@@ -3889,7 +3925,7 @@ function promotionPaymentModal() {
         : "",
     percentBlock =
       type === "percent"
-        ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span><input name="discountPercent" type="number" min="1" max="100" required placeholder="5" class="w-full px-3 py-3 bg-secondary rounded app-input"></label>`
+        ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
         : "";
   box(
     "Төлбөрийн урамшуулал",
@@ -3914,6 +3950,7 @@ function savePromotionQty(e) {
     freeQty: Number(f.get("freeQty")) || 1,
   });
   state.promoPick = null;
+  state.promoFormDraft = null;
   state.promoModalKind = "";
   state.searches.promo_buyProductIds = "";
   state.searches.promo_freeProductIds = "";
@@ -4138,6 +4175,7 @@ function savePromotionPrice(e) {
   }
   state.promotionRules.price.push(rule);
   state.promoPick = null;
+  state.promoFormDraft = null;
   state.promoModalKind = "";
   state.searches.promo_priceFreeProductIds = "";
   closeModal();
@@ -4172,6 +4210,7 @@ function savePromotionPayment(e) {
     state.promotionRules.payment = [];
   state.promotionRules.payment.push(rule);
   state.promoPick = null;
+  state.promoFormDraft = null;
   state.promoModalKind = "";
   state.searches.promo_paymentFreeProductIds = "";
   closeModal();
@@ -5047,6 +5086,7 @@ function closeModal() {
   state.pickerQtyProductId = "";
   destroyCustomerMap();
   state.promoPick = null;
+  state.promoFormDraft = null;
   state.customerFormDraft = null;
   state.searches.deliveryPick = "";
   const deliveryTrigger = document.getElementById("warehouse-delivery-trigger");
@@ -6846,6 +6886,7 @@ Object.assign(window, {
   promoProductSearch,
   selectPromoProduct,
   promoPickSearch,
+  promoFormDraftField,
   addPromoPickProduct,
   removePromoPickProduct,
   promoBuyProductSearch,
