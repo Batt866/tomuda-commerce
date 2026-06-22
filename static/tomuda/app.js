@@ -319,6 +319,16 @@ function canApplyPercentDiscount(emp = state.currentEmployee) {
   if (emp.allowPercentDiscount == null) return percentDiscountRate() > 0;
   return !!emp.allowPercentDiscount && percentDiscountRate() > 0;
 }
+function isCashPayment(term = state.paymentTerm) {
+  return (term || "cash") === "cash";
+}
+function workerPercentDiscountActive(term = state.paymentTerm) {
+  return (
+    !!state.applyPercentDiscount &&
+    canApplyPercentDiscount() &&
+    isCashPayment(term)
+  );
+}
 function ensureEmployeePercentDiscount() {
   state.employees.forEach((e) => {
     if (e.role === "sales" && e.allowPercentDiscount == null)
@@ -434,7 +444,7 @@ function orderGrossTotal(o) {
 function orderDiscountAmount(o) {
   if (o.discountAmount != null) return Number(o.discountAmount);
   const gross = orderGrossTotal(o);
-  const pct = o.applyPercentDiscount
+  const pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
     ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
     : 0;
   return Math.round((gross * pct) / 100);
@@ -451,9 +461,10 @@ function orderGrossFromItems(o) {
 function recalcOrderTotals(o) {
   if (!o) return o;
   const gross = orderGrossFromItems(o);
-  const pctRate = o.applyPercentDiscount
-    ? Number(o.percentDiscount ?? percentDiscountRate())
-    : 0;
+  const pctRate =
+    o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+      ? Number(o.percentDiscount ?? percentDiscountRate())
+      : 0;
   const employeeDiscount =
     pctRate > 0 ? Math.round((gross * pctRate) / 100) : 0;
   const term = o.paymentTerm || "cash";
@@ -791,8 +802,8 @@ const card = (l, v, t = "", opts = null) => {
     notifyActive = notify && !!opts.active;
   return `<div class="metrics-bar__item${notify ? " metrics-bar__item--notify" : ""}">${notify ? metricsNotifyIcon(notifyActive) : ""}<span class="metrics-bar__label">${l}</span><b class="metrics-bar__value ${t}">${v}</b></div>`;
 };
-const metricsBar = (items, cols = "") =>
-  `<div class="metrics-bar${cols ? ` metrics-bar--${cols}` : ""}">${items}</div>`;
+const metricsBar = (items, cols = "", modifier = "") =>
+  `<div class="metrics-bar${cols ? ` metrics-bar--${cols}` : ""}${modifier ? ` metrics-bar--${modifier}` : ""}">${items}</div>`;
 const pageHead = (title, action = "") =>
   action
     ? `<div class="page-head page-head--row"><h2 class="page-head__title">${title}</h2><div class="page-head__actions">${action}</div></div>`
@@ -2334,7 +2345,7 @@ function buildOrderReceiptExcelRows(o) {
     payable = orderPayableTotal(o),
     sub = Math.round(payable / 1.1),
     vat = Math.round(payable - sub),
-    pct = o.applyPercentDiscount
+    pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
       ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
       : 0,
     paid = o.paymentTerm === "cash" || o.isPaid,
@@ -2487,7 +2498,7 @@ function warehouseOrderDetail(o) {
     gross = orderGrossTotal(o),
     discount = orderDiscountAmount(o),
     payable = orderPayableTotal(o),
-    pct = o.applyPercentDiscount
+    pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
       ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
       : 0,
     paid = o.paymentTerm === "cash" || o.isPaid,
@@ -2885,7 +2896,7 @@ function countView() {
     list = countFilteredProducts(),
     counted = list.filter((p) => countValue(p.id) !== null).length,
     mismatches = countMismatchesForList(list);
-  return `<div class="space-y-4">${pageHead("Тооллого")}${metricsBar(`${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "text-tone-success")}${card("Бараа", list.length)}`, 3)}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
+  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${metricsBar(`${card("Тоолсон", counted)}${card("Зөрүү", mismatches.length, mismatches.length ? "text-tone-danger" : "")}${card("Бараа", list.length)}`, "3", "count")}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
     .map(
       (c) =>
         `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
@@ -4151,8 +4162,7 @@ function workerCartSummary() {
     paymentPromoDiscount = paymentPromotionDiscountAmount(gross, paymentRule),
     all = workerOrderLines(),
     promo = all.filter((l) => l.isPromoFree),
-    employeeDiscount =
-      state.applyPercentDiscount && canApplyPercentDiscount()
+    employeeDiscount = workerPercentDiscountActive()
         ? Math.round((gross * percentDiscountRate()) / 100)
         : 0,
     discount = Math.min(
@@ -4484,13 +4494,9 @@ function clearWorkerOrderHighlight() {
   state.workerHighlightOrderId = "";
 }
 function openWorkerNewTab() {
-  if (state.filters.worker === "new" && !state.workerStoreReady) return;
-  if (state.filters.worker === "orders") clearWorkerOrderHighlight();
+  if (state.filters.worker === "new") return;
+  clearWorkerOrderHighlight();
   state.filters.worker = "new";
-  state.workerStoreReady = false;
-  state.workerCustomer = "";
-  state.searches.workerStore = "";
-  resetWorkerCart();
   render();
   pushAppHistory();
 }
@@ -5008,21 +5014,22 @@ function workerOrderOptionsHtml(cart) {
     sd = state.settlementDay || String(new Date().getDate()),
     pct = percentDiscountRate(),
     pctAllowed = canApplyPercentDiscount(),
+    cashOnly = isCashPayment(),
     settlementBody = state.settlementAgreed
       ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Сар</span><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select></label><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Өдөр</span><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></label></div></div>`
       : "",
-    pctBody =
-      state.applyPercentDiscount && pctAllowed
+    pctBody = workerPercentDiscountActive()
         ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
         : "",
     pctRow = pctAllowed
-      ? `<div class="worker-order-opt${state.applyPercentDiscount ? " is-open" : ""}" aria-expanded="${state.applyPercentDiscount ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.applyPercentDiscount ? "checked" : ""} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
+      ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
   return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
   state.isPaid = paidFromPaymentTerm(term);
+  if (term === "credit") state.applyPercentDiscount = false;
   render();
 }
 function workerNewOrderStep(cart) {
@@ -5992,7 +5999,7 @@ function receipt(o) {
     deliveryDay = orderDeliveryDay(o),
     settlement = settlementNoteText(o),
     promoItems = (o.items || []).filter((i) => i.isPromoFree),
-    pct = o.applyPercentDiscount
+    pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
       ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
       : 0,
     grandLabel = pct
@@ -6508,7 +6515,7 @@ function saveWorker() {
     e = orderActor(),
     items = workerOrderLines();
   if (!workerPaidLines().length) return alert("Бараа сонгоно уу");
-  if (state.applyPercentDiscount && !canApplyPercentDiscount())
+  if (state.applyPercentDiscount && !workerPercentDiscountActive())
     state.applyPercentDiscount = false;
   const grossTotal = workerPaidLines().reduce((s, l) => s + l.total, 0),
     priceRule = matchingPricePromotionRule(grossTotal),
@@ -6518,10 +6525,7 @@ function saveWorker() {
       grossTotal,
       paymentRule,
     ),
-    percentDiscount =
-      state.applyPercentDiscount && canApplyPercentDiscount()
-        ? percentDiscountRate()
-        : 0,
+    percentDiscount = workerPercentDiscountActive() ? percentDiscountRate() : 0,
     discountAmount = Math.min(
       grossTotal,
       Math.round((grossTotal * percentDiscount) / 100) +
@@ -6534,7 +6538,7 @@ function saveWorker() {
       customerName: c.name,
       items,
       grossTotal,
-      applyPercentDiscount: !!state.applyPercentDiscount,
+      applyPercentDiscount: workerPercentDiscountActive(),
       percentDiscount,
       discountAmount,
       total,
