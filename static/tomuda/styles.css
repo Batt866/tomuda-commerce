@@ -7469,16 +7469,17 @@ input::placeholder, textarea::placeholder {
 }
 
 .line-list__row--new {
-  background: #e4f4f7;
+  background: #c5e9ef;
+  box-shadow: inset 3px 0 0 var(--hex-primary);
 }
 
 .line-list__row--new:hover,
 .line-list__row--new:focus-visible {
-  background: #d9eef2;
+  background: #b5e2ea;
 }
 
 .line-list__row--new:active:not(:disabled) {
-  background: #cfe9ee;
+  background: #a6d9e3;
 }
 
 .line-list__row--static {
