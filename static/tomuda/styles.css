@@ -4858,7 +4858,7 @@ input::placeholder, textarea::placeholder {
 .picker-qty-sheet__row {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .picker-qty-sheet__row-head {
@@ -4882,8 +4882,8 @@ input::placeholder, textarea::placeholder {
 
 .picker-qty-stepper--sheet {
   display: grid;
-  grid-template-columns: 50px minmax(0, 1fr) 50px;
-  gap: 10px;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  gap: 8px;
   width: 100%;
   min-width: 0;
   max-width: none;
@@ -4900,16 +4900,16 @@ input::placeholder, textarea::placeholder {
 }
 
 .picker-qty-stepper--sheet .qty-stepper__btn {
-  width: 50px;
-  max-width: 50px;
-  min-width: 50px;
-  min-height: 72px !important;
-  height: 72px !important;
+  width: 64px;
+  max-width: 64px;
+  min-width: 64px;
+  min-height: 56px !important;
+  height: 56px !important;
   padding: 0 !important;
-  font-size: 32px !important;
+  font-size: 30px !important;
   line-height: 1;
   border-width: 2px;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--hex-card);
 }
 
@@ -4917,14 +4917,14 @@ input::placeholder, textarea::placeholder {
   justify-self: stretch;
   width: 100%;
   min-width: 0;
-  min-height: 72px !important;
-  height: 72px !important;
-  padding: 0 12px !important;
-  font-size: 30px !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  padding: 0 10px !important;
+  font-size: 24px !important;
   font-weight: 800;
   text-align: center;
   border-width: 2px;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #fff;
 }
 
