@@ -2717,8 +2717,8 @@ button:focus-visible,
     font-size: 1.4rem;
   }
 
-  .qty-stepper:not(.picker-qty-stepper--compact) button,
-  .qty-stepper:not(.picker-qty-stepper--compact) input {
+  .qty-stepper:not(.picker-qty-stepper--compact):not(.picker-qty-stepper--sheet) button,
+  .qty-stepper:not(.picker-qty-stepper--compact):not(.picker-qty-stepper--sheet) input {
     height: 44px;
     min-height: 44px;
   }
@@ -4882,8 +4882,8 @@ input::placeholder, textarea::placeholder {
 
 .picker-qty-stepper--sheet {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 64px;
-  gap: 10px;
+  grid-template-columns: 76px minmax(0, 1fr) 76px;
+  gap: 12px;
   width: 100%;
   min-width: 0;
   max-width: none;
@@ -4901,27 +4901,27 @@ input::placeholder, textarea::placeholder {
 .picker-qty-stepper--sheet .qty-stepper__btn {
   width: 100%;
   min-width: 0;
-  min-height: 60px !important;
-  height: 60px !important;
+  min-height: 72px !important;
+  height: 72px !important;
   padding: 0 !important;
-  font-size: 30px !important;
+  font-size: 34px !important;
   line-height: 1;
   border-width: 2px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--hex-card);
 }
 
 .picker-qty-stepper--sheet .qty-stepper__input {
   width: 100%;
   min-width: 0;
-  min-height: 60px !important;
-  height: 60px !important;
-  padding: 0 10px !important;
-  font-size: 26px !important;
+  min-height: 72px !important;
+  height: 72px !important;
+  padding: 0 12px !important;
+  font-size: 30px !important;
   font-weight: 800;
   text-align: center;
   border-width: 2px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #fff;
 }
 
@@ -5821,13 +5821,13 @@ input::placeholder, textarea::placeholder {
     padding-top: 0;
   }
 
-  .qty-stepper {
+  .qty-stepper:not(.picker-qty-stepper--sheet) {
     grid-template-columns: 36px 52px 36px;
     gap: 6px;
   }
 
-  .qty-stepper button,
-  .qty-stepper input {
+  .qty-stepper:not(.picker-qty-stepper--sheet) button,
+  .qty-stepper:not(.picker-qty-stepper--sheet) input {
     height: 44px;
     min-height: 44px;
     font-size: 16px !important;
