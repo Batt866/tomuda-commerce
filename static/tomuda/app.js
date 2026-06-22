@@ -459,7 +459,10 @@ function recalcOrderTotals(o) {
   const priceRule = matchingPricePromotionRule(gross);
   const paymentRule = matchingPaymentPromotionRule(gross, term);
   const pricePromoDiscount = pricePromotionDiscountAmount(gross, priceRule);
-  const paymentPromoDiscount = paymentPromotionDiscountAmount(gross, paymentRule);
+  const paymentPromoDiscount = paymentPromotionDiscountAmount(
+    gross,
+    paymentRule,
+  );
   const discountAmount = Math.min(
     gross,
     employeeDiscount + pricePromoDiscount + paymentPromoDiscount,
@@ -472,8 +475,7 @@ function recalcOrderTotals(o) {
 function orderAmount(o) {
   if (!o) return 0;
   const liveGross = orderGrossFromItems(o);
-  const cachedGross =
-    o.grossTotal != null ? Number(o.grossTotal) : null;
+  const cachedGross = o.grossTotal != null ? Number(o.grossTotal) : null;
   const stored = Number(o.total);
   if (
     Number.isFinite(stored) &&
@@ -537,15 +539,15 @@ function normalizeOrderPayments() {
 function normalizeOrderDeliveryDates() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
-    if (!isoDay(o.deliveryDate)) o.deliveryDate = isoDay(o.createdAt) || todayIso();
+    if (!isoDay(o.deliveryDate))
+      o.deliveryDate = isoDay(o.createdAt) || todayIso();
   }
 }
 function normalizeOrderTotals() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
     const liveGross = orderGrossFromItems(o);
-    const cachedGross =
-      o.grossTotal != null ? Number(o.grossTotal) : null;
+    const cachedGross = o.grossTotal != null ? Number(o.grossTotal) : null;
     if (
       !Number.isFinite(Number(o.total)) ||
       (cachedGross != null && Math.abs(cachedGross - liveGross) > 0.01)
@@ -581,9 +583,7 @@ function buildNewOrder(fields) {
   const receiptMonth = receiptMonthKey({ createdAt });
   const created = isoDay(createdAt);
   const stored = isoDay(fields.deliveryDate);
-  const deliveryDate = stored
-    ? fields.deliveryDate
-    : created || todayIso();
+  const deliveryDate = stored ? fields.deliveryDate : created || todayIso();
   return {
     id: String(state.orders.length + 1),
     receiptMonth,
@@ -773,7 +773,12 @@ const ADMIN_METRIC_ICONS = {
   employees:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
 };
-function adminMetricCard(label, value, tone = "", { active = false, action = "", icon = "stock" } = {}) {
+function adminMetricCard(
+  label,
+  value,
+  tone = "",
+  { active = false, action = "", icon = "stock" } = {},
+) {
   const svg = ADMIN_METRIC_ICONS[icon] || ADMIN_METRIC_ICONS.stock;
   return `<button type="button" onclick="${action}" class="admin-metric-card${active ? " admin-metric-card--active" : ""}" aria-label="${esc(label)}: ${value}"><span class="admin-metric-card__icon-wrap${active ? " is-active" : ""}"><svg class="ui-icon admin-metric-card__icon" viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>${active ? `<span class="admin-metric-card__dot" aria-hidden="true"></span>` : ""}</span><span class="admin-metric-card__label">${label}</span><b class="admin-metric-card__value ${tone}">${value}</b></button>`;
 }
@@ -1408,7 +1413,11 @@ function readPickerQtyParts(id) {
       : fallback.pieces,
   };
 }
-function pickerPartStepperHtml(p, value, { kind, min = 0, max, sheet = false }) {
+function pickerPartStepperHtml(
+  p,
+  value,
+  { kind, min = 0, max, sheet = false },
+) {
   const idAttr = esc(p.id);
   const v = Math.max(min, Math.min(max, Math.floor(Number(value) || 0)));
   const decDisabled = v <= min;
@@ -1603,7 +1612,8 @@ function qtyDraft(el) {
   if (digits !== el.value) el.value = digits;
   if (!digits) return;
   const n = Number(digits);
-  if (n > p.stock && el.hasAttribute("data-picker-qty-input")) showStockLimitToast();
+  if (n > p.stock && el.hasAttribute("data-picker-qty-input"))
+    showStockLimitToast();
   const capped = Math.min(n, p.stock);
   if (capped < min) return;
   state.workerQty[id] = capped;
@@ -1621,7 +1631,8 @@ function qtyCommit(el) {
   const min = Number(el.closest(".qty-stepper")?.dataset?.qtyMin ?? 0);
   const digits = String(el.value || "").replace(/\D/g, "");
   let v = digits ? Number(digits) : 0;
-  if (v > p.stock && el.hasAttribute("data-picker-qty-input")) showStockLimitToast();
+  if (v > p.stock && el.hasAttribute("data-picker-qty-input"))
+    showStockLimitToast();
   if (v < min) v = min;
   v = Math.min(v, p.stock);
   el.value = String(v);
@@ -2114,7 +2125,10 @@ function shell(content) {
   return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
-  const svg = ADMIN_METRIC_ICONS[iconKey] || MOBILE_NAV_SVG[view] || ADMIN_METRIC_ICONS.stock;
+  const svg =
+    ADMIN_METRIC_ICONS[iconKey] ||
+    MOBILE_NAV_SVG[view] ||
+    ADMIN_METRIC_ICONS.stock;
   return `<button type="button" onclick="go('${view}')" class="admin-hub-card"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
 }
 function adminHubActionCard(action, label, iconKey) {
@@ -2234,14 +2248,10 @@ function saveStockAlertSettings(e) {
     closeModal();
     return;
   }
-  confirmModal(
-    "Үлдэгдэл сануулга хадгалах",
-    summary.html,
-    {
-      confirmLabel: "Хадгалах",
-      onConfirm: () => applyStockAlertSettings(data),
-    },
-  );
+  confirmModal("Үлдэгдэл сануулга хадгалах", summary.html, {
+    confirmLabel: "Хадгалах",
+    onConfirm: () => applyStockAlertSettings(data),
+  });
 }
 function stockAlertChangeSummary(data) {
   const lines = [];
@@ -2284,7 +2294,10 @@ function applyStockAlertSettings(data) {
   render();
   showInstallToast("Үлдэгдэл сануулга хадгалагдлаа");
 }
-function orderReceiptRowsFiltered(searchKey = "warehouseOrders", employeeIds = []) {
+function orderReceiptRowsFiltered(
+  searchKey = "warehouseOrders",
+  employeeIds = [],
+) {
   const q = (state.searches[searchKey] || "").toLowerCase();
   return filterWarehouseOrders(
     state.orders.filter(
@@ -2350,11 +2363,9 @@ function buildOrderReceiptExcelRows(o) {
     rows.push(["Урамшуулал", "Бараа", "Тоо", "Дүн"]);
     promoItems.forEach((i) => rows.push(["", i.productName, i.quantity, 0]));
   }
-  rows.push(
-    [],
-    ["Хувь хасагдаагүй нийт үнийн дүн", "", "", "", "", "", gross],
-  );
-  if (discount) rows.push([`Хөнгөлөлт (${pct}%)`, "", "", "", "", "", -discount]);
+  rows.push([], ["Хувь хасагдаагүй нийт үнийн дүн", "", "", "", "", "", gross]);
+  if (discount)
+    rows.push([`Хөнгөлөлт (${pct}%)`, "", "", "", "", "", -discount]);
   rows.push(
     ["Бараа ажил үйлчилгээний дүн", "", "", "", "", "", sub],
     ["НӨАТ", "", "", "", "", "", vat],
@@ -2378,7 +2389,10 @@ function exportOrderReceiptsExcel(orders) {
   });
   excel(`zahialgiin-barimt-${stamp}.csv`, sheetRows);
 }
-function confirmOrderReceiptsExcel(searchKey = "warehouseOrders", employeeIds = []) {
+function confirmOrderReceiptsExcel(
+  searchKey = "warehouseOrders",
+  employeeIds = [],
+) {
   const rows = orderReceiptRowsFiltered(searchKey, employeeIds);
   if (!rows.length) return alert("Захиалга олдсонгүй");
   confirmDataExport("Excel татах", () => exportOrderReceiptsExcel(rows));
@@ -2424,7 +2438,9 @@ function warehouseReceiptStatusOptions() {
   return ["pending", "cancelled"];
 }
 function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
-  if (!["all", ...warehouseReceiptStatusOptions()].includes(state.filters.order))
+  if (
+    !["all", ...warehouseReceiptStatusOptions()].includes(state.filters.order)
+  )
     state.filters.order = "all";
   if (rows.length && !rows.some((o) => o.id === state.selectedWarehouseOrderId))
     state.selectedWarehouseOrderId = rows[0].id;
@@ -2438,7 +2454,14 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
       ? warehouseOrderDetail(selected)
       : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`,
     exportBtn = `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})" class="btn btn--secondary btn--sm wh-receipts__export">${EXCEL_FILE_DOWNLOAD}</button>`;
-  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside">${exportBtn}<span class="wh-receipts__total">${fmt(total)}</span></div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions().map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside">${exportBtn}<span class="wh-receipts__total">${fmt(total)}</span></div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
+    .map(
+      (s) =>
+        `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
+    )
+    .join(
+      "",
+    )}</select></div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
 }
 function warehouseOrderDetail(o) {
   const actions = warehouseOrderStatusActions(o),
@@ -2510,12 +2533,13 @@ function clearCustomerImage() {
   if (value) value.value = "";
   if (fileInput) fileInput.value = "";
   if (preview) {
-    const name =
-      document.querySelector('[name="name"]')?.value || "Дэлгүүр";
+    const name = document.querySelector('[name="name"]')?.value || "Дэлгүүр";
     preview.src = customerStoreImage({ name });
   }
   document
-    .querySelector('.customer-image-upload__body [onclick="clearCustomerImage()"]')
+    .querySelector(
+      '.customer-image-upload__body [onclick="clearCustomerImage()"]',
+    )
     ?.remove();
 }
 function customerSubtitle(c) {
@@ -2817,8 +2841,7 @@ function countFilteredProducts() {
     if (cat !== "all" && p.category !== cat) return false;
     if (!q) return true;
     return (
-      p.name.toLowerCase().includes(q) ||
-      String(p.barcode || "").includes(q)
+      p.name.toLowerCase().includes(q) || String(p.barcode || "").includes(q)
     );
   });
 }
@@ -2911,8 +2934,10 @@ function countSheetProductsGrouped() {
     .filter((p) => ids.has(p.id) && countValue(p.id) !== null)
     .sort(
       (a, b) =>
-        String(a.category || "").localeCompare(String(b.category || ""), "mn") ||
-        String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+        String(a.category || "").localeCompare(
+          String(b.category || ""),
+          "mn",
+        ) || String(a.name || "").localeCompare(String(b.name || ""), "mn"),
     );
   const groups = [];
   let cur = "";
@@ -2948,9 +2973,7 @@ function xlsxColName(n) {
   return s;
 }
 function xlsxSharedStringsXml(strings) {
-  const items = strings
-    .map((s) => `<si><t>${xlsxXmlEsc(s)}</t></si>`)
-    .join("");
+  const items = strings.map((s) => `<si><t>${xlsxXmlEsc(s)}</t></si>`).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${strings.length}" uniqueCount="${strings.length}">${items}</sst>`;
 }
 function xlsxCellXml(ref, styleId, value, kind) {
@@ -3104,7 +3127,12 @@ function buildCountSheetXml() {
   pushRow(null, [
     xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтан:"), "s"),
     xlsxCellXml(`B${sign1}`, 17, null, "empty"),
-    xlsxCellXml(`C${sign1}`, 18, si("/...................................................../"), "s"),
+    xlsxCellXml(
+      `C${sign1}`,
+      18,
+      si("/...................................................../"),
+      "s",
+    ),
     xlsxCellXml(`D${sign1}`, 18, null, "empty"),
     xlsxCellXml(`E${sign1}`, 18, null, "empty"),
   ]);
@@ -3124,7 +3152,12 @@ function buildCountSheetXml() {
   pushRow(null, [
     xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан ажилтан:"), "s"),
     xlsxCellXml(`B${sign3}`, 17, null, "empty"),
-    xlsxCellXml(`C${sign3}`, 18, si("/...................................................../"), "s"),
+    xlsxCellXml(
+      `C${sign3}`,
+      18,
+      si("/...................................................../"),
+      "s",
+    ),
     xlsxCellXml(`D${sign3}`, 18, null, "empty"),
     xlsxCellXml(`E${sign3}`, 18, null, "empty"),
   ]);
@@ -3137,13 +3170,12 @@ function buildCountSheetXml() {
     xlsxCellXml(`E${sign4}`, 16, null, "empty"),
   ]);
   const lastRow = rowNum;
-  const mergeXml = merges
-    .map((ref) => `<mergeCell ref="${ref}"/>`)
-    .join("");
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:H${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.12890625" customWidth="1"/><col min="2" max="2" width="12.74609375" customWidth="1"/><col min="3" max="3" width="13.73046875" customWidth="1"/><col min="4" max="4" width="7.35546875" customWidth="1"/><col min="5" max="5" width="8.08984375" customWidth="1"/><col min="6" max="6" width="14.5859375" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
-const COUNT_SHEET_TEMPLATE = "/static/tomuda/templates/count-sheet-template.xls";
+const COUNT_SHEET_TEMPLATE =
+  "/static/tomuda/templates/count-sheet-template.xls";
 async function exportCountExcelXlsx() {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
@@ -3179,11 +3211,29 @@ function exportCountExcelFallback() {
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
     [],
-    ["Барааны нэр төрөл", "Хэмжих нэгж", "Баркод", "Багц", "Ширхэг", "Үлдэгдэл"],
+    [
+      "Барааны нэр төрөл",
+      "Хэмжих нэгж",
+      "Баркод",
+      "Багц",
+      "Ширхэг",
+      "Үлдэгдэл",
+    ],
     ...rows.map(([barcode, name, , stock, counted]) => {
-      const p = state.products.find((x) => x.barcode === barcode || x.name === name);
-      const parts = p ? pickerQtyToParts(counted, p) : { packs: "", pieces: counted };
-      return [name, p?.unit || "ш", barcode, parts.packs || "", parts.pieces || "", counted];
+      const p = state.products.find(
+        (x) => x.barcode === barcode || x.name === name,
+      );
+      const parts = p
+        ? pickerQtyToParts(counted, p)
+        : { packs: "", pieces: counted };
+      return [
+        name,
+        p?.unit || "ш",
+        barcode,
+        parts.packs || "",
+        parts.pieces || "",
+        counted,
+      ];
     }),
   ]);
 }
@@ -3351,12 +3401,7 @@ function productLabel(id) {
 }
 function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
   const qtyHtml = qtyOpts
-    ? promotionQtyField(
-        qtyOpts.name,
-        qtyOpts.label,
-        qtyOpts.defaultValue,
-        true,
-      )
+    ? promotionQtyField(qtyOpts.name, qtyOpts.label, qtyOpts.defaultValue, true)
     : "";
   return qtyHtml
     ? `<div class="promo-input-row">${searchInputHtml}${qtyHtml}</div>`
@@ -3436,15 +3481,62 @@ function promotionBuyProductIds(rule) {
   if (rule.buyProductId) return [rule.buyProductId];
   return [];
 }
-function promotionMultiBuyPickerBlock(selectedIds, freeId) {
+function promotionFreeProductIds(rule) {
+  if (Array.isArray(rule.freeProductIds) && rule.freeProductIds.length) {
+    return rule.freeProductIds.filter(Boolean);
+  }
+  if (rule.freeProductId) return [rule.freeProductId];
+  return [];
+}
+function promotionPickIds(pick, key) {
+  const raw = pick?.[key];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (key === "freeProductIds" && pick?.freeProductId)
+    return [pick.freeProductId];
+  if (key === "priceFreeProductIds" && pick?.priceFreeProductId) {
+    return [pick.priceFreeProductId];
+  }
+  if (key === "paymentFreeProductIds" && pick?.paymentFreeProductId) {
+    return [pick.paymentFreeProductId];
+  }
+  return [];
+}
+function promoPickSearchKey(pickKey) {
+  const map = {
+    buyProductIds: "promo_buyProductIds",
+    freeProductIds: "promo_freeProductIds",
+    priceFreeProductIds: "promo_priceFreeProductIds",
+    paymentFreeProductIds: "promo_paymentFreeProductIds",
+  };
+  return map[pickKey] || "";
+}
+function promotionProductLabels(ids) {
+  return (Array.isArray(ids) ? ids : [])
+    .map((id) => productLabel(id))
+    .filter(Boolean)
+    .join(", ");
+}
+function promotionMultiProductPickerBlock({
+  pickKey,
+  fieldName,
+  selectedIds,
+  excludeIds = [],
+  title,
+  hint,
+  placeholder,
+  variant = "",
+  badge = "",
+  qty = null,
+}) {
   const ids = Array.isArray(selectedIds) ? selectedIds : [],
-    excludeIds = new Set([freeId, ...ids].filter(Boolean)),
-    rawQ = state.searches.promo_buyProductIds || "",
+    exclude = new Set([...excludeIds, ...ids].filter(Boolean)),
+    searchKey = promoPickSearchKey(pickKey),
+    rawQ = (searchKey && state.searches[searchKey]) || "",
     q = rawQ.toLowerCase().trim(),
     searchProducts = q
       ? state.products.filter(
           (p) =>
-            !excludeIds.has(p.id) &&
+            !exclude.has(p.id) &&
             (p.name.toLowerCase().includes(q) ||
               p.barcode.includes(q) ||
               p.category.toLowerCase().includes(q)),
@@ -3454,60 +3546,122 @@ function promotionMultiBuyPickerBlock(selectedIds, freeId) {
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
     selectedHtml = selectedProducts.length
-      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoBuyProduct('${esc(p.id)}')" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
+      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoPickProduct('${pickKey}','${esc(p.id)}')" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
       : `<p class="promo-section-hint">Хайлтаар бараа нэмнэ</p>`,
     searchHtml = q
       ? searchProducts.length
-        ? `<div class="promo-product-list">${searchProducts.map((p) => `<button type="button" onclick="addPromoBuyProduct('${esc(p.id)}')" class="promo-product-row"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 text-left"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`).join("")}</div>`
+        ? `<div class="promo-product-list">${searchProducts.map((p) => `<button type="button" onclick="addPromoPickProduct('${pickKey}','${esc(p.id)}')" class="promo-product-row"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 text-left"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`).join("")}</div>`
         : `<p class="p-4 text-sm text-muted-foreground text-center">Бараа олдсонгүй</p>`
       : "",
     hiddenInputs = ids
-      .map((id) => `<input type="hidden" name="buyProductIds" value="${esc(id)}">`)
+      .map(
+        (id) => `<input type="hidden" name="${fieldName}" value="${esc(id)}">`,
+      )
       .join(""),
-    searchInput = `<input data-promo-search="buyProductIds" value="${esc(rawQ)}" oninput="promoBuyProductSearch(this.value)" placeholder="Бараа хайж нэмэх..." class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`;
-  return `<div class="promo-section promo-section--buy"><div class="promo-product-block">${hiddenInputs}<div class="promo-section-head"><span class="promo-section-badge">1</span><div><p class="promo-section-title">Авах бараа</p><p class="promo-section-hint">Олон бараа сонгож болно · нийт тоо шалгана</p></div></div>${promotionSearchQtyRow(searchInput, { name: "buyQty", label: "Ширхэг" })}${selectedHtml}${searchHtml}</div></div>`;
+    searchInput = `<input data-promo-pick="${pickKey}" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
+    head = badge
+      ? `<div class="promo-section-head"><span class="promo-section-badge">${badge}</span><div><p class="promo-section-title">${title}</p>${hint ? `<p class="promo-section-hint">${hint}</p>` : ""}</div></div>`
+      : `<span class="block text-sm font-medium mb-2">${title}</span>`;
+  return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block">${hiddenInputs}${head}${promotionSearchQtyRow(searchInput, qty)}${selectedHtml}${searchHtml}</div></div>`;
+}
+function promotionMultiBuyPickerBlock(selectedIds, freeIds) {
+  const freeList = Array.isArray(freeIds) ? freeIds : freeIds ? [freeIds] : [];
+  return promotionMultiProductPickerBlock({
+    pickKey: "buyProductIds",
+    fieldName: "buyProductIds",
+    selectedIds,
+    excludeIds: freeList,
+    title: "Авах бараа",
+    hint: "Олон бараа сонгож болно · нийт тоо шалгана",
+    placeholder: "Бараа хайж нэмэх...",
+    variant: "buy",
+    badge: "1",
+    qty: { name: "buyQty", label: "Ширхэг" },
+  });
+}
+function promotionMultiFreePickerBlock({
+  pickKey,
+  fieldName,
+  selectedIds,
+  excludeIds = [],
+  title,
+  hint,
+  placeholder,
+  badge,
+  qty,
+}) {
+  return promotionMultiProductPickerBlock({
+    pickKey,
+    fieldName,
+    selectedIds,
+    excludeIds,
+    title,
+    hint,
+    placeholder,
+    variant: "free",
+    badge,
+    qty,
+  });
+}
+function promoPickSearch(pickKey, value) {
+  const key = promoPickSearchKey(pickKey);
+  if (!key) return;
+  state.searches[key] = value;
+  refreshPromoModal();
+  if (value.trim()) {
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-promo-pick="${pickKey}"]`);
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  }
 }
 function promoBuyProductSearch(value) {
-  state.searches.promo_buyProductIds = value;
-  refreshPromoModal();
-  if (value.trim()) {
-    requestAnimationFrame(() => {
-      const el = document.querySelector('[data-promo-search="buyProductIds"]');
-      if (el) {
-        el.focus();
-        el.setSelectionRange(el.value.length, el.value.length);
-      }
-    });
+  promoPickSearch("buyProductIds", value);
+}
+function promoPickConflict(pickKey, id) {
+  const pick = state.promoPick || {};
+  if (pickKey === "buyProductIds") {
+    const freeIds = promotionPickIds(pick, "freeProductIds");
+    if (freeIds.includes(id)) {
+      return "Үнэгүй өгөх бараатай ижил байж болохгүй.";
+    }
   }
+  if (pickKey === "freeProductIds") {
+    const buyIds = promotionPickIds(pick, "buyProductIds");
+    if (buyIds.includes(id)) {
+      return "Авах бараатай ижил байж болохгүй. Өөр бараа сонгоно уу.";
+    }
+  }
+  return "";
+}
+function addPromoPickProduct(pickKey, id) {
+  const conflict = promoPickConflict(pickKey, id);
+  if (conflict) return alert(conflict);
+  const pick = state.promoPick || {},
+    ids = [...promotionPickIds(pick, pickKey)];
+  if (ids.includes(id)) return;
+  state.promoPick = { ...pick, [pickKey]: [...ids, id] };
+  const searchKey = promoPickSearchKey(pickKey);
+  if (searchKey) state.searches[searchKey] = "";
+  refreshPromoModal();
+}
+function removePromoPickProduct(pickKey, id) {
+  const pick = state.promoPick || {},
+    ids = promotionPickIds(pick, pickKey).filter((x) => x !== id);
+  state.promoPick = { ...pick, [pickKey]: ids };
+  refreshPromoModal();
 }
 function addPromoBuyProduct(id) {
-  const freeId = state.promoPick?.freeProductId;
-  if (freeId && freeId === id) {
-    return alert("Үнэгүй өгөх бараатай ижил байж болохгүй.");
-  }
-  const ids = [...(state.promoPick?.buyProductIds || [])];
-  if (ids.includes(id)) return;
-  state.promoPick = { ...(state.promoPick || {}), buyProductIds: [...ids, id] };
-  state.searches.promo_buyProductIds = "";
-  refreshPromoModal();
+  addPromoPickProduct("buyProductIds", id);
 }
 function removePromoBuyProduct(id) {
-  const ids = (state.promoPick?.buyProductIds || []).filter((x) => x !== id);
-  state.promoPick = { ...(state.promoPick || {}), buyProductIds: ids };
-  refreshPromoModal();
+  removePromoPickProduct("buyProductIds", id);
 }
 function promoProductSearch(fieldName, value) {
-  state.searches[`promo_${fieldName}`] = value;
-  refreshPromoModal();
-  if (value.trim()) {
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-promo-search="${fieldName}"]`);
-      if (el) {
-        el.focus();
-        el.setSelectionRange(el.value.length, el.value.length);
-      }
-    });
-  }
+  promoPickSearch(fieldName, value);
 }
 function refreshPromoModal() {
   if (state.promoModalKind === "price") promotionPriceModal();
@@ -3515,23 +3669,15 @@ function refreshPromoModal() {
   else promotionQtyModal();
 }
 function selectPromoProduct(fieldName, id) {
-  if (fieldName === "freeProductId") {
-    const buyIds = state.promoPick?.buyProductIds || [];
-    if (buyIds.includes(id)) {
-      return alert("Авах бараатай ижил байж болохгүй. Өөр бараа сонгоно уу.");
-    }
-  }
-  state.promoPick = { ...(state.promoPick || {}), [fieldName]: id };
-  state.searches[`promo_${fieldName}`] = "";
-  const input = document.getElementById(`promo-${fieldName}`);
-  if (input) input.value = id;
-  refreshPromoModal();
+  addPromoPickProduct(fieldName, id);
 }
 function promotionQtyRuleText(r) {
-  const buyIds = promotionBuyProductIds(r);
-  if (buyIds.length && r.freeProductId) {
-    const names = buyIds.map((id) => productLabel(id)).join(", ");
-    return `${names}-аас нийт ${r.buyQty} ш авахад → ${productLabel(r.freeProductId)} ${r.freeQty || 1} ш үнэгүй`;
+  const buyIds = promotionBuyProductIds(r),
+    freeIds = promotionFreeProductIds(r);
+  if (buyIds.length && freeIds.length) {
+    const buyNames = promotionProductLabels(buyIds),
+      freeNames = promotionProductLabels(freeIds);
+    return `${buyNames}-аас нийт ${r.buyQty} ш авахад → ${freeNames} ${r.freeQty || 1} ш үнэгүй`;
   }
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
@@ -3543,7 +3689,9 @@ function promotionQtyRuleCard(r, i) {
     buyProducts = buyIds
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
-    free = state.products.find((p) => p.id === r.freeProductId) || {},
+    freeProducts = promotionFreeProductIds(r)
+      .map((id) => state.products.find((p) => p.id === id))
+      .filter(Boolean),
     buyLabel =
       buyProducts.length > 2
         ? `${buyProducts
@@ -3551,14 +3699,28 @@ function promotionQtyRuleCard(r, i) {
             .map((p) => p.name)
             .join(", ")} +${buyProducts.length - 2}`
         : buyProducts.map((p) => p.name).join(", ") || "-",
+    freeLabel =
+      freeProducts.length > 2
+        ? `${freeProducts
+            .slice(0, 2)
+            .map((p) => p.name)
+            .join(", ")} +${freeProducts.length - 2}`
+        : freeProducts.map((p) => p.name).join(", ") || "-",
     buyThumbs = buyProducts
       .slice(0, 3)
       .map(
         (p) =>
           `<img src="${productImage(p)}" class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
+      .join(""),
+    freeThumbs = freeProducts
+      .slice(0, 3)
+      .map(
+        (p) =>
+          `<img src="${productImage(p)}" class="product-thumb promo-qty-rule-thumb" alt="">`,
+      )
       .join("");
-  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><img src="${productImage(free)}" class="product-thumb" alt=""><div class="min-w-0"><p class="font-medium truncate">${free.name || "-"}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('quantity',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
+  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('quantity',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -3567,11 +3729,14 @@ function promotionPriceRuleText(r) {
   const min = fmt(Number(r.minAmount) || 0),
     max = Number(r.maxAmount) > 0 ? fmt(Number(r.maxAmount)) : "",
     range = max ? `${min} – ${max}` : `${min}-с дээш`;
-  if (r.type === "percent" || (r.discountPercent && !r.freeProductId)) {
+  if (
+    r.type === "percent" ||
+    (r.discountPercent && !promotionFreeProductIds(r).length)
+  ) {
     return `${range} · ${r.discountPercent}% хөнгөлөлт`;
   }
-  const free = state.products.find((p) => p.id === r.freeProductId);
-  return `${range} · ${free?.name || "-"} ${r.freeQty || 1} ш үнэгүй`;
+  const freeNames = promotionProductLabels(promotionFreeProductIds(r));
+  return `${range} · ${freeNames || "-"} ${r.freeQty || 1} ш үнэгүй`;
 }
 function promotionPricePanel(rows) {
   const sorted = [...rows].sort(
@@ -3583,11 +3748,14 @@ function promotionPaymentRuleText(r) {
   const term = r.paymentTerm === "credit" ? "Дансаар" : "Бэлнээр",
     min = Number(r.minAmount) || 0,
     minText = min > 0 ? ` · ${fmt(min)}-с дээш` : "";
-  if (r.type === "percent" || (r.discountPercent && !r.freeProductId)) {
+  if (
+    r.type === "percent" ||
+    (r.discountPercent && !promotionFreeProductIds(r).length)
+  ) {
     return `${term}${minText} · ${r.discountPercent}% хөнгөлөлт`;
   }
-  const free = state.products.find((p) => p.id === r.freeProductId);
-  return `${term}${minText} · ${free?.name || "-"} ${r.freeQty || 1} ш үнэгүй`;
+  const freeNames = promotionProductLabels(promotionFreeProductIds(r));
+  return `${term}${minText} · ${freeNames || "-"} ${r.freeQty || 1} ш үнэгүй`;
 }
 function promotionPaymentPanel(rows) {
   return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн хэлбэр (бэлэн эсвэл дансаар) сонгосон үед хөнгөлөлт эсвэл үнэгүй бараа олгоно.</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
@@ -3600,32 +3768,41 @@ function promotionPriceRuleCard(r, i) {
 }
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
-  state.promoPick = { buyProductIds: [], freeProductId: "" };
+  state.promoPick = { buyProductIds: [], freeProductIds: [] };
   state.searches.promo_buyProductIds = "";
-  state.searches.promo_freeProductId = "";
+  state.searches.promo_freeProductIds = "";
   promotionQtyModal();
 }
 function promotionQtyModal() {
   state.promoModalKind = "qty";
-  state.promoPick = state.promoPick || { buyProductIds: [], freeProductId: "" };
+  state.promoPick = state.promoPick || {
+    buyProductIds: [],
+    freeProductIds: [],
+  };
   if (!Array.isArray(state.promoPick.buyProductIds)) {
     state.promoPick.buyProductIds = state.promoPick.buyProductId
       ? [state.promoPick.buyProductId]
       : [];
   }
+  if (!Array.isArray(state.promoPick.freeProductIds)) {
+    state.promoPick.freeProductIds = promotionPickIds(
+      state.promoPick,
+      "freeProductIds",
+    );
+  }
   const buyIds = state.promoPick.buyProductIds,
-    free = state.promoPick.freeProductId || "";
+    freeIds = state.promoPick.freeProductIds;
   box(
     "Багцын хөнгөлөлт",
-    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds, free)}${promoSectionArrow()}${promotionProductPickerBlock("freeProductId", "Үнэгүй өгөх бараа", free, { variant: "free", excludeIds: buyIds, hint: "Үнэгүй өгөх бараа", placeholder: "Үнэгүй бараа хайх...", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds, freeIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: buyIds, title: "Үнэгүй өгөх бараа", hint: "Олон бараа сонгож болно", placeholder: "Үнэгүй бараа хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
 }
 function openPromotionPriceModal() {
   state.promoModalKind = "price";
   state.promoPriceRuleType = "free";
-  state.promoPick = { priceFreeProductId: "" };
-  state.searches.promo_priceFreeProductId = "";
+  state.promoPick = { priceFreeProductIds: [] };
+  state.searches.promo_priceFreeProductIds = "";
   promotionPriceModal();
 }
 function setPromotionPriceRuleType(type) {
@@ -3635,16 +3812,25 @@ function setPromotionPriceRuleType(type) {
 function promotionPriceModal() {
   state.promoModalKind = "price";
   state.promoPick = state.promoPick || {};
+  if (!Array.isArray(state.promoPick.priceFreeProductIds)) {
+    state.promoPick.priceFreeProductIds = promotionPickIds(
+      state.promoPick,
+      "priceFreeProductIds",
+    );
+  }
   const type = state.promoPriceRuleType === "percent" ? "percent" : "free",
-    freeId = state.promoPick.priceFreeProductId || "",
+    freeIds = state.promoPick.priceFreeProductIds || [],
     typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувийн хөнгөлөлт</button></div>`,
-    amountFields = `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span><input name="minAmount" type="number" min="0" step="1000" required placeholder="200000" class="w-full px-3 py-3 bg-secondary rounded app-input"></label><label class="block"><span class="block text-sm font-medium mb-2">Дээд дүн (₮)</span><input name="maxAmount" type="number" min="0" step="1000" placeholder="400000" class="w-full px-3 py-3 bg-secondary rounded app-input"><span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label></div>`,
+    amountFields = `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span><input name="minAmount" type="number" min="0" step="1" required placeholder="200000" class="w-full px-3 py-3 bg-secondary rounded app-input"></label><label class="block"><span class="block text-sm font-medium mb-2">Дээд дүн (₮)</span><input name="maxAmount" type="number" min="0" step="1" placeholder="400000" class="w-full px-3 py-3 bg-secondary rounded app-input"><span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label></div>`,
     freeBlock =
       type === "free"
-        ? promotionProductPickerBlock("priceFreeProductId", "Үнэгүй өгөх бараа", freeId, {
-            variant: "free",
-            hint: "Үнэгүй өгөх бараа сонгоно уу",
-            placeholder: "Бараа хайх...",
+        ? promotionMultiFreePickerBlock({
+            pickKey: "priceFreeProductIds",
+            fieldName: "priceFreeProductIds",
+            selectedIds: freeIds,
+            title: "Үнэгүй өгөх бараа",
+            hint: "Олон бараа сонгож болно",
+            placeholder: "Бараа хайж нэмэх...",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
           })
         : "",
@@ -3662,8 +3848,8 @@ function openPromotionPaymentModal() {
   state.promoModalKind = "payment";
   state.promoPaymentRuleType = "free";
   state.promoPaymentTerm = "cash";
-  state.promoPick = { paymentFreeProductId: "" };
-  state.searches.promo_paymentFreeProductId = "";
+  state.promoPick = { paymentFreeProductIds: [] };
+  state.searches.promo_paymentFreeProductIds = "";
   promotionPaymentModal();
 }
 function setPromotionPaymentRuleType(type) {
@@ -3677,17 +3863,26 @@ function setPromotionPaymentTerm(term) {
 function promotionPaymentModal() {
   state.promoModalKind = "payment";
   state.promoPick = state.promoPick || {};
+  if (!Array.isArray(state.promoPick.paymentFreeProductIds)) {
+    state.promoPick.paymentFreeProductIds = promotionPickIds(
+      state.promoPick,
+      "paymentFreeProductIds",
+    );
+  }
   const term = state.promoPaymentTerm === "credit" ? "credit" : "cash",
     type = state.promoPaymentRuleType === "percent" ? "percent" : "free",
-    freeId = state.promoPick.paymentFreeProductId || "",
+    freeIds = state.promoPick.paymentFreeProductIds || [],
     termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлнээр</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Дансаар</button></div>`,
     typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувийн хөнгөлөлт</button></div>`,
-    minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span><input name="minAmount" type="number" min="0" step="1000" placeholder="0" class="w-full px-3 py-3 bg-secondary rounded app-input"><span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
+    minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span><input name="minAmount" type="number" min="0" step="1" placeholder="0" class="w-full px-3 py-3 bg-secondary rounded app-input"><span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
     freeBlock =
       type === "free"
-        ? promotionProductPickerBlock("paymentFreeProductId", "Үнэгүй өгөх бараа", freeId, {
-            variant: "free",
-            hint: "Үнэгүй өгөх бараа сонгоно уу",
+        ? promotionMultiFreePickerBlock({
+            pickKey: "paymentFreeProductIds",
+            fieldName: "paymentFreeProductIds",
+            selectedIds: freeIds,
+            title: "Үнэгүй өгөх бараа",
+            hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайх...",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
           })
@@ -3706,21 +3901,22 @@ function savePromotionQty(e) {
   e.preventDefault();
   const f = new FormData(e.target),
     buyProductIds = f.getAll("buyProductIds").filter(Boolean),
-    freeProductId = f.get("freeProductId");
-  if (!buyProductIds.length || !freeProductId)
+    freeProductIds = f.getAll("freeProductIds").filter(Boolean);
+  if (!buyProductIds.length || !freeProductIds.length)
     return alert("Авах болон үнэгүй бараа сонгоно уу");
-  if (buyProductIds.includes(freeProductId))
+  if (buyProductIds.some((id) => freeProductIds.includes(id)))
     return alert("Авах болон үнэгүй бараа өөр байх ёстой");
   state.promotionRules.quantity.push({
     buyProductIds,
     buyQty: Number(f.get("buyQty")),
-    freeProductId,
+    freeProductIds,
+    freeProductId: freeProductIds[0],
     freeQty: Number(f.get("freeQty")) || 1,
   });
   state.promoPick = null;
   state.promoModalKind = "";
   state.searches.promo_buyProductIds = "";
-  state.searches.promo_freeProductId = "";
+  state.searches.promo_freeProductIds = "";
   closeModal();
   render();
 }
@@ -3739,36 +3935,46 @@ function matchingPricePromotionRule(gross) {
 function pricePromotionDiscountAmount(gross, rule) {
   if (!rule) return 0;
   const isPercent =
-    rule.type === "percent" || (rule.discountPercent && !rule.freeProductId);
+    rule.type === "percent" ||
+    (rule.discountPercent && !promotionFreeProductIds(rule).length);
   if (!isPercent) return 0;
   return Math.round((gross * Number(rule.discountPercent || 0)) / 100);
+}
+function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
+  const grant = Number(freeQty) || 1;
+  (Array.isArray(freeIds) ? freeIds : []).forEach((freeId) => {
+    const product = state.products.find((p) => p.id === freeId);
+    if (!product) return;
+    const existing = result.find(
+      (l) => l.productId === freeId && l.isPromoFree,
+    );
+    if (existing) {
+      existing.quantity += grant;
+    } else {
+      result.push({
+        productId: freeId,
+        productName: product.name,
+        quantity: grant,
+        price: 0,
+        total: 0,
+        isPromoFree: true,
+        ...extra,
+      });
+    }
+  });
+  return result;
 }
 function applyPricePromotions(lines, gross) {
   const rule = matchingPricePromotionRule(gross);
   if (!rule) return lines;
+  const freeIds = promotionFreeProductIds(rule);
   const isFree =
-    rule.type === "free" || (!!rule.freeProductId && !rule.discountPercent);
+    rule.type === "free" || (freeIds.length && !rule.discountPercent);
   if (!isFree) return lines;
-  const freeId = rule.freeProductId,
-    freeQty = Number(rule.freeQty) || 1,
-    product = state.products.find((p) => p.id === freeId);
-  if (!freeId || !product) return lines;
   const result = lines.map((line) => ({ ...line }));
-  const existing = result.find((l) => l.productId === freeId && l.isPromoFree);
-  if (existing) {
-    existing.quantity += freeQty;
-  } else {
-    result.push({
-      productId: freeId,
-      productName: product.name,
-      quantity: freeQty,
-      price: 0,
-      total: 0,
-      isPromoFree: true,
-      isPricePromo: true,
-    });
-  }
-  return result;
+  return appendPromoFreeLines(result, freeIds, rule.freeQty, {
+    isPricePromo: true,
+  });
 }
 function matchingPaymentPromotionRule(gross, paymentTerm) {
   let best = null;
@@ -3783,36 +3989,22 @@ function matchingPaymentPromotionRule(gross, paymentTerm) {
 function paymentPromotionDiscountAmount(gross, rule) {
   if (!rule) return 0;
   const isPercent =
-    rule.type === "percent" || (rule.discountPercent && !rule.freeProductId);
+    rule.type === "percent" ||
+    (rule.discountPercent && !promotionFreeProductIds(rule).length);
   if (!isPercent) return 0;
   return Math.round((gross * Number(rule.discountPercent || 0)) / 100);
 }
 function applyPaymentPromotions(lines, gross, paymentTerm) {
   const rule = matchingPaymentPromotionRule(gross, paymentTerm);
   if (!rule) return lines;
+  const freeIds = promotionFreeProductIds(rule);
   const isFree =
-    rule.type === "free" || (!!rule.freeProductId && !rule.discountPercent);
+    rule.type === "free" || (freeIds.length && !rule.discountPercent);
   if (!isFree) return lines;
-  const freeId = rule.freeProductId,
-    freeQty = Number(rule.freeQty) || 1,
-    product = state.products.find((p) => p.id === freeId);
-  if (!freeId || !product) return lines;
   const result = lines.map((line) => ({ ...line }));
-  const existing = result.find((l) => l.productId === freeId && l.isPromoFree);
-  if (existing) {
-    existing.quantity += freeQty;
-  } else {
-    result.push({
-      productId: freeId,
-      productName: product.name,
-      quantity: freeQty,
-      price: 0,
-      total: 0,
-      isPromoFree: true,
-      isPaymentPromo: true,
-    });
-  }
-  return result;
+  return appendPromoFreeLines(result, freeIds, rule.freeQty, {
+    isPaymentPromo: true,
+  });
 }
 function workerPaidLines() {
   return state.products
@@ -3844,10 +4036,10 @@ function applyQuantityPromotions(lines) {
   });
   (state.promotionRules.quantity || []).forEach((rule) => {
     const buyIds = promotionBuyProductIds(rule),
-      freeId = rule.freeProductId,
+      freeIds = promotionFreeProductIds(rule),
       buyQty = Number(rule.buyQty) || 0,
       freeQty = Number(rule.freeQty) || 1;
-    if (!buyIds.length || !freeId || buyQty < 1) return;
+    if (!buyIds.length || !freeIds.length || buyQty < 1) return;
     const combinedQty = buyIds.reduce(
       (sum, id) => sum + (qtyByProduct[id] || 0),
       0,
@@ -3855,24 +4047,26 @@ function applyQuantityPromotions(lines) {
     const sets = Math.floor(combinedQty / buyQty);
     if (sets < 1) return;
     const grant = sets * freeQty;
-    const product = state.products.find((p) => p.id === freeId);
-    if (!product) return;
-    const existing = result.find(
-      (l) => l.productId === freeId && l.isPromoFree,
-    );
-    if (existing) {
-      existing.quantity += grant;
-      existing.total = 0;
-    } else {
-      result.push({
-        productId: freeId,
-        productName: product.name,
-        quantity: grant,
-        price: 0,
-        total: 0,
-        isPromoFree: true,
-      });
-    }
+    freeIds.forEach((freeId) => {
+      const product = state.products.find((p) => p.id === freeId);
+      if (!product) return;
+      const existing = result.find(
+        (l) => l.productId === freeId && l.isPromoFree,
+      );
+      if (existing) {
+        existing.quantity += grant;
+        existing.total = 0;
+      } else {
+        result.push({
+          productId: freeId,
+          productName: product.name,
+          quantity: grant,
+          price: 0,
+          total: 0,
+          isPromoFree: true,
+        });
+      }
+    });
   });
   return result;
 }
@@ -3920,7 +4114,8 @@ function workerCartSummary() {
 }
 function savePromotionPrice(e) {
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target)),
+  const form = new FormData(e.target),
+    f = Object.fromEntries(form),
     minAmount = Number(f.minAmount),
     maxAmount = Number(f.maxAmount) || 0;
   if (!Number.isFinite(minAmount) || minAmount < 0)
@@ -3930,8 +4125,10 @@ function savePromotionPrice(e) {
   const type = f.type === "percent" ? "percent" : "free",
     rule = { minAmount, maxAmount, type };
   if (type === "free") {
-    if (!f.priceFreeProductId) return alert("Үнэгүй бараа сонгоно уу");
-    rule.freeProductId = f.priceFreeProductId;
+    const freeProductIds = form.getAll("priceFreeProductIds").filter(Boolean);
+    if (!freeProductIds.length) return alert("Үнэгүй бараа сонгоно уу");
+    rule.freeProductIds = freeProductIds;
+    rule.freeProductId = freeProductIds[0];
     rule.freeQty = Number(f.freeQty) || 1;
   } else {
     const pct = Number(f.discountPercent);
@@ -3942,13 +4139,14 @@ function savePromotionPrice(e) {
   state.promotionRules.price.push(rule);
   state.promoPick = null;
   state.promoModalKind = "";
-  state.searches.promo_priceFreeProductId = "";
+  state.searches.promo_priceFreeProductIds = "";
   closeModal();
   render();
 }
 function savePromotionPayment(e) {
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target)),
+  const form = new FormData(e.target),
+    f = Object.fromEntries(form),
     minAmount = f.minAmount === "" ? 0 : Number(f.minAmount);
   if (!Number.isFinite(minAmount) || minAmount < 0)
     return alert("Доод дүн зөв оруулна уу");
@@ -3959,8 +4157,10 @@ function savePromotionPayment(e) {
       type,
     };
   if (type === "free") {
-    if (!f.paymentFreeProductId) return alert("Үнэгүй бараа сонгоно уу");
-    rule.freeProductId = f.paymentFreeProductId;
+    const freeProductIds = form.getAll("paymentFreeProductIds").filter(Boolean);
+    if (!freeProductIds.length) return alert("Үнэгүй бараа сонгоно уу");
+    rule.freeProductIds = freeProductIds;
+    rule.freeProductId = freeProductIds[0];
     rule.freeQty = Number(f.freeQty) || 1;
   } else {
     const pct = Number(f.discountPercent);
@@ -3973,13 +4173,14 @@ function savePromotionPayment(e) {
   state.promotionRules.payment.push(rule);
   state.promoPick = null;
   state.promoModalKind = "";
-  state.searches.promo_paymentFreeProductId = "";
+  state.searches.promo_paymentFreeProductIds = "";
   closeModal();
   render();
 }
 function removePromotionRule(type, index) {
   if (!requireAdminDelete()) return;
-  if (!Array.isArray(state.promotionRules[type])) state.promotionRules[type] = [];
+  if (!Array.isArray(state.promotionRules[type]))
+    state.promotionRules[type] = [];
   state.promotionRules[type].splice(index, 1);
   render();
 }
@@ -4024,7 +4225,8 @@ function employeePlaceholderImage(e = {}) {
   if (e?.image) return e.image;
   const initial = deliveryInitial(e.name);
   const hue =
-    [...String(e?.name || "A")].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 360;
+    [...String(e?.name || "A")].reduce((s, ch) => s + ch.charCodeAt(0), 0) %
+    360;
   const bg = `hsl(${hue} 48% 90%)`;
   const accent = `hsl(${hue} 58% 40%)`;
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 88 88"><rect width="88" height="88" rx="14" fill="${bg}"/><text x="44" y="54" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" font-weight="800" fill="${accent}">${initial}</text></svg>`)}`;
@@ -4081,7 +4283,9 @@ function clearEmployeeImage() {
     preview.src = employeePlaceholderImage({ name });
   }
   upload
-    ?.querySelector('.customer-image-upload__body [onclick="clearEmployeeImage()"]')
+    ?.querySelector(
+      '.customer-image-upload__body [onclick="clearEmployeeImage()"]',
+    )
     ?.remove();
 }
 function employeesView() {
@@ -4294,7 +4498,11 @@ function filterDeliveryStores(rows, q) {
       c.province,
       c.district,
       c.locationText,
-    ].some((v) => String(v || "").toLowerCase().includes(query)),
+    ].some((v) =>
+      String(v || "")
+        .toLowerCase()
+        .includes(query),
+    ),
   );
 }
 function customerHasCoords(c) {
@@ -4336,15 +4544,17 @@ function deliveryStoreMapStep() {
     rows = filterDeliveryStores(deliveryStoresWithOrders(), q),
     orders = selected ? deliveryOrdersForStore(selected.id) : [],
     addr = selected ? customerAddress(selected) : "-",
-    maps = selected && customerHasCoords(selected)
-      ? mapsLink(selected.latitude, selected.longitude)
-      : "";
+    maps =
+      selected && customerHasCoords(selected)
+        ? mapsLink(selected.latitude, selected.longitude)
+        : "";
   if (!selected) {
     state.deliveryStoreReady = false;
     state.deliveryStoreId = "";
     return deliveryStorePickStep();
   }
-  const selectedEntry = rows.find((r) => r.customer.id === selected.id) ||
+  const selectedEntry =
+    rows.find((r) => r.customer.id === selected.id) ||
     deliveryStoresWithOrders().find((r) => r.customer.id === selected.id);
   const orderList = orders.length
     ? orders
@@ -4453,9 +4663,7 @@ function initDeliveryRouteMap(stores, selectedId) {
       name: c.name,
     }));
   const selected = points.find((p) => p.id === selectedId) || points[0],
-    start = selected
-      ? [selected.lat, selected.lng]
-      : [47.9189, 106.9176];
+    start = selected ? [selected.lat, selected.lng] : [47.9189, 106.9176];
   window.deliveryMap = L.map(mapEl, { tap: true, zoomControl: true }).setView(
     start,
     selected ? 15 : 12,
@@ -4847,7 +5055,9 @@ function closeModal() {
   state.searches.workerProduct = "";
   state.pickerStatus = "";
   clearReceiptEdit();
-  const syncWorkerSelect = !!document.querySelector("[data-worker-select-modal]");
+  const syncWorkerSelect = !!document.querySelector(
+    "[data-worker-select-modal]",
+  );
   modal.innerHTML = "";
   if (syncWorkerSelect) render();
 }
@@ -5018,7 +5228,8 @@ function customerModal(id, draft = null) {
     initCustomerMap(c.latitude, c.longitude);
   }, 120);
   loadMnLocations().then(() => {
-    if (modal.querySelector("form[data-customer-form]")) initCustomerAddressFields(c);
+    if (modal.querySelector("form[data-customer-form]"))
+      initCustomerAddressFields(c);
   });
   loadLesRegistryIndex();
 }
@@ -5540,8 +5751,7 @@ function adjustReceiptEditStock(beforeItems, afterItems) {
     const map = {};
     (items || []).forEach((i) => {
       if (!i?.productId) return;
-      map[i.productId] =
-        (map[i.productId] || 0) + (Number(i.quantity) || 0);
+      map[i.productId] = (map[i.productId] || 0) + (Number(i.quantity) || 0);
     });
     return map;
   };
@@ -5990,11 +6200,12 @@ function pickerModal() {
   box(
     pickerModalTitleHtml(),
     `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions"><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
-    "max-w-4xl",
+    "max-w-2xl",
     {
       titleId: "picker-order-title",
       dialog: true,
       titleHtml: !!pickerModalCustomer(),
+      panelClass: "modal-panel--picker",
     },
   );
 }
@@ -6309,7 +6520,10 @@ function initConfirmDeleteActions() {
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
-      confirmDelete(btn.getAttribute("data-confirm-delete") || "", btn.getAttribute("data-id") || "");
+      confirmDelete(
+        btn.getAttribute("data-confirm-delete") || "",
+        btn.getAttribute("data-id") || "",
+      );
     },
     true,
   );
@@ -6631,6 +6845,9 @@ Object.assign(window, {
   promotionQtyModal,
   promoProductSearch,
   selectPromoProduct,
+  promoPickSearch,
+  addPromoPickProduct,
+  removePromoPickProduct,
   promoBuyProductSearch,
   addPromoBuyProduct,
   removePromoBuyProduct,

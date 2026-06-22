@@ -2356,6 +2356,22 @@ button:focus-visible,
   font-size: 13px;
 }
 
+.modal-panel--picker {
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 820px);
+}
+
+.modal-panel--picker .picker-step2 {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.picker-list .picker-row:last-child {
+  border-bottom: none;
+}
+
 .receipt-edit-head {
   display: inline-flex;
   flex-wrap: wrap;
@@ -5011,6 +5027,86 @@ input::placeholder, textarea::placeholder {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   background: var(--hex-card);
+}
+
+@media (min-width: 1024px) {
+  .modal-panel--picker .modal-panel__head {
+    padding: 16px 20px;
+  }
+
+  .modal-panel--picker .modal-panel__title {
+    font-size: 1.125rem;
+  }
+
+  #picker-order-title .worker-order-store__name {
+    font-size: 1.125rem;
+  }
+
+  .picker-step2 {
+    --picker-h-inset: 20px;
+    --picker-row-thumb: 56px;
+    --picker-row-gap: 12px;
+    --picker-row-pad-y: 11px;
+    --picker-row-name: 15px;
+    --picker-row-meta: 13px;
+    min-height: min(480px, calc(88vh - 120px));
+  }
+
+  .picker-step2__toolbar {
+    padding: 12px var(--picker-h-inset) 10px;
+  }
+
+  .picker-cat-chips {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 8px;
+    padding: 0;
+  }
+
+  .picker-cat-chip {
+    padding: 8px 14px;
+    font-size: 13px;
+    min-height: 36px;
+  }
+
+  .picker-step2__scroll {
+    padding: 0 var(--picker-h-inset);
+  }
+
+  .picker-row {
+    padding: var(--picker-row-pad-y) 4px var(--picker-row-pad-y) 0;
+    transition: background 0.12s ease;
+  }
+
+  .picker-row:hover {
+    background: color-mix(in srgb, var(--hex-secondary) 45%, transparent);
+  }
+
+  .picker-row__info {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .picker-row__name {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .picker-row__meta {
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  .picker-step2__bottom {
+    padding: 14px var(--picker-h-inset) 16px;
+    box-shadow: none;
+  }
+
+  .picker-footer {
+    gap: 12px;
+  }
 }
 
 .picker-barcode-tools {
