@@ -51,6 +51,7 @@ const state = {
   pickerQtyProductId: "",
   workerOrderActiveId: "",
   workerOrdersArrived: false,
+  workerHighlightOrderId: "",
   receiptEditOrderId: "",
   receiptEditItems: null,
   receiptEditOriginalItems: null,
@@ -1126,6 +1127,7 @@ async function boot() {
     restoreAuthSession();
     initNoZoom();
     initPickerModalActions();
+    initEmployeeModalActions();
     initQtyStepperButtons();
     initConfirmCard();
     initConfirmDeleteActions();
@@ -1662,6 +1664,15 @@ function initQtyStepperButtons() {
     },
     true,
   );
+}
+function initEmployeeModalActions() {
+  if (modal.dataset.employeeFormBound) return;
+  modal.dataset.employeeFormBound = "1";
+  modal.addEventListener("submit", (e) => {
+    const form = e.target.closest("[data-employee-form]");
+    if (!form) return;
+    saveEmployee(e);
+  });
 }
 function initPickerModalActions() {
   if (modal.dataset.pickerBound) return;
@@ -2557,17 +2568,27 @@ function customerCardPhoneIcon() {
 function customerCardPinIcon() {
   return `<svg class="ui-icon customer-card__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
 }
+function customerCardPhonesHtml(c) {
+  const phones = [c.phone1, c.phone2]
+    .map((p) => String(p || "").trim())
+    .filter(Boolean);
+  if (!phones.length) {
+    return `<span class="customer-card__muted customer-card__phones">Утасгүй</span>`;
+  }
+  return `<div class="customer-card__phones">${phones
+    .map(
+      (phone) =>
+        `<a href="tel:${encodeURIComponent(phone)}" class="customer-card__phone-link">${customerCardPhoneIcon()}<span>${esc(phone)}</span></a>`,
+    )
+    .join("")}</div>`;
+}
 function customerListHead() {
-  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Дугаар</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
+  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  const phone = (c.phone1 || "").trim();
-  const phoneHtml = phone
-    ? `<a href="tel:${encodeURIComponent(phone)}" class="customer-card__line">${customerCardPhoneIcon()}<span>${esc(phone)}</span></a>`
-    : `<span class="customer-card__muted">Утасгүй</span>`;
-  return `<article class="customer-card ${active ? "customer-card--active" : ""}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><h3 class="customer-card__name">${esc(c.name)}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__phone">${phoneHtml}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card ${active ? "customer-card--active" : ""}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(c.name)}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function customersView() {
   const q = state.searches.customers || "",
@@ -5023,7 +5044,7 @@ function workerOrders(orders) {
     day = state.filters.workerDate || "",
     pay = state.filters.workerPay,
     today = todayIso();
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${orderIsPaid(o) ? "text-tone-success" : "text-tone-danger"}">${orderIsPaid(o) ? "Төлсөн" : "Төлөөгүй"}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="px-3 py-2 rounded text-sm ${!day ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="px-3 py-2 rounded text-sm ${day === today ? "bg-primary text-primary-foreground" : "bg-secondary"}">Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerOrdersArrived && state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${orderIsPaid(o) ? "text-tone-success" : "text-tone-danger"}">${orderIsPaid(o) ? "Төлсөн" : "Төлөөгүй"}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   orderReceiptModal(id);
@@ -5623,7 +5644,7 @@ function employeeModal() {
   if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form onsubmit="saveEmployee(event)" class="p-5 space-y-3 modal-scroll overflow-y-auto">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" required placeholder="Нууц үг" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form data-employee-form class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" type="password" required placeholder="Нууц үг" autocomplete="new-password" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Нэмэх</button></div></form>`,
     "max-w-md",
   );
   setTimeout(syncEmployeePctField, 0);
@@ -5825,7 +5846,7 @@ function orderReceiptModal(id, keepDraft = false) {
   const draft = receiptEditDraftOrder();
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="receipt-edit-store__meta">Хүргэлт ${dte(orderDeliveryDay(o))}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div><button type="button" onclick="printOrderReceipt('${o.id}')" class="btn btn--primary btn--block btn--lg">Баримт хэвлэх</button></div>`,
+    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dte(o.createdAt)}</p><p class="receipt-edit-store__meta">Хүргэлт ${dte(orderDeliveryDay(o))}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div><button type="button" onclick="downloadOrderReceiptExcel('${o.id}')" class="btn btn--primary btn--block btn--lg">${EXCEL_FILE_DOWNLOAD}</button></div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
@@ -5857,6 +5878,50 @@ function printRootEl() {
     document.body.appendChild(root);
   }
   return root;
+}
+function downloadOrderReceiptExcelNow(id) {
+  const hadChanges =
+    state.receiptEditOrderId === id &&
+    state.receiptEditItems &&
+    receiptEditHasChanges();
+  if (hadChanges) {
+    applyReceiptEditToOrder();
+    clearReceiptEdit();
+    render();
+  }
+  const o = state.orders.find((x) => x.id === id);
+  if (!o) return alert("Захиалга олдсонгүй");
+  const exportOrder =
+    !hadChanges &&
+    state.receiptEditOrderId === id &&
+    state.receiptEditItems
+      ? receiptEditDraftOrder()
+      : o;
+  exportOrderReceiptsExcel([exportOrder || o]);
+  showInstallToast("Excel файл татагдлаа");
+}
+function downloadOrderReceiptExcel(id) {
+  if (
+    state.receiptEditOrderId === id &&
+    state.receiptEditItems &&
+    receiptEditHasChanges()
+  ) {
+    const draft = receiptEditDraftOrder();
+    const o = state.orders.find((x) => x.id === id);
+    const oldTotal = o ? orderPayableTotal(o) : 0;
+    const newTotal = draft ? orderPayableTotal(draft) : oldTotal;
+    confirmModal(
+      "Excel татах",
+      `<p>Захиалгын дүнг хадгалж Excel татах уу?</p><p class="text-sm text-muted-foreground mt-2">Нийт: ${fmt(oldTotal)} → <b>${fmt(newTotal)}</b></p>`,
+      {
+        confirmLabel: "Тийм",
+        onConfirm: () => downloadOrderReceiptExcelNow(id),
+        onCancel: () => orderReceiptModalKeepDraft(id),
+      },
+    );
+    return;
+  }
+  downloadOrderReceiptExcelNow(id);
 }
 function printOrderReceipt(id) {
   if (
@@ -6427,6 +6492,10 @@ function employeeExcel() {
     ];
   excel(`aguulah-zahialga-${stamp}.csv`, sheetRows);
 }
+function clearWorkerOrderHighlight() {
+  state.workerOrdersArrived = false;
+  state.workerHighlightOrderId = "";
+}
 function saveWorker() {
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
   const c = state.customers.find((x) => x.id === state.workerCustomer),
@@ -6454,8 +6523,7 @@ function saveWorker() {
         paymentPromoDiscount,
     ),
     total = grossTotal - discountAmount;
-  state.orders.push(
-    buildNewOrder({
+  const order = buildNewOrder({
       customerId: c.id,
       customerName: c.name,
       items,
@@ -6476,8 +6544,8 @@ function saveWorker() {
       paymentTerm: state.paymentTerm,
       deliveryDate: todayIso(),
       ...deliveryFieldsForNewOrder(),
-    }),
-  );
+    });
+  state.orders.push(order);
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
   resetWorkerCart();
   state.workerStoreReady = false;
@@ -6489,15 +6557,21 @@ function saveWorker() {
   state.applyPercentDiscount = false;
   state.filters.worker = "orders";
   state.workerOrdersArrived = true;
+  state.workerHighlightOrderId = order.id;
   render();
   pushAppHistory();
+  requestAnimationFrame(() => {
+    document
+      .querySelector(`[data-order-id="${order.id}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
   setTimeout(() => {
     if (!state.workerOrdersArrived) return;
-    state.workerOrdersArrived = false;
+    clearWorkerOrderHighlight();
     if (state.currentView === "worker" && state.filters.worker === "orders") {
       render();
     }
-  }, 1400);
+  }, 2200);
 }
 function login(e) {
   e.preventDefault();
@@ -6649,27 +6723,43 @@ function logout() {
   render();
 }
 function saveEmployee(e) {
-  if (!isAdmin()) return;
   e.preventDefault();
-  const f = Object.fromEntries(new FormData(e.target));
+  const form = e.target?.closest?.("[data-employee-form]");
+  if (!form) return;
+  if (!isAdmin()) {
+    alertModal("Эрхгүй", "Зөвхөн админ ажилтан нэмэх эрхтэй.");
+    return;
+  }
+  const f = Object.fromEntries(new FormData(form));
+  const name = String(f.name || "").trim();
+  const email = normalizeEmail(f.email);
+  const password = String(f.password || "");
+  if (!name) return alert("Нэр оруулна уу");
+  if (!email) return alert("Email оруулна уу");
+  if (!password) return alert("Нууц үг оруулна уу");
   if (
     state.employees.some(
-      (e) => normalizeEmail(e.email) === normalizeEmail(f.email),
+      (emp) => normalizeEmail(emp.email) === email,
     )
   ) {
     return alert("Энэ email аль хэдийн бүртгэгдсэн байна");
   }
   state.employees.push({
     id: "employee-" + Date.now(),
-    ...f,
-    email: normalizeEmail(f.email),
-    image: f.image || "",
+    name,
+    email,
+    phone: String(f.phone || "").trim(),
+    password,
+    role: f.role || "sales",
+    image: String(f.image || ""),
     totalSales: 0,
     commissionRate: 0,
     allowPercentDiscount: f.role === "sales" && f.allowPercentDiscount === "on",
   });
   closeModal();
+  scheduleBackendSave();
   render();
+  showInstallToast("Ажилтан нэмэгдлээ");
 }
 function confirmDelete(type, id) {
   if (!canDelete()) {
@@ -6831,6 +6921,8 @@ Object.assign(window, {
   receiptDetail,
   printOrderReceipt,
   printOrderReceiptNow,
+  downloadOrderReceiptExcel,
+  downloadOrderReceiptExcelNow,
   orderReceiptModalKeepDraft,
   workerOrderDetail,
   applyStock,

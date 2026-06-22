@@ -306,7 +306,17 @@ textarea.text-sm,
   min-width: 0;
 }
 
+.customer-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 .customer-card__name {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: 16px;
   font-weight: 700;
@@ -314,6 +324,41 @@ textarea.text-sm,
   color: var(--hex-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-card__phones {
+  flex: 0 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 10px;
+  min-width: 0;
+  max-width: 58%;
+}
+
+.customer-card__phone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--hex-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.customer-card__phone-link .customer-card__icon {
+  width: 14px;
+  height: 14px;
+  margin-top: 0;
+  color: var(--hex-primary);
+}
+
+.customer-card__phones.customer-card__muted {
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -330,6 +375,10 @@ textarea.text-sm,
 .customer-card__phone,
 .customer-card__addr {
   min-width: 0;
+}
+
+.customer-card__addr {
+  margin-top: -2px;
 }
 
 .customer-card__line {
@@ -674,7 +723,7 @@ a.customer-card__line .customer-card__icon {
 
   .customer-list__head {
     display: grid;
-    grid-template-columns: minmax(200px, 1.15fr) 140px minmax(220px, 1.35fr) minmax(200px, auto);
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(200px, auto);
     gap: 16px;
     align-items: center;
     padding: 10px 16px;
@@ -693,8 +742,8 @@ a.customer-card__line .customer-card__icon {
 
   .customer-card {
     display: grid;
-    grid-template-columns: minmax(200px, 1.15fr) 140px minmax(220px, 1.35fr) minmax(200px, auto);
-    grid-template-areas: "head phone addr actions";
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(200px, auto);
+    grid-template-areas: "head addr actions";
     gap: 12px 16px;
     align-items: center;
     padding: 12px 16px;
@@ -708,12 +757,9 @@ a.customer-card__line .customer-card__icon {
     grid-area: head;
   }
 
-  .customer-card__phone {
-    grid-area: phone;
-  }
-
   .customer-card__addr {
     grid-area: addr;
+    margin-top: 0;
   }
 
   .customer-card__actions {
@@ -2206,27 +2252,8 @@ button:focus-visible,
   }
 }
 
-.worker-view--orders .worker-view__tabs {
-  background: #eef2f6;
-  border-bottom-color: #cfd8e3;
-}
-
-@media (max-width: 1023px) {
-  .worker-view--orders .worker-view__tabs {
-    margin-left: calc(-1 * var(--app-gutter));
-    margin-right: calc(-1 * var(--app-gutter));
-    padding: 8px var(--app-gutter) 0;
-  }
-}
-
 .worker-view--orders-arrived .worker-view__tabs {
   animation: worker-orders-top-arrive 1.3s ease;
-}
-
-.worker-view--orders .seg-tab.is-active {
-  background: #fff;
-  color: var(--hex-foreground);
-  box-shadow: 0 1px 0 #fff;
 }
 
 .mobile-bottom-nav {
@@ -3256,10 +3283,56 @@ input::placeholder, textarea::placeholder {
 }
 
 .worker-view__tabs {
-  margin-bottom: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  margin: 0 0 8px;
   border: none;
   border-bottom: 1px solid var(--hex-border);
+  border-radius: 0;
   background: transparent;
+}
+
+.worker-view__tabs .seg-tab {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--hex-muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.worker-view__tabs .seg-tab.is-active {
+  color: var(--hex-primary);
+  background: transparent;
+  box-shadow: none;
+  border-bottom-color: var(--hex-primary);
+}
+
+@media (max-width: 1023px) {
+  .worker-view--orders .worker-view__tabs {
+    margin-left: calc(-1 * var(--app-gutter));
+    margin-right: calc(-1 * var(--app-gutter));
+    margin-bottom: 0;
+    padding: 0 var(--app-gutter);
+    background: #eef2f6;
+    border-bottom-color: #cfd8e3;
+  }
+
+  .worker-view--orders .worker-view__tabs .seg-tab.is-active {
+    color: #117d8d;
+    border-bottom-color: #117d8d;
+  }
+
+  .worker-view--orders .worker-view__tabs .seg-tab:not(.is-active) {
+    color: #6b7c91;
+  }
 }
 
 .worker-view {
@@ -5476,7 +5549,7 @@ input::placeholder, textarea::placeholder {
     max-height: calc(100dvh - 55px) !important;
   }
 
-  #modal > div > div > :not(.border-b):not(.picker-step2):not(.picker-step1):not(.stock-alert-form) {
+  #modal > div > div > :not(.border-b):not(.picker-step2):not(.picker-step1):not(.stock-alert-form):not(.employee-form) {
     max-height: calc(100dvh - 55px);
     overflow-y: auto;
   }
@@ -5501,6 +5574,29 @@ input::placeholder, textarea::placeholder {
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+  }
+
+  #modal > div > div > .employee-form {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .employee-form__body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .employee-form__foot {
+    flex-shrink: 0;
   }
 
   .stock-alert-list {
@@ -7370,6 +7466,28 @@ input::placeholder, textarea::placeholder {
 
 .line-list__row:active:not(:disabled) {
   background: color-mix(in srgb, var(--hex-primary) 10%, var(--hex-secondary));
+}
+
+.line-list__row--new {
+  background: #d9eef2;
+  animation: worker-order-row-arrive 2.2s ease forwards;
+}
+
+.line-list__row--new:hover,
+.line-list__row--new:focus-visible {
+  background: #cfe9ee;
+}
+
+@keyframes worker-order-row-arrive {
+  0% {
+    background: #b8e3eb;
+  }
+  70% {
+    background: #e4f4f7;
+  }
+  100% {
+    background: transparent;
+  }
 }
 
 .line-list__row--static {
