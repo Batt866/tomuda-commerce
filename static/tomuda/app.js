@@ -2834,7 +2834,7 @@ function productsView() {
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
-    )}</select>${isAdmin() ? `<div class="products-toolbar__actions"><button type="button" onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button type="button" onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div>` : ""}</div><div class="product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+    )}</select>${isAdmin() ? `<div class="products-toolbar__actions"><button type="button" onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл</button><button type="button" onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div>` : ""}</div><div class="product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = isAdmin();
@@ -5720,13 +5720,81 @@ function saveProduct(e, id) {
   closeModal();
   render();
 }
+function categoryProductCount(name) {
+  return state.products.filter((p) => p.category === name).length;
+}
 function categoryModal() {
   if (!isAdmin()) return;
+  const rows = cats()
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b), "mn"))
+    .map((cat) => {
+      const count = categoryProductCount(cat);
+      const action =
+        count > 0
+          ? `<span class="category-row__meta">${count} бараа</span>`
+          : `<button type="button" onclick="confirmDeleteCategory('${esc(cat)}')" class="category-row__delete">Устгах</button>`;
+      return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span>${action}</div>`;
+    })
+    .join("");
   box(
-    "Төрөл нэмэх",
-    `<form onsubmit="event.preventDefault();state.extraCategories.push(this.category.value);closeModal();render()" class="p-6 space-y-4"><input name="category" autofocus required placeholder="Төрөлийн нэр" class="w-full px-4 py-3 bg-secondary rounded"><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
-    "max-w-md",
+    "Төрөл удирдах",
+    `<form onsubmit="addCategory(event)" class="category-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="category-form__add shrink-0"><label class="block text-sm font-medium mb-2">Шинэ төрөл</label><div class="category-form__add-row"><input name="category" autofocus required placeholder="Төрөлийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="submit" class="btn btn--primary shrink-0">Нэмэх</button></div></div><div class="category-form__list modal-scroll flex-1 min-h-0 overflow-y-auto mt-4">${rows || `<p class="category-form__empty">Төрөл байхгүй</p>`}</div></form>`,
+    "max-w-lg",
   );
+}
+function addCategory(e) {
+  e.preventDefault();
+  if (!isAdmin()) return;
+  const name = String(new FormData(e.target).get("category") || "").trim();
+  if (!name) return alert("Төрөлийн нэр оруулна уу");
+  if (cats().includes(name)) return alert("Энэ төрөл аль хэдийн бүртгэгдсэн байна");
+  state.extraCategories.push(name);
+  scheduleBackendSave();
+  closeModal();
+  render();
+  scheduleBackendSave();
+  showInstallToast("Төрөл нэмэгдлээ");
+}
+function confirmDeleteCategory(name) {
+  if (!isAdmin()) return;
+  const count = categoryProductCount(name);
+  if (count > 0) {
+    alertModal(
+      "Устгах боломжгүй",
+      `<p><strong>${esc(name)}</strong> төрөлд <strong>${count}</strong> бараа байна.</p><p class="text-sm text-muted-foreground mt-2">Эхлээд барааны төрлийг өөрчилнө үү.</p>`,
+    );
+    return;
+  }
+  confirmModal("Төрөл устгах уу?", `<strong>${esc(name)}</strong> төрлийг устгах гэж байна.`, {
+    confirmLabel: "Тийм",
+    danger: true,
+    onConfirm: () => {
+      confirmModal(
+        "Баталгаажуулах",
+        `<strong>${esc(name)}</strong> төрлийг бүрмөсөн устгахдаа итгэлтэй байна уу?`,
+        {
+          confirmLabel: "Батлах",
+          danger: true,
+          closable: true,
+          onConfirm: () => deleteCategoryNow(name),
+        },
+      );
+    },
+  });
+}
+function deleteCategoryNow(name) {
+  if (!isAdmin()) return;
+  state.extraCategories = state.extraCategories.filter((c) => c !== name);
+  if (state.filters.category === name) state.filters.category = "all";
+  if (state.filters.inventoryCategory === name)
+    state.filters.inventoryCategory = "all";
+  if (state.filters.countCategory === name) state.filters.countCategory = "all";
+  if (state.filters.workerCategory === name) state.filters.workerCategory = "";
+  scheduleBackendSave();
+  closeModal();
+  render();
+  showInstallToast("Төрөл устгагдлаа");
 }
 function employeeModal() {
   if (!isAdmin()) return;
@@ -6993,6 +7061,8 @@ Object.assign(window, {
   scheduleCustomerRegistryLookup,
   saveProduct,
   categoryModal,
+  addCategory,
+  confirmDeleteCategory,
   employeeModal,
   orderModal,
   saveOrder,

@@ -1214,6 +1214,67 @@ a.customer-card__line .customer-card__icon {
   min-width: 0;
 }
 
+.category-form__add-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.category-form__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hex-border);
+}
+
+.category-form__empty {
+  margin: 0;
+  padding: 16px 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--hex-muted-foreground);
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--hex-secondary);
+}
+
+.category-row__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.category-row__meta {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--hex-muted-foreground);
+}
+
+.category-row__delete {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: #dc2626;
+  cursor: pointer;
+}
+
+.category-row__delete:active {
+  opacity: 0.85;
+}
+
 @media (min-width: 640px) {
   .products-toolbar {
     flex-direction: row;
