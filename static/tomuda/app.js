@@ -4533,7 +4533,11 @@ function clearEmployeeImage() {
     ?.remove();
 }
 function employeesView() {
-  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
+  const editBtn = (e) =>
+    isAdmin()
+      ? `<button type="button" onclick="employeeModal('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
+      : "";
+  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -5587,18 +5591,35 @@ function initCustomerMap(lat, lng) {
   showCustomerUserLocation(has);
   scheduleCustomerMapResize();
 }
-function saveCustomer(e, id) {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target));
-  id
-    ? Object.assign(
-        state.customers.find((c) => c.id === id),
-        data,
-      )
-    : state.customers.push({ ...data, id: String(Date.now()) });
+function applyCustomerSave(data, id) {
+  if (id) {
+    const existing = state.customers.find((c) => c.id === id);
+    if (existing) Object.assign(existing, data);
+  } else {
+    state.customers.push({ ...data, id: String(Date.now()) });
+  }
   closeModal();
   render();
   scheduleBackendSave();
+}
+function saveCustomer(e, id) {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  if (id) {
+    const existing = state.customers.find((c) => c.id === id);
+    const name = String(data.name || existing?.name || "Харилцагч").trim();
+    confirmModal(
+      "Харилцагч засах",
+      `<p><b>${esc(name)}</b> мэдээллийг хадгалах уу?</p>`,
+      {
+        confirmLabel: "Тийм",
+        closable: true,
+        onConfirm: () => applyCustomerSave(data, id),
+      },
+    );
+    return;
+  }
+  applyCustomerSave(data, id);
 }
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
@@ -5800,20 +5821,21 @@ async function fillProductFromBarcode(code) {
     return;
   }
 }
-function saveProduct(e, id) {
-  if (!isAdmin()) return;
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target));
-  if (!data.category?.trim()) return alert("Төрөл сонгоно уу");
+function buildProductDataFromForm(form) {
+  const data = Object.fromEntries(new FormData(form));
+  if (!data.category?.trim()) return { error: "Төрөл сонгоно уу" };
   if (data.category === "__new__") {
     const custom = prompt("Шинэ төрлийн нэр");
-    if (!custom?.trim()) return alert("Төрөл сонгоно уу");
+    if (!custom?.trim()) return { error: "Төрөл сонгоно уу" };
     data.category = custom.trim();
     if (!state.extraCategories.includes(data.category))
       state.extraCategories.push(data.category);
   }
   ["price", "costPrice"].forEach((k) => (data[k] = Number(data[k] || 0)));
   data.country = String(data.country || "").trim() || "Монгол";
+  return { data };
+}
+function applyProductSave(data, id) {
   if (id) {
     const existing = state.products.find((p) => p.id === id);
     if (existing) Object.assign(existing, data);
@@ -5828,6 +5850,29 @@ function saveProduct(e, id) {
   }
   closeModal();
   render();
+  scheduleBackendSave();
+}
+function saveProduct(e, id) {
+  if (!isAdmin()) return;
+  e.preventDefault();
+  const built = buildProductDataFromForm(e.target);
+  if (built.error) return alert(built.error);
+  const data = built.data;
+  if (id) {
+    const existing = state.products.find((p) => p.id === id);
+    const name = String(data.name || existing?.name || "Бараа").trim();
+    confirmModal(
+      "Бараа засах",
+      `<p><b>${esc(name)}</b> мэдээллийг хадгалах уу?</p>`,
+      {
+        confirmLabel: "Тийм",
+        closable: true,
+        onConfirm: () => applyProductSave(data, id),
+      },
+    );
+    return;
+  }
+  applyProductSave(data, id);
 }
 function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
@@ -5910,17 +5955,98 @@ function deleteCategoryNow(name) {
   render();
   showInstallToast("Төрөл устгагдлаа");
 }
-function employeeModal() {
+function employeeModal(id) {
   if (!isAdmin()) return;
+  const editId = id ? String(id) : "";
+  const e = editId ? state.employees.find((x) => x.id === editId) : null;
+  if (editId && !e) return alert("Ажилтан олдсонгүй");
+  const isEdit = !!editId;
+  const roleOptions = ["sales", "warehouse", "delivery", "admin"]
+    .map(
+      (r) =>
+        `<option value="${r}" ${(e?.role || "sales") === r ? "selected" : ""}>${role(r)}</option>`,
+    )
+    .join("");
+  const pctChecked =
+    isEdit && e?.role === "sales"
+      ? e.allowPercentDiscount !== false
+      : !isEdit;
+  const passwordAttrs = isEdit
+    ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
+    : `required placeholder="Нууц үг" autocomplete="new-password"`;
   box(
-    "Ажилтан нэмэх",
-    `<form data-employee-form class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" required placeholder="Нууц үг" autocomplete="new-password" class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Нэмэх</button></div></form>`,
+    isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-md",
   );
   setTimeout(() => {
     syncEmployeePctField();
-    initEmployeeImageField();
+    initEmployeeImageField(e || {});
   }, 0);
+}
+function buildEmployeeDataFromForm(form, editId = "") {
+  const f = Object.fromEntries(new FormData(form));
+  const name = String(f.name || "").trim();
+  const email = normalizeEmail(f.email);
+  const password = String(f.password || "");
+  if (!name) return { error: "Нэр оруулна уу" };
+  if (!email) return { error: "Email оруулна уу" };
+  if (!editId && !password) return { error: "Нууц үг оруулна уу" };
+  if (
+    state.employees.some(
+      (emp) => normalizeEmail(emp.email) === email && emp.id !== editId,
+    )
+  ) {
+    return { error: "Энэ email аль хэдийн бүртгэгдсэн байна" };
+  }
+  return {
+    data: {
+      name,
+      email,
+      phone: String(f.phone || "").trim(),
+      password,
+      role: f.role || "sales",
+      image: String(f.image || ""),
+      allowPercentDiscount:
+        (f.role || "sales") === "sales" && f.allowPercentDiscount === "on",
+    },
+  };
+}
+function applyEmployeeSave(data, editId = "") {
+  if (editId) {
+    const existing = state.employees.find((e) => e.id === editId);
+    if (!existing) return alert("Ажилтан олдсонгүй");
+    existing.name = data.name;
+    existing.email = data.email;
+    existing.phone = data.phone;
+    existing.role = data.role;
+    existing.image = data.image;
+    existing.allowPercentDiscount = data.allowPercentDiscount;
+    if (data.password) existing.password = data.password;
+    if (state.currentEmployee?.id === editId) {
+      state.currentEmployee = existing;
+      applyLoginRoleDefaults(existing);
+      saveAuthSession();
+    }
+    showInstallToast("Ажилтан шинэчлэгдлээ");
+  } else {
+    state.employees.push({
+      id: "employee-" + Date.now(),
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      password: data.password,
+      role: data.role,
+      image: data.image,
+      totalSales: 0,
+      commissionRate: 0,
+      allowPercentDiscount: data.allowPercentDiscount,
+    });
+    showInstallToast("Ажилтан нэмэгдлээ");
+  }
+  closeModal();
+  scheduleBackendSave();
+  render();
 }
 function orderModal() {
   box(
@@ -6989,32 +7115,25 @@ function saveEmployee(e) {
     alertModal("Эрхгүй", "Зөвхөн админ ажилтан нэмэх эрхтэй.");
     return;
   }
-  const f = Object.fromEntries(new FormData(form));
-  const name = String(f.name || "").trim();
-  const email = normalizeEmail(f.email);
-  const password = String(f.password || "");
-  if (!name) return alert("Нэр оруулна уу");
-  if (!email) return alert("Email оруулна уу");
-  if (!password) return alert("Нууц үг оруулна уу");
-  if (state.employees.some((emp) => normalizeEmail(emp.email) === email)) {
-    return alert("Энэ email аль хэдийн бүртгэгдсэн байна");
+  const editId = form.getAttribute("data-employee-id") || "";
+  const built = buildEmployeeDataFromForm(form, editId);
+  if (built.error) return alert(built.error);
+  const data = built.data;
+  if (editId) {
+    const existing = state.employees.find((emp) => emp.id === editId);
+    const name = data.name || existing?.name || "Ажилтан";
+    confirmModal(
+      "Ажилтан засах",
+      `<p><b>${esc(name)}</b> мэдээллийг хадгалах уу?</p>`,
+      {
+        confirmLabel: "Тийм",
+        closable: true,
+        onConfirm: () => applyEmployeeSave(data, editId),
+      },
+    );
+    return;
   }
-  state.employees.push({
-    id: "employee-" + Date.now(),
-    name,
-    email,
-    phone: String(f.phone || "").trim(),
-    password,
-    role: f.role || "sales",
-    image: String(f.image || ""),
-    totalSales: 0,
-    commissionRate: 0,
-    allowPercentDiscount: f.role === "sales" && f.allowPercentDiscount === "on",
-  });
-  closeModal();
-  scheduleBackendSave();
-  render();
-  showInstallToast("Ажилтан нэмэгдлээ");
+  applyEmployeeSave(data, editId);
 }
 function confirmDelete(type, id) {
   if (!canDelete()) {
