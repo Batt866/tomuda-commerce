@@ -444,13 +444,22 @@ textarea.text-sm,
   box-shadow: var(--thumb-shadow);
 }
 
-.sidebar-user__avatar.employee-card__avatar-img,
+.sidebar-user__avatar.employee-card__avatar-img {
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .mobile-top-bar__user-avatar.employee-card__avatar-img,
 .delivery-picker-option__avatar.employee-card__avatar-img {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: inherit;
+  object-fit: cover;
 }
 
 .mobile-top-bar__user:has(.mobile-top-bar__user-avatar) {
