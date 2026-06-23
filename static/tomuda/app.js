@@ -2716,7 +2716,7 @@ function customerDetailHtml(c, id) {
       customerCardPinIcon(),
     ),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div><footer class="customer-detail__actions"><button type="button" onclick="closeModal();customerModal('${esc(id)}')" class="btn btn--primary btn--block">Засах</button></footer></div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div><footer class="customer-detail__actions"><button type="button" onclick="confirmEditCustomer('${esc(id)}')" class="btn btn--primary btn--block">Засах</button></footer></div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -2910,7 +2910,7 @@ function customerRow(c) {
     : "";
   return customerListRow(
     c,
-    `<button type="button" onclick="customerDetail('${c.id}')" class="customer-card__btn customer-card__btn--ghost">Харах</button><button type="button" onclick="customerModal('${c.id}')" class="customer-card__btn customer-card__btn--primary">Засах</button>${deleteBtn}`,
+    `<button type="button" onclick="customerDetail('${c.id}')" class="customer-card__btn customer-card__btn--ghost">Харах</button><button type="button" onclick="confirmEditCustomer('${c.id}')" class="customer-card__btn customer-card__btn--primary">Засах</button>${deleteBtn}`,
   );
 }
 function workerPickCard(c) {
@@ -2945,7 +2945,7 @@ function productListHead() {
 }
 function productCard(p) {
   const adminActions = isAdmin()
-    ? `<div class="product-card__actions"><button type="button" onclick="productModal('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
+    ? `<div class="product-card__actions"><button type="button" onclick="confirmEditProduct('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
     : "";
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
   return `<article class="product-card"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
@@ -4535,7 +4535,7 @@ function clearEmployeeImage() {
 function employeesView() {
   const editBtn = (e) =>
     isAdmin()
-      ? `<button type="button" onclick="employeeModal('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
+      ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
       : "";
   return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
 }
@@ -5471,6 +5471,51 @@ function customerFromDraft(id, draft) {
     locationText: draft.locationText ?? saved.locationText,
   };
 }
+function confirmEditCustomer(id) {
+  const c = state.customers.find((x) => x.id === id);
+  if (!c) return alert("Харилцагч олдсонгүй");
+  const name = c.name || c.companyName || "Харилцагч";
+  confirmModal(
+    "Харилцагч засах",
+    `<p><b>${esc(name)}</b> засах уу?</p>`,
+    {
+      confirmLabel: "Тийм",
+      closable: true,
+      onConfirm: () => {
+        closeModal();
+        customerModal(id);
+      },
+    },
+  );
+}
+function confirmEditProduct(id) {
+  if (!isAdmin()) return;
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return alert("Бараа олдсонгүй");
+  confirmModal(
+    "Бараа засах",
+    `<p><b>${esc(p.name || "Бараа")}</b> засах уу?</p>`,
+    {
+      confirmLabel: "Тийм",
+      closable: true,
+      onConfirm: () => productModal(id),
+    },
+  );
+}
+function confirmEditEmployee(id) {
+  if (!isAdmin()) return;
+  const e = state.employees.find((x) => x.id === id);
+  if (!e) return alert("Ажилтан олдсонгүй");
+  confirmModal(
+    "Ажилтан засах",
+    `<p><b>${esc(e.name || "Ажилтан")}</b> засах уу?</p>`,
+    {
+      confirmLabel: "Тийм",
+      closable: true,
+      onConfirm: () => employeeModal(id),
+    },
+  );
+}
 function customerModal(id, draft = null) {
   destroyCustomerMap();
   const useDraft = draft || null;
@@ -5605,20 +5650,6 @@ function applyCustomerSave(data, id) {
 function saveCustomer(e, id) {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
-  if (id) {
-    const existing = state.customers.find((c) => c.id === id);
-    const name = String(data.name || existing?.name || "Харилцагч").trim();
-    confirmModal(
-      "Харилцагч засах",
-      `<p><b>${esc(name)}</b> мэдээллийг хадгалах уу?</p>`,
-      {
-        confirmLabel: "Тийм",
-        closable: true,
-        onConfirm: () => applyCustomerSave(data, id),
-      },
-    );
-    return;
-  }
   applyCustomerSave(data, id);
 }
 function customerDetail(id) {
@@ -5857,22 +5888,7 @@ function saveProduct(e, id) {
   e.preventDefault();
   const built = buildProductDataFromForm(e.target);
   if (built.error) return alert(built.error);
-  const data = built.data;
-  if (id) {
-    const existing = state.products.find((p) => p.id === id);
-    const name = String(data.name || existing?.name || "Бараа").trim();
-    confirmModal(
-      "Бараа засах",
-      `<p><b>${esc(name)}</b> мэдээллийг хадгалах уу?</p>`,
-      {
-        confirmLabel: "Тийм",
-        closable: true,
-        onConfirm: () => applyProductSave(data, id),
-      },
-    );
-    return;
-  }
-  applyProductSave(data, id);
+  applyProductSave(built.data, id);
 }
 function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
@@ -7118,22 +7134,7 @@ function saveEmployee(e) {
   const editId = form.getAttribute("data-employee-id") || "";
   const built = buildEmployeeDataFromForm(form, editId);
   if (built.error) return alert(built.error);
-  const data = built.data;
-  if (editId) {
-    const existing = state.employees.find((emp) => emp.id === editId);
-    const name = data.name || existing?.name || "Ажилтан";
-    confirmModal(
-      "Ажилтан засах",
-      `<p><b>${esc(name)}</b> мэдээллийг хадгалах уу?</p>`,
-      {
-        confirmLabel: "Тийм",
-        closable: true,
-        onConfirm: () => applyEmployeeSave(data, editId),
-      },
-    );
-    return;
-  }
-  applyEmployeeSave(data, editId);
+  applyEmployeeSave(built.data, editId);
 }
 function confirmDelete(type, id) {
   if (!canDelete()) {
@@ -7260,6 +7261,9 @@ Object.assign(window, {
   search,
   render,
   closeModal,
+  confirmEditCustomer,
+  confirmEditProduct,
+  confirmEditEmployee,
   customerModal,
   handleCustomerImage,
   clearCustomerImage,
