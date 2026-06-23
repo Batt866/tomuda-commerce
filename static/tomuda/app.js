@@ -27,7 +27,6 @@ const state = {
     reportDate: "",
     promotionTab: "price",
     promotionDetail: "",
-    productsTab: "all",
   },
   promotionRules: { quantity: [], price: [], payment: [] },
   workerCustomer: "",
@@ -799,21 +798,6 @@ const card = (l, v, t = "", opts = null) => {
     notifyActive = notify && !!opts.active;
   return `<div class="metrics-bar__item${notify ? " metrics-bar__item--notify" : ""}">${notify ? metricsNotifyIcon(notifyActive) : ""}<span class="metrics-bar__label">${l}</span><b class="metrics-bar__value ${t}">${v}</b></div>`;
 };
-function metricsCard(label, value, tone = "", opts = {}) {
-  const {
-      action = "",
-      active = false,
-      notify = false,
-      notifyActive = false,
-    } = opts,
-    notifyHtml = notify ? metricsNotifyIcon(notifyActive) : "",
-    activeCls = active ? " metrics-bar__item--active" : "",
-    notifyCls = notify ? " metrics-bar__item--notify" : "";
-  if (!action) {
-    return `<div class="metrics-bar__item${notifyCls}${activeCls}">${notifyHtml}<span class="metrics-bar__label">${label}</span><b class="metrics-bar__value ${tone}">${value}</b></div>`;
-  }
-  return `<button type="button" onclick="${action}" class="metrics-bar__item metrics-bar__item--btn${notifyCls}${activeCls}" aria-pressed="${active ? "true" : "false"}">${notifyHtml}<span class="metrics-bar__label">${label}</span><b class="metrics-bar__value ${tone}">${value}</b></button>`;
-}
 const metricsBar = (items, cols = "", modifier = "") =>
   `<div class="metrics-bar${cols ? ` metrics-bar--${cols}` : ""}${modifier ? ` metrics-bar--${modifier}` : ""}">${items}</div>`;
 const pageHead = (title, action = "") =>
@@ -2264,7 +2248,9 @@ function stockAlertModal() {
         .map((p) => {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImage(p)}" alt="" class="stock-alert-thumb" width="44" height="44" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="number" name="minStock_${esc(p.id)}" min="0" step="1" value="${limit}" placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
+          const limitAttr =
+            limit > 0 ? `value="${limit}" ` : "";
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImage(p)}" alt="" class="stock-alert-thumb" width="44" height="44" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="number" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
@@ -2834,100 +2820,32 @@ function workerPickCard(c) {
   const line2 = sub || reg || phone;
   return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}"><span class="worker-pick-card__avatar">${esc(initial)}</span><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
-function setProductsTab(tab) {
-  state.filters.productsTab = tab || "all";
-  if (tab === "all") state.filters.category = "all";
-  render();
-}
 function productsView() {
   const q = state.searches.products || "",
     cat = state.filters.category,
-    tab = state.filters.productsTab || "all",
     list = state.products.filter(
       (p) =>
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
           p.barcode.includes(q)) &&
         (cat === "all" || p.category === cat),
     ),
-    low = lowStockProducts().length,
-    stockHint =
-      tab === "stock"
-        ? `<p class="products-stock-hint">Бараа дээр «Засах» дарж тоолсон тоогоо оруулаад «Таталт хийж дууссан» дарна.</p>`
-        : "",
-    categoryChips =
-      tab === "category"
-        ? `<div class="inventory-categories products-category-chips">${[
-            ["all", "Бүх төрөл"],
-            ...cats().map((c) => [c, c]),
-          ]
-            .map(
-              ([id, label]) =>
-                `<button type="button" onclick="state.filters.category='${esc(id)}';render()" class="px-3 py-2 rounded text-sm ${cat === id ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(label)}</button>`,
-            )
-            .join("")}</div>`
-        : "";
-  return `<div class="space-y-4">${pageHead("Бараа", `<button onclick="confirmProductsExport()" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`)}${metricsBar(`${metricsCard("Бараа", state.products.length, "", { action: "setProductsTab('all')", active: tab === "all" })}${metricsCard("Төрөл", cats().length, "", { action: "setProductsTab('category')", active: tab === "category" })}${metricsCard("Үлд", low, low ? "text-tone-warning" : "text-tone-success", { action: "setProductsTab('stock')", active: tab === "stock" })}`, 3)}${stockHint}${categoryChips}<div class="line-panel"><div class="line-panel__toolbar products-toolbar"><input data-focus="products" value="${esc(q)}" oninput="search('products',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded app-input"><select onchange="state.filters.category=this.value;render()" class="px-3 py-2.5 bg-secondary rounded app-input"><option value="all">Бүх төрөл</option>${cats()
+    low = lowStockProducts().length;
+  return `<div class="space-y-4">${pageHead("Бараа", `<button onclick="confirmProductsExport()" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`)}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel"><div class="line-panel__toolbar products-toolbar"><input data-focus="products" value="${esc(q)}" oninput="search('products',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded app-input"><select onchange="state.filters.category=this.value;render()" class="px-3 py-2.5 bg-secondary rounded app-input"><option value="all">Бүх төрөл</option>${cats()
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
-    )}</select>${isAdmin() ? `<div class="products-toolbar__actions"><button type="button" onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button type="button" onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div>` : ""}</div><div class="product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead(tab)}${list.map((p) => productCard(p, tab)).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+    )}</select>${isAdmin() ? `<div class="products-toolbar__actions"><button type="button" onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл нэмэх</button><button type="button" onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div>` : ""}</div><div class="product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
-function productListHead(tab = "all") {
+function productListHead() {
   const actions = isAdmin();
-  const stockTab = tab === "stock";
-  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span><span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">${stockTab ? "Таталт" : "Үйлдэл"}</span>` : ""}</div>`;
+  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span><span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
 }
-function productCard(p, tab = "all") {
-  const stockTab = tab === "stock";
+function productCard(p) {
   const adminActions = isAdmin()
-    ? `<div class="product-card__actions"><button type="button" onclick="${stockTab ? `productStockTakeModal('${p.id}')` : `productModal('${p.id}')`}" class="product-card__action-btn product-card__action-btn--edit">Засах</button>${stockTab ? "" : `<button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button>`}</div>`
+    ? `<div class="product-card__actions"><button type="button" onclick="productModal('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
     : "";
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
-  const stockCount = Number(p.stock ?? 0);
-  return `<article class="product-card${stockTab && isLowStock(p) ? " product-card--low-stock" : ""}"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">${stockTab ? `${stockCount} ${esc(p.unit || "ш")}` : `Үлд: ${stockCount}`}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
-}
-function productStockTakeModal(id) {
-  const p = state.products.find((x) => x.id === id);
-  if (!p) return;
-  const current = Number(p.stock || 0);
-  box(
-    "Таталт",
-    `<form onsubmit="saveProductStockTake(event,'${esc(id)}')" class="product-stock-take p-5 space-y-4"><div class="product-stock-take__product"><img src="${productImage(p)}" alt="" class="product-thumb product-stock-take__thumb"><div class="product-stock-take__info"><p class="product-stock-take__name">${esc(p.name)}</p><p class="product-stock-take__barcode">${esc(p.barcode || "-")}</p><p class="product-stock-take__stock">Бүртгэсэн: <b>${current} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоолсон тоо (${esc(p.unit || "ш")})</span><input name="quantity" type="number" min="0" step="1" value="${current}" required inputmode="numeric" autofocus class="field-input app-input product-stock-take__input"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Таталт хийж дууссан</button></div></form>`,
-    "max-w-md",
-  );
-}
-function saveProductStockTake(e, id) {
-  e.preventDefault();
-  if (setProductStock(id, new FormData(e.target).get("quantity"))) {
-    closeModal();
-    showInstallToast("Үлдэгдэл хадгалагдлаа");
-  }
-}
-function setProductStock(id, qty) {
-  const p = state.products.find((x) => x.id === id);
-  if (!p) return false;
-  const next = Math.max(0, Number(qty));
-  if (!Number.isFinite(next)) {
-    alert("Тоо оруулна уу");
-    return false;
-  }
-  const prev = Number(p.stock || 0);
-  if (prev !== next) {
-    const diff = next - prev;
-    p.stock = next;
-    state.inventoryLogs.push({
-      id: Date.now(),
-      productName: p.name,
-      type: diff >= 0 ? "in" : "out",
-      quantity: Math.abs(diff),
-      date: new Date(),
-      employeeName: state.currentEmployee?.name || "",
-      note: "таталт",
-    });
-    scheduleBackendSave();
-    render();
-  }
-  return true;
+  return `<article class="product-card"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -2971,7 +2889,7 @@ function inventoryStockModal(id, tab) {
     btnClass = isIn ? "btn--primary" : "btn--danger";
   box(
     title,
-    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImage(p)}" alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="number" min="1" value="1" required inputmode="numeric" autofocus class="field-input app-input"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
+    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImage(p)}" alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="number" min="1" placeholder="1" required inputmode="numeric" autofocus class="field-input app-input"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
     "max-w-md",
   );
 }
@@ -3616,7 +3534,9 @@ function promoFormDraftField(el) {
 }
 function promoAmountInputHtml(name, { required = false, placeholder = "", value = "" } = {}) {
   const req = required ? " required" : "";
-  return `<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1"${req} placeholder="${esc(placeholder)}" value="${esc(String(value ?? ""))}" oninput="promoFormDraftField(this)" class="w-full px-3 py-3 bg-secondary rounded app-input">`;
+  const v = String(value ?? "").trim();
+  const valAttr = v ? ` value="${esc(v)}"` : "";
+  return `<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1"${req} placeholder="${esc(placeholder)}"${valAttr} oninput="promoFormDraftField(this)" class="w-full px-3 py-3 bg-secondary rounded app-input">`;
 }
 function promotionProductPickerBlock(
   fieldName,
@@ -3666,13 +3586,12 @@ function promoSectionArrow() {
   return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">үнэгүй өгнө</span></div>`;
 }
 function promotionQtyField(name, label, defaultValue, inline = false) {
-  const draftVal = promoFormDraftVal(name, defaultValue ?? "");
-  const val =
-    draftVal !== ""
-      ? ` value="${esc(draftVal)}"`
-      : defaultValue !== undefined && defaultValue !== ""
-        ? ` value="${esc(String(defaultValue))}"`
-        : "";
+  const draftVal = promoFormDraftVal(name, "");
+  const val = draftVal !== "" ? ` value="${esc(draftVal)}"` : "";
+  const ph =
+    defaultValue !== undefined && defaultValue !== ""
+      ? String(defaultValue)
+      : "1";
   const cls = inline
     ? "promo-qty-field promo-qty-field--inline"
     : "promo-qty-field";
@@ -3682,7 +3601,7 @@ function promotionQtyField(name, label, defaultValue, inline = false) {
     ? ""
     : `<span class="block text-xs text-muted-foreground mb-1">${label}</span>`;
   const aria = inline ? ` aria-label="${label}"` : "";
-  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1" required${val} placeholder="1"${aria} oninput="promoFormDraftField(this)" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
+  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1" required${val} placeholder="${esc(ph)}"${aria} oninput="promoFormDraftField(this)" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
 }
 function promotionProductPickRow(p, fieldName, selectedId) {
   const active = selectedId === p.id;
@@ -5385,11 +5304,21 @@ function scheduleCustomerMapResize() {
   window.customerMapResizeTimer = setTimeout(fix, 150);
   setTimeout(fix, 350);
 }
-function field(name, label, value = "", type = "text") {
-  return `<label><span class="block text-sm font-medium mb-2">${label}</span><input name="${name}" type="${type}" value="${esc(value)}" class="w-full px-4 py-3 bg-secondary rounded app-input"></label>`;
+function inputAttrs(value, placeholder = "", { treatZeroAsEmpty = false } = {}) {
+  const v = value === null || value === undefined ? "" : String(value);
+  const ph = placeholder || "";
+  const empty = v === "" || (treatZeroAsEmpty && v === "0");
+  if (empty) return ph ? `placeholder="${esc(ph)}"` : "";
+  return `value="${esc(v)}"${ph ? ` placeholder="${esc(ph)}"` : ""}`;
+}
+function field(name, label, value = "", type = "text", placeholder = "") {
+  const ph = placeholder || label;
+  const attrs = inputAttrs(value, ph, { treatZeroAsEmpty: type === "number" });
+  return `<label><span class="block text-sm font-medium mb-2">${label}</span><input name="${name}" type="${type}" ${attrs} class="w-full px-4 py-3 bg-secondary rounded app-input"></label>`;
 }
 function customerRegistrationField(value = "") {
-  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="numeric" autocomplete="off" value="${esc(value)}" oninput="scheduleCustomerRegistryLookup(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
+  const attrs = inputAttrs(value, "Регистрийн дугаар");
+  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="numeric" autocomplete="off" ${attrs} oninput="scheduleCustomerRegistryLookup(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
 }
 function customerProvinceField(value = "") {
   const selected = (value || "").trim() || "Улаанбаатар";
@@ -5569,6 +5498,7 @@ function customerDetail(id) {
 }
 function productModal(id) {
   if (!isAdmin()) return;
+  const isNew = !id;
   const p = state.products.find((x) => x.id === id) || {
     unit: "ширхэг",
     boxQuantity: 1,
@@ -5578,16 +5508,17 @@ function productModal(id) {
     minStock: 0,
     country: "Монгол",
   };
+  const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" value="${esc(p.barcode || "")}" inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
+    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" ${barcodeAttrs} inputmode="numeric" onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
       .map(
         (c) =>
           `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", p.price, "number")}${field("costPrice", "Өртөг", p.costPrice, "number")}</div>${field("country", "Үйлдвэрлэсэн улс", p.country)}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="product-thumb product-thumb--preview"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл нь зөвхөн <b>Агуулах → Орлого авах</b> цэснээс нэмэгдэнэ.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", isNew ? "" : p.price, "number", "0")}${field("costPrice", "Өртөг", isNew ? "" : p.costPrice, "number", "0")}</div>${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="product-thumb product-thumb--preview"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл нь зөвхөн <b>Агуулах → Орлого авах</b> цэснээс нэмэгдэнэ.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
 function handleProductImage(input) {
@@ -5773,6 +5704,7 @@ function saveProduct(e, id) {
       state.extraCategories.push(data.category);
   }
   ["price", "costPrice"].forEach((k) => (data[k] = Number(data[k] || 0)));
+  data.country = String(data.country || "").trim() || "Монгол";
   if (id) {
     const existing = state.products.find((p) => p.id === id);
     if (existing) Object.assign(existing, data);
@@ -5792,7 +5724,7 @@ function categoryModal() {
   if (!isAdmin()) return;
   box(
     "Төрөл нэмэх",
-    `<form onsubmit="event.preventDefault();state.extraCategories.push(this.category.value);closeModal();render()" class="p-6 space-y-4"><input name="category" autofocus required class="w-full px-4 py-3 bg-secondary rounded"><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
+    `<form onsubmit="event.preventDefault();state.extraCategories.push(this.category.value);closeModal();render()" class="p-6 space-y-4"><input name="category" autofocus required placeholder="Төрөлийн нэр" class="w-full px-4 py-3 bg-secondary rounded"><button class="w-full py-3 bg-primary text-primary-foreground rounded">Нэмэх</button></form>`,
     "max-w-md",
   );
 }
@@ -5811,7 +5743,7 @@ function employeeModal() {
 function orderModal() {
   box(
     "Шинэ захиалга",
-    `<form onsubmit="saveOrder(event)" class="p-5 space-y-4 modal-scroll overflow-y-auto"><select name="customerId" class="w-full px-3 py-3 bg-secondary rounded">${state.customers.map((c) => `<option value="${c.id}">${c.companyName}</option>`).join("")}</select><div class="grid md:grid-cols-2 gap-3">${state.products.map((p) => `<label class="rounded bg-secondary/50 p-3 grid grid-cols-[1fr_80px] gap-2"><span><b>${p.name}</b><small class="block text-muted-foreground">${fmt(p.price)} · Үлд ${p.stock}</small></span><input name="${p.id}" type="number" min="0" value="0" class="px-2 py-2 bg-card rounded text-center"></label>`).join("")}</div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form onsubmit="saveOrder(event)" class="p-5 space-y-4 modal-scroll overflow-y-auto"><select name="customerId" class="w-full px-3 py-3 bg-secondary rounded">${state.customers.map((c) => `<option value="${c.id}">${c.companyName}</option>`).join("")}</select><div class="grid md:grid-cols-2 gap-3">${state.products.map((p) => `<label class="rounded bg-secondary/50 p-3 grid grid-cols-[1fr_80px] gap-2"><span><b>${p.name}</b><small class="block text-muted-foreground">${fmt(p.price)} · Үлд ${p.stock}</small></span><input name="${p.id}" type="number" min="0" placeholder="0" class="px-2 py-2 bg-card rounded text-center"></label>`).join("")}</div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-5xl",
   );
 }
@@ -7040,9 +6972,6 @@ Object.assign(window, {
   initCustomerAddressFields,
   confirmCustomerExcel,
   confirmProductsExport,
-  setProductsTab,
-  productStockTakeModal,
-  saveProductStockTake,
   confirmInventoryExport,
   confirmReportExport,
   confirmEmployeeExcel,
