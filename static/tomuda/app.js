@@ -2990,19 +2990,24 @@ function applyStockFromModal(e, id, type) {
   }
   const isIn = type === "in",
     title = isIn ? "Орлого авах" : "Зарлага гаргах",
-    actionLabel = isIn ? "Орлого" : "Зарлага",
-    afterStock = isIn ? p.stock + q : p.stock - q;
-  confirmModal(
-    title,
-    `<p><b>${esc(p.name)}</b> — <b>${q}</b> ${esc(p.unit || "ш")} ${isIn ? "орлого" : "зарлага"} хийх үү?</p><p class="text-sm text-muted-foreground mt-2">Одоо: ${p.stock} ${esc(p.unit || "ш")} → Дараа: ${afterStock} ${esc(p.unit || "ш")}</p>`,
-    {
-      confirmLabel: actionLabel,
-      danger: !isIn,
-      onConfirm: () => {
-        if (applyStock(id, type, q)) closeModal();
-      },
+    actionLabel = isIn ? "орлого" : "зарлага",
+    afterStock = isIn ? p.stock + q : p.stock - q,
+    summaryHtml = `<p><b>${esc(p.name)}</b> — <b>${q}</b> ${esc(p.unit || "ш")} ${actionLabel} хийх үү?</p><p class="text-sm text-muted-foreground mt-2">Одоо: ${p.stock} ${esc(p.unit || "ш")} → Дараа: ${afterStock} ${esc(p.unit || "ш")}</p>`,
+    finalMessage = `<p><strong>${esc(p.name)}</strong>-д <strong>${q}</strong> ${esc(p.unit || "ш")} ${actionLabel} бүртгэхдээ итгэлтэй байна уу?</p><p class="text-sm text-muted-foreground mt-2">Үлдэгдэл: ${p.stock} ${esc(p.unit || "ш")} → ${afterStock} ${esc(p.unit || "ш")}</p>`;
+  confirmModal(title, summaryHtml, {
+    confirmLabel: "Тийм",
+    danger: !isIn,
+    onConfirm: () => {
+      confirmModal("Баталгаажуулах", finalMessage, {
+        confirmLabel: "Батлах",
+        onConfirm: () => {
+          if (applyStock(id, type, q)) closeModal();
+        },
+        danger: !isIn,
+        closable: true,
+      });
     },
-  );
+  });
 }
 function stockActionList(list, tab) {
   const hint =
