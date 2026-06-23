@@ -939,6 +939,91 @@ function persistentState() {
     return data;
   }, {});
 }
+const MERGE_BY_ID_KEYS = ["customers", "products", "employees", "orders"];
+
+function mergeArrayById(remote = [], local = []) {
+  const map = new Map();
+  (remote || []).forEach((item) => {
+    if (item?.id != null) map.set(String(item.id), item);
+  });
+  (local || []).forEach((item) => {
+    if (item?.id != null) map.set(String(item.id), item);
+  });
+  return Array.from(map.values());
+}
+
+function mergeRuleArrays(remote = [], local = []) {
+  const seen = new Set();
+  const merged = [];
+  [...(remote || []), ...(local || [])].forEach((item) => {
+    const key = JSON.stringify(item);
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+  return merged;
+}
+
+function mergePersistentStates(remote = {}, local = {}) {
+  const merged = {};
+  for (const key of MERGE_BY_ID_KEYS) {
+    merged[key] = mergeArrayById(remote[key], local[key]);
+  }
+  for (const key of persistKeys) {
+    if (MERGE_BY_ID_KEYS.includes(key)) continue;
+    if (key === "promotionRules") {
+      const remoteRules = remote.promotionRules || {};
+      const localRules = local.promotionRules || {};
+      merged.promotionRules = {
+        quantity: mergeRuleArrays(
+          remoteRules.quantity,
+          localRules.quantity,
+        ),
+        price: mergeRuleArrays(remoteRules.price, localRules.price),
+        payment: mergeRuleArrays(
+          remoteRules.payment,
+          localRules.payment,
+        ),
+      };
+      continue;
+    }
+    if (key === "countQty") {
+      merged.countQty = {
+        ...(remote.countQty || {}),
+        ...(local.countQty || {}),
+      };
+      continue;
+    }
+    if (key === "settings") {
+      merged.settings = {
+        ...(remote.settings || {}),
+        ...(local.settings || {}),
+      };
+      continue;
+    }
+    if (key === "extraCategories") {
+      merged.extraCategories = [
+        ...new Set([
+          ...(remote.extraCategories || []),
+          ...(local.extraCategories || []),
+        ]),
+      ];
+      continue;
+    }
+    if (key === "inventoryLogs") {
+      merged.inventoryLogs = mergeArrayById(
+        remote.inventoryLogs,
+        local.inventoryLogs,
+      );
+      continue;
+    }
+    merged[key] =
+      local[key] !== undefined && local[key] !== null
+        ? local[key]
+        : remote[key];
+  }
+  return merged;
+}
 function protectDeletionsForNonAdmin(data) {
   if (canDelete()) return data;
   let baseline = null;
@@ -1046,7 +1131,8 @@ function applyRemoteState(payload) {
   const session = captureSessionSnapshot();
   const pickerCategory = state.filters.workerCategory;
   const reopenPicker = pickerOpen();
-  applyPersistentState(payload.state);
+  const merged = mergePersistentStates(payload.state, persistentState());
+  applyPersistentState(merged);
   restoreSessionSnapshot(session);
   ensureEmployeeEmails();
   ensureEmployeePercentDiscount();
@@ -1072,8 +1158,7 @@ async function fetchBackendPayload() {
   return res.json();
 }
 async function pollBackendState() {
-  if (!backendReady || backendSaving || backendSaveTimer || localStateDirty())
-    return;
+  if (!backendReady || backendSaving || backendSaveTimer) return;
   try {
     const payload = await fetchBackendPayload();
     if (!payload?.updatedAt) return;
@@ -2060,6 +2145,7 @@ function scheduleBackendSave() {
   backendSaveTimer = setTimeout(saveBackendState, 350);
 }
 async function saveBackendState() {
+  backendSaveTimer = null;
   let data = persistentState();
   const protectedData = protectDeletionsForNonAdmin(data);
   if (JSON.stringify(protectedData) !== JSON.stringify(data)) {
@@ -2068,6 +2154,23 @@ async function saveBackendState() {
     restoreSessionSnapshot(session);
     render();
     data = protectedData;
+  }
+  try {
+    const latest = await fetchBackendPayload();
+    if (latest?.state) {
+      const merged = mergePersistentStates(latest.state, data);
+      if (JSON.stringify(merged) !== JSON.stringify(data)) {
+        const session = captureSessionSnapshot();
+        applyPersistentState(merged);
+        restoreSessionSnapshot(session);
+        render();
+        data = merged;
+      } else {
+        data = merged;
+      }
+    }
+  } catch (error) {
+    console.warn("Backend pre-save merge failed", error);
   }
   const body = JSON.stringify({ state: data });
   if (body === backendLastSaved) return;
