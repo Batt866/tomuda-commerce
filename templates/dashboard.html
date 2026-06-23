@@ -101,8 +101,8 @@
         cursor: pointer;
       }
     </style>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260604-worker-order-continue" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260604-worker-order-continue" as="script" />
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260604-boot-loading-text" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260604-boot-loading-text" as="script" />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
     <script>
       tailwind.config = {
@@ -138,7 +138,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260604-worker-order-continue"
+      href="{% static 'tomuda/styles.css' %}?v=20260604-boot-loading-text"
     />
   </head>
   <body>
@@ -153,8 +153,10 @@
             height="64"
             decoding="async"
           />
-          <p class="boot-screen__title">ТОМУДА</p>
-          <p class="boot-screen__detail">Ачаалж байна...</p>
+          <p id="boot-title" class="boot-screen__title" hidden></p>
+          <p id="boot-detail" class="boot-screen__detail">
+            Мэдээлэл татаж байна. Түр хүлээнэ үү
+          </p>
           <div class="boot-screen__spinner" aria-hidden="true"></div>
         </div>
       </div>
@@ -162,7 +164,10 @@
     <div id="modal"></div>
     <div id="confirm-card-overlay" class="confirm-card-overlay" hidden>
       <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-card-title">
-        <h3 id="confirm-card-title" class="confirm-card__title"></h3>
+        <div class="confirm-card__head">
+          <h3 id="confirm-card-title" class="confirm-card__title"></h3>
+          <button type="button" id="confirm-card-close" class="confirm-card__close" hidden aria-label="Хаах"><span aria-hidden="true">✕</span></button>
+        </div>
         <p id="confirm-card-message" class="confirm-card__message"></p>
         <div class="confirm-card__actions">
           <button type="button" id="confirm-card-yes" class="confirm-card__btn confirm-card__btn--danger"></button>
@@ -187,7 +192,7 @@
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
     <script
-      src="{% static 'tomuda/app.js' %}?v=20260604-worker-order-continue"
+      src="{% static 'tomuda/app.js' %}?v=20260604-boot-loading-text"
       onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
     ></script>
   </body>
