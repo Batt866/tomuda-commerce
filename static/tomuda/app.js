@@ -2514,7 +2514,7 @@ function customerAvatarHtml(c, className = "customer-card__avatar") {
 }
 function customerImageField(c) {
   const preview = c.image || customerStoreImage(c);
-  return `<div class="customer-image-field"><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload customer-image-upload--stack"><img id="customerImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input id="customerImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleCustomerImage(this)" hidden><div class="customer-image-upload__actions"><button type="button" onclick="document.getElementById('customerImageFile').click()" class="btn btn--primary btn--sm customer-image-upload__pick">Зураг оруулах</button>${c.image ? `<button type="button" onclick="clearCustomerImage()" class="btn btn--secondary btn--sm">Зураг арилгах</button>` : ""}</div><input id="customerImageValue" name="image" type="hidden" value=""><p class="customer-image-upload__hint">Дэлгүүрийн зураг оруулна. JPG, PNG, WEBP. 2MB хүртэл.</p></div></div></div>`;
+  return `<div class="customer-image-field"><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload customer-image-upload--stack"><img id="customerImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input id="customerImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleCustomerImage(this)" hidden><div class="customer-image-upload__actions"><button type="button" onclick="document.getElementById('customerImageFile').click()" class="btn btn--primary btn--sm customer-image-upload__pick">Зураг оруулах</button>${c.image ? `<button type="button" onclick="clearCustomerImage()" class="btn btn--secondary btn--sm">Зураг арилгах</button>` : ""}</div><input id="customerImageValue" name="image" type="hidden" value=""><p class="customer-image-upload__hint">Дэлгүүрийн зураг оруулна. JPG, PNG, WEBP.</p></div></div></div>`;
 }
 function initCustomerImageField(c) {
   const value = document.getElementById("customerImageValue"),
@@ -2525,11 +2525,6 @@ function initCustomerImageField(c) {
 function handleCustomerImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    alert("Зураг 2MB-аас бага байна");
-    input.value = "";
-    return;
-  }
   const reader = new FileReader();
   reader.onload = () => {
     const value = document.getElementById("customerImageValue"),
@@ -4378,16 +4373,17 @@ function employeeAvatarHtml(e, className = "employee-card__avatar") {
 }
 function employeeImageField(e = {}) {
   const preview = e.image || employeePlaceholderImage(e);
-  return `<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload"><img id="employeeImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input type="file" accept="image/*" capture="user" onchange="handleEmployeeImage(this)" class="w-full text-sm"><input id="employeeImageValue" name="image" type="hidden" value="${esc(e.image || "")}"><p class="text-xs text-muted-foreground mt-2">Ажилтны зураг оруулна. JPG, PNG, WEBP.</p>${e.image ? `<button type="button" onclick="clearEmployeeImage()" class="btn btn--secondary btn--sm mt-2">Зураг арилгах</button>` : ""}</div></div></div>`;
+  return `<div class="customer-image-field"><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload customer-image-upload--stack"><img id="employeeImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input id="employeeImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleEmployeeImage(this)" hidden><div class="customer-image-upload__actions"><button type="button" onclick="document.getElementById('employeeImageFile').click()" class="btn btn--primary btn--sm customer-image-upload__pick">Зураг оруулах</button>${e.image ? `<button type="button" onclick="clearEmployeeImage()" class="btn btn--secondary btn--sm">Зураг арилгах</button>` : ""}</div><input id="employeeImageValue" name="image" type="hidden" value=""><p class="customer-image-upload__hint">Ажилтны зураг оруулна. JPG, PNG, WEBP.</p></div></div></div>`;
+}
+function initEmployeeImageField(e = {}) {
+  const value = document.getElementById("employeeImageValue"),
+    preview = document.getElementById("employeeImagePreview");
+  if (value) value.value = e.image || "";
+  if (preview) preview.src = e.image || employeePlaceholderImage(e);
 }
 function handleEmployeeImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    alert("Зураг 2MB-аас бага байна");
-    input.value = "";
-    return;
-  }
   const reader = new FileReader();
   reader.onload = () => {
     const value = document.getElementById("employeeImageValue"),
@@ -4395,35 +4391,34 @@ function handleEmployeeImage(input) {
     if (value) value.value = reader.result;
     if (preview) preview.src = reader.result;
     const removeBtn = input
-      .closest(".customer-image-upload__body")
+      .closest(".customer-image-upload__actions")
       ?.querySelector('[onclick="clearEmployeeImage()"]');
     if (!removeBtn) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "btn btn--secondary btn--sm mt-2";
+      btn.className = "btn btn--secondary btn--sm";
       btn.textContent = "Зураг арилгах";
       btn.onclick = clearEmployeeImage;
-      input.closest(".customer-image-upload__body")?.appendChild(btn);
+      input
+        .closest(".customer-image-upload__actions")
+        ?.appendChild(btn);
     }
   };
   reader.readAsDataURL(file);
 }
 function clearEmployeeImage() {
-  const upload = document
-      .getElementById("employeeImagePreview")
-      ?.closest(".customer-image-upload"),
-    value = document.getElementById("employeeImageValue"),
+  const value = document.getElementById("employeeImageValue"),
     preview = document.getElementById("employeeImagePreview"),
-    fileInput = upload?.querySelector('input[type="file"]');
+    fileInput = document.getElementById("employeeImageFile");
   if (value) value.value = "";
   if (fileInput) fileInput.value = "";
   if (preview) {
     const name = document.querySelector('[name="name"]')?.value || "Ажилтан";
     preview.src = employeePlaceholderImage({ name });
   }
-  upload
-    ?.querySelector(
-      '.customer-image-upload__body [onclick="clearEmployeeImage()"]',
+  document
+    .querySelector(
+      '.customer-image-upload__actions [onclick="clearEmployeeImage()"]',
     )
     ?.remove();
 }
@@ -5719,7 +5714,10 @@ function employeeModal() {
     `<form data-employee-form class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" type="password" required placeholder="Нууц үг" autocomplete="new-password" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Нэмэх</button></div></form>`,
     "max-w-md",
   );
-  setTimeout(syncEmployeePctField, 0);
+  setTimeout(() => {
+    syncEmployeePctField();
+    initEmployeeImageField();
+  }, 0);
 }
 function orderModal() {
   box(
