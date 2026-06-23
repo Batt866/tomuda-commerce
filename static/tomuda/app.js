@@ -2514,7 +2514,13 @@ function customerAvatarHtml(c, className = "customer-card__avatar") {
 }
 function customerImageField(c) {
   const preview = c.image || customerStoreImage(c);
-  return `<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload"><img id="customerImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input id="customerImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleCustomerImage(this)" hidden><button type="button" onclick="document.getElementById('customerImageFile').click()" class="btn btn--secondary btn--sm">Галерейгаас сонгох</button><input id="customerImageValue" name="image" type="hidden" value="${esc(c.image || "")}"><p class="text-xs text-muted-foreground mt-2">Дэлгүүрийн зураг оруулна. JPG, PNG, WEBP.</p>${c.image ? `<button type="button" onclick="clearCustomerImage()" class="btn btn--secondary btn--sm mt-2">Зураг арилгах</button>` : ""}</div></div></div>`;
+  return `<div class="customer-image-field"><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload customer-image-upload--stack"><img id="customerImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input id="customerImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleCustomerImage(this)" hidden><div class="customer-image-upload__actions"><button type="button" onclick="document.getElementById('customerImageFile').click()" class="btn btn--primary btn--sm customer-image-upload__pick">Зураг оруулах</button>${c.image ? `<button type="button" onclick="clearCustomerImage()" class="btn btn--secondary btn--sm">Зураг арилгах</button>` : ""}</div><input id="customerImageValue" name="image" type="hidden" value=""><p class="customer-image-upload__hint">Дэлгүүрийн зураг оруулна. JPG, PNG, WEBP. 2MB хүртэл.</p></div></div></div>`;
+}
+function initCustomerImageField(c) {
+  const value = document.getElementById("customerImageValue"),
+    preview = document.getElementById("customerImagePreview");
+  if (value) value.value = c.image || "";
+  if (preview) preview.src = c.image || customerStoreImage(c);
 }
 function handleCustomerImage(input) {
   const file = input.files?.[0];
@@ -2531,15 +2537,17 @@ function handleCustomerImage(input) {
     if (value) value.value = reader.result;
     if (preview) preview.src = reader.result;
     const removeBtn = input
-      .closest(".customer-image-upload__body")
+      .closest(".customer-image-upload__actions")
       ?.querySelector('[onclick="clearCustomerImage()"]');
     if (!removeBtn) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "btn btn--secondary btn--sm mt-2";
+      btn.className = "btn btn--secondary btn--sm";
       btn.textContent = "Зураг арилгах";
       btn.onclick = clearCustomerImage;
-      input.closest(".customer-image-upload__body")?.appendChild(btn);
+      input
+        .closest(".customer-image-upload__actions")
+        ?.appendChild(btn);
     }
   };
   reader.readAsDataURL(file);
@@ -2556,9 +2564,63 @@ function clearCustomerImage() {
   }
   document
     .querySelector(
-      '.customer-image-upload__body [onclick="clearCustomerImage()"]',
+      '.customer-image-upload__actions [onclick="clearCustomerImage()"]',
     )
     ?.remove();
+}
+function customerDetailIdIcon() {
+  return `<svg class="ui-icon customer-detail__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h5M7 13h8"/></svg>`;
+}
+function customerDetailRow(label, valueHtml, iconHtml) {
+  return `<div class="customer-detail__row">${iconHtml}<div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
+}
+function customerDetailPhonesHtml(c) {
+  const phones = [c.phone1, c.phone2]
+    .map((p) => String(p || "").trim())
+    .filter(Boolean);
+  if (!phones.length) return `<span class="customer-detail__muted">—</span>`;
+  return phones
+    .map(
+      (phone) =>
+        `<a href="tel:${encodeURIComponent(phone)}" class="customer-detail__phone">${esc(phone)}</a>`,
+    )
+    .join('<span class="customer-detail__sep" aria-hidden="true">·</span>');
+}
+function customerDetailHtml(c, id) {
+  const addr = [c.province, c.district, c.khoroo, c.address]
+      .filter(Boolean)
+      .join(", "),
+    link = mapsLink(c.latitude, c.longitude),
+    rd = customerRegistrationDisplay(c);
+  const rows = [
+    customerDetailRow(
+      "Регистр",
+      rd
+        ? esc(rd)
+        : `<span class="customer-detail__muted">—</span>`,
+      customerDetailIdIcon(),
+    ),
+    customerDetailRow(
+      "Утас",
+      customerDetailPhonesHtml(c),
+      customerCardPhoneIcon(),
+    ),
+    customerDetailRow(
+      "Хаяг",
+      addr
+        ? esc(addr)
+        : `<span class="customer-detail__muted">—</span>`,
+      customerCardPinIcon(),
+    ),
+    customerDetailRow(
+      "Байршил",
+      link
+        ? `<a href="${link}" target="_blank" rel="noopener" class="customer-detail__maps">Google Maps дээр нээх</a>`
+        : `<span class="customer-detail__muted">Бүртгэгдээгүй</span>`,
+      customerCardPinIcon(),
+    ),
+  ].join("");
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div><footer class="customer-detail__actions"><button type="button" onclick="closeModal();customerModal('${esc(id)}')" class="btn btn--primary btn--block">Засах</button></footer></div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -5299,6 +5361,7 @@ function customerModal(id, draft = null) {
     `<form data-customer-form onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" onclick="centerCustomerMapOnUser()" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
+  initCustomerImageField(c);
   window.customerMapInitTimer = setTimeout(() => {
     window.customerMapInitTimer = null;
     initCustomerMap(c.latitude, c.longitude);
@@ -5413,20 +5476,12 @@ function saveCustomer(e, id) {
     : state.customers.push({ ...data, id: String(Date.now()) });
   closeModal();
   render();
+  scheduleBackendSave();
 }
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
   if (!c) return;
-  const addr = [c.province, c.district, c.khoroo, c.address]
-      .filter(Boolean)
-      .join(", "),
-    link = mapsLink(c.latitude, c.longitude),
-    rd = customerRegistrationDisplay(c);
-  box(
-    c.name,
-    `<div class="p-6 space-y-4 customer-detail">${c.image ? `<img src="${esc(c.image)}" alt="" class="customer-detail__photo">` : ""}${rd ? `<p class="customer-detail__rd"><b>РД:</b> ${esc(rd)}</p>` : `<p class="customer-detail__rd customer-detail__rd--empty"><b>РД:</b> —</p>`}${c.companyName ? `<p class="text-muted-foreground">${esc(c.companyName)}</p>` : ""}<p><b>Дугаар:</b> ${c.phone1 || "-"}${c.phone2 ? ` · ${esc(c.phone2)}` : ""}</p><p><b>Хаяг:</b> ${esc(addr || "-")}</p><p><b>Байршил:</b> ${link ? `<a href="${link}" target="_blank" rel="noopener" class="text-primary underline">Google Maps дээр нээх</a>` : "-"}</p>${c.locationText ? `<p class="text-sm text-muted-foreground">${esc(c.locationText)}</p>` : ""}<button onclick="closeModal();customerModal('${id}')" class="w-full py-3 bg-primary text-primary-foreground rounded">Засах</button></div>`,
-    "max-w-xl",
-  );
+  box(c.name, customerDetailHtml(c, id), "max-w-xl");
 }
 function productModal(id) {
   if (!isAdmin()) return;
