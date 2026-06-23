@@ -2406,6 +2406,12 @@ button:focus-visible,
   .mobile-sidebar.translate-x-0 {
     opacity: 1;
     pointer-events: auto;
+    z-index: 55;
+  }
+
+  .app-shell:has(.mobile-sidebar.translate-x-0) .mobile-bottom-nav {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .sidebar-user {
