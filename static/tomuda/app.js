@@ -441,9 +441,10 @@ function orderGrossTotal(o) {
 function orderDiscountAmount(o) {
   if (o.discountAmount != null) return Number(o.discountAmount);
   const gross = orderGrossTotal(o);
-  const pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
-    ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
-    : 0;
+  const pct =
+    o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+      : 0;
   return Math.round((gross * pct) / 100);
 }
 function orderPayableTotal(o) {
@@ -2248,8 +2249,7 @@ function stockAlertModal() {
         .map((p) => {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
-          const limitAttr =
-            limit > 0 ? `value="${limit}" ` : "";
+          const limitAttr = limit > 0 ? `value="${limit}" ` : "";
           return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImage(p)}" alt="" class="stock-alert-thumb" width="44" height="44" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="number" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
@@ -2340,9 +2340,10 @@ function buildOrderReceiptExcelRows(o) {
     payable = orderPayableTotal(o),
     sub = Math.round(payable / 1.1),
     vat = Math.round(payable - sub),
-    pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
-      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
-      : 0,
+    pct =
+      o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+        ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+        : 0,
     paid = o.paymentTerm === "cash" || o.isPaid,
     rows = [
       ["ТОМУДА групп ХХК"],
@@ -2493,9 +2494,10 @@ function warehouseOrderDetail(o) {
     gross = orderGrossTotal(o),
     discount = orderDiscountAmount(o),
     payable = orderPayableTotal(o),
-    pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
-      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
-      : 0,
+    pct =
+      o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+        ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+        : 0,
     paid = o.paymentTerm === "cash" || o.isPaid,
     itemRows = (o.items || [])
       .map((i) => {
@@ -2542,9 +2544,7 @@ function handleCustomerImage(input) {
       btn.className = "btn btn--secondary btn--sm";
       btn.textContent = "Зураг арилгах";
       btn.onclick = clearCustomerImage;
-      input
-        .closest(".customer-image-upload__actions")
-        ?.appendChild(btn);
+      input.closest(".customer-image-upload__actions")?.appendChild(btn);
     }
   };
   reader.readAsDataURL(file);
@@ -2592,9 +2592,7 @@ function customerDetailHtml(c, id) {
   const rows = [
     customerDetailRow(
       "Регистр",
-      rd
-        ? esc(rd)
-        : `<span class="customer-detail__muted">—</span>`,
+      rd ? esc(rd) : `<span class="customer-detail__muted">—</span>`,
       customerDetailIdIcon(),
     ),
     customerDetailRow(
@@ -2604,9 +2602,7 @@ function customerDetailHtml(c, id) {
     ),
     customerDetailRow(
       "Хаяг",
-      addr
-        ? esc(addr)
-        : `<span class="customer-detail__muted">—</span>`,
+      addr ? esc(addr) : `<span class="customer-detail__muted">—</span>`,
       customerCardPinIcon(),
     ),
     customerDetailRow(
@@ -2635,9 +2631,13 @@ function customerRegistrationDigits(c) {
   return customerRegistrationDisplay(c).replace(/\D/g, "");
 }
 function customerMatchesQuery(c, q) {
-  const needle = String(q || "").trim().toLowerCase();
+  const needle = String(q || "")
+    .trim()
+    .toLowerCase();
   if (!needle) return true;
-  const nameMatch = String(c.name || "").toLowerCase().includes(needle);
+  const nameMatch = String(c.name || "")
+    .toLowerCase()
+    .includes(needle);
   const rdNeedle = needle.replace(/\D/g, "");
   const rdMatch =
     !!rdNeedle && customerRegistrationDigits(c).includes(rdNeedle);
@@ -2928,10 +2928,8 @@ function applyStockFromModal(e, id, type) {
   });
 }
 function stockActionList(list, tab) {
-  const hint =
-    tab === "in"
-      ? "Бараа дээр дарж тоо оруулаад «Орлого» дарна — баталгаажуулах цонх гарна"
-      : "Бараа дээр дарж тоо оруулаад «Зарлага» дарна — баталгаажуулах цонх гарна";
+  const hint = tab === "in";
+
   return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">${hint}</div><div class="divide-y divide-border">${list.length ? list.map((p) => stockActionRow(p, tab)).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockGrid(list) {
@@ -3532,7 +3530,10 @@ function promoFormDraftField(el) {
   }
   state.promoFormDraft[el.name] = v;
 }
-function promoAmountInputHtml(name, { required = false, placeholder = "", value = "" } = {}) {
+function promoAmountInputHtml(
+  name,
+  { required = false, placeholder = "", value = "" } = {},
+) {
   const req = required ? " required" : "";
   const v = String(value ?? "").trim();
   const valAttr = v ? ` value="${esc(v)}"` : "";
@@ -4230,8 +4231,8 @@ function workerCartSummary() {
     all = workerOrderLines(),
     promo = all.filter((l) => l.isPromoFree),
     employeeDiscount = workerPercentDiscountActive()
-        ? Math.round((gross * percentDiscountRate()) / 100)
-        : 0,
+      ? Math.round((gross * percentDiscountRate()) / 100)
+      : 0,
     discount = Math.min(
       gross,
       employeeDiscount + pricePromoDiscount + paymentPromoDiscount,
@@ -4407,9 +4408,7 @@ function handleEmployeeImage(input) {
       btn.className = "btn btn--secondary btn--sm";
       btn.textContent = "Зураг арилгах";
       btn.onclick = clearEmployeeImage;
-      input
-        .closest(".customer-image-upload__actions")
-        ?.appendChild(btn);
+      input.closest(".customer-image-upload__actions")?.appendChild(btn);
     }
   };
   reader.readAsDataURL(file);
@@ -4516,14 +4515,17 @@ function saveLoginCredentials(email, password, remember) {
     JSON.stringify({ email, password, remember: true }),
   );
 }
-function toggleLoginPassword() {
-  const input = document.getElementById("loginPassword");
-  const btn = document.getElementById("loginPasswordToggle");
+function togglePasswordField(inputId, btnId) {
+  const input = document.getElementById(inputId),
+    btn = document.getElementById(btnId);
   if (!input || !btn) return;
   const show = input.type === "password";
   input.type = show ? "text" : "password";
   btn.textContent = show ? "Нуух" : "Харах";
   btn.setAttribute("aria-label", show ? "Нууц үг нуух" : "Нууц үг харах");
+}
+function toggleLoginPassword() {
+  togglePasswordField("loginPassword", "loginPasswordToggle");
 }
 function loginView() {
   const saved = getSavedLogin();
@@ -5075,8 +5077,8 @@ function workerOrderOptionsHtml(cart) {
       ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Сар</span><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select></label><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Өдөр</span><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></label></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
-        ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
-        : "",
+      ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
+      : "",
     pctRow = pctAllowed
       ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
@@ -5304,7 +5306,11 @@ function scheduleCustomerMapResize() {
   window.customerMapResizeTimer = setTimeout(fix, 150);
   setTimeout(fix, 350);
 }
-function inputAttrs(value, placeholder = "", { treatZeroAsEmpty = false } = {}) {
+function inputAttrs(
+  value,
+  placeholder = "",
+  { treatZeroAsEmpty = false } = {},
+) {
   const v = value === null || value === undefined ? "" : String(value);
   const ph = placeholder || "";
   const empty = v === "" || (treatZeroAsEmpty && v === "0");
@@ -5748,7 +5754,8 @@ function addCategory(e) {
   if (!isAdmin()) return;
   const name = String(new FormData(e.target).get("category") || "").trim();
   if (!name) return alert("Төрөлийн нэр оруулна уу");
-  if (cats().includes(name)) return alert("Энэ төрөл аль хэдийн бүртгэгдсэн байна");
+  if (cats().includes(name))
+    return alert("Энэ төрөл аль хэдийн бүртгэгдсэн байна");
   state.extraCategories.push(name);
   scheduleBackendSave();
   closeModal();
@@ -5766,22 +5773,26 @@ function confirmDeleteCategory(name) {
     );
     return;
   }
-  confirmModal("Төрөл устгах уу?", `<strong>${esc(name)}</strong> төрлийг устгах гэж байна.`, {
-    confirmLabel: "Тийм",
-    danger: true,
-    onConfirm: () => {
-      confirmModal(
-        "Баталгаажуулах",
-        `<strong>${esc(name)}</strong> төрлийг бүрмөсөн устгахдаа итгэлтэй байна уу?`,
-        {
-          confirmLabel: "Батлах",
-          danger: true,
-          closable: true,
-          onConfirm: () => deleteCategoryNow(name),
-        },
-      );
+  confirmModal(
+    "Төрөл устгах уу?",
+    `<strong>${esc(name)}</strong> төрлийг устгах гэж байна.`,
+    {
+      confirmLabel: "Тийм",
+      danger: true,
+      onConfirm: () => {
+        confirmModal(
+          "Баталгаажуулах",
+          `<strong>${esc(name)}</strong> төрлийг бүрмөсөн устгахдаа итгэлтэй байна уу?`,
+          {
+            confirmLabel: "Батлах",
+            danger: true,
+            closable: true,
+            onConfirm: () => deleteCategoryNow(name),
+          },
+        );
+      },
     },
-  });
+  );
 }
 function deleteCategoryNow(name) {
   if (!isAdmin()) return;
@@ -5800,7 +5811,7 @@ function employeeModal() {
   if (!isAdmin()) return;
   box(
     "Ажилтан нэмэх",
-    `<form data-employee-form class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="password" type="password" required placeholder="Нууц үг" autocomplete="new-password" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Нэмэх</button></div></form>`,
+    `<form data-employee-form class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField()}<input name="name" required placeholder="Нэр" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" required placeholder="Нууц үг" autocomplete="new-password" class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input"><option value="sales">Худалдааны төлөөлөгч</option><option value="warehouse">Агуулах</option><option value="delivery">Түгээгч</option><option value="admin">Админ</option></select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Нэмэх</button></div></form>`,
     "max-w-md",
   );
   setTimeout(() => {
@@ -6051,9 +6062,7 @@ function downloadOrderReceiptExcelNow(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o) return alert("Захиалга олдсонгүй");
   const exportOrder =
-    !hadChanges &&
-    state.receiptEditOrderId === id &&
-    state.receiptEditItems
+    !hadChanges && state.receiptEditOrderId === id && state.receiptEditItems
       ? receiptEditDraftOrder()
       : o;
   exportOrderReceiptsExcel([exportOrder || o]);
@@ -6141,9 +6150,10 @@ function receipt(o) {
     deliveryDay = orderDeliveryDay(o),
     settlement = settlementNoteText(o),
     promoItems = (o.items || []).filter((i) => i.isPromoFree),
-    pct = o.applyPercentDiscount && isCashPayment(o.paymentTerm)
-      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
-      : 0,
+    pct =
+      o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+        ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+        : 0,
     grandLabel = pct
       ? `Таны нийт төлөх дүн (Бэлэн төлөлтийн ${pct}% хасагдав)`
       : "Таны нийт төлөх дүн",
@@ -6658,27 +6668,27 @@ function saveWorker() {
   const items = cart.all,
     percentDiscount = workerPercentDiscountActive() ? percentDiscountRate() : 0;
   const order = buildNewOrder({
-      customerId: c.id,
-      customerName: c.name,
-      items,
-      grossTotal: cart.gross,
-      applyPercentDiscount: workerPercentDiscountActive(),
-      percentDiscount,
-      discountAmount: cart.discount,
-      total: cart.total,
-      settlementAgreed: !!state.settlementAgreed,
-      settlementMonth: state.settlementAgreed ? state.settlementMonth : "",
-      settlementDay: state.settlementAgreed ? state.settlementDay : "",
-      status: "pending",
-      employeeId: e.id,
-      employeeName: e.name,
-      employeePhone: e.phone || "",
-      ...orderEmailFields(e),
-      isPaid: paidFromPaymentTerm(state.paymentTerm),
-      paymentTerm: state.paymentTerm,
-      deliveryDate: todayIso(),
-      ...deliveryFieldsForNewOrder(),
-    });
+    customerId: c.id,
+    customerName: c.name,
+    items,
+    grossTotal: cart.gross,
+    applyPercentDiscount: workerPercentDiscountActive(),
+    percentDiscount,
+    discountAmount: cart.discount,
+    total: cart.total,
+    settlementAgreed: !!state.settlementAgreed,
+    settlementMonth: state.settlementAgreed ? state.settlementMonth : "",
+    settlementDay: state.settlementAgreed ? state.settlementDay : "",
+    status: "pending",
+    employeeId: e.id,
+    employeeName: e.name,
+    employeePhone: e.phone || "",
+    ...orderEmailFields(e),
+    isPaid: paidFromPaymentTerm(state.paymentTerm),
+    paymentTerm: state.paymentTerm,
+    deliveryDate: todayIso(),
+    ...deliveryFieldsForNewOrder(),
+  });
   state.orders.push(order);
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
   resetWorkerCart();
@@ -6752,11 +6762,13 @@ function initConfirmCard() {
     closeConfirmCard();
     fn?.();
   });
-  overlay.querySelector("#confirm-card-close")?.addEventListener("click", () => {
-    const fn = pendingConfirm?.onCancel;
-    closeConfirmCard();
-    fn?.();
-  });
+  overlay
+    .querySelector("#confirm-card-close")
+    ?.addEventListener("click", () => {
+      const fn = pendingConfirm?.onCancel;
+      closeConfirmCard();
+      fn?.();
+    });
   overlay.addEventListener("click", (e) => {
     if (e.target !== overlay) return;
     const fn = pendingConfirm?.onCancel;
@@ -6881,11 +6893,7 @@ function saveEmployee(e) {
   if (!name) return alert("Нэр оруулна уу");
   if (!email) return alert("Email оруулна уу");
   if (!password) return alert("Нууц үг оруулна уу");
-  if (
-    state.employees.some(
-      (emp) => normalizeEmail(emp.email) === email,
-    )
-  ) {
+  if (state.employees.some((emp) => normalizeEmail(emp.email) === email)) {
     return alert("Энэ email аль хэдийн бүртгэгдсэн байна");
   }
   state.employees.push({
@@ -7155,6 +7163,7 @@ Object.assign(window, {
   saveWorker,
   login,
   toggleLoginPassword,
+  togglePasswordField,
   confirmLogout,
   closeConfirmCard,
   logout,
