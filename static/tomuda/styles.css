@@ -2388,6 +2388,35 @@ button:focus-visible,
 
 .app-sidebar {
   width: min(82vw, 280px);
+  overflow: hidden;
+}
+
+@media (max-width: 1023px) {
+  .mobile-sidebar {
+    transition:
+      transform 0.3s ease,
+      opacity 0.3s ease;
+  }
+
+  .mobile-sidebar.-translate-x-full {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .mobile-sidebar.translate-x-0 {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar-user {
+    flex-wrap: wrap;
+  }
+
+  .sidebar-user .btn--sidebar {
+    flex: 1 1 100%;
+    margin-top: 4px;
+    justify-content: center;
+  }
 }
 
 .btn--block-mobile {
