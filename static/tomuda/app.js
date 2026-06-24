@@ -2233,6 +2233,11 @@ function search(key, value) {
     el.setSelectionRange(el.value.length, el.value.length);
   }
 }
+function scrollAppMainToTop() {
+  requestAnimationFrame(() => {
+    document.querySelector(".app-main")?.scrollTo({ top: 0, left: 0 });
+  });
+}
 function shell(content) {
   const userRole = currentRole();
   const sidebarNav = sidebarNavForRole(userRole);
@@ -2967,7 +2972,7 @@ function inventoryView() {
   ]
     .map(
       (t) =>
-        `<button type="button" onclick="state.filters.inventory='${t[0]}';render()" class="seg-tab ${tab === t[0] ? "is-active" : ""}">${t[1]}</button>`,
+        `<button type="button" onclick="setInventoryTab('${t[0]}')" class="seg-tab ${tab === t[0] ? "is-active" : ""}">${t[1]}</button>`,
     )
     .join(
       "",
@@ -3031,7 +3036,10 @@ function applyStockFromModal(e, id, type) {
   });
 }
 function stockActionList(list, tab) {
-  const hint = tab === "in";
+  const hint =
+    tab === "in"
+      ? "Орлого авах бараагаа сонгоно уу."
+      : "Зарлага гаргах бараагаа сонгоно уу.";
 
   return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">${hint}</div><div class="divide-y divide-border">${list.length ? list.map((p) => stockActionRow(p, tab)).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
@@ -3484,6 +3492,12 @@ function confirmNewCount() {
 function setInventoryCategory(cat) {
   state.filters.inventoryCategory = cat;
   render();
+  scrollAppMainToTop();
+}
+function setInventoryTab(tab) {
+  state.filters.inventory = tab;
+  render();
+  scrollAppMainToTop();
 }
 function reportOrdersFiltered() {
   const day = state.filters.reportDate || "";
@@ -5650,6 +5664,22 @@ function applyCustomerSave(data, id) {
 function saveCustomer(e, id) {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
+  if (id) {
+    const existing = state.customers.find((c) => c.id === id);
+    if (!existing) return alert("Харилцагч олдсонгүй");
+    const name = data.name || data.companyName || existing.name || "Харилцагч";
+    confirmModal(
+      "Засвар хадгалах",
+      `<p><b>${esc(name)}</b> засаж дууслаа. Хадгалах уу?</p>`,
+      {
+        confirmLabel: "Хадгалах",
+        cancelLabel: "Үгүй",
+        closable: true,
+        onConfirm: () => applyCustomerSave(data, id),
+      },
+    );
+    return;
+  }
   applyCustomerSave(data, id);
 }
 function customerDetail(id) {
@@ -7088,13 +7118,21 @@ function alertModal(title, messageHtml) {
 function confirmModal(
   title,
   messageHtml,
-  { confirmLabel, onConfirm, onCancel, danger = false, closable = false } = {},
+  {
+    confirmLabel,
+    cancelLabel,
+    onConfirm,
+    onCancel,
+    danger = false,
+    closable = false,
+  } = {},
 ) {
   if (!confirmLabel || !onConfirm) return;
   showConfirmCard({
     title,
     message: messageHtml,
     confirmLabel,
+    cancelLabel,
     onConfirm,
     onCancel,
     danger,
@@ -7317,6 +7355,7 @@ Object.assign(window, {
   inventoryStockModal,
   applyStockFromModal,
   setInventoryCategory,
+  setInventoryTab,
   setCountCategory,
   setWorkerQty,
   setWorkerOrderActive,
