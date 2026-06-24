@@ -978,15 +978,9 @@ function mergePersistentStates(remote = {}, local = {}) {
       const remoteRules = remote.promotionRules || {};
       const localRules = local.promotionRules || {};
       merged.promotionRules = {
-        quantity: mergeRuleArrays(
-          remoteRules.quantity,
-          localRules.quantity,
-        ),
+        quantity: mergeRuleArrays(remoteRules.quantity, localRules.quantity),
         price: mergeRuleArrays(remoteRules.price, localRules.price),
-        payment: mergeRuleArrays(
-          remoteRules.payment,
-          localRules.payment,
-        ),
+        payment: mergeRuleArrays(remoteRules.payment, localRules.payment),
       };
       continue;
     }
@@ -2824,7 +2818,9 @@ function orderReceiptSearchText(o) {
     .join(" ");
 }
 function orderReceiptMatchesQuery(o, q) {
-  const needle = String(q || "").trim().toLowerCase();
+  const needle = String(q || "")
+    .trim()
+    .toLowerCase();
   if (!needle) return true;
   return orderReceiptSearchText(o).includes(needle);
 }
@@ -3723,7 +3719,9 @@ function promoFilteredProducts(pickKey, excludeIds = []) {
     return (
       p.name.toLowerCase().includes(q) ||
       String(p.barcode || "").includes(q) ||
-      String(p.category || "").toLowerCase().includes(q)
+      String(p.category || "")
+        .toLowerCase()
+        .includes(q)
     );
   });
 }
@@ -3757,7 +3755,9 @@ function promoProductSearchListHtml({
           : `addPromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})`;
       return `<button type="button" onclick="${onclick}" class="promo-product-row ${selectedId === p.id ? "is-active" : ""}"><img src="${productImage(p)}" class="product-thumb" alt=""><div class="min-w-0 text-left"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`;
     })
-    .join("")}${more ? `<p class="promo-product-more">+${more} бараа. Хайлтаа нарийсгана уу.</p>` : ""}</div>`;
+    .join(
+      "",
+    )}${more ? `<p class="promo-product-more">+${more} бараа. Хайлтаа нарийсгана уу.</p>` : ""}</div>`;
 }
 function promotionProductPickerBlock(
   fieldName,
@@ -5581,18 +5581,14 @@ function confirmEditCustomer(id) {
   const c = state.customers.find((x) => x.id === id);
   if (!c) return alert("Харилцагч олдсонгүй");
   const name = c.name || c.companyName || "Харилцагч";
-  confirmModal(
-    "Харилцагч засах",
-    `<p><b>${esc(name)}</b> засах уу?</p>`,
-    {
-      confirmLabel: "Тийм",
-      closable: true,
-      onConfirm: () => {
-        closeModal();
-        customerModal(id);
-      },
+  confirmModal("Харилцагч засах", `<p><b>${esc(name)}</b> засах уу?</p>`, {
+    confirmLabel: "Тийм",
+    closable: true,
+    onConfirm: () => {
+      closeModal();
+      customerModal(id);
     },
-  );
+  });
 }
 function confirmEditProduct(id) {
   if (!isAdmin()) return;
@@ -6106,9 +6102,7 @@ function employeeModal(id) {
     )
     .join("");
   const pctChecked =
-    isEdit && e?.role === "sales"
-      ? e.allowPercentDiscount !== false
-      : !isEdit;
+    isEdit && e?.role === "sales" ? e.allowPercentDiscount !== false : !isEdit;
   const passwordAttrs = isEdit
     ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
