@@ -5252,7 +5252,10 @@ function workerOrderDetail(id) {
   orderReceiptModal(id);
 }
 function render() {
-  if (!window.__tomudaBooted) return;
+  if (!window.__tomudaBooted) {
+    if (!app.querySelector(".boot-screen")) app.innerHTML = bootScreenHtml();
+    return;
+  }
   if (!state.isLoggedIn) {
     app.innerHTML = loginView();
     return;

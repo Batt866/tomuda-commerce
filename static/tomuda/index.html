@@ -37,7 +37,33 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="boot-screen" aria-live="polite">
+        <div class="boot-screen__card">
+          <img
+            src="./branding/logo-blue.png"
+            alt=""
+            class="boot-screen__logo"
+            width="64"
+            height="64"
+            decoding="async"
+          />
+          <p id="boot-title" class="boot-screen__title" hidden></p>
+          <p id="boot-detail" class="boot-screen__detail">
+            Мэдээлэл татаж байна. Түр хүлээнэ үү
+          </p>
+          <div class="boot-screen__spinner" aria-hidden="true"></div>
+          <button
+            type="button"
+            id="boot-retry"
+            class="boot-screen__retry hidden"
+            onclick="location.reload()"
+          >
+            Дахин оролдох
+          </button>
+        </div>
+      </div>
+    </div>
     <div id="modal"></div>
     <script
       src="./vendor/leaflet/leaflet.js"
