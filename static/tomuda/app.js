@@ -2433,7 +2433,7 @@ function orderReceiptRowsFiltered(
     state.orders.filter(
       (o) =>
         (!employeeIds.length || employeeIds.includes(o.employeeId)) &&
-        o.customerName.toLowerCase().includes(q) &&
+        orderReceiptMatchesQuery(o, q) &&
         (state.filters.order === "all" || o.status === state.filters.order),
     ),
   );
@@ -2547,7 +2547,7 @@ function orderReceiptsPanel({
     rows = orderReceiptRowsFiltered(searchKey, employeeIds);
   if (compact)
     return warehouseReceiptsPanel(rows, { title, searchKey, employeeIds });
-  const exportBtn = `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`;
+  const exportBtn = `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`;
   return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border flex items-center justify-between gap-2"><h2 class="page-head__title">${title}</h2><div class="flex items-center gap-2 shrink-0">${exportBtn}${showCreate ? `<button onclick="orderModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm">+ Шинэ</button>` : ""}</div></div><div class="p-3 flex flex-col sm:flex-row gap-2"><input data-focus="${searchKey}" value="${esc(q)}" oninput="search('${searchKey}',this.value)" placeholder="Хайх..." class="flex-1 px-3 py-2.5 bg-secondary rounded text-sm"><select onchange="state.filters.order=this.value;render()" class="px-4 py-2.5 bg-secondary rounded text-sm"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select></div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold">Захиалга</th><th class="px-4 py-3 text-left text-xs font-semibold">Ажилтан</th><th class="px-4 py-3 text-left text-xs font-semibold">Бараа</th><th class="px-4 py-3 text-left text-xs font-semibold">Төлөв</th><th class="px-4 py-3 text-right text-xs font-semibold">Дүн</th><th class="px-4 py-3 text-right text-xs font-semibold">Үйлдэл</th></tr></thead><tbody class="divide-y divide-border">${rows.map(orderRow).join("")}</tbody></table></div>${rows.length ? "" : `<div class="p-12 text-center text-muted-foreground">Захиалга олдсонгүй</div>`}</section>`;
 }
 function warehouseOrderStatusActions(o) {
@@ -2792,6 +2792,28 @@ function confirmDataExport(title, onConfirm) {
     confirmLabel: "Тийм",
     onConfirm,
   });
+}
+function orderReceiptSearchText(o) {
+  const customer = state.customers.find((x) => x.id === o.customerId) || {};
+  return [
+    o.id,
+    formatReceiptNumber(o),
+    o.customerName,
+    customer.name,
+    customer.companyName,
+    customer.phone1,
+    customer.phone2,
+    o.employeeName,
+    o.employeePhone,
+    o.status,
+  ]
+    .map((value) => String(value || "").toLowerCase())
+    .join(" ");
+}
+function orderReceiptMatchesQuery(o, q) {
+  const needle = String(q || "").trim().toLowerCase();
+  if (!needle) return true;
+  return orderReceiptSearchText(o).includes(needle);
 }
 function warehouseOrdersForSelectedWorkers() {
   const ids = new Set(state.selectedWorkers || []);
@@ -5051,8 +5073,7 @@ function showDeliveryUserLocation(hasStorePin) {
   );
 }
 function warehouseReceiptsView() {
-  const employeeIds = state.selectedWorkers.length ? state.selectedWorkers : [];
-  return `<div class="space-y-4">${orderReceiptsPanel({ employeeIds, compact: true })}</div>`;
+  return `<div class="space-y-4">${orderReceiptsPanel({ compact: true, employeeIds: [] })}</div>`;
 }
 function workerChooser(orders) {
   const qty = orders
