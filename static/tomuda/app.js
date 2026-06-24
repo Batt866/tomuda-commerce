@@ -2591,7 +2591,9 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     detailHtml = selected
       ? warehouseOrderDetail(selected)
       : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`,
-    exportBtn = `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})" class="btn btn--secondary btn--sm wh-receipts__export">${EXCEL_FILE_DOWNLOAD}</button>`;
+    exportBtn = selected
+      ? `<button type="button" onclick="downloadOrderReceiptExcel('${esc(selected.id)}')" class="btn btn--secondary btn--sm wh-receipts__export">${EXCEL_FILE_DOWNLOAD}</button>`
+      : `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})" class="btn btn--secondary btn--sm wh-receipts__export">${EXCEL_FILE_DOWNLOAD}</button>`;
   return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside">${exportBtn}<span class="wh-receipts__total">${fmt(total)}</span></div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
     .map(
       (s) =>
