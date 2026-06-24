@@ -4198,6 +4198,12 @@ input::placeholder, textarea::placeholder {
   overflow-y: auto;
 }
 
+.promo-product-list--search {
+  max-height: 260px;
+  padding-right: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
 .promo-product-row {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -4233,6 +4239,50 @@ input::placeholder, textarea::placeholder {
 
 .promo-product-list--selected {
   margin-bottom: 8px;
+}
+
+.promo-category-scroll {
+  display: flex;
+  gap: 6px;
+  margin: -2px 0 10px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.promo-category-chip {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hex-border);
+  border-radius: 999px;
+  background: var(--hex-card);
+  color: var(--hex-muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.promo-category-chip.is-active {
+  border-color: var(--hex-primary);
+  background: var(--hex-primary);
+  color: #fff;
+}
+
+.promo-product-empty,
+.promo-product-more {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hex-card) 72%, transparent);
+  color: var(--hex-muted-foreground);
+  font-size: 12px;
+  text-align: center;
+}
+
+.promo-product-more {
+  padding: 8px 10px;
 }
 
 .promo-qty-rule-buys {
