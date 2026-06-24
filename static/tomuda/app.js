@@ -531,6 +531,9 @@ function nextReceiptSeq(month) {
 function paidFromPaymentTerm(term) {
   return term === "cash";
 }
+function paymentTermLabel(term) {
+  return term === "credit" ? "Зээлээр" : "Бэлнээр";
+}
 function orderIsPaid(o) {
   if (!o) return false;
   if (o.paymentTerm === "cash") return true;
@@ -3575,12 +3578,7 @@ function reportsView() {
 function paymentRow(o) {
   const paid = orderIsPaid(o),
     amount = orderAmount(o),
-    term =
-      o.paymentTerm === "credit"
-        ? "Төлөөгүй"
-        : o.paymentTerm === "cash"
-          ? "Төлсөн"
-          : "Бэлэн",
+    term = paymentTermLabel(o.paymentTerm),
     actions = paid
       ? ""
       : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Тооцоо дууссан</button>`;
@@ -5277,7 +5275,7 @@ function workerPromoRow(line) {
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
-  return `<div class="seg-tabs worker-payment-tabs"><button type="button" onclick="setPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлэн</button><button type="button" onclick="setPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Зээл</button></div>`;
+  return `<div class="seg-tabs worker-payment-tabs"><button type="button" onclick="setPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">${paymentTermLabel("cash")}</button><button type="button" onclick="setPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">${paymentTermLabel("credit")}</button></div>`;
 }
 function workerOrderOptionsHtml(cart) {
   const sm = state.settlementMonth || String(new Date().getMonth() + 1),
@@ -5337,7 +5335,7 @@ function workerOrders(orders) {
     today = todayIso(),
     todayPastDisabled = isDayBeforeToday(day),
     todayBtnClass = `worker-orders-filters__chip${day === today ? " is-active" : ""}${todayPastDisabled ? " is-disabled" : ""}`;
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="${todayBtnClass}"${todayPastDisabled ? " disabled" : ""}>Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${orderIsPaid(o) ? "text-tone-success" : "text-tone-danger"}">${orderIsPaid(o) ? "Төлсөн" : "Төлөөгүй"}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="${todayBtnClass}"${todayPastDisabled ? " disabled" : ""}>Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   orderReceiptModal(id);
