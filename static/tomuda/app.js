@@ -5278,7 +5278,7 @@ function workerNew(cart) {
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${line.productName}</p><p class="text-xs text-tone-success mt-1">Урамшуулал · үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImage(p)}" class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">Урамшуулал · үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
