@@ -10,7 +10,7 @@ api = NinjaAPI(title="Tomuda API")
 
 @api.get("/health")
 def health(request):
-    return {"ok": True, "app": "tomuda"}
+    return {"status": "ok"}
 
 
 @api.get("/meta")

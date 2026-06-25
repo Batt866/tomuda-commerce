@@ -39,70 +39,210 @@
       .boot-screen {
         min-height: 100vh;
         min-height: 100dvh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         padding: max(16px, env(safe-area-inset-top, 0px)) 24px
           max(24px, env(safe-area-inset-bottom, 0px));
-        background: linear-gradient(165deg, #eef2f5 0%, #e6f3f5 100%);
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(22, 137, 154, 0.08) 1px, transparent 1px)
+            0 0 / 42px 42px,
+          linear-gradient(0deg, rgba(22, 137, 154, 0.06) 1px, transparent 1px)
+            0 0 / 42px 42px,
+          #f4f7f8;
+      }
+      .boot-screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          132deg,
+          transparent 0%,
+          transparent 46%,
+          rgba(22, 137, 154, 0.08) 46%,
+          rgba(22, 137, 154, 0.08) 64%,
+          rgba(176, 122, 26, 0.08) 64%,
+          rgba(176, 122, 26, 0.08) 100%
+        );
+        pointer-events: none;
       }
       .boot-screen__card {
-        width: min(100%, 360px);
-        padding: 28px 24px;
-        border-radius: 16px;
-        border: 1px solid #d8dee6;
-        background: #fff;
-        box-shadow: 0 8px 24px rgba(16, 22, 35, 0.08);
-        text-align: center;
+        position: relative;
+        z-index: 1;
+        width: min(100%, 520px);
+        padding: 24px;
+        border-radius: 8px;
+        border: 1px solid rgba(216, 222, 230, 0.9);
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 18px 48px rgba(16, 22, 35, 0.13);
+        text-align: left;
+      }
+      @supports (backdrop-filter: blur(14px)) {
+        .boot-screen__card {
+          backdrop-filter: blur(14px);
+        }
+      }
+      .boot-screen__brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
       }
       .boot-screen__logo {
         display: block;
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 12px;
-        border-radius: 14px;
+        flex: 0 0 auto;
+        width: 52px;
+        height: 52px;
+        margin: 0;
+        border-radius: 8px;
+        box-shadow: 0 8px 18px rgba(22, 137, 154, 0.18);
+      }
+      .boot-screen__brand-copy {
+        min-width: 0;
+      }
+      .boot-screen__brand-name {
+        margin: 0;
+        color: #16899a;
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+      .boot-screen__brand-sub {
+        margin: 2px 0 0;
+        color: #687386;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .boot-screen__copy {
+        margin-top: 22px;
       }
       .boot-screen__title {
         margin: 0;
-        font-size: 1.125rem;
+        font-size: 1.25rem;
         font-weight: 800;
+        line-height: 1.25;
       }
       .boot-screen__detail {
-        margin: 8px 0 0;
+        margin: 7px 0 0;
         font-size: 13px;
+        line-height: 1.45;
         color: #687386;
       }
-      .boot-screen__spinner {
-        width: 28px;
-        height: 28px;
-        margin: 18px auto 0;
-        border: 3px solid #d8dee6;
-        border-top-color: #16899a;
-        border-radius: 50%;
-        animation: boot-spin 0.75s linear infinite;
+      .boot-screen__progress {
+        height: 6px;
+        margin-top: 18px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e5ecef;
       }
-      @keyframes boot-spin {
-        to {
-          transform: rotate(360deg);
+      .boot-screen__progress span {
+        display: block;
+        width: 42%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #16899a, #22a79d, #b07a1a);
+        animation: boot-progress 1.35s ease-in-out infinite;
+      }
+      .boot-screen__status-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 14px;
+        color: #4f5b6d;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .boot-screen__pulse {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #16899a;
+        box-shadow: 0 0 0 0 rgba(22, 137, 154, 0.35);
+        animation: boot-pulse 1.4s ease-out infinite;
+      }
+      .boot-screen__preview {
+        display: grid;
+        gap: 8px;
+        margin-top: 20px;
+      }
+      .boot-screen__preview-row {
+        height: 36px;
+        border-radius: 8px;
+        background: linear-gradient(90deg, #eef4f5, #dfeaed, #eef4f5);
+        background-size: 220% 100%;
+        animation: boot-skeleton 1.6s ease-in-out infinite;
+      }
+      .boot-screen__preview-row:nth-child(2) {
+        width: 86%;
+        animation-delay: 0.12s;
+      }
+      .boot-screen__preview-row:nth-child(3) {
+        width: 68%;
+        animation-delay: 0.24s;
+      }
+      .boot-screen--error .boot-screen__progress,
+      .boot-screen--error .boot-screen__status-row,
+      .boot-screen--error .boot-screen__preview {
+        display: none;
+      }
+      @keyframes boot-progress {
+        0% {
+          transform: translateX(-120%);
+        }
+        55%,
+        100% {
+          transform: translateX(260%);
+        }
+      }
+      @keyframes boot-pulse {
+        70% {
+          box-shadow: 0 0 0 10px rgba(22, 137, 154, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(22, 137, 154, 0);
+        }
+      }
+      @keyframes boot-skeleton {
+        0% {
+          background-position: 120% 0;
+        }
+        100% {
+          background-position: -120% 0;
         }
       }
       .boot-screen__retry {
         display: inline-block;
         width: 100%;
-        margin-top: 16px;
+        margin-top: 18px;
         min-height: 44px;
         padding: 0 16px;
         border: none;
-        border-radius: 12px;
+        border-radius: 8px;
         background: #16899a;
         color: #fff;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
       }
+      .boot-screen__retry.hidden {
+        display: none;
+      }
+      @media (max-width: 480px) {
+        .boot-screen {
+          padding-right: 16px;
+          padding-left: 16px;
+        }
+        .boot-screen__card {
+          padding: 20px;
+        }
+        .boot-screen__title {
+          font-size: 1.12rem;
+        }
+      }
     </style>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260604-edit-confirm-open" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260624-current-receipt-export" as="script" />
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260624-boot-loading" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260624-boot-loading" as="script" />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
     <script>
       tailwind.config = {
@@ -138,26 +278,43 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260604-edit-confirm-open"
+      href="{% static 'tomuda/styles.css' %}?v=20260624-boot-loading"
     />
   </head>
   <body>
     <div id="app">
       <div class="boot-screen" aria-live="polite">
-        <div class="boot-screen__card">
-          <img
-            src="{% static 'tomuda/branding/logo-blue.png' %}"
-            alt=""
-            class="boot-screen__logo"
-            width="64"
-            height="64"
-            decoding="async"
-          />
-          <p id="boot-title" class="boot-screen__title" hidden></p>
-          <p id="boot-detail" class="boot-screen__detail">
-            Мэдээлэл татаж байна. Түр хүлээнэ үү
-          </p>
-          <div class="boot-screen__spinner" aria-hidden="true"></div>
+        <div class="boot-screen__card" role="status">
+          <div class="boot-screen__brand">
+            <img
+              src="{% static 'tomuda/branding/logo-blue.png' %}"
+              alt=""
+              class="boot-screen__logo"
+              width="52"
+              height="52"
+              decoding="async"
+            />
+            <div class="boot-screen__brand-copy">
+              <p class="boot-screen__brand-name">ТОМУДА</p>
+              <p class="boot-screen__brand-sub">Борлуулалт, агуулах</p>
+            </div>
+          </div>
+          <div class="boot-screen__copy">
+            <p id="boot-title" class="boot-screen__title">Апп нээгдэж байна</p>
+            <p id="boot-detail" class="boot-screen__detail">
+              Мэдээлэл татаж байна. Түр хүлээнэ үү
+            </p>
+          </div>
+          <div class="boot-screen__progress" aria-hidden="true"><span></span></div>
+          <div class="boot-screen__status-row" aria-hidden="true">
+            <span class="boot-screen__pulse"></span>
+            <span>Сервертэй холбогдож байна</span>
+          </div>
+          <div class="boot-screen__preview" aria-hidden="true">
+            <span class="boot-screen__preview-row"></span>
+            <span class="boot-screen__preview-row"></span>
+            <span class="boot-screen__preview-row"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -184,15 +341,21 @@
       window.__showTomudaFatal = function (msg) {
         var el = document.getElementById("app");
         if (!el) return;
+        var safe = String(msg || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
         el.innerHTML =
-          '<div class="boot-screen"><div class="boot-screen__card"><p class="boot-screen__title">Алдаа</p><p class="boot-screen__detail">' +
-          msg +
-          '</p><button type="button" class="boot-screen__retry" onclick="location.reload()">Дахин оролдох</button></div></div>';
+          '<div class="boot-screen boot-screen--error"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="{% static 'tomuda/branding/logo-blue.png' %}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Борлуулалт, агуулах</p></div></div><div class="boot-screen__copy"><p class="boot-screen__title">Алдаа</p><p class="boot-screen__detail">' +
+          safe +
+          '</p></div><button type="button" class="boot-screen__retry" onclick="location.reload()">Дахин оролдох</button></div></div>';
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
     <script
-      src="{% static 'tomuda/app.js' %}?v=20260624-current-receipt-export"
+      src="{% static 'tomuda/app.js' %}?v=20260624-boot-loading"
       onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
     ></script>
   </body>

@@ -39,20 +39,37 @@
   <body>
     <div id="app">
       <div class="boot-screen" aria-live="polite">
-        <div class="boot-screen__card">
-          <img
-            src="./branding/logo-blue.png"
-            alt=""
-            class="boot-screen__logo"
-            width="64"
-            height="64"
-            decoding="async"
-          />
-          <p id="boot-title" class="boot-screen__title" hidden></p>
-          <p id="boot-detail" class="boot-screen__detail">
-            Мэдээлэл татаж байна. Түр хүлээнэ үү
-          </p>
-          <div class="boot-screen__spinner" aria-hidden="true"></div>
+        <div class="boot-screen__card" role="status">
+          <div class="boot-screen__brand">
+            <img
+              src="./branding/logo-blue.png"
+              alt=""
+              class="boot-screen__logo"
+              width="52"
+              height="52"
+              decoding="async"
+            />
+            <div class="boot-screen__brand-copy">
+              <p class="boot-screen__brand-name">ТОМУДА</p>
+              <p class="boot-screen__brand-sub">Борлуулалт, агуулах</p>
+            </div>
+          </div>
+          <div class="boot-screen__copy">
+            <p id="boot-title" class="boot-screen__title">Апп нээгдэж байна</p>
+            <p id="boot-detail" class="boot-screen__detail">
+              Мэдээлэл татаж байна. Түр хүлээнэ үү
+            </p>
+          </div>
+          <div class="boot-screen__progress" aria-hidden="true"><span></span></div>
+          <div class="boot-screen__status-row" aria-hidden="true">
+            <span class="boot-screen__pulse"></span>
+            <span>Сервертэй холбогдож байна</span>
+          </div>
+          <div class="boot-screen__preview" aria-hidden="true">
+            <span class="boot-screen__preview-row"></span>
+            <span class="boot-screen__preview-row"></span>
+            <span class="boot-screen__preview-row"></span>
+          </div>
           <button
             type="button"
             id="boot-retry"
