@@ -43,6 +43,9 @@ const state = {
   applyPercentDiscount: false,
   selectedWorkers: [],
   selectedWarehouseOrderId: "",
+  receiptPrintWorkerId: "",
+  receiptPrintOrderIds: [],
+  receiptPrintWorkerSync: "",
   selectedDeliveryId: "",
   deliveryName: "",
   deliveryPhone: "",
@@ -1108,6 +1111,9 @@ function captureSessionSnapshot() {
     filters: { ...state.filters },
     selectedWorkers: [...(state.selectedWorkers || [])],
     selectedWarehouseOrderId: state.selectedWarehouseOrderId,
+    receiptPrintWorkerId: state.receiptPrintWorkerId || "",
+    receiptPrintOrderIds: [...(state.receiptPrintOrderIds || [])],
+    receiptPrintWorkerSync: state.receiptPrintWorkerSync || "",
     selectedDeliveryId: state.selectedDeliveryId,
     workerStoreReady: state.workerStoreReady,
     pickerStatus: state.pickerStatus,
@@ -2429,16 +2435,22 @@ function applyStockAlertSettings(data) {
 function orderReceiptRowsFiltered(
   searchKey = "warehouseOrders",
   employeeIds = [],
+  opts = {},
 ) {
   const q = (state.searches[searchKey] || "").toLowerCase();
-  return filterWarehouseOrders(
+  const workerIds = idList(opts.workerIds || employeeIds),
+    deliveryIds = idList(opts.deliveryIds);
+  const rows = filterWarehouseOrders(
     state.orders.filter(
       (o) =>
-        (!employeeIds.length || employeeIds.includes(o.employeeId)) &&
+        (!workerIds.length || workerIds.includes(o.employeeId)) &&
+        (!deliveryIds.length ||
+          deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
         orderReceiptMatchesQuery(o, q) &&
         (state.filters.order === "all" || o.status === state.filters.order),
     ),
   );
+  return sortOrdersBySelectedPeople(rows, workerIds, deliveryIds);
 }
 function buildOrderReceiptExcelRows(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
@@ -2528,11 +2540,15 @@ function exportOrderReceiptsExcel(orders) {
   });
   excel(`zahialgiin-barimt-${stamp}.csv`, sheetRows);
 }
+function confirmVisibleOrderReceiptsExcel(searchKey = "warehouseOrders") {
+  confirmOrderReceiptsExcel(searchKey, [], receiptFilterOptions());
+}
 function confirmOrderReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
+  opts = {},
 ) {
-  const rows = orderReceiptRowsFiltered(searchKey, employeeIds).map(
+  const rows = orderReceiptRowsFiltered(searchKey, employeeIds, opts).map(
     orderReceiptSnapshot,
   );
   if (!rows.length) return alert("Захиалга олдсонгүй");
@@ -2556,7 +2572,8 @@ function orderReceiptsPanel({
   compact = false,
 } = {}) {
   const q = state.searches[searchKey] || "",
-    rows = orderReceiptRowsFiltered(searchKey, employeeIds);
+    filters = compact ? receiptFilterOptions() : {},
+    rows = orderReceiptRowsFiltered(searchKey, employeeIds, filters);
   if (compact)
     return warehouseReceiptsPanel(rows, { title, searchKey, employeeIds });
   const exportBtn = `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`;
@@ -2573,33 +2590,44 @@ function warehouseOrderStatusActions(o) {
     return `<button type="button" onclick="setOrder('${o.id}','delivered')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
   return "";
 }
-function warehouseReceiptListItem(o) {
-  const active = state.selectedWarehouseOrderId === o.id;
-  return `<button type="button" onclick="selectWarehouseOrder('${o.id}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button>`;
+function warehouseReceiptPrintListItem(o) {
+  const active = state.selectedWarehouseOrderId === o.id,
+    checked = idList(state.receiptPrintOrderIds).includes(o.id);
+  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions() {
-  return ["pending", "cancelled"];
+  return ["pending", "confirmed", "delivered", "cancelled"];
 }
 function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   if (
     !["all", ...warehouseReceiptStatusOptions()].includes(state.filters.order)
   )
     state.filters.order = "all";
-  if (rows.length && !rows.some((o) => o.id === state.selectedWarehouseOrderId))
-    state.selectedWarehouseOrderId = rows[0].id;
-  if (!rows.length) state.selectedWarehouseOrderId = "";
-  const selected = rows.find((o) => o.id === state.selectedWarehouseOrderId),
-    total = rows.reduce((s, o) => s + orderAmount(o), 0),
-    listHtml = rows.length
-      ? rows.map(warehouseReceiptListItem).join("")
-      : `<p class="wh-receipt-list__empty">Захиалга олдсонгүй</p>`,
+  const workerId = state.receiptPrintWorkerId || "",
+    displayRows = workerId ? receiptPrintWorkerOrders(workerId) : [];
+  syncReceiptPrintSelection(displayRows);
+  const selectedPrintIds = idList(state.receiptPrintOrderIds);
+  if (
+    displayRows.length &&
+    !displayRows.some((o) => o.id === state.selectedWarehouseOrderId)
+  )
+    state.selectedWarehouseOrderId = displayRows[0].id;
+  if (!displayRows.length) state.selectedWarehouseOrderId = "";
+  const selected = displayRows.find(
+      (o) => o.id === state.selectedWarehouseOrderId,
+    ),
+    total = displayRows.reduce((s, o) => s + orderAmount(o), 0),
+    listHtml = !workerId
+      ? `<p class="wh-receipt-list__empty">Худалдааны төлөөлөгч сонгоно уу</p>`
+      : displayRows.length
+        ? displayRows.map(warehouseReceiptPrintListItem).join("")
+        : `<p class="wh-receipt-list__empty">Захиалга олдсонгүй</p>`,
     detailHtml = selected
       ? warehouseOrderDetail(selected)
-      : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`,
-    exportBtn = selected
-      ? `<button type="button" onclick="downloadOrderReceiptExcel('${esc(selected.id)}')" class="btn btn--secondary btn--sm wh-receipts__export">${EXCEL_FILE_DOWNLOAD}</button>`
-      : `<button type="button" onclick="confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})" class="btn btn--secondary btn--sm wh-receipts__export">${EXCEL_FILE_DOWNLOAD}</button>`;
-  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside">${exportBtn}<span class="wh-receipts__total">${fmt(total)}</span></div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
+      : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>${workerId ? "Баримт сонгоно уу" : "Худалдааны төлөөлөгч сонгоно уу"}</p></div>`,
+    printBtn = `<button type="button" onclick="printSelectedOrderReceipts()" class="btn btn--primary btn--sm wh-receipts__print"${selectedPrintIds.length && workerId ? "" : " disabled"}>Хэвлэх (${selectedPrintIds.length})</button>`,
+    exportBtn = `<button type="button" onclick="confirmVisibleOrderReceiptsExcel('${esc(searchKey)}')" class="btn btn--secondary btn--sm wh-receipts__export"${displayRows.length ? "" : " disabled"}>${EXCEL_FILE_DOWNLOAD}</button>`;
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside">${printBtn}${exportBtn}<span class="wh-receipts__total">${fmt(total)}</span></div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}${receiptPrintWorkerSelectHtml()}${receiptPeopleFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
     .map(
       (s) =>
         `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
@@ -2627,7 +2655,7 @@ function warehouseOrderDetail(o) {
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(i.total)}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.logoBlue}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Хүргэлт</span><b>${dte(orderDeliveryDay(o))}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}')" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.logoBlue}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Хүргэлт</span><b>${dte(orderDeliveryDay(o))}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}')" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}')" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
@@ -2831,12 +2859,134 @@ function orderReceiptMatchesQuery(o, q) {
   if (!needle) return true;
   return orderReceiptSearchText(o).includes(needle);
 }
+function idList(value) {
+  return Array.isArray(value) ? value.filter(Boolean).map(String) : [];
+}
+function receiptWorkerIds() {
+  return idList(state.searches.receiptWorkerIds);
+}
+function receiptDeliveryIds() {
+  return idList(state.searches.receiptDeliveryIds);
+}
+function receiptFilterOptions() {
+  const workerId = state.receiptPrintWorkerId || "";
+  return {
+    workerIds: workerId ? [workerId] : receiptWorkerIds(),
+    deliveryIds: receiptDeliveryIds(),
+  };
+}
+function receiptPrintWorkerOrders(workerId) {
+  const deliveryIds = receiptDeliveryIds();
+  const rows = filterWarehouseOrders(
+    state.orders.filter(
+      (o) =>
+        o.employeeId === workerId &&
+        (!deliveryIds.length ||
+          deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
+        (state.filters.order === "all" || o.status === state.filters.order),
+    ),
+  );
+  return rows.sort((a, b) => {
+    const at = new Date(a.createdAt || 0).getTime(),
+      bt = new Date(b.createdAt || 0).getTime();
+    if (at !== bt) return at - bt;
+    return String(a.id || "").localeCompare(String(b.id || ""), "mn");
+  });
+}
+function syncReceiptPrintSelection(orders) {
+  const workerId = state.receiptPrintWorkerId || "";
+  if (!workerId) {
+    state.receiptPrintOrderIds = [];
+    state.receiptPrintWorkerSync = "";
+    return;
+  }
+  if (state.receiptPrintWorkerSync !== workerId) {
+    state.receiptPrintWorkerSync = workerId;
+    const pick = orders.length > 10 ? orders.slice(0, 10) : orders;
+    state.receiptPrintOrderIds = pick.map((o) => o.id);
+    return;
+  }
+  const valid = new Set(orders.map((o) => o.id));
+  state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter((id) =>
+    valid.has(id),
+  );
+}
+function receiptPrintWorkerSelectHtml() {
+  const workers = state.employees.filter((e) => e.role === "sales"),
+    workerId = state.receiptPrintWorkerId || "";
+  return `<select onchange="setReceiptPrintWorker(this.value)" class="wh-receipts__filter app-input wh-receipts__worker-select" aria-label="Худалдааны төлөөлөгч"><option value="">Худалдааны төлөөлөгч</option>${workers.map((e) => `<option value="${esc(e.id)}"${workerId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select>`;
+}
+function setReceiptPrintWorker(id) {
+  const next = id || "";
+  if (state.receiptPrintWorkerId === next) return;
+  state.receiptPrintWorkerId = next;
+  state.receiptPrintWorkerSync = "";
+  state.selectedWarehouseOrderId = "";
+  render();
+}
+function toggleReceiptPrintOrder(id) {
+  const current = idList(state.receiptPrintOrderIds);
+  state.receiptPrintOrderIds = current.includes(id)
+    ? current.filter((x) => x !== id)
+    : [...current, id];
+  render();
+}
+function orderDeliveryEmployeeId(o = {}) {
+  if (o.deliveryEmployeeId) return String(o.deliveryEmployeeId);
+  const name = String(o.deliveryName || "")
+    .trim()
+    .toLowerCase();
+  if (!name) return "";
+  return (
+    deliveryEmployees().find(
+      (e) =>
+        String(e.name || "")
+          .trim()
+          .toLowerCase() === name,
+    )?.id || ""
+  );
+}
+function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
+  const workerRank = new Map(workerIds.map((id, idx) => [id, idx]));
+  const deliveryRank = new Map(deliveryIds.map((id, idx) => [id, idx]));
+  return [...orders].sort((a, b) => {
+    if (workerRank.size) {
+      const ar = workerRank.has(a.employeeId)
+          ? workerRank.get(a.employeeId)
+          : Number.MAX_SAFE_INTEGER,
+        br = workerRank.has(b.employeeId)
+          ? workerRank.get(b.employeeId)
+          : Number.MAX_SAFE_INTEGER;
+      if (ar !== br) return ar - br;
+    }
+    if (deliveryRank.size) {
+      const ad = orderDeliveryEmployeeId(a),
+        bd = orderDeliveryEmployeeId(b),
+        ar = deliveryRank.has(ad)
+          ? deliveryRank.get(ad)
+          : Number.MAX_SAFE_INTEGER,
+        br = deliveryRank.has(bd)
+          ? deliveryRank.get(bd)
+          : Number.MAX_SAFE_INTEGER;
+      if (ar !== br) return ar - br;
+    }
+    const at = new Date(a.createdAt || 0).getTime(),
+      bt = new Date(b.createdAt || 0).getTime();
+    if (at !== bt) return at - bt;
+    return String(a.id || "").localeCompare(String(b.id || ""), "mn");
+  });
+}
 function warehouseOrdersForSelectedWorkers() {
   const ids = new Set(state.selectedWorkers || []);
   if (!ids.size) return [];
-  return filterWarehouseOrders(
+  const orders = filterWarehouseOrders(
     state.orders.filter((o) => ids.has(o.employeeId)),
   );
+  return sortOrdersBySelectedPeople(orders, state.selectedWorkers || []);
+}
+function warehouseActiveWorkerIds(orders) {
+  const hasOrder = new Set((orders || []).map((o) => o.employeeId));
+  return (state.selectedWorkers || []).filter((id) => hasOrder.has(id));
 }
 function warehouseDateFiltersHtml() {
   const day = state.filters.warehouseDate || "",
@@ -2852,6 +3002,42 @@ function clearWarehouseDate() {
 function setWarehouseDate(day) {
   state.filters.warehouseDate = day || "";
   render();
+}
+function receiptFilterToggle(kind, id) {
+  const key =
+    kind === "delivery" ? "receiptDeliveryIds" : "receiptWorkerIds";
+  const current = idList(state.searches[key]);
+  state.searches[key] = current.includes(id)
+    ? current.filter((x) => x !== id)
+    : [...current, id];
+  state.selectedWarehouseOrderId = "";
+  render();
+}
+function receiptFilterClear(kind = "") {
+  if (!kind || kind === "worker") state.searches.receiptWorkerIds = [];
+  if (!kind || kind === "delivery") state.searches.receiptDeliveryIds = [];
+  state.selectedWarehouseOrderId = "";
+  render();
+}
+function receiptFilterChip(kind, item, selectedIds) {
+  const active = selectedIds.includes(item.id);
+  return `<button type="button" onclick="receiptFilterToggle(${jsStringArg(kind)},${jsStringArg(item.id)})" class="receipt-filter-chip${active ? " is-active" : ""}" aria-pressed="${active ? "true" : "false"}">${esc(item.name)}</button>`;
+}
+function receiptFilterGroup(kind, title, items, selectedIds) {
+  if (!items.length) return "";
+  const clear =
+    selectedIds.length > 0
+      ? `<button type="button" onclick="receiptFilterClear(${jsStringArg(kind)})" class="receipt-filter-clear">Цэвэрлэх</button>`
+      : "";
+  return `<div class="receipt-filter-group"><div class="receipt-filter-group__head"><span>${esc(title)}</span>${clear}</div><div class="receipt-filter-chips">${items.map((item) => receiptFilterChip(kind, item, selectedIds)).join("")}</div></div>`;
+}
+function receiptPeopleFiltersHtml() {
+  const deliveries = deliveryEmployees(),
+    deliveryIds = receiptDeliveryIds(),
+    clearAll = deliveryIds.length
+      ? `<button type="button" onclick="receiptFilterClear('delivery')" class="receipt-filter-clear receipt-filter-clear--all">Бүгдийг цэвэрлэх</button>`
+      : "";
+  return `<div class="receipt-people-filters">${clearAll}${receiptFilterGroup("delivery", "Түгээгч", deliveries, deliveryIds)}</div>`;
 }
 function confirmCustomerExcel() {
   if (!isAdmin()) return;
@@ -5095,12 +5281,13 @@ function workerChooser(orders) {
       .flatMap((o) => o.items)
       .reduce((s, i) => s + i.quantity, 0),
     total = orders.reduce((s, o) => s + orderAmount(o), 0),
+    activeWorkerIds = warehouseActiveWorkerIds(orders),
     names = state.employees
-      .filter((e) => state.selectedWorkers.includes(e.id))
+      .filter((e) => activeWorkerIds.includes(e.id))
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders);
-  return `<section class="bg-card rounded p-3 space-y-3">${warehouseDateFiltersHtml()}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || "Сонгох"}</span></button>${warehouseDeliveryField()}${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${state.selectedWorkers.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Захиалга алга</p>`}</div><button onclick="confirmEmployeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Худалдааны төлөөлөгчөө сонгоно уу</div>`}</section>`;
+  return `<section class="bg-card rounded p-3 space-y-3">${warehouseDateFiltersHtml()}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || (state.selectedWorkers.length ? "Захиалга алга" : "Сонгох")}</span></button>${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Сонгосон ХТ дээр захиалга алга</p>`}</div><button onclick="confirmEmployeeExcel()" class="w-full py-2.5 bg-primary text-primary-foreground rounded font-medium"${orders.length ? "" : " disabled"}>${EXCEL_FILE_DOWNLOAD}</button>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Худалдааны төлөөлөгчөө сонгоно уу</div>`}</section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -6478,9 +6665,17 @@ function printOrderReceiptNow(id) {
   }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
+  printOrderReceiptsNow([id]);
+}
+function printOrderReceiptsNow(ids) {
+  const idOrder = idList(ids);
+  const orders = idOrder
+    .map((id) => state.orders.find((o) => o.id === id))
+    .filter(Boolean);
+  if (!orders.length) return alert("Захиалга олдсонгүй");
   closeModal();
   const root = printRootEl();
-  root.innerHTML = receipt(o);
+  root.innerHTML = orders.map((o) => receipt(o)).join("");
   const cleanup = () => {
     root.innerHTML = "";
   };
@@ -6489,6 +6684,12 @@ function printOrderReceiptNow(id) {
     window.print();
     setTimeout(cleanup, 1500);
   }, 120);
+}
+function printSelectedOrderReceipts() {
+  const ids = idList(state.receiptPrintOrderIds);
+  if (!state.receiptPrintWorkerId) return alert("Худалдааны төлөөлөгч сонгоно уу");
+  if (!ids.length) return alert("Хэвлэх захиалга сонгоно уу");
+  confirmDataExport("Баримт хэвлэх", () => printOrderReceiptsNow(ids));
 }
 function orderDetail(id) {
   orderReceiptModal(id);
@@ -6966,9 +7167,11 @@ function toggleWorkerOnly(id) {
 }
 function employeeExcel() {
   if (!state.selectedWorkers.length) return alert("Ажилтан сонгоно уу");
-  const workerIds = [...state.selectedWorkers],
-    orders = warehouseOrdersForSelectedWorkers(),
+  const orders = warehouseOrdersForSelectedWorkers(),
+    workerIds = warehouseActiveWorkerIds(orders),
     map = {};
+  if (!orders.length || !workerIds.length)
+    return alert("Сонгосон ХТ дээр захиалга алга");
   orders.forEach((o) =>
     o.items.forEach((i) => {
       const key = i.productId || i.productName;
@@ -7409,6 +7612,7 @@ Object.assign(window, {
   confirmReportExport,
   confirmEmployeeExcel,
   confirmOrderReceiptsExcel,
+  confirmVisibleOrderReceiptsExcel,
   confirmSingleOrderReceiptExcel,
   exportOrderReceiptsExcel,
   customerExcel,
@@ -7491,6 +7695,12 @@ Object.assign(window, {
   setWorkerOrderDate,
   clearWarehouseDate,
   setWarehouseDate,
+  receiptFilterToggle,
+  receiptFilterClear,
+  setReceiptPrintWorker,
+  toggleReceiptPrintOrder,
+  printSelectedOrderReceipts,
+  printOrderReceiptsNow,
   scrollWorkerOrdersToDate,
   openPromotionQtyModal,
   openPromotionPage,

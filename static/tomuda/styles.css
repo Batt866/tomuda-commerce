@@ -6581,6 +6581,14 @@ input::placeholder, textarea::placeholder {
   flex-shrink: 0;
 }
 
+.wh-receipts__print {
+  flex-shrink: 0;
+}
+
+.wh-receipts__worker-select {
+  font-weight: 700;
+}
+
 .wh-receipts__total {
   font-size: 14px;
   font-weight: 800;
@@ -6594,6 +6602,65 @@ input::placeholder, textarea::placeholder {
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--hex-border);
+}
+
+.receipt-people-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.receipt-filter-group {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--hex-secondary);
+}
+
+.receipt-filter-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--hex-muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.receipt-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.receipt-filter-chip {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--hex-border);
+  border-radius: 8px;
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.receipt-filter-chip.is-active {
+  border-color: var(--hex-primary);
+  background: var(--hex-primary);
+  color: var(--hex-primary-foreground);
+}
+
+.receipt-filter-clear {
+  border: 0;
+  background: transparent;
+  color: var(--hex-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.receipt-filter-clear--all {
+  align-self: flex-end;
 }
 
 .wh-date-filters {
@@ -6653,6 +6720,39 @@ input::placeholder, textarea::placeholder {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid var(--hex-border);
+}
+
+.wh-receipt-list__item--selectable {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.wh-receipt-list__check {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.wh-receipt-list__check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--hex-primary);
+  cursor: pointer;
+}
+
+.wh-receipt-list__body-btn {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
 }
 
 .wh-receipt-list__item {
@@ -7028,6 +7128,10 @@ input::placeholder, textarea::placeholder {
     border-radius: 12px;
     border-bottom: 1px solid var(--hex-border);
     box-shadow: none;
+  }
+
+  .wh-receipt-list__item--selectable {
+    width: min(52vw, 196px);
   }
 
   .wh-receipt-list__item.is-active {
@@ -7474,6 +7578,10 @@ input::placeholder, textarea::placeholder {
     background: white;
     color: black;
     font-family: Arial, sans-serif;
+  }
+  .print-receipt:not(:last-child) .receipt-page {
+    page-break-after: always;
+    break-after: page;
   }
   .receipt-page { width: 190mm; margin: 0 auto; padding: 4mm 3mm; font-size: 10.5px; line-height: 1.22; }
   .receipt-header { display: grid; grid-template-columns: 22mm 1fr 34mm; gap: 4mm; align-items: start; }
