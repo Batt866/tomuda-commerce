@@ -44,6 +44,7 @@ const state = {
   selectedWorkers: [],
   selectedWarehouseOrderId: "",
   receiptPrintWorkerId: "",
+  receiptPrintDeliveryId: "",
   receiptPrintOrderIds: [],
   receiptPrintWorkerSync: "",
   selectedDeliveryId: "",
@@ -383,12 +384,8 @@ function todayNoonLocal() {
   return d;
 }
 function orderInWarehouseLiveSession(o) {
-  const today = todayIso(),
-    now = new Date(),
-    noon = todayNoonLocal(),
-    created = new Date(o.createdAt);
-  if (Number.isNaN(created.getTime())) return false;
-  if (now >= noon) return isoDay(created) === today && created >= noon;
+  const today = todayIso();
+  if (isoDay(o.createdAt) === today) return true;
   return orderDay(o) === today;
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
@@ -1112,6 +1109,7 @@ function captureSessionSnapshot() {
     selectedWorkers: [...(state.selectedWorkers || [])],
     selectedWarehouseOrderId: state.selectedWarehouseOrderId,
     receiptPrintWorkerId: state.receiptPrintWorkerId || "",
+    receiptPrintDeliveryId: state.receiptPrintDeliveryId || "",
     receiptPrintOrderIds: [...(state.receiptPrintOrderIds || [])],
     receiptPrintWorkerSync: state.receiptPrintWorkerSync || "",
     selectedDeliveryId: state.selectedDeliveryId,
@@ -2281,7 +2279,7 @@ function adminHubHtml() {
     ["warehouseReceipts", "Баримтууд", "stock"],
   ];
   const settings = [
-    ["stockAlertModal()", "Үлдэгдэл сануулга", "stock"],
+    ["stockAlertModal()", "ҮЛДЭГДЭЛ САНУУЛАХ", "stock"],
     [
       "percentDiscountSettingsModal()",
       `Хувь тооцох (${percentDiscountRate()}%)`,
@@ -2371,7 +2369,7 @@ function stockAlertModal() {
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
-    "Үлдэгдэл сануулга",
+    "Үлдэгдэл сануулах",
     `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Таталт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-xl",
   );
@@ -2386,7 +2384,7 @@ function saveStockAlertSettings(e) {
     closeModal();
     return;
   }
-  confirmModal("Үлдэгдэл сануулга хадгалах", summary.html, {
+  confirmModal("Үлдэгдэл сануулах хадгалах", summary.html, {
     confirmLabel: "Хадгалах",
     onConfirm: () => applyStockAlertSettings(data),
   });
@@ -2430,7 +2428,7 @@ function applyStockAlertSettings(data) {
   closeModal();
   scheduleBackendSave();
   render();
-  showInstallToast("Үлдэгдэл сануулга хадгалагдлаа");
+  showInstallToast("Үлдэгдэл сануулах хадгалагдлаа");
 }
 function orderReceiptRowsFiltered(
   searchKey = "warehouseOrders",
@@ -2470,7 +2468,6 @@ function buildOrderReceiptExcelRows(o) {
     rows = [
       ["ТОМУДА групп ХХК"],
       ["ЗАРЛАГЫН БАРИМТ", `№${formatReceiptNumber(o)}`],
-      ["Хүргэлтийн огноо", dte(orderDeliveryDay(o))],
       ["Захиалгын огноо", dte(o.createdAt)],
       [],
       ["Худалдааны төлөөлөгч", o.employeeName || sales.name || "-"],
@@ -2590,10 +2587,14 @@ function warehouseOrderStatusActions(o) {
     return `<button type="button" onclick="setOrder('${o.id}','delivered')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
   return "";
 }
+function warehouseReceiptListItem(o) {
+  const active = state.selectedWarehouseOrderId === o.id;
+  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)}</span></span></button>`;
+}
 function warehouseReceiptPrintListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id,
     checked = idList(state.receiptPrintOrderIds).includes(o.id);
-  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
+  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions() {
   return ["pending", "confirmed", "delivered", "cancelled"];
@@ -2604,9 +2605,12 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   )
     state.filters.order = "all";
   const workerId = state.receiptPrintWorkerId || "",
-    displayRows = workerId ? receiptPrintWorkerOrders(workerId) : [];
-  syncReceiptPrintSelection(displayRows);
-  const selectedPrintIds = idList(state.receiptPrintOrderIds);
+    displayRows = workerId ? receiptPrintWorkerOrders(workerId) : rows;
+  if (workerId) syncReceiptPrintSelection(displayRows);
+  else {
+    state.receiptPrintOrderIds = [];
+    state.receiptPrintWorkerSync = "";
+  }
   if (
     displayRows.length &&
     !displayRows.some((o) => o.id === state.selectedWarehouseOrderId)
@@ -2616,18 +2620,19 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   const selected = displayRows.find(
       (o) => o.id === state.selectedWarehouseOrderId,
     ),
-    total = displayRows.reduce((s, o) => s + orderAmount(o), 0),
-    listHtml = !workerId
-      ? `<p class="wh-receipt-list__empty">Худалдааны төлөөлөгч сонгоно уу</p>`
-      : displayRows.length
-        ? displayRows.map(warehouseReceiptPrintListItem).join("")
-        : `<p class="wh-receipt-list__empty">Захиалга олдсонгүй</p>`,
+    listHtml = displayRows.length
+      ? displayRows
+          .map(
+            workerId
+              ? warehouseReceiptPrintListItem
+              : warehouseReceiptListItem,
+          )
+          .join("")
+      : `<p class="wh-receipt-list__empty">Захиалга олдсонгүй</p>`,
     detailHtml = selected
       ? warehouseOrderDetail(selected)
-      : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>${workerId ? "Баримт сонгоно уу" : "Худалдааны төлөөлөгч сонгоно уу"}</p></div>`,
-    printBtn = `<button type="button" onclick="printSelectedOrderReceipts()" class="btn btn--primary btn--sm wh-receipts__print"${selectedPrintIds.length && workerId ? "" : " disabled"}>Хэвлэх (${selectedPrintIds.length})</button>`,
-    exportBtn = `<button type="button" onclick="confirmVisibleOrderReceiptsExcel('${esc(searchKey)}')" class="btn btn--secondary btn--sm wh-receipts__export"${displayRows.length ? "" : " disabled"}>${EXCEL_FILE_DOWNLOAD}</button>`;
-  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-aside">${printBtn}${exportBtn}<span class="wh-receipts__total">${fmt(total)}</span></div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}${receiptPrintWorkerSelectHtml()}${receiptPeopleFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
+      : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`;
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
     .map(
       (s) =>
         `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
@@ -2655,7 +2660,7 @@ function warehouseOrderDetail(o) {
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(i.total)}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.logoBlue}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Хүргэлт</span><b>${dte(orderDeliveryDay(o))}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}')" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}')" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.logoBlue}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}')" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}')" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
@@ -2869,14 +2874,19 @@ function receiptDeliveryIds() {
   return idList(state.searches.receiptDeliveryIds);
 }
 function receiptFilterOptions() {
-  const workerId = state.receiptPrintWorkerId || "";
+  const workerId = state.receiptPrintWorkerId || "",
+    deliveryId = state.receiptPrintDeliveryId || "";
   return {
     workerIds: workerId ? [workerId] : receiptWorkerIds(),
-    deliveryIds: receiptDeliveryIds(),
+    deliveryIds: deliveryId ? [deliveryId] : receiptDeliveryIds(),
   };
 }
+function receiptPrintDeliveryIds() {
+  const id = state.receiptPrintDeliveryId || "";
+  return id ? [id] : receiptDeliveryIds();
+}
 function receiptPrintWorkerOrders(workerId) {
-  const deliveryIds = receiptDeliveryIds();
+  const deliveryIds = receiptPrintDeliveryIds();
   const rows = filterWarehouseOrders(
     state.orders.filter(
       (o) =>
@@ -2914,12 +2924,25 @@ function syncReceiptPrintSelection(orders) {
 function receiptPrintWorkerSelectHtml() {
   const workers = state.employees.filter((e) => e.role === "sales"),
     workerId = state.receiptPrintWorkerId || "";
-  return `<select onchange="setReceiptPrintWorker(this.value)" class="wh-receipts__filter app-input wh-receipts__worker-select" aria-label="Худалдааны төлөөлөгч"><option value="">Худалдааны төлөөлөгч</option>${workers.map((e) => `<option value="${esc(e.id)}"${workerId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select>`;
+  return `<select onchange="setReceiptPrintWorker(this.value)" class="wh-receipts__head-select app-input" aria-label="Худалдааны төлөөлөгч"><option value="">Худалдааны төлөөлөгч</option>${workers.map((e) => `<option value="${esc(e.id)}"${workerId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select>`;
+}
+function receiptPrintDeliverySelectHtml() {
+  const deliveries = deliveryEmployees(),
+    deliveryId = state.receiptPrintDeliveryId || "";
+  return `<select onchange="setReceiptPrintDelivery(this.value)" class="wh-receipts__head-select app-input" aria-label="Түгээгч"><option value="">Түгээгч</option>${deliveries.map((e) => `<option value="${esc(e.id)}"${deliveryId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select>`;
 }
 function setReceiptPrintWorker(id) {
   const next = id || "";
   if (state.receiptPrintWorkerId === next) return;
   state.receiptPrintWorkerId = next;
+  state.receiptPrintWorkerSync = "";
+  state.selectedWarehouseOrderId = "";
+  render();
+}
+function setReceiptPrintDelivery(id) {
+  const next = id || "";
+  if (state.receiptPrintDeliveryId === next) return;
+  state.receiptPrintDeliveryId = next;
   state.receiptPrintWorkerSync = "";
   state.selectedWarehouseOrderId = "";
   render();
@@ -2993,7 +3016,7 @@ function warehouseDateFiltersHtml() {
     today = todayIso(),
     displayDay = day || today,
     live = !day;
-  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><input type="date" value="${displayDay}" onchange="setWarehouseDate(this.value)" class="wh-date-filters__date app-input" aria-label="Огноо сонгох"><span class="wh-date-filters__hint">${live ? (new Date() >= todayNoonLocal() ? "12:00-с хойших шинэ захиалга" : "Өнөөдрийн захиалга") : "Сонгосон өдрийн захиалга"}</span></div>`;
+  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><input type="date" value="${displayDay}" onchange="setWarehouseDate(this.value)" class="wh-date-filters__date app-input" aria-label="Огноо сонгох"><span class="wh-date-filters__hint">${live ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
 }
 function clearWarehouseDate() {
   state.filters.warehouseDate = "";
@@ -4410,7 +4433,7 @@ function promotionPaymentModal() {
     type = state.promoPaymentRuleType === "percent" ? "percent" : "free",
     freeIds = state.promoPick.paymentFreeProductIds || [],
     termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлнээр</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Дансаар</button></div>`,
-    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувийн хөнгөлөлт</button></div>`,
+    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувь тооцох</button></div>`,
     minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { placeholder: "0", value: promoFormDraftVal("minAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
     freeBlock =
       type === "free"
@@ -6571,7 +6594,7 @@ function orderReceiptModal(id, keepDraft = false) {
   const draft = receiptEditDraftOrder();
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><p class="receipt-edit-store__meta">Хүргэлт ${dte(orderDeliveryDay(o))}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
+    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
@@ -6716,7 +6739,6 @@ function receipt(o) {
     delivery = resolveOrderDelivery(o),
     deliveryName = esc(delivery.deliveryName),
     deliveryPhone = esc(delivery.deliveryPhone),
-    deliveryDay = orderDeliveryDay(o),
     settlement = settlementNoteText(o),
     promoItems = (o.items || []).filter((i) => i.isPromoFree),
     pct =
@@ -6741,7 +6763,7 @@ function receipt(o) {
           )
           .join("")
       : `<div class="receipt-promo-row receipt-promo-row--empty"><span></span><span></span><strong>0</strong></div>`;
-  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${dte(deliveryDay)}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</h2><section class="receipt-info"><div class="receipt-info__col"><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div><div class="receipt-info__col"><p><span>Харилцагч:</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистрийн дугаар:</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Компанийн нэр:</span><b>${esc(c.companyName || "-")}</b></p><p><span>Утасны дугаар:</span><b>${esc(c.phone1 || "-")}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хүргэлтийн хаяг:</span><b>${esc(addr)}</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${itemRows}</tbody></table><section class="receipt-footer-block"><div class="receipt-gross-bar"><span>Хувь хасагдаагүй нийт үнийн дүн</span><strong>${receiptMoney(gross)}</strong></div>${settlement ? `<div class="receipt-settlement-note">${esc(settlement)}</div>` : ""}<section class="receipt-promo-block"><div class="receipt-promo-head"><b>Урамшуулал</b><span>Үнэтрүүлэгч</span><span>Дүн</span></div>${promoRows}</section><section class="receipt-totals"><div class="receipt-total-line"><b>Бараа ажил үйлчилгээний дүн</b><strong>${receiptMoney(sub)}</strong></div><div class="receipt-total-line"><b>НӨАТ</b><strong>${receiptMoney(vat)}</strong></div>${discount ? `<div class="receipt-total-line"><b>Хөнгөлөлт (${pct}%)</b><strong>-${receiptMoney(discount)}</strong></div>` : ""}<div class="receipt-grand-total"><span class="receipt-grand-total__label">${grandLabel}</span><strong class="receipt-grand-total__amount">${receiptMoney(payable)}</strong></div></section><section class="receipt-warning"><p>Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.</p><p><b>Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.</b></p><p>Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p><b>Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</b></p></section><footer class="receipt-sign"><p><span>Хүлээлгэн өгсөн ажилтны гарын үсэг:</span><b></b></p><p><span>Хүлээн авсан ажилтны гарын үсэг:</span><b></b></p></footer></section></div></div>`;
+  return `<div class="print-receipt"><div class="receipt-page"><header class="receipt-header"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</h2><section class="receipt-info"><div class="receipt-info__col"><p><span>Худалдааны төлөөлөгч:</span><b>${salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${deliveryPhone}</b></p><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div><div class="receipt-info__col"><p><span>Харилцагч:</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистрийн дугаар:</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Компанийн нэр:</span><b>${esc(c.companyName || "-")}</b></p><p><span>Утасны дугаар:</span><b>${esc(c.phone1 || "-")}</b></p><p><span>Төлбөрийн нөхцөл:</span><b><span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар</b></p><p class="receipt-address"><span>Хаяг:</span><b>${esc(addr)}</b></p></div></section><table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${itemRows}</tbody></table><section class="receipt-footer-block"><div class="receipt-gross-bar"><span>Хувь хасагдаагүй нийт үнийн дүн</span><strong>${receiptMoney(gross)}</strong></div>${settlement ? `<div class="receipt-settlement-note">${esc(settlement)}</div>` : ""}<section class="receipt-promo-block"><div class="receipt-promo-head"><b>Урамшуулал</b><span>Үнэтрүүлэгч</span><span>Дүн</span></div>${promoRows}</section><section class="receipt-totals"><div class="receipt-total-line"><b>Бараа ажил үйлчилгээний дүн</b><strong>${receiptMoney(sub)}</strong></div><div class="receipt-total-line"><b>НӨАТ</b><strong>${receiptMoney(vat)}</strong></div>${discount ? `<div class="receipt-total-line"><b>Хөнгөлөлт (${pct}%)</b><strong>-${receiptMoney(discount)}</strong></div>` : ""}<div class="receipt-grand-total"><span class="receipt-grand-total__label">${grandLabel}</span><strong class="receipt-grand-total__amount">${receiptMoney(payable)}</strong></div></section><section class="receipt-warning"><p>Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.</p><p><b>Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.</b></p><p>Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p><b>Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</b></p></section><footer class="receipt-sign"><p><span>Хүлээлгэн өгсөн ажилтны гарын үсэг:</span><b></b></p><p><span>Хүлээн авсан ажилтны гарын үсэг:</span><b></b></p></footer></section></div></div>`;
 }
 function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);
@@ -7698,6 +7720,7 @@ Object.assign(window, {
   receiptFilterToggle,
   receiptFilterClear,
   setReceiptPrintWorker,
+  setReceiptPrintDelivery,
   toggleReceiptPrintOrder,
   printSelectedOrderReceipts,
   printOrderReceiptsNow,

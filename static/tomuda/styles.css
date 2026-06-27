@@ -6570,6 +6570,21 @@ input::placeholder, textarea::placeholder {
   font-weight: 700;
 }
 
+.wh-receipts__head-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.wh-receipts__head-select {
+  min-width: 132px;
+  max-width: min(42vw, 180px);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .wh-receipts__head-aside {
   display: flex;
   align-items: center;
@@ -7584,7 +7599,7 @@ input::placeholder, textarea::placeholder {
     break-after: page;
   }
   .receipt-page { width: 190mm; margin: 0 auto; padding: 4mm 3mm; font-size: 10.5px; line-height: 1.22; }
-  .receipt-header { display: grid; grid-template-columns: 22mm 1fr 34mm; gap: 4mm; align-items: start; }
+  .receipt-header { display: grid; grid-template-columns: 22mm 1fr; gap: 4mm; align-items: start; }
   .receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
   .receipt-company h1 { font-size: 15px; margin: 1mm 0 2mm; font-weight: 800; }
   .receipt-company p, .receipt-date p { margin: 0.7mm 0; }
