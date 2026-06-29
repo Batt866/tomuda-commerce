@@ -4403,10 +4403,16 @@ function countMetricsTotals(products) {
   let opening = 0,
     sold = 0,
     expended = 0,
+    income = 0,
+    expected = 0,
+    system = 0,
     final = 0,
     openingValue = 0,
     soldValue = 0,
     expendedValue = 0,
+    incomeValue = 0,
+    expectedValue = 0,
+    systemValue = 0,
     finalValue = 0,
     diffValue = 0;
   for (const p of products) {
@@ -4416,10 +4422,16 @@ function countMetricsTotals(products) {
     opening += stats.opening;
     sold += stats.sold;
     expended += stats.expended;
+    income += stats.income || 0;
+    expected += stats.expected ?? stats.system;
+    system += stats.system;
     final += stats.final;
     openingValue += stats.opening * cost;
     soldValue += stats.sold * cost;
     expendedValue += stats.expended * cost;
+    incomeValue += (stats.income || 0) * cost;
+    expectedValue += (stats.expected ?? stats.system) * cost;
+    systemValue += stats.system * cost;
     finalValue += stats.final * cost;
     const diff = countBookDiff(stats);
     if (diff !== null) diffValue += diff * cost;
@@ -4428,10 +4440,16 @@ function countMetricsTotals(products) {
     opening,
     sold,
     expended,
+    income,
+    expected,
+    system,
     final,
     openingValue,
     soldValue,
     expendedValue,
+    incomeValue,
+    expectedValue,
+    systemValue,
     finalValue,
     diffValue,
   };
@@ -4578,13 +4596,15 @@ function countExcelRows() {
     return [
       p.name,
       p.barcode || "-",
-      p.category || "-",
       stats.opening,
+      stats.income || 0,
       stats.sold,
       stats.expended,
+      stats.expected ?? stats.system,
+      stats.system,
       stats.final,
-      cost,
       diff,
+      cost,
       countDiffAmount(diff, p),
       p.unit || "ш",
     ];
@@ -4647,12 +4667,13 @@ function xlsxCellXml(ref, styleId, value, kind) {
   }
   return `<c r="${ref}" s="${styleId}"/>`;
 }
-function xlsxRowXml(rowNum, height, cells) {
+function xlsxRowXml(rowNum, height, cells, lastCol = "J") {
   const ht = height ? ` ht="${height}" customHeight="1"` : "";
   const body = cells.join("");
-  return `<row r="${rowNum}" spans="1:10"${ht}>${body}</row>`;
+  const spanEnd = "ABCDEFGHIJKLMNOP".indexOf(lastCol) + 1;
+  return `<row r="${rowNum}" spans="1:${spanEnd}"${ht}>${body}</row>`;
 }
-const COUNT_XLSX_LAST_COL = "J";
+const COUNT_XLSX_LAST_COL = "M";
 const PRODUCT_XLSX_LAST_COL = "H";
 const PRODUCT_SHEET_TEMPLATE =
   "/static/tomuda/templates/count-sheet-template.xls";
@@ -4783,16 +4804,20 @@ function buildCountSheetXml() {
   const mismatchCount = countMismatchesForList(products).length;
   const groups = countSheetProductsGrouped();
   const rows = [];
-  const merges = [`A1:${COUNT_XLSX_LAST_COL}1`, `F2:${COUNT_XLSX_LAST_COL}2`];
+  const merges = [
+    `A1:${COUNT_XLSX_LAST_COL}1`,
+    `F2:${COUNT_XLSX_LAST_COL}2`,
+    `A3:${COUNT_XLSX_LAST_COL}3`,
+  ];
   let rowNum = 1;
   const pushRow = (height, cells) => {
-    rows.push(xlsxRowXml(rowNum, height, cells));
+    rows.push(xlsxRowXml(rowNum, height, cells, COUNT_XLSX_LAST_COL));
     rowNum += 1;
   };
   const emptyCells = (row, from = "A", to = COUNT_XLSX_LAST_COL, style = 1) => {
-    const cols = "ABCDEFGHIJ".slice(
-      "ABCDEFGHIJ".indexOf(from),
-      "ABCDEFGHIJ".indexOf(to) + 1,
+    const cols = "ABCDEFGHIJKLM".slice(
+      "ABCDEFGHIJKLM".indexOf(from),
+      "ABCDEFGHIJKLM".indexOf(to) + 1,
     );
     return cols
       .split("")
@@ -4800,7 +4825,7 @@ function buildCountSheetXml() {
   };
   pushRow(43.5, [
     xlsxCellXml("A1", 13, si("Тооллогын тайлан"), "s"),
-    ...emptyCells(1, "B", COUNT_XLSX_LAST_COL),
+    ...emptyCells(1, "B", COUNT_XLSX_LAST_COL, 13),
   ]);
   pushRow(28.5, [
     xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
@@ -4812,43 +4837,32 @@ function buildCountSheetXml() {
     ...emptyCells(2, "G", COUNT_XLSX_LAST_COL, 14),
   ]);
   pushRow(24, [
-    xlsxCellXml("A3", 3, si("Нийт (ш):"), "s"),
-    xlsxCellXml("B3", 5, null, "empty"),
-    xlsxCellXml("C3", 10, totals.opening, "n"),
-    xlsxCellXml("D3", 10, totals.sold, "n"),
-    xlsxCellXml("E3", 10, totals.expended, "n"),
-    xlsxCellXml("F3", 10, totals.final, "n"),
     xlsxCellXml(
-      "G3",
-      7,
-      si(mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"),
+      "A3",
+      3,
+      si(
+        `Тоолсон: ${products.length} бараа · ${mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"} · Хүлээгдэж буй = Эхний + Орлого − Борлуулсан − Зарлагдсан · Зөрүү = Тоолсон − Бүртгэл`,
+      ),
       "s",
     ),
-    ...emptyCells(3, "H", COUNT_XLSX_LAST_COL),
+    ...emptyCells(3, "B", COUNT_XLSX_LAST_COL, 3),
   ]);
-  pushRow(24, [
-    xlsxCellXml("A4", 3, si("Нийт (₮):"), "s"),
-    xlsxCellXml("B4", 5, null, "empty"),
-    xlsxCellXml("C4", 10, totals.openingValue, "n"),
-    xlsxCellXml("D4", 10, totals.soldValue, "n"),
-    xlsxCellXml("E4", 10, totals.expendedValue, "n"),
-    xlsxCellXml("F4", 10, totals.finalValue, "n"),
-    xlsxCellXml("I4", 10, totals.diffValue, "n"),
-    ...emptyCells(4, "G", "H"),
-    xlsxCellXml("J4", 5, null, "empty"),
-  ]);
-  pushRow(16.5, emptyCells(5));
+  pushRow(16.5, emptyCells(rowNum));
+  const headerRow = rowNum;
   pushRow(30.75, [
-    xlsxCellXml("A6", 7, si("Бараа"), "s"),
-    xlsxCellXml("B6", 7, si("Баркод"), "s"),
-    xlsxCellXml("C6", 7, si("Эхний үлдэгдэл"), "s"),
-    xlsxCellXml("D6", 7, si("Борлуулсан"), "s"),
-    xlsxCellXml("E6", 7, si("Зарлагдсан"), "s"),
-    xlsxCellXml("F6", 7, si("Эцсийн үлдэгдэл"), "s"),
-    xlsxCellXml("G6", 7, si("Өртөг үнэ"), "s"),
-    xlsxCellXml("H6", 7, si("Зөрүү"), "s"),
-    xlsxCellXml("I6", 7, si("Зөрүү дүн"), "s"),
-    xlsxCellXml("J6", 7, si("Нэгж"), "s"),
+    xlsxCellXml(`A${headerRow}`, 7, si("Бараа"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Баркод"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, si("Эхний үлдэгдэл"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Орлого"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Борлуулсан"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Зарлагдсан"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Хүлээгдэж буй"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Бүртгэл"), "s"),
+    xlsxCellXml(`I${headerRow}`, 7, si("Тоолсон"), "s"),
+    xlsxCellXml(`J${headerRow}`, 7, si("Зөрүү"), "s"),
+    xlsxCellXml(`K${headerRow}`, 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml(`L${headerRow}`, 7, si("Зөрүү дүн"), "s"),
+    xlsxCellXml(`M${headerRow}`, 7, si("Нэгж"), "s"),
   ]);
   for (const item of groups) {
     if (item.type === "cat") {
@@ -4870,30 +4884,51 @@ function buildCountSheetXml() {
       xlsxCellXml(`A${r}`, 8, si(p.name), "s"),
       xlsxCellXml(`B${r}`, 9, si(p.barcode || "-"), "s"),
       xlsxCellXml(`C${r}`, 10, stats.opening, "n"),
-      xlsxCellXml(`D${r}`, 10, stats.sold, "n"),
-      xlsxCellXml(`E${r}`, 10, stats.expended, "n"),
-      xlsxCellXml(`F${r}`, 10, stats.final ?? 0, "n"),
-      xlsxCellXml(`G${r}`, 10, cost, "n"),
-      xlsxCellXml(`H${r}`, 10, diff ?? 0, "n"),
-      xlsxCellXml(`I${r}`, 10, diffAmount, "n"),
-      xlsxCellXml(`J${r}`, 8, si(p.unit || "ш"), "s"),
+      xlsxCellXml(`D${r}`, 10, stats.income || 0, "n"),
+      xlsxCellXml(`E${r}`, 10, stats.sold, "n"),
+      xlsxCellXml(`F${r}`, 10, stats.expended, "n"),
+      xlsxCellXml(`G${r}`, 10, stats.expected ?? stats.system, "n"),
+      xlsxCellXml(`H${r}`, 10, stats.system, "n"),
+      xlsxCellXml(`I${r}`, 10, stats.final ?? 0, "n"),
+      xlsxCellXml(`J${r}`, 10, diff ?? 0, "n"),
+      xlsxCellXml(`K${r}`, 10, cost, "n"),
+      xlsxCellXml(`L${r}`, 10, diffAmount, "n"),
+      xlsxCellXml(`M${r}`, 8, si(p.unit || "ш"), "s"),
     ]);
   }
   const totalRow = rowNum;
   pushRow(24, [
-    xlsxCellXml(`A${totalRow}`, 7, si("Нийт"), "s"),
+    xlsxCellXml(`A${totalRow}`, 7, si("Нийт (ш)"), "s"),
     xlsxCellXml(`B${totalRow}`, 7, si(""), "s"),
     xlsxCellXml(`C${totalRow}`, 10, totals.opening, "n"),
-    xlsxCellXml(`D${totalRow}`, 10, totals.sold, "n"),
-    xlsxCellXml(`E${totalRow}`, 10, totals.expended, "n"),
-    xlsxCellXml(`F${totalRow}`, 10, totals.final, "n"),
-    xlsxCellXml(`G${totalRow}`, 10, null, "empty"),
-    xlsxCellXml(`H${totalRow}`, 10, null, "empty"),
-    xlsxCellXml(`I${totalRow}`, 10, totals.diffValue, "n"),
-    xlsxCellXml(`J${totalRow}`, 7, si(""), "s"),
+    xlsxCellXml(`D${totalRow}`, 10, totals.income, "n"),
+    xlsxCellXml(`E${totalRow}`, 10, totals.sold, "n"),
+    xlsxCellXml(`F${totalRow}`, 10, totals.expended, "n"),
+    xlsxCellXml(`G${totalRow}`, 10, totals.expected, "n"),
+    xlsxCellXml(`H${totalRow}`, 10, totals.system, "n"),
+    xlsxCellXml(`I${totalRow}`, 10, totals.final, "n"),
+    xlsxCellXml(`J${totalRow}`, 10, null, "empty"),
+    xlsxCellXml(`K${totalRow}`, 10, null, "empty"),
+    xlsxCellXml(`L${totalRow}`, 10, null, "empty"),
+    xlsxCellXml(`M${totalRow}`, 7, si(""), "s"),
+  ]);
+  const totalValueRow = rowNum;
+  pushRow(24, [
+    xlsxCellXml(`A${totalValueRow}`, 7, si("Нийт (₮)"), "s"),
+    xlsxCellXml(`B${totalValueRow}`, 7, si(""), "s"),
+    xlsxCellXml(`C${totalValueRow}`, 10, totals.openingValue, "n"),
+    xlsxCellXml(`D${totalValueRow}`, 10, totals.incomeValue, "n"),
+    xlsxCellXml(`E${totalValueRow}`, 10, totals.soldValue, "n"),
+    xlsxCellXml(`F${totalValueRow}`, 10, totals.expendedValue, "n"),
+    xlsxCellXml(`G${totalValueRow}`, 10, totals.expectedValue, "n"),
+    xlsxCellXml(`H${totalValueRow}`, 10, totals.systemValue, "n"),
+    xlsxCellXml(`I${totalValueRow}`, 10, totals.finalValue, "n"),
+    xlsxCellXml(`J${totalValueRow}`, 10, null, "empty"),
+    xlsxCellXml(`K${totalValueRow}`, 10, null, "empty"),
+    xlsxCellXml(`L${totalValueRow}`, 10, totals.diffValue, "n"),
+    xlsxCellXml(`M${totalValueRow}`, 7, si(""), "s"),
   ]);
   pushRow(16.5, emptyCells(rowNum));
-  rowNum += 1;
   const sign1 = rowNum;
   merges.push(`A${sign1}:B${sign1}`, `C${sign1}:E${sign1}`);
   pushRow(null, [
@@ -4911,7 +4946,6 @@ function buildCountSheetXml() {
     xlsxCellXml(`G${sign1}`, 1, null, "empty"),
     xlsxCellXml(`H${sign1}`, 1, null, "empty"),
   ]);
-  rowNum += 1;
   const sign2 = rowNum;
   merges.push(`C${sign2}:E${sign2}`);
   pushRow(null, [
@@ -4924,7 +4958,6 @@ function buildCountSheetXml() {
     xlsxCellXml(`G${sign2}`, 1, null, "empty"),
     xlsxCellXml(`H${sign2}`, 1, null, "empty"),
   ]);
-  rowNum += 1;
   const sign3 = rowNum;
   merges.push(`A${sign3}:B${sign3}`, `C${sign3}:E${sign3}`);
   pushRow(null, [
@@ -4942,7 +4975,6 @@ function buildCountSheetXml() {
     xlsxCellXml(`G${sign3}`, 1, null, "empty"),
     xlsxCellXml(`H${sign3}`, 1, null, "empty"),
   ]);
-  rowNum += 1;
   const sign4 = rowNum;
   merges.push(`C${sign4}:E${sign4}`);
   pushRow(null, [
@@ -4955,7 +4987,7 @@ function buildCountSheetXml() {
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${COUNT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="12" customWidth="1"/><col min="4" max="4" width="11" customWidth="1"/><col min="5" max="5" width="11" customWidth="1"/><col min="6" max="6" width="13" customWidth="1"/><col min="7" max="7" width="11" customWidth="1"/><col min="8" max="8" width="9" customWidth="1"/><col min="9" max="9" width="12" customWidth="1"/><col min="10" max="10" width="10" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${COUNT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="12" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="11" customWidth="1"/><col min="6" max="6" width="11" customWidth="1"/><col min="7" max="7" width="13" customWidth="1"/><col min="8" max="8" width="10" customWidth="1"/><col min="9" max="9" width="10" customWidth="1"/><col min="10" max="10" width="9" customWidth="1"/><col min="11" max="11" width="11" customWidth="1"/><col min="12" max="12" width="12" customWidth="1"/><col min="13" max="13" width="10" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 const COUNT_SHEET_TEMPLATE =
@@ -4986,6 +5018,309 @@ async function exportCountExcelXlsx() {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+const WAREHOUSE_PREPARE_LAST_COL = "F";
+const WAREHOUSE_PREPARE_TEMPLATE =
+  "/static/tomuda/templates/warehouse-prepare-template.xls";
+function warehouseSheetDateLabel() {
+  const raw = state.filters.warehouseDate || todayIso();
+  const parts = String(raw).split("-");
+  if (parts.length === 3) {
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (y && m && d) return `Огноо: ${y}/${m}/${d}`;
+  }
+  return countSheetDateLabel();
+}
+function warehouseOrderProductsGrouped(orders) {
+  const map = {};
+  orders.forEach((o) =>
+    o.items.forEach((i) => {
+      const key = i.productId || i.productName;
+      if (!map[key]) {
+        map[key] = {
+          productId: i.productId,
+          productName: i.productName,
+          qty: 0,
+        };
+      }
+      map[key].qty += i.quantity;
+    }),
+  );
+  const items = Object.values(map)
+    .map((row) => {
+      const p = state.products.find((x) => x.id === row.productId) || {
+        id: row.productId,
+        name: row.productName || row.productId,
+        category: "Бусад",
+      };
+      return { product: p, qty: row.qty };
+    })
+    .sort(
+      (a, b) =>
+        String(a.product.category || "").localeCompare(
+          String(b.product.category || ""),
+          "mn",
+        ) ||
+        String(a.product.name || "").localeCompare(
+          String(b.product.name || ""),
+          "mn",
+        ),
+    );
+  const groups = [];
+  let cur = "";
+  for (const item of items) {
+    const cat = item.product.category || "Бусад";
+    if (cat !== cur) {
+      groups.push({ type: "cat", name: cat });
+      cur = cat;
+    }
+    groups.push({ type: "product", product: item.product, qty: item.qty });
+  }
+  return groups;
+}
+function xlsxOptionalNum(ref, styleId, value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) {
+    return xlsxCellXml(ref, styleId, null, "empty");
+  }
+  return xlsxCellXml(ref, styleId, n, "n");
+}
+function buildWarehousePrepareSheetXml(orders, workerIds) {
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const warehouseEmp = state.currentEmployee?.name || "-";
+  const dateLabel = warehouseSheetDateLabel();
+  const workerNames = state.employees
+    .filter((e) => workerIds.includes(e.id))
+    .map((e) => e.name);
+  const groups = warehouseOrderProductsGrouped(orders);
+  const rows = [];
+  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `E2:F2`];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(xlsxRowXml(rowNum, height, cells));
+    rowNum += 1;
+  };
+  const emptyCells = (
+    row,
+    from = "A",
+    to = WAREHOUSE_PREPARE_LAST_COL,
+    style = 1,
+  ) => {
+    const cols = "ABCDEF".slice(
+      "ABCDEF".indexOf(from),
+      "ABCDEF".indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
+  pushRow(43.5, [
+    xlsxCellXml("A1", 13, si("Бараа бэлдэх хуудас"), "s"),
+    ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
+  ]);
+  pushRow(28.5, [
+    xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
+    xlsxCellXml("B2", 4, si(warehouseEmp), "s"),
+    xlsxCellXml("C2", 5, null, "empty"),
+    xlsxCellXml("D2", 6, null, "empty"),
+    xlsxCellXml("E2", 14, si(dateLabel), "s"),
+    xlsxCellXml("F2", 14, null, "empty"),
+  ]);
+  if (workerNames.length) {
+    pushRow(24, [
+      xlsxCellXml("A3", 3, si("Захиалга авсан ажилтан:"), "s"),
+      xlsxCellXml("B3", 4, si(workerNames[0]), "s"),
+      xlsxCellXml("C3", 5, null, "empty"),
+      xlsxCellXml("D3", 6, null, "empty"),
+      xlsxCellXml("E3", 5, null, "empty"),
+      xlsxCellXml("F3", 6, null, "empty"),
+    ]);
+    for (let i = 1; i < workerNames.length; i += 1) {
+      const r = rowNum;
+      pushRow(24, [
+        xlsxCellXml(`A${r}`, 6, null, "empty"),
+        xlsxCellXml(`B${r}`, 4, si(workerNames[i]), "s"),
+        xlsxCellXml(`C${r}`, 5, null, "empty"),
+        xlsxCellXml(`D${r}`, 6, null, "empty"),
+        xlsxCellXml(`E${r}`, 5, null, "empty"),
+        xlsxCellXml(`F${r}`, 6, null, "empty"),
+      ]);
+    }
+  } else {
+    pushRow(24, [
+      xlsxCellXml("A3", 3, si("Захиалга авсан ажилтан:"), "s"),
+      xlsxCellXml("B3", 4, si("-"), "s"),
+      ...emptyCells(3, "C", WAREHOUSE_PREPARE_LAST_COL, 5),
+    ]);
+  }
+  pushRow(16.5, emptyCells(rowNum));
+  const headerRow = rowNum;
+  pushRow(30.75, [
+    xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Багц"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Ширхэг"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Үлдэгдэл"), "s"),
+  ]);
+  for (const item of groups) {
+    if (item.type === "cat") {
+      const r = rowNum;
+      merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
+      pushRow(24, [
+        xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
+        ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
+      ]);
+      continue;
+    }
+    const p = item.product;
+    const { packs, pieces } = pickerQtyToParts(item.qty, p);
+    const r = rowNum;
+    pushRow(15.75, [
+      xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
+      xlsxCellXml(`B${r}`, 8, si(p.unit || ""), "s"),
+      xlsxCellXml(`C${r}`, 9, si(p.barcode || ""), "s"),
+      xlsxOptionalNum(`D${r}`, 10, packs),
+      xlsxOptionalNum(`E${r}`, 10, pieces),
+      xlsxCellXml(`F${r}`, 8, Number(p.stock) || 0, "n"),
+    ]);
+  }
+  pushRow(16.5, emptyCells(rowNum));
+  const sign1 = rowNum;
+  merges.push(`A${sign1}:B${sign1}`, `C${sign1}:E${sign1}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтан:"), "s"),
+    xlsxCellXml(`B${sign1}`, 17, null, "empty"),
+    xlsxCellXml(
+      `C${sign1}`,
+      18,
+      si("/...................................................../"),
+      "s",
+    ),
+    xlsxCellXml(`D${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`E${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign1}`, 1, null, "empty"),
+  ]);
+  const sign2 = rowNum;
+  merges.push(`C${sign2}:E${sign2}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign2}`, 12, null, "empty"),
+    xlsxCellXml(`B${sign2}`, 12, null, "empty"),
+    xlsxCellXml(`C${sign2}`, 16, si("гарын үсэг"), "s"),
+    xlsxCellXml(`D${sign2}`, 16, null, "empty"),
+    xlsxCellXml(`E${sign2}`, 16, null, "empty"),
+    xlsxCellXml(`F${sign2}`, 1, null, "empty"),
+  ]);
+  const sign3 = rowNum;
+  merges.push(`A${sign3}:B${sign3}`, `C${sign3}:E${sign3}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан ажилтан:"), "s"),
+    xlsxCellXml(`B${sign3}`, 17, null, "empty"),
+    xlsxCellXml(
+      `C${sign3}`,
+      18,
+      si("/...................................................../"),
+      "s",
+    ),
+    xlsxCellXml(`D${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`E${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign3}`, 1, null, "empty"),
+  ]);
+  const sign4 = rowNum;
+  merges.push(`C${sign4}:E${sign4}`);
+  pushRow(null, [
+    xlsxCellXml(`C${sign4}`, 16, si("гарын үсэг"), "s"),
+    xlsxCellXml(`D${sign4}`, 16, null, "empty"),
+    xlsxCellXml(`E${sign4}`, 16, null, "empty"),
+    xlsxCellXml(`F${sign4}`, 1, null, "empty"),
+  ]);
+  const lastRow = rowNum;
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.12890625" customWidth="1"/><col min="2" max="2" width="12.74609375" customWidth="1"/><col min="3" max="3" width="13.73046875" customWidth="1"/><col min="4" max="4" width="7.35546875" customWidth="1"/><col min="5" max="5" width="8.08984375" customWidth="1"/><col min="6" max="6" width="14.5859375" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+}
+async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
+  if (typeof JSZip === "undefined") {
+    throw new Error("JSZip missing");
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  const { sharedStringsXml, sheetXml } = buildWarehousePrepareSheetXml(
+    orders,
+    workerIds,
+  );
+  const tpl = await fetch(WAREHOUSE_PREPARE_TEMPLATE).then((r) => {
+    if (!r.ok) throw new Error("template missing");
+    return r.arrayBuffer();
+  });
+  const zip = await JSZip.loadAsync(tpl);
+  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `aguulah-beldeh-${stamp}.xls`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function exportWarehousePrepareExcelFallback(orders, workerIds) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const warehouseEmp = state.currentEmployee?.name || "-";
+  const workerNames = state.employees
+    .filter((e) => workerIds.includes(e.id))
+    .map((e) => e.name);
+  const groups = warehouseOrderProductsGrouped(orders);
+  const sheetRows = [
+    ["Бараа бэлдэх хуудас"],
+    ["Агуулахын ажилтан:", warehouseEmp, "", "", warehouseSheetDateLabel()],
+    ["Захиалга авсан ажилтан:", workerNames[0] || "-"],
+    ...workerNames.slice(1).map((name) => ["", name]),
+    [],
+    ["Барааны нэр төрөл", "Хэмжих нэгж", "Баркод", "Багц", "Ширхэг", "Үлдэгдэл"],
+  ];
+  for (const item of groups) {
+    if (item.type === "cat") {
+      sheetRows.push([item.name]);
+      continue;
+    }
+    const p = item.product;
+    const { packs, pieces } = pickerQtyToParts(item.qty, p);
+    sheetRows.push([
+      p.name || "",
+      p.unit || "",
+      p.barcode || "",
+      packs || "",
+      pieces || "",
+      Number(p.stock) || 0,
+    ]);
+  }
+  sheetRows.push(
+    [],
+    ["Хүлээлгэн өгсөн ажилтан:", "", "/...................................................../"],
+    ["", "", "гарын үсэг"],
+    ["Хүлээн авсан ажилтан:", "", "/...................................................../"],
+    ["гарын үсэг"],
+  );
+  excel(`aguulah-beldeh-${stamp}.csv`, sheetRows);
+}
+function exportWarehousePrepareExcel(orders, workerIds) {
+  exportWarehousePrepareExcelXlsx(orders, workerIds).catch(() =>
+    exportWarehousePrepareExcelFallback(orders, workerIds),
+  );
+}
 function exportCountExcelFallback() {
   const rows = countExcelRows();
   if (!rows.length) return alert("Тоолсон бараа байхгүй");
@@ -4998,13 +5333,37 @@ function exportCountExcelFallback() {
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
     [
+      `Тоолсон: ${products.length} бараа · ${mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"} · Хүлээгдэж буй = Эхний + Орлого − Борлуулсан − Зарлагдсан · Зөрүү = Тоолсон − Бүртгэл`,
+    ],
+    [],
+    [
+      "Бараа",
+      "Баркод",
+      "Эхний үлдэгдэл",
+      "Орлого",
+      "Борлуулсан",
+      "Зарлагдсан",
+      "Хүлээгдэж буй",
+      "Бүртгэл",
+      "Тоолсон",
+      "Зөрүү",
+      "Өртөг үнэ",
+      "Зөрүү дүн",
+      "Нэгж",
+    ],
+    ...rows,
+    [],
+    [
       "Нийт (ш)",
       "",
       totals.opening,
+      totals.income,
       totals.sold,
       totals.expended,
+      totals.expected,
+      totals.system,
       totals.final,
-      mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй",
+      "",
       "",
       "",
       "",
@@ -5013,49 +5372,12 @@ function exportCountExcelFallback() {
       "Нийт (₮)",
       "",
       totals.openingValue,
+      totals.incomeValue,
       totals.soldValue,
       totals.expendedValue,
+      totals.expectedValue,
+      totals.systemValue,
       totals.finalValue,
-      "",
-      "",
-      totals.diffValue,
-      "",
-    ],
-    [],
-    [
-      "Бараа",
-      "Баркод",
-      "Эхний үлдэгдэл",
-      "Борлуулсан",
-      "Зарлагдсан",
-      "Эцсийн үлдэгдэл",
-      "Өртөг үнэ",
-      "Зөрүү",
-      "Зөрүү дүн",
-      "Нэгж",
-    ],
-    ...rows.map(
-      ([name, barcode, , opening, sold, expended, final, cost, diff, diffAmount, unit]) => [
-        name,
-        barcode,
-        opening,
-        sold,
-        expended,
-        final,
-        cost,
-        diff,
-        diffAmount,
-        unit,
-      ],
-    ),
-    [],
-    [
-      "Нийт",
-      "",
-      totals.opening,
-      totals.sold,
-      totals.expended,
-      totals.final,
       "",
       "",
       totals.diffValue,
@@ -8623,65 +8945,10 @@ function toggleWorkerOnly(id) {
 function employeeExcel() {
   if (!state.selectedWorkers.length) return alert("Ажилтан сонгоно уу");
   const orders = warehouseOrdersForSelectedWorkers(),
-    workerIds = warehouseActiveWorkerIds(orders),
-    map = {};
+    workerIds = warehouseActiveWorkerIds(orders);
   if (!orders.length || !workerIds.length)
     return alert("Сонгосон ХТ дээр захиалга алга");
-  orders.forEach((o) =>
-    o.items.forEach((i) => {
-      const key = i.productId || i.productName;
-      if (!map[key])
-        map[key] = {
-          productId: i.productId,
-          productName: i.productName,
-          quantity: 0,
-          total: 0,
-        };
-      map[key].quantity += i.quantity;
-      map[key].total += i.total || i.quantity * i.price;
-    }),
-  );
-  const names = state.employees
-      .filter((e) => workerIds.includes(e.id))
-      .map((e) => e.name)
-      .join(", "),
-    rows = Object.values(map).sort((a, b) =>
-      String(a.productName || "").localeCompare(
-        String(b.productName || ""),
-        "mn",
-      ),
-    ),
-    totalQty = rows.reduce((sum, row) => sum + row.quantity, 0),
-    totalAmount = orders.reduce((sum, o) => sum + orderAmount(o), 0),
-    reportDate = dte(new Date()),
-    stamp = new Date().toISOString().slice(0, 10),
-    sheetRows = [
-      ["ТОМУДА — Агуулахын захиалга"],
-      [`Тайлан огноо: ${reportDate}`],
-      [],
-      ["Ажилтан", "Огноо", "Захиалга", "Нийт ширхэг", "Нийт дүн (₮)"],
-      [names, reportDate, orders.length, totalQty, totalAmount],
-      [],
-      ["№", "Бараа", "Ангилал", "Баркод", "Тоо", "Дүн (₮)"],
-      ...rows.map((x, i) => {
-        const p = state.products.find(
-          (product) => product.id === x.productId,
-        ) || {
-          category: "",
-          barcode: "",
-        };
-        return [
-          i + 1,
-          x.productName,
-          p.category || "-",
-          p.barcode || "",
-          x.quantity,
-          x.total,
-        ];
-      }),
-      ["", "", "", "НИЙТ", totalQty, totalAmount],
-    ];
-  excel(`aguulah-zahialga-${stamp}.csv`, sheetRows);
+  exportWarehousePrepareExcel(orders, workerIds);
 }
 function saveWorker() {
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
