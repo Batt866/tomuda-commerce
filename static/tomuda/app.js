@@ -226,6 +226,7 @@ let backendPollTimer = null;
 let countRenderPending = false;
 let countBlurSaveTimer = null;
 let countFocusedProductId = "";
+let countInputSyncing = false;
 let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
@@ -1125,6 +1126,19 @@ function applyPersistentState(data) {
 function localStateDirty() {
   return JSON.stringify({ state: persistentState() }) !== backendLastSaved;
 }
+function shouldDeferBackendSync() {
+  if (isEditingCountQty()) return true;
+  if (
+    state.currentView === "count" &&
+    (state.countDone || countSessionActive())
+  ) {
+    return true;
+  }
+  return false;
+}
+function syncBackendSaveMarker() {
+  backendLastSaved = JSON.stringify({ state: persistentState() });
+}
 function captureSessionSnapshot() {
   return {
     isLoggedIn: state.isLoggedIn,
@@ -1154,7 +1168,7 @@ function restoreSessionSnapshot(session) {
 }
 function syncBackendMarkers(payload, stateData) {
   if (stateData) applyPersistentState(stateData);
-  backendLastSaved = JSON.stringify({ state: persistentState() });
+  syncBackendSaveMarker();
   if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
 }
 function isEditingCountQty() {
@@ -1191,11 +1205,15 @@ function flushPendingCountRender() {
 }
 function applyRemoteState(payload) {
   if (!payload?.state) return false;
-  if (isEditingCountQty()) return false;
+  if (shouldDeferBackendSync()) return false;
+  const merged = mergePersistentStates(payload.state, persistentState());
+  if (JSON.stringify(merged) === JSON.stringify(persistentState())) {
+    if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+    return false;
+  }
   const session = captureSessionSnapshot();
   const pickerCategory = state.filters.workerCategory;
   const reopenPicker = pickerOpen();
-  const merged = mergePersistentStates(payload.state, persistentState());
   applyPersistentState(merged);
   restoreSessionSnapshot(session);
   ensureEmployeeEmails();
@@ -1204,7 +1222,7 @@ function applyRemoteState(payload) {
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
-  backendLastSaved = JSON.stringify({ state: persistentState() });
+  syncBackendSaveMarker();
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   render();
   if (reopenPicker && pickerCategory) {
@@ -1223,6 +1241,7 @@ async function fetchBackendPayload() {
 }
 async function pollBackendState() {
   if (!backendReady || backendSaving || backendSaveTimer) return;
+  if (shouldDeferBackendSync()) return;
   try {
     const payload = await fetchBackendPayload();
     if (!payload?.updatedAt) return;
@@ -2215,33 +2234,30 @@ function scheduleBackendSave() {
 }
 async function saveBackendState() {
   backendSaveTimer = null;
-  let data = persistentState();
-  const protectedData = protectDeletionsForNonAdmin(data);
-  if (JSON.stringify(protectedData) !== JSON.stringify(data)) {
+  const protectedData = protectDeletionsForNonAdmin(persistentState());
+  if (JSON.stringify(protectedData) !== JSON.stringify(persistentState())) {
     const session = captureSessionSnapshot();
     applyPersistentState(protectedData);
     restoreSessionSnapshot(session);
-    safeRender();
-    data = protectedData;
+    if (!shouldDeferBackendSync()) safeRender();
   }
-  try {
-    const latest = await fetchBackendPayload();
-    if (latest?.state) {
-      const merged = mergePersistentStates(latest.state, data);
-      if (JSON.stringify(merged) !== JSON.stringify(data)) {
-        const session = captureSessionSnapshot();
-        applyPersistentState(merged);
-        restoreSessionSnapshot(session);
-        safeRender();
-        data = merged;
-      } else {
-        data = merged;
+  if (!shouldDeferBackendSync()) {
+    try {
+      const latest = await fetchBackendPayload();
+      if (latest?.state) {
+        const merged = mergePersistentStates(latest.state, persistentState());
+        if (JSON.stringify(merged) !== JSON.stringify(persistentState())) {
+          const session = captureSessionSnapshot();
+          applyPersistentState(merged);
+          restoreSessionSnapshot(session);
+          safeRender();
+        }
       }
+    } catch (error) {
+      console.warn("Backend pre-save merge failed", error);
     }
-  } catch (error) {
-    console.warn("Backend pre-save merge failed", error);
   }
-  const body = JSON.stringify({ state: data });
+  const body = JSON.stringify({ state: persistentState() });
   if (body === backendLastSaved) return;
   backendSaving = true;
   try {
@@ -2256,7 +2272,7 @@ async function saveBackendState() {
     });
     if (res.ok) {
       const payload = await res.json();
-      backendLastSaved = body;
+      syncBackendSaveMarker();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
     }
   } catch (error) {
@@ -3820,14 +3836,20 @@ function refreshCountRowMeta(id) {
   }
 }
 function syncCountInputsFromState() {
-  document
-    .querySelectorAll(".count-row__input[data-count-product-id]")
-    .forEach((input) => {
-      if (input === document.activeElement) return;
-      const id = input.getAttribute("data-count-product-id") || "";
-      const v = countValue(id);
-      input.value = v == null ? "" : String(v);
-    });
+  if (state.countDone) return;
+  countInputSyncing = true;
+  try {
+    document
+      .querySelectorAll(".count-row__input[data-count-product-id]")
+      .forEach((input) => {
+        if (input === document.activeElement) return;
+        const id = input.getAttribute("data-count-product-id") || "";
+        const v = countValue(id);
+        input.value = v == null ? "" : String(v);
+      });
+  } finally {
+    countInputSyncing = false;
+  }
 }
 function updateCountMetricsInPlace() {
   if (state.countDone || state.currentView !== "count") return;
@@ -3864,6 +3886,7 @@ function countQtyFocus(id, el) {
   if (countSessionActive()) refreshCountRowMeta(id);
 }
 function countQtyInput(id, el) {
+  if (countInputSyncing) return;
   if (!countSessionActive()) ensureCountSessionQuiet(id);
   const digits = String(el?.value ?? "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
@@ -3878,8 +3901,9 @@ function countQtyInput(id, el) {
   updateCountMetricsInPlace();
 }
 function countQtyCommit(id, el) {
-  if (!el || el.isConnected) countQtyInput(id, el);
-  scheduleBackendSave();
+  if (!el?.isConnected) return;
+  countQtyInput(id, el);
+  if (localStateDirty()) scheduleBackendSave();
   countFocusedProductId = "";
   requestAnimationFrame(flushPendingCountRender);
 }
@@ -3923,6 +3947,7 @@ function initCountInputHandlers() {
         )) {
           return;
         }
+        if (!el.isConnected) return;
         countQtyCommit(id, el);
       }, 150);
     },
@@ -3972,17 +3997,21 @@ function countView() {
           "2",
           "count",
         );
-  const sessionHint = countSessionActive()
+  const sessionHint =
+    countSessionActive() || state.countDone
+      ? ""
+      : `<p class="count-view__hint">Тоо оруулах эсвэл «Шинэ» дарж тооллого эхлүүлнэ.</p>`;
+  const countListPanel = state.countDone
     ? ""
-    : `<p class="count-view__hint">Тоо оруулах эсвэл «Шинэ» дарж тооллого эхлүүлнэ.</p>`;
-  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
-    .map(
-      (c) =>
-        `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
-    )
-    .join(
-      "",
-    )}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div><div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
+    : `<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
+        .map(
+          (c) =>
+            `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
+        )
+        .join(
+          "",
+        )}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
+  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}${countListPanel}<div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
   const stats = countProductStats(p),
@@ -3995,7 +4024,7 @@ function countRow(p) {
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -4029,6 +4058,7 @@ function countMismatchesForList(list) {
 }
 function countResult(mismatches) {
   const list = countFilteredProducts().filter((p) => countValue(p.id) !== null);
+  const mismatchCount = mismatches.length;
   const headHtml = `<div class="count-result-table__head" aria-hidden="false"><span class="count-result-table__head-name">Бараа</span><span class="count-result-table__head-num" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num">Борлуулсан</span><span class="count-result-table__head-num">Зарлагдсан</span><span class="count-result-table__head-num">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num">Зөрүү</span></div>`;
   const rowHtml = list
     .map((p) => {
@@ -4040,10 +4070,16 @@ function countResult(mismatches) {
             : "count-result-table__diff count-result-table__diff--bad",
         diffText =
           diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff);
-      return `<div class="count-result-table__row"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num">${stats.opening}</span><span class="count-result-table__num">${stats.sold}</span><span class="count-result-table__num">${stats.expended}</span><span class="count-result-table__num">${stats.final}</span><span class="${diffClass}">${diffText}</span></div>`;
+      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num" data-label="Эхний">${stats.opening}</span><span class="count-result-table__num" data-label="Борлуулсан">${stats.sold}</span><span class="count-result-table__num" data-label="Зарлагдсан">${stats.expended}</span><span class="count-result-table__num" data-label="Эцсийн">${stats.final}</span><span class="${diffClass}" data-label="Зөрүү">${diffText}</span></div>`;
     })
     .join("");
-  return `<div class="bg-card rounded overflow-hidden count-result-panel"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p><p class="text-xs text-muted-foreground mt-1">Эхний үлдэгдэл — тооллого эхлэх (сүүлийн таталт/«Шинэ») үеийн тоо ширхэг · Зөрүү = Эцсийн − Бүртгэл</p></div>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="p-4 text-sm text-muted-foreground">Тоолсон бараа байхгүй</div>`}${mismatches.length === 0 && list.length ? `<div class="p-4 text-sm text-tone-success font-medium border-t border-border">Зөрүүтэй бараа байхгүй</div>` : ""}<div class="p-4 border-t border-border"><button type="button" onclick="confirmCountExcel()" class="w-full py-3 bg-secondary rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button></div></div>`;
+  const badgeClass = mismatchCount
+    ? "count-result-panel__badge count-result-panel__badge--warn"
+    : "count-result-panel__badge count-result-panel__badge--ok";
+  const badgeText = mismatchCount
+    ? `Зөрүүтэй: ${mismatchCount}`
+    : "Зөрүүгүй";
+  return `<section class="count-result-panel"><header class="count-result-panel__head"><div class="count-result-panel__head-copy"><p class="count-result-panel__title">Тооллого хадгалагдлаа</p><p class="count-result-panel__sub">${list.length} бараа тоолсон</p></div><span class="${badgeClass}">${badgeText}</span></header>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="count-result-panel__empty">Тоолсон бараа байхгүй</div>`}${mismatchCount === 0 && list.length ? `<div class="count-result-panel__success">Бүх барааны тоо таарч байна</div>` : ""}<footer class="count-result-panel__foot"><button type="button" onclick="confirmCountExcel()" class="btn btn--secondary btn--block">${EXCEL_FILE_DOWNLOAD}</button></footer></section>`;
 }
 function countExcelRows() {
   const ids = new Set(countFilteredProducts().map((p) => p.id));
@@ -4396,6 +4432,9 @@ function finishCount() {
   state.countDone = true;
   scheduleBackendSave();
   render();
+  window.setTimeout(() => {
+    if (state.currentView === "count" && state.countDone) pollBackendState();
+  }, 600);
 }
 function resetCountSession() {
   startCountSession();
@@ -6250,7 +6289,7 @@ function render() {
   }
   if (isEditingCountQty()) {
     countRenderPending = true;
-    scheduleBackendSave();
+    if (localStateDirty()) scheduleBackendSave();
     return;
   }
   countRenderPending = false;
@@ -6279,7 +6318,7 @@ function render() {
   };
   const view = map[state.currentView] || workerView;
   app.innerHTML = shell(view());
-  scheduleBackendSave();
+  if (localStateDirty()) scheduleBackendSave();
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     requestAnimationFrame(() => {
@@ -6291,7 +6330,7 @@ function render() {
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
   bindReceiptPrintWorkerPickerDismiss();
-  if (state.currentView === "count") syncCountInputsFromState();
+  if (state.currentView === "count" && !state.countDone) syncCountInputsFromState();
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
   const titleId = opts.titleId || "modal-title",
