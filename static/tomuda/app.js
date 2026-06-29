@@ -227,6 +227,8 @@ let countRenderPending = false;
 let countBlurSaveTimer = null;
 let countFocusedProductId = "";
 let countInputSyncing = false;
+let warehouseDateRenderPending = false;
+let warehouseDateBlurTimer = null;
 let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
@@ -816,10 +818,30 @@ const card = (l, v, t = "", opts = null) => {
 };
 const metricsBar = (items, cols = "", modifier = "") =>
   `<div class="metrics-bar${cols ? ` metrics-bar--${cols}` : ""}${modifier ? ` metrics-bar--${modifier}` : ""}">${items}</div>`;
-const pageHead = (title, action = "") =>
-  action
-    ? `<div class="page-head page-head--row"><h2 class="page-head__title">${title}</h2><div class="page-head__actions">${action}</div></div>`
-    : `<h2 class="page-head__title">${title}</h2>`;
+const pageBackBtnHtml = () =>
+  `<button type="button" class="page-head__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`;
+function canPageBack() {
+  if (!state.isLoggedIn) return false;
+  if (state.currentView === "promotions" && state.filters.promotionDetail) {
+    return true;
+  }
+  return [
+    "employees",
+    "inventory",
+    "reports",
+    "promotions",
+    "warehouseReceipts",
+  ].includes(state.currentView);
+}
+const pageHead = (title, action = "", opts = {}) => {
+  const showBack =
+    opts.back !== false && (opts.back === true || canPageBack());
+  const back = showBack ? pageBackBtnHtml() : "";
+  if (action || showBack) {
+    return `<div class="page-head page-head--row${showBack ? " page-head--with-back" : ""}">${back}<h2 class="page-head__title">${title}</h2>${action ? `<div class="page-head__actions">${action}</div>` : ""}</div>`;
+  }
+  return `<h2 class="page-head__title">${title}</h2>`;
+};
 const MOBILE_NAV_SHORT = {
   worker: "Захиалга",
   customers: "Харилцагч",
@@ -1128,6 +1150,7 @@ function localStateDirty() {
 }
 function shouldDeferBackendSync() {
   if (isEditingCountQty()) return true;
+  if (isWarehouseDateEditing()) return true;
   if (
     state.currentView === "count" &&
     (state.countDone || countSessionActive())
@@ -1178,6 +1201,24 @@ function isEditingCountQty() {
     el?.matches?.(".count-row__input[data-count-product-id]")
   );
 }
+function isWarehouseDateEditing() {
+  const el = document.activeElement;
+  return el?.matches?.(".wh-date-filters__native");
+}
+function flushPendingWarehouseDateRender() {
+  if (isWarehouseDateEditing()) return;
+  if (!warehouseDateRenderPending) return;
+  warehouseDateRenderPending = false;
+  render();
+}
+function warehouseDateFocus() {
+  closeReceiptPrintPickersState();
+  closeReceiptPrintPickersVisual();
+}
+function warehouseDateBlur() {
+  clearTimeout(warehouseDateBlurTimer);
+  warehouseDateBlurTimer = setTimeout(flushPendingWarehouseDateRender, 150);
+}
 function closeReceiptPrintPickersVisual() {
   document.querySelectorAll(".wh-receipt-picker.is-open").forEach((picker) => {
     picker.classList.remove("is-open");
@@ -1195,7 +1236,12 @@ function safeRender() {
     countRenderPending = true;
     return;
   }
+  if (isWarehouseDateEditing()) {
+    warehouseDateRenderPending = true;
+    return;
+  }
   countRenderPending = false;
+  warehouseDateRenderPending = false;
   render();
 }
 function flushPendingCountRender() {
@@ -2876,7 +2922,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     detailHtml = selected
       ? warehouseOrderDetail(selected)
       : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`;
-  return `<section class="wh-receipts"><header class="wh-receipts__head"><h2 class="wh-receipts__title">${title}</h2><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><div class="wh-receipts__head-main">${canPageBack() ? pageBackBtnHtml() : ""}<h2 class="wh-receipts__title">${title}</h2></div><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header><div class="wh-receipts__filters">${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
     .map(
       (s) =>
         `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
@@ -3381,37 +3427,9 @@ function warehouseDateDisplayText(day = state.filters.warehouseDate || "") {
 function warehouseDateFiltersHtml() {
   const day = state.filters.warehouseDate || "",
     live = !day,
+    pickerDay = day || todayIso(),
     display = warehouseDateDisplayText(day);
-  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><button type="button" onclick="warehouseDateModal()" class="wh-date-filters__date app-input" aria-label="Огноо сонгох"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg></button><span class="wh-date-filters__hint">${live ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
-}
-function warehouseDateModal() {
-  closeReceiptPrintPickersState();
-  closeReceiptPrintPickersVisual();
-  const day = state.filters.warehouseDate || todayIso();
-  box(
-    "Огноо сонгох",
-    `<div class="p-5 space-y-4 wh-date-modal"><p class="wh-date-modal__desc">Захиалга харах өдрөө сонгоно уу.</p><label class="wh-date-modal__field"><span class="wh-date-modal__label">Огноо</span><input id="warehouse-date-modal-input" type="date" value="${esc(day)}" class="wh-date-modal__input app-input"></label><div class="wh-date-modal__actions"><button type="button" onclick="closeModal()" class="btn btn--secondary btn--block">Болих</button><button type="button" onclick="applyWarehouseDateFromModal()" class="btn btn--primary btn--block">Сонгох</button></div></div>`,
-    "max-w-sm",
-    { dialog: true, closeLabel: "Огноо сонгогч хаах" },
-  );
-  requestAnimationFrame(() => {
-    const el = document.getElementById("warehouse-date-modal-input");
-    if (!el) return;
-    if (typeof el.showPicker === "function") {
-      try {
-        el.showPicker();
-        return;
-      } catch (_) {}
-    }
-    el.focus();
-  });
-}
-function applyWarehouseDateFromModal() {
-  const el = document.getElementById("warehouse-date-modal-input");
-  const day = el?.value || "";
-  if (!day) return alert("Огноо сонгоно уу");
-  closeModal();
-  setWarehouseDate(day);
+  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
 }
 function clearWarehouseDate() {
   state.filters.warehouseDate = "";
@@ -4070,7 +4088,7 @@ function countResult(mismatches) {
             : "count-result-table__diff count-result-table__diff--bad",
         diffText =
           diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff);
-      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num" data-label="Эхний">${stats.opening}</span><span class="count-result-table__num" data-label="Борлуулсан">${stats.sold}</span><span class="count-result-table__num" data-label="Зарлагдсан">${stats.expended}</span><span class="count-result-table__num" data-label="Эцсийн">${stats.final}</span><span class="${diffClass}" data-label="Зөрүү">${diffText}</span></div>`;
+      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num" data-label="Эхний үлдэгдэл">${stats.opening}</span><span class="count-result-table__num" data-label="Борлуулсан">${stats.sold}</span><span class="count-result-table__num" data-label="Зарлагдсан">${stats.expended}</span><span class="count-result-table__num" data-label="Эцсийн үлдэгдэл">${stats.final}</span><span class="${diffClass}" data-label="Зөрүү">${diffText}</span></div>`;
     })
     .join("");
   const badgeClass = mismatchCount
@@ -4081,32 +4099,30 @@ function countResult(mismatches) {
     : "Зөрүүгүй";
   return `<section class="count-result-panel"><header class="count-result-panel__head"><div class="count-result-panel__head-copy"><p class="count-result-panel__title">Тооллого хадгалагдлаа</p><p class="count-result-panel__sub">${list.length} бараа тоолсон</p></div><span class="${badgeClass}">${badgeText}</span></header>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="count-result-panel__empty">Тоолсон бараа байхгүй</div>`}${mismatchCount === 0 && list.length ? `<div class="count-result-panel__success">Бүх барааны тоо таарч байна</div>` : ""}<footer class="count-result-panel__foot"><button type="button" onclick="confirmCountExcel()" class="btn btn--secondary btn--block">${EXCEL_FILE_DOWNLOAD}</button></footer></section>`;
 }
+function countExportProducts() {
+  return countFilteredProducts().filter((p) => countValue(p.id) !== null);
+}
 function countExcelRows() {
-  const ids = new Set(countFilteredProducts().map((p) => p.id));
-  return state.products
-    .filter((p) => ids.has(p.id))
-    .map((p) => {
-      const stats = countProductStats(p);
-      if (stats.final === null) return null;
-      const diff = countBookDiff(stats);
-      return [
-        p.barcode || "-",
-        p.name,
-        p.category || "-",
-        stats.opening,
-        stats.sold,
-        stats.expended,
-        stats.final,
-        diff,
-        p.unit || "ш",
-      ];
-    })
-    .filter(Boolean);
+  return countExportProducts().map((p) => {
+    const stats = countProductStats(p);
+    const diff = countBookDiff(stats);
+    return [
+      p.name,
+      p.barcode || "-",
+      p.category || "-",
+      stats.opening,
+      stats.sold,
+      stats.expended,
+      stats.final,
+      diff,
+      p.unit || "ш",
+    ];
+  });
 }
 function countSheetProductsGrouped() {
-  const ids = new Set(countFilteredProducts().map((p) => p.id));
+  const ids = new Set(countExportProducts().map((p) => p.id));
   const products = state.products
-    .filter((p) => ids.has(p.id) && countValue(p.id) !== null)
+    .filter((p) => ids.has(p.id))
     .sort(
       (a, b) =>
         String(a.category || "").localeCompare(
@@ -4178,124 +4194,103 @@ function buildCountSheetXml() {
   };
   const emp = state.currentEmployee?.name || "-";
   const dateLabel = countSheetDateLabel();
+  const products = countExportProducts();
+  const totals = countMetricsTotals(products);
+  const mismatchCount = countMismatchesForList(products).length;
   const groups = countSheetProductsGrouped();
   const rows = [];
-  const merges = ["A1:F1", "E2:F2"];
+  const merges = ["A1:H1", "F2:H2"];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells));
     rowNum += 1;
   };
+  const emptyCells = (row, from = "A", to = "H", style = 1) => {
+    const cols = "ABCDEFGH".slice(
+      "ABCDEFGH".indexOf(from),
+      "ABCDEFGH".indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
   pushRow(43.5, [
-    xlsxCellXml("A1", 13, si("Бараа бэлдэх хуудас"), "s"),
-    xlsxCellXml("B1", 13, null, "empty"),
-    xlsxCellXml("C1", 13, null, "empty"),
-    xlsxCellXml("D1", 13, null, "empty"),
-    xlsxCellXml("E1", 13, null, "empty"),
-    xlsxCellXml("F1", 13, null, "empty"),
-    xlsxCellXml("G1", 1, null, "empty"),
-    xlsxCellXml("H1", 1, null, "empty"),
+    xlsxCellXml("A1", 13, si("Тооллогын тайлан"), "s"),
+    ...emptyCells(1, "B", "H"),
   ]);
   pushRow(28.5, [
     xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
     xlsxCellXml("B2", 4, si(emp), "s"),
     xlsxCellXml("C2", 5, null, "empty"),
-    xlsxCellXml("D2", 6, null, "empty"),
-    xlsxCellXml("E2", 14, si(dateLabel), "s"),
-    xlsxCellXml("F2", 14, null, "empty"),
-    xlsxCellXml("G2", 1, null, "empty"),
-    xlsxCellXml("H2", 1, null, "empty"),
+    xlsxCellXml("D2", 5, null, "empty"),
+    xlsxCellXml("E2", 5, null, "empty"),
+    xlsxCellXml("F2", 14, si(dateLabel), "s"),
+    xlsxCellXml("G2", 14, null, "empty"),
+    xlsxCellXml("H2", 14, null, "empty"),
   ]);
-  pushRow(20.25, [
-    xlsxCellXml("A3", 3, si("Захиалга авсан ажилтан:"), "s"),
-    xlsxCellXml("B3", 4, si(""), "s"),
-    xlsxCellXml("C3", 5, null, "empty"),
-    xlsxCellXml("D3", 6, null, "empty"),
-    xlsxCellXml("E3", 5, null, "empty"),
-    xlsxCellXml("F3", 6, null, "empty"),
-    xlsxCellXml("G3", 1, null, "empty"),
-    xlsxCellXml("H3", 1, null, "empty"),
+  pushRow(24, [
+    xlsxCellXml("A3", 3, si("Нийт дүн:"), "s"),
+    xlsxCellXml("B3", 5, null, "empty"),
+    xlsxCellXml("C3", 10, totals.opening, "n"),
+    xlsxCellXml("D3", 10, totals.sold, "n"),
+    xlsxCellXml("E3", 10, totals.expended, "n"),
+    xlsxCellXml("F3", 10, totals.final, "n"),
+    xlsxCellXml(
+      "G3",
+      7,
+      si(mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"),
+      "s",
+    ),
+    xlsxCellXml("H3", 5, null, "empty"),
   ]);
-  pushRow(16.5, [
-    xlsxCellXml("A4", 6, null, "empty"),
-    xlsxCellXml("B4", 4, si(""), "s"),
-    xlsxCellXml("C4", 5, null, "empty"),
-    xlsxCellXml("D4", 6, null, "empty"),
-    xlsxCellXml("E4", 5, null, "empty"),
-    xlsxCellXml("F4", 6, null, "empty"),
-    xlsxCellXml("G4", 1, null, "empty"),
-    xlsxCellXml("H4", 1, null, "empty"),
-  ]);
-  pushRow(16.5, [
-    xlsxCellXml("A5", 6, null, "empty"),
-    xlsxCellXml("B5", 6, null, "empty"),
-    xlsxCellXml("C5", 5, null, "empty"),
-    xlsxCellXml("D5", 6, null, "empty"),
-    xlsxCellXml("E5", 5, null, "empty"),
-    xlsxCellXml("F5", 6, null, "empty"),
-    xlsxCellXml("G5", 1, null, "empty"),
-    xlsxCellXml("H5", 1, null, "empty"),
-  ]);
+  pushRow(16.5, emptyCells(4));
   pushRow(30.75, [
-    xlsxCellXml("A6", 7, si("Барааны нэр төрөл"), "s"),
-    xlsxCellXml("B6", 7, si("Хэмжих нэгж"), "s"),
-    xlsxCellXml("C6", 7, si("Баркод"), "s"),
-    xlsxCellXml("D6", 7, si("Багц"), "s"),
-    xlsxCellXml("E6", 7, si("Ширхэг"), "s"),
-    xlsxCellXml("F6", 7, si("Үлдэгдэл"), "s"),
+    xlsxCellXml("A5", 7, si("Бараа"), "s"),
+    xlsxCellXml("B5", 7, si("Баркод"), "s"),
+    xlsxCellXml("C5", 7, si("Эхний үлдэгдэл"), "s"),
+    xlsxCellXml("D5", 7, si("Борлуулсан"), "s"),
+    xlsxCellXml("E5", 7, si("Зарлагдсан"), "s"),
+    xlsxCellXml("F5", 7, si("Эцсийн үлдэгдэл"), "s"),
+    xlsxCellXml("G5", 7, si("Зөрүү"), "s"),
+    xlsxCellXml("H5", 7, si("Нэгж"), "s"),
   ]);
   for (const item of groups) {
     if (item.type === "cat") {
       const r = rowNum;
-      merges.push(`A${r}:F${r}`);
+      merges.push(`A${r}:H${r}`);
       pushRow(24, [
         xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
-        xlsxCellXml(`B${r}`, 15, null, "empty"),
-        xlsxCellXml(`C${r}`, 15, null, "empty"),
-        xlsxCellXml(`D${r}`, 15, null, "empty"),
-        xlsxCellXml(`E${r}`, 15, null, "empty"),
-        xlsxCellXml(`F${r}`, 15, null, "empty"),
+        ...emptyCells(r, "B", "H", 15),
       ]);
       continue;
     }
     const p = item.product;
-    const counted = countValue(p.id);
-    const { packs, pieces } = pickerQtyToParts(counted, p);
+    const stats = countProductStats(p);
+    const diff = countBookDiff(stats);
     const r = rowNum;
-    const packCell =
-      packs > 0
-        ? xlsxCellXml(`D${r}`, 10, String(packs), "n")
-        : xlsxCellXml(`D${r}`, 10, null, "empty");
-    const pieceCell =
-      pieces > 0
-        ? xlsxCellXml(`E${r}`, 10, String(pieces), "n")
-        : xlsxCellXml(`E${r}`, 10, null, "empty");
     pushRow(15.75, [
       xlsxCellXml(`A${r}`, 8, si(p.name), "s"),
-      xlsxCellXml(`B${r}`, 8, si(p.unit || "ш"), "s"),
-      xlsxCellXml(`C${r}`, 9, si(p.barcode || ""), "s"),
-      packCell,
-      pieceCell,
-      xlsxCellXml(`F${r}`, 8, String(counted), "n"),
+      xlsxCellXml(`B${r}`, 9, si(p.barcode || "-"), "s"),
+      xlsxCellXml(`C${r}`, 10, stats.opening, "n"),
+      xlsxCellXml(`D${r}`, 10, stats.sold, "n"),
+      xlsxCellXml(`E${r}`, 10, stats.expended, "n"),
+      xlsxCellXml(`F${r}`, 10, stats.final ?? 0, "n"),
+      xlsxCellXml(`G${r}`, 10, diff ?? 0, "n"),
+      xlsxCellXml(`H${r}`, 8, si(p.unit || "ш"), "s"),
     ]);
   }
-  pushRow(47.25, [
-    xlsxCellXml(`A${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`B${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`C${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`D${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`E${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`F${rowNum}`, 1, null, "empty"),
+  const totalRow = rowNum;
+  pushRow(24, [
+    xlsxCellXml(`A${totalRow}`, 7, si("Нийт"), "s"),
+    xlsxCellXml(`B${totalRow}`, 7, si(""), "s"),
+    xlsxCellXml(`C${totalRow}`, 10, totals.opening, "n"),
+    xlsxCellXml(`D${totalRow}`, 10, totals.sold, "n"),
+    xlsxCellXml(`E${totalRow}`, 10, totals.expended, "n"),
+    xlsxCellXml(`F${totalRow}`, 10, totals.final, "n"),
+    xlsxCellXml(`G${totalRow}`, 10, null, "empty"),
+    xlsxCellXml(`H${totalRow}`, 7, si(""), "s"),
   ]);
-  rowNum += 1;
-  pushRow(null, [
-    xlsxCellXml(`A${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`B${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`C${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`D${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`E${rowNum}`, 1, null, "empty"),
-    xlsxCellXml(`F${rowNum}`, 1, null, "empty"),
-  ]);
+  pushRow(16.5, emptyCells(rowNum));
   rowNum += 1;
   const sign1 = rowNum;
   merges.push(`A${sign1}:B${sign1}`, `C${sign1}:E${sign1}`);
@@ -4310,6 +4305,9 @@ function buildCountSheetXml() {
     ),
     xlsxCellXml(`D${sign1}`, 18, null, "empty"),
     xlsxCellXml(`E${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign1}`, 1, null, "empty"),
+    xlsxCellXml(`G${sign1}`, 1, null, "empty"),
+    xlsxCellXml(`H${sign1}`, 1, null, "empty"),
   ]);
   rowNum += 1;
   const sign2 = rowNum;
@@ -4320,6 +4318,9 @@ function buildCountSheetXml() {
     xlsxCellXml(`C${sign2}`, 16, si("гарын үсэг"), "s"),
     xlsxCellXml(`D${sign2}`, 16, null, "empty"),
     xlsxCellXml(`E${sign2}`, 16, null, "empty"),
+    xlsxCellXml(`F${sign2}`, 1, null, "empty"),
+    xlsxCellXml(`G${sign2}`, 1, null, "empty"),
+    xlsxCellXml(`H${sign2}`, 1, null, "empty"),
   ]);
   rowNum += 1;
   const sign3 = rowNum;
@@ -4335,6 +4336,9 @@ function buildCountSheetXml() {
     ),
     xlsxCellXml(`D${sign3}`, 18, null, "empty"),
     xlsxCellXml(`E${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign3}`, 1, null, "empty"),
+    xlsxCellXml(`G${sign3}`, 1, null, "empty"),
+    xlsxCellXml(`H${sign3}`, 1, null, "empty"),
   ]);
   rowNum += 1;
   const sign4 = rowNum;
@@ -4343,10 +4347,13 @@ function buildCountSheetXml() {
     xlsxCellXml(`C${sign4}`, 16, si("гарын үсэг"), "s"),
     xlsxCellXml(`D${sign4}`, 16, null, "empty"),
     xlsxCellXml(`E${sign4}`, 16, null, "empty"),
+    xlsxCellXml(`F${sign4}`, 1, null, "empty"),
+    xlsxCellXml(`G${sign4}`, 1, null, "empty"),
+    xlsxCellXml(`H${sign4}`, 1, null, "empty"),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:H${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.12890625" customWidth="1"/><col min="2" max="2" width="12.74609375" customWidth="1"/><col min="3" max="3" width="13.73046875" customWidth="1"/><col min="4" max="4" width="7.35546875" customWidth="1"/><col min="5" max="5" width="8.08984375" customWidth="1"/><col min="6" max="6" width="14.5859375" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:H${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="12" customWidth="1"/><col min="4" max="4" width="11" customWidth="1"/><col min="5" max="5" width="11" customWidth="1"/><col min="6" max="6" width="13" customWidth="1"/><col min="7" max="7" width="9" customWidth="1"/><col min="8" max="8" width="10" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 const COUNT_SHEET_TEMPLATE =
@@ -4381,36 +4388,57 @@ function exportCountExcelFallback() {
   const rows = countExcelRows();
   if (!rows.length) return alert("Тоолсон бараа байхгүй");
   const stamp = new Date().toISOString().slice(0, 10);
+  const products = countExportProducts();
+  const totals = countMetricsTotals(products);
+  const mismatchCount = countMismatchesForList(products).length;
   excel(`toollogo-${stamp}.csv`, [
-    ["Бараа бэлдэх хуудас"],
+    ["Тооллогын тайлан"],
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
+    [
+      "Нийт дүн",
+      "",
+      totals.opening,
+      totals.sold,
+      totals.expended,
+      totals.final,
+      mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй",
+      "",
+    ],
     [],
     [
-      "Барааны нэр төрөл",
-      "Хэмжих нэгж",
+      "Бараа",
       "Баркод",
       "Эхний үлдэгдэл",
       "Борлуулсан",
       "Зарлагдсан",
       "Эцсийн үлдэгдэл",
       "Зөрүү",
+      "Нэгж",
     ],
-    ...rows.map(([barcode, name, , opening, sold, expended, final, diff]) => {
-      const p = state.products.find(
-        (x) => x.barcode === barcode || x.name === name,
-      );
-      return [
+    ...rows.map(
+      ([name, barcode, , opening, sold, expended, final, diff, unit]) => [
         name,
-        p?.unit || "ш",
         barcode,
         opening,
         sold,
         expended,
         final,
         diff,
-      ];
-    }),
+        unit,
+      ],
+    ),
+    [],
+    [
+      "Нийт",
+      "",
+      totals.opening,
+      totals.sold,
+      totals.expended,
+      totals.final,
+      "",
+      "",
+    ],
   ]);
 }
 function exportCountExcel() {
@@ -6292,7 +6320,13 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
+  if (isWarehouseDateEditing()) {
+    warehouseDateRenderPending = true;
+    if (localStateDirty()) scheduleBackendSave();
+    return;
+  }
   countRenderPending = false;
+  warehouseDateRenderPending = false;
   if (!state.isLoggedIn) {
     app.innerHTML = loginView();
     return;
@@ -8467,8 +8501,6 @@ Object.assign(window, {
   setWorkerOrderDate,
   clearWarehouseDate,
   setWarehouseDate,
-  warehouseDateModal,
-  applyWarehouseDateFromModal,
   receiptFilterToggle,
   receiptFilterClear,
   setReceiptPrintDelivery,
