@@ -43,10 +43,11 @@ const state = {
   applyPercentDiscount: false,
   selectedWorkers: [],
   selectedWarehouseOrderId: "",
-  receiptPrintWorkerId: "",
+  receiptPrintWorkerIds: [],
+  receiptPrintWorkerPickerOpen: false,
   receiptPrintDeliveryId: "",
   receiptPrintOrderIds: [],
-  receiptPrintWorkerSync: "",
+  receiptPrintWorkerSyncKey: "",
   selectedDeliveryId: "",
   deliveryName: "",
   deliveryPhone: "",
@@ -1108,10 +1109,11 @@ function captureSessionSnapshot() {
     filters: { ...state.filters },
     selectedWorkers: [...(state.selectedWorkers || [])],
     selectedWarehouseOrderId: state.selectedWarehouseOrderId,
-    receiptPrintWorkerId: state.receiptPrintWorkerId || "",
+    receiptPrintWorkerIds: [...(state.receiptPrintWorkerIds || [])],
+    receiptPrintWorkerPickerOpen: !!state.receiptPrintWorkerPickerOpen,
     receiptPrintDeliveryId: state.receiptPrintDeliveryId || "",
     receiptPrintOrderIds: [...(state.receiptPrintOrderIds || [])],
-    receiptPrintWorkerSync: state.receiptPrintWorkerSync || "",
+    receiptPrintWorkerSyncKey: state.receiptPrintWorkerSyncKey || "",
     selectedDeliveryId: state.selectedDeliveryId,
     workerStoreReady: state.workerStoreReady,
     pickerStatus: state.pickerStatus,
@@ -2604,12 +2606,12 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     !["all", ...warehouseReceiptStatusOptions()].includes(state.filters.order)
   )
     state.filters.order = "all";
-  const workerId = state.receiptPrintWorkerId || "",
-    displayRows = workerId ? receiptPrintWorkerOrders(workerId) : rows;
-  if (workerId) syncReceiptPrintSelection(displayRows);
+  const workerIds = receiptPrintWorkerIds(),
+    displayRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows;
+  if (workerIds.length) syncReceiptPrintSelection(displayRows);
   else {
     state.receiptPrintOrderIds = [];
-    state.receiptPrintWorkerSync = "";
+    state.receiptPrintWorkerSyncKey = "";
   }
   if (
     displayRows.length &&
@@ -2623,7 +2625,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     listHtml = displayRows.length
       ? displayRows
           .map(
-            workerId
+            workerIds.length
               ? warehouseReceiptPrintListItem
               : warehouseReceiptListItem,
           )
@@ -2873,11 +2875,35 @@ function receiptWorkerIds() {
 function receiptDeliveryIds() {
   return idList(state.searches.receiptDeliveryIds);
 }
+function receiptPrintWorkerIds() {
+  return idList(state.receiptPrintWorkerIds);
+}
+function receiptSalesEmployees() {
+  return state.employees
+    .filter((e) => e.role === "sales" || e.role === "admin")
+    .sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+    );
+}
+function receiptPrintWorkerRoleLabel(role) {
+  return role === "admin" ? "Админ" : "ХТ";
+}
+function receiptPrintWorkerSummary(selected = receiptPrintWorkerIds()) {
+  if (!selected.length) return "Сонгох";
+  if (selected.length === 1) {
+    const emp = state.employees.find((e) => e.id === selected[0]);
+    return emp?.name || "1 сонгосон";
+  }
+  return `${selected.length} сонгосон`;
+}
+function receiptPrintWorkerSyncToken() {
+  return receiptPrintWorkerIds().slice().sort().join("|");
+}
 function receiptFilterOptions() {
-  const workerId = state.receiptPrintWorkerId || "",
+  const workerIds = receiptPrintWorkerIds(),
     deliveryId = state.receiptPrintDeliveryId || "";
   return {
-    workerIds: workerId ? [workerId] : receiptWorkerIds(),
+    workerIds: workerIds.length ? workerIds : receiptWorkerIds(),
     deliveryIds: deliveryId ? [deliveryId] : receiptDeliveryIds(),
   };
 }
@@ -2885,33 +2911,31 @@ function receiptPrintDeliveryIds() {
   const id = state.receiptPrintDeliveryId || "";
   return id ? [id] : receiptDeliveryIds();
 }
-function receiptPrintWorkerOrders(workerId) {
+function receiptPrintWorkerOrders(workerIds = receiptPrintWorkerIds()) {
+  const ids = new Set(workerIds);
+  if (!ids.size) return [];
   const deliveryIds = receiptPrintDeliveryIds();
   const rows = filterWarehouseOrders(
     state.orders.filter(
       (o) =>
-        o.employeeId === workerId &&
+        ids.has(o.employeeId) &&
         (!deliveryIds.length ||
           deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
         (state.filters.order === "all" || o.status === state.filters.order),
     ),
   );
-  return rows.sort((a, b) => {
-    const at = new Date(a.createdAt || 0).getTime(),
-      bt = new Date(b.createdAt || 0).getTime();
-    if (at !== bt) return at - bt;
-    return String(a.id || "").localeCompare(String(b.id || ""), "mn");
-  });
+  return sortOrdersBySelectedPeople(rows, workerIds, deliveryIds);
 }
 function syncReceiptPrintSelection(orders) {
-  const workerId = state.receiptPrintWorkerId || "";
-  if (!workerId) {
+  const workerIds = receiptPrintWorkerIds();
+  if (!workerIds.length) {
     state.receiptPrintOrderIds = [];
-    state.receiptPrintWorkerSync = "";
+    state.receiptPrintWorkerSyncKey = "";
     return;
   }
-  if (state.receiptPrintWorkerSync !== workerId) {
-    state.receiptPrintWorkerSync = workerId;
+  const key = receiptPrintWorkerSyncToken();
+  if (state.receiptPrintWorkerSyncKey !== key) {
+    state.receiptPrintWorkerSyncKey = key;
     const pick = orders.length > 10 ? orders.slice(0, 10) : orders;
     state.receiptPrintOrderIds = pick.map((o) => o.id);
     return;
@@ -2922,30 +2946,76 @@ function syncReceiptPrintSelection(orders) {
   );
 }
 function receiptPrintWorkerSelectHtml() {
-  const workers = state.employees.filter((e) => e.role === "sales"),
-    workerId = state.receiptPrintWorkerId || "";
-  return `<select onchange="setReceiptPrintWorker(this.value)" class="wh-receipts__head-select app-input" aria-label="Худалдааны төлөөлөгч"><option value="">Худалдааны төлөөлөгч</option>${workers.map((e) => `<option value="${esc(e.id)}"${workerId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select>`;
+  const people = receiptSalesEmployees(),
+    selected = receiptPrintWorkerIds(),
+    open = !!state.receiptPrintWorkerPickerOpen,
+    summary = receiptPrintWorkerSummary(selected),
+    selectedChips =
+      selected.length > 1
+        ? `<div class="wh-receipt-picker__chips">${selected
+            .map((id) => {
+              const emp = state.employees.find((e) => e.id === id);
+              if (!emp) return "";
+              return `<span class="wh-receipt-picker__chip">${esc(emp.name)}</span>`;
+            })
+            .join("")}</div>`
+        : "";
+  return `<div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__copy"><span class="wh-receipt-picker__label">Худалдааны төлөөлөгч</span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span>${selectedChips}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Худалдааны төлөөлөгч</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers()">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onchange="toggleReceiptPrintWorker('${esc(e.id)}')"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker()">Болсон</button></div></div>` : ""}</div>`;
 }
 function receiptPrintDeliverySelectHtml() {
   const deliveries = deliveryEmployees(),
     deliveryId = state.receiptPrintDeliveryId || "";
-  return `<select onchange="setReceiptPrintDelivery(this.value)" class="wh-receipts__head-select app-input" aria-label="Түгээгч"><option value="">Түгээгч</option>${deliveries.map((e) => `<option value="${esc(e.id)}"${deliveryId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select>`;
+  return `<label class="wh-receipt-field"><span class="wh-receipt-field__label">Түгээгч</span><span class="wh-receipt-field__control"><svg class="wh-receipt-field__icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg><select onchange="setReceiptPrintDelivery(this.value)" class="wh-receipt-field__select app-input" aria-label="Түгээгч"><option value=""${deliveryId ? "" : " selected"}>Бүгд</option>${deliveries.map((e) => `<option value="${esc(e.id)}"${deliveryId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select><svg class="wh-receipt-field__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>`;
 }
-function setReceiptPrintWorker(id) {
-  const next = id || "";
-  if (state.receiptPrintWorkerId === next) return;
-  state.receiptPrintWorkerId = next;
-  state.receiptPrintWorkerSync = "";
+function toggleReceiptPrintWorkerPicker(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.receiptPrintWorkerPickerOpen = !state.receiptPrintWorkerPickerOpen;
+  render();
+}
+function closeReceiptPrintWorkerPicker() {
+  state.receiptPrintWorkerPickerOpen = false;
+  render();
+}
+function toggleReceiptPrintWorker(id) {
+  const current = receiptPrintWorkerIds();
+  state.receiptPrintWorkerIds = current.includes(id)
+    ? current.filter((x) => x !== id)
+    : [...current, id];
+  state.receiptPrintWorkerSyncKey = "";
   state.selectedWarehouseOrderId = "";
+  state.receiptPrintWorkerPickerOpen = true;
+  render();
+}
+function clearReceiptPrintWorkers() {
+  state.receiptPrintWorkerIds = [];
+  state.receiptPrintWorkerSyncKey = "";
+  state.receiptPrintOrderIds = [];
+  state.selectedWarehouseOrderId = "";
+  state.receiptPrintWorkerPickerOpen = true;
   render();
 }
 function setReceiptPrintDelivery(id) {
   const next = id || "";
   if (state.receiptPrintDeliveryId === next) return;
   state.receiptPrintDeliveryId = next;
-  state.receiptPrintWorkerSync = "";
+  state.receiptPrintWorkerSyncKey = "";
   state.selectedWarehouseOrderId = "";
   render();
+}
+function bindReceiptPrintWorkerPickerDismiss() {
+  if (!state.receiptPrintWorkerPickerOpen) return;
+  requestAnimationFrame(() => {
+    const picker = document.querySelector("[data-receipt-worker-picker].is-open");
+    if (!picker) return;
+    const close = (ev) => {
+      if (!picker.contains(ev.target)) {
+        state.receiptPrintWorkerPickerOpen = false;
+        document.removeEventListener("click", close, true);
+        render();
+      }
+    };
+    setTimeout(() => document.addEventListener("click", close, true), 0);
+  });
 }
 function toggleReceiptPrintOrder(id) {
   const current = idList(state.receiptPrintOrderIds);
@@ -5598,6 +5668,7 @@ function render() {
   }
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
+  bindReceiptPrintWorkerPickerDismiss();
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
   const titleId = opts.titleId || "modal-title",
@@ -6710,7 +6781,7 @@ function printOrderReceiptsNow(ids) {
 }
 function printSelectedOrderReceipts() {
   const ids = idList(state.receiptPrintOrderIds);
-  if (!state.receiptPrintWorkerId) return alert("Худалдааны төлөөлөгч сонгоно уу");
+  if (!receiptPrintWorkerIds().length) return alert("Худалдааны төлөөлөгч сонгоно уу");
   if (!ids.length) return alert("Хэвлэх захиалга сонгоно уу");
   confirmDataExport("Баримт хэвлэх", () => printOrderReceiptsNow(ids));
 }
@@ -7719,8 +7790,11 @@ Object.assign(window, {
   setWarehouseDate,
   receiptFilterToggle,
   receiptFilterClear,
-  setReceiptPrintWorker,
   setReceiptPrintDelivery,
+  toggleReceiptPrintWorker,
+  toggleReceiptPrintWorkerPicker,
+  closeReceiptPrintWorkerPicker,
+  clearReceiptPrintWorkers,
   toggleReceiptPrintOrder,
   printSelectedOrderReceipts,
   printOrderReceiptsNow,
