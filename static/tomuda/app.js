@@ -3646,11 +3646,25 @@ function countSoldQty(productId) {
   }
   return total;
 }
+function countUsesSnapshot() {
+  return (
+    (countSessionActive() || state.countDone) &&
+    state.countOpeningStock &&
+    Object.keys(state.countOpeningStock).length > 0
+  );
+}
+function countOpeningForProduct(id, system) {
+  if (!countUsesSnapshot()) return system;
+  if (Object.prototype.hasOwnProperty.call(state.countOpeningStock, id)) {
+    return Number(state.countOpeningStock[id]) || 0;
+  }
+  return system;
+}
 function countProductStats(p) {
   const id = p.id;
   const system = Number(p.stock) || 0;
   const final = countValue(id);
-  if (!countSessionActive()) {
+  if (!countUsesSnapshot()) {
     return {
       opening: system,
       sold: 0,
@@ -3661,7 +3675,7 @@ function countProductStats(p) {
       final,
     };
   }
-  const opening = Number(state.countOpeningStock?.[id] ?? system) || 0;
+  const opening = countOpeningForProduct(id, system);
   const sold = countSoldQty(id);
   const expended = countInventoryQty(id, "out");
   const income = countInventoryQty(id, "in");
@@ -3919,17 +3933,21 @@ function countMismatchesForList(list) {
 }
 function countResult(mismatches) {
   const list = countFilteredProducts().filter((p) => countValue(p.id) !== null);
+  const headHtml = `<div class="count-result-table__head" aria-hidden="false"><span class="count-result-table__head-name">Бараа</span><span class="count-result-table__head-num" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num">Борлуулсан</span><span class="count-result-table__head-num">Зарлагдсан</span><span class="count-result-table__head-num">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num">Зөрүү</span></div>`;
   const rowHtml = list
     .map((p) => {
       const stats = countProductStats(p),
         diff = countBookDiff(stats),
         diffClass =
-          diff === 0 ? "text-muted-foreground" : "text-tone-danger font-semibold",
-        diffText = diff > 0 ? `+${diff}` : String(diff);
-      return `<div class="px-4 py-3 grid grid-cols-2 sm:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(56px,1fr))_minmax(56px,1fr)] gap-x-2 gap-y-1 text-sm count-result-row"><span class="font-medium col-span-2 sm:col-span-1">${esc(p.name)}</span><span class="count-result-row__cell"><span class="text-muted-foreground sm:hidden">Эхний: </span><b>${stats.opening}</b></span><span class="count-result-row__cell"><span class="text-muted-foreground sm:hidden">Борлуулсан: </span><b>${stats.sold}</b></span><span class="count-result-row__cell"><span class="text-muted-foreground sm:hidden">Зарлагдсан: </span><b>${stats.expended}</b></span><span class="count-result-row__cell"><span class="text-muted-foreground sm:hidden">Эцсийн: </span><b>${stats.final}</b></span><span class="${diffClass} count-result-row__cell"><span class="text-muted-foreground sm:hidden">Зөрүү: </span><b>${diffText}</b></span></div>`;
+          diff === null || diff === 0
+            ? "count-result-table__diff"
+            : "count-result-table__diff count-result-table__diff--bad",
+        diffText =
+          diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff);
+      return `<div class="count-result-table__row"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num">${stats.opening}</span><span class="count-result-table__num">${stats.sold}</span><span class="count-result-table__num">${stats.expended}</span><span class="count-result-table__num">${stats.final}</span><span class="${diffClass}">${diffText}</span></div>`;
     })
     .join("");
-  return `<div class="bg-card rounded overflow-hidden"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p></div>${list.length ? `<div class="hidden sm:grid grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(56px,1fr))_minmax(56px,1fr)] gap-2 px-4 py-2 bg-secondary/30 text-xs font-semibold text-muted-foreground border-b border-border"><span>Бараа</span><span class="text-center">Эхний үлдэгдэл</span><span class="text-center">Борлуулсан</span><span class="text-center">Зарлагдсан</span><span class="text-center">Эцсийн үлдэгдэл</span><span class="text-center">Зөрүү</span></div><div class="divide-y divide-border">${rowHtml}</div>` : `<div class="p-4 text-sm text-muted-foreground">Тоолсон бараа байхгүй</div>`}${mismatches.length === 0 && list.length ? `<div class="p-4 text-sm text-tone-success font-medium border-t border-border">Зөрүүтэй бараа байхгүй</div>` : ""}<div class="p-4 border-t border-border"><button type="button" onclick="confirmCountExcel()" class="w-full py-3 bg-secondary rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button></div></div>`;
+  return `<div class="bg-card rounded overflow-hidden count-result-panel"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p><p class="text-xs text-muted-foreground mt-1">Эхний үлдэгдэл — тооллого эхлэх (сүүлийн таталт/«Шинэ») үеийн тоо ширхэг</p></div>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="p-4 text-sm text-muted-foreground">Тоолсон бараа байхгүй</div>`}${mismatches.length === 0 && list.length ? `<div class="p-4 text-sm text-tone-success font-medium border-t border-border">Зөрүүтэй бараа байхгүй</div>` : ""}<div class="p-4 border-t border-border"><button type="button" onclick="confirmCountExcel()" class="w-full py-3 bg-secondary rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button></div></div>`;
 }
 function countExcelRows() {
   const ids = new Set(countFilteredProducts().map((p) => p.id));
