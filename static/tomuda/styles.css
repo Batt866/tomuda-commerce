@@ -3656,7 +3656,8 @@ input::placeholder, textarea::placeholder {
   color: var(--hex-muted-foreground);
 }
 
-.count-row__diff.text-tone-danger {
+.count-row__diff.text-tone-danger,
+.count-row__diff.count-result-table__diff--bad {
   color: #e53935;
   font-weight: 800;
 }

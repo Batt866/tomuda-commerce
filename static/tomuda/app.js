@@ -3598,7 +3598,6 @@ function countCategoryLabel(cat = state.filters.countCategory || "all") {
 }
 function setCountCategory(cat) {
   state.filters.countCategory = cat || "all";
-  state.countDone = false;
   render();
 }
 function countSessionSinceMs() {
@@ -3608,6 +3607,7 @@ function countSessionSinceMs() {
   return Number.isFinite(ms) ? ms : 0;
 }
 function inventoryLogProductId(log) {
+  if (log?.productId) return String(log.productId);
   const name = String(log.productName || "")
     .trim()
     .toLowerCase();
@@ -3616,6 +3616,9 @@ function inventoryLogProductId(log) {
     (p) => String(p.name || "").trim().toLowerCase() === name,
   );
   return hit?.id || "";
+}
+function nextInventoryLogId() {
+  return `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 function countInventoryQty(productId, type) {
   const since = countSessionSinceMs();
@@ -3708,6 +3711,7 @@ function ensureCountSessionQuiet(focusId) {
   snapshotCountOpeningStock();
   document.querySelector(".count-view__hint")?.remove();
   if (focusId) refreshCountRowMeta(focusId);
+  scheduleBackendSave();
 }
 function refreshCountRowMeta(id) {
   const p = state.products.find((x) => x.id === id);
@@ -3758,7 +3762,7 @@ function updateCountRowDiffDisplay(id, inputEl) {
   diffEl.className = `count-row__diff ${
     diff === null || diff === 0
       ? "text-muted-foreground"
-      : "text-tone-danger font-semibold"
+      : "count-row__diff count-result-table__diff--bad"
   }`;
 }
 function countQtyFocus(id, el) {
@@ -3895,7 +3899,7 @@ function countRow(p) {
     diffClass =
       diff === null || diff === 0
         ? "text-muted-foreground"
-        : "text-tone-danger font-semibold",
+        : "count-result-table__diff--bad",
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
@@ -3947,7 +3951,7 @@ function countResult(mismatches) {
       return `<div class="count-result-table__row"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num">${stats.opening}</span><span class="count-result-table__num">${stats.sold}</span><span class="count-result-table__num">${stats.expended}</span><span class="count-result-table__num">${stats.final}</span><span class="${diffClass}">${diffText}</span></div>`;
     })
     .join("");
-  return `<div class="bg-card rounded overflow-hidden count-result-panel"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p><p class="text-xs text-muted-foreground mt-1">Эхний үлдэгдэл — тооллого эхлэх (сүүлийн таталт/«Шинэ») үеийн тоо ширхэг</p></div>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="p-4 text-sm text-muted-foreground">Тоолсон бараа байхгүй</div>`}${mismatches.length === 0 && list.length ? `<div class="p-4 text-sm text-tone-success font-medium border-t border-border">Зөрүүтэй бараа байхгүй</div>` : ""}<div class="p-4 border-t border-border"><button type="button" onclick="confirmCountExcel()" class="w-full py-3 bg-secondary rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button></div></div>`;
+  return `<div class="bg-card rounded overflow-hidden count-result-panel"><div class="px-4 py-3 bg-secondary/50"><p class="font-semibold">Тооллого хадгалагдлаа</p><p class="text-sm text-muted-foreground mt-1">Зөрүүтэй бараа: ${mismatches.length}</p><p class="text-xs text-muted-foreground mt-1">Эхний үлдэгдэл — тооллого эхлэх (сүүлийн таталт/«Шинэ») үеийн тоо ширхэг · Зөрүү = Эцсийн − Бүртгэл</p></div>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="p-4 text-sm text-muted-foreground">Тоолсон бараа байхгүй</div>`}${mismatches.length === 0 && list.length ? `<div class="p-4 text-sm text-tone-success font-medium border-t border-border">Зөрүүтэй бараа байхгүй</div>` : ""}<div class="p-4 border-t border-border"><button type="button" onclick="confirmCountExcel()" class="w-full py-3 bg-secondary rounded font-medium">${EXCEL_FILE_DOWNLOAD}</button></div></div>`;
 }
 function countExcelRows() {
   const ids = new Set(countFilteredProducts().map((p) => p.id));
@@ -4300,7 +4304,6 @@ function finishCount() {
   state.countDone = true;
   scheduleBackendSave();
   render();
-  confirmCountExcel();
 }
 function resetCountSession() {
   startCountSession();
@@ -6155,6 +6158,7 @@ function render() {
   }
   if (isEditingCountQty()) {
     countRenderPending = true;
+    scheduleBackendSave();
     return;
   }
   countRenderPending = false;
@@ -7041,6 +7045,7 @@ function saveOrder(e) {
   );
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
   closeModal();
+  scheduleBackendSave();
   render();
 }
 function clearReceiptEdit() {
@@ -7392,13 +7397,15 @@ function applyStock(id, type, qty) {
   }
   stock(id, q, type);
   state.inventoryLogs.push({
-    id: Date.now(),
+    id: nextInventoryLogId(),
+    productId: id,
     productName: p.name,
     type,
     quantity: q,
-    date: new Date(),
+    date: new Date().toISOString(),
     employeeName: state.currentEmployee?.name || "",
   });
+  scheduleBackendSave();
   render();
   return true;
 }
@@ -8187,10 +8194,14 @@ function setOrder(id, s) {
     });
   }
   o.status = s;
+  scheduleBackendSave();
   render();
 }
 function setPaid(id, isPaid) {
-  state.orders.find((o) => o.id === id).isPaid = isPaid;
+  const o = state.orders.find((order) => order.id === id);
+  if (!o) return;
+  o.isPaid = isPaid;
+  scheduleBackendSave();
   render();
 }
 function csvRow(cells) {
