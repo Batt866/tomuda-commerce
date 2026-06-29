@@ -46,6 +46,7 @@ const state = {
   receiptPrintWorkerIds: [],
   receiptPrintWorkerPickerOpen: false,
   receiptPrintDeliveryId: "",
+  receiptPrintDeliveryPickerOpen: false,
   receiptPrintOrderIds: [],
   receiptPrintWorkerSyncKey: "",
   selectedDeliveryId: "",
@@ -1137,6 +1138,7 @@ function captureSessionSnapshot() {
     receiptPrintWorkerIds: [...(state.receiptPrintWorkerIds || [])],
     receiptPrintWorkerPickerOpen: !!state.receiptPrintWorkerPickerOpen,
     receiptPrintDeliveryId: state.receiptPrintDeliveryId || "",
+    receiptPrintDeliveryPickerOpen: !!state.receiptPrintDeliveryPickerOpen,
     receiptPrintOrderIds: [...(state.receiptPrintOrderIds || [])],
     receiptPrintWorkerSyncKey: state.receiptPrintWorkerSyncKey || "",
     selectedDeliveryId: state.selectedDeliveryId,
@@ -1161,6 +1163,18 @@ function isEditingCountQty() {
     state.currentView === "count" &&
     el?.matches?.(".count-row__input[data-count-product-id]")
   );
+}
+function closeReceiptPrintPickersVisual() {
+  document.querySelectorAll(".wh-receipt-picker.is-open").forEach((picker) => {
+    picker.classList.remove("is-open");
+    const trigger = picker.querySelector(".wh-receipt-picker__trigger");
+    if (trigger) trigger.setAttribute("aria-expanded", "false");
+    picker.querySelector(".wh-receipt-picker__panel")?.remove();
+  });
+}
+function closeReceiptPrintPickersState() {
+  state.receiptPrintWorkerPickerOpen = false;
+  state.receiptPrintDeliveryPickerOpen = false;
 }
 function safeRender() {
   if (isEditingCountQty()) {
@@ -3175,20 +3189,39 @@ function receiptPrintWorkerSelectHtml() {
     summary = receiptPrintWorkerSummary(selected);
   return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Худалдааны төлөөлөгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onchange="toggleReceiptPrintWorker('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
+function receiptPrintDeliverySummary(deliveryId = state.receiptPrintDeliveryId || "") {
+  if (!deliveryId) return "Бүгд";
+  const emp = state.employees.find((e) => e.id === deliveryId);
+  return emp?.name || "Бүгд";
+}
 function receiptPrintDeliverySelectHtml() {
   const deliveries = deliveryEmployees(),
-    deliveryId = state.receiptPrintDeliveryId || "";
-  return `<label class="wh-receipt-field"><span class="wh-receipt-field__label">Түгээгч</span><span class="wh-receipt-field__control"><svg class="wh-receipt-field__icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg><select onchange="setReceiptPrintDelivery(this.value)" class="wh-receipt-field__select app-input" aria-label="Түгээгч"><option value=""${deliveryId ? "" : " selected"}>Бүгд</option>${deliveries.map((e) => `<option value="${esc(e.id)}"${deliveryId === e.id ? " selected" : ""}>${esc(e.name)}</option>`).join("")}</select><svg class="wh-receipt-field__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>`;
+    deliveryId = state.receiptPrintDeliveryId || "",
+    open = !!state.receiptPrintDeliveryPickerOpen,
+    summary = receiptPrintDeliverySummary(deliveryId);
+  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Түгээгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-delivery-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintDeliveryPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><span class="wh-receipt-picker__value${deliveryId ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Түгээгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${deliveryId ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintDelivery(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${deliveries.length ? deliveries.map((e) => `<label class="wh-receipt-picker__item${deliveryId === e.id ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${deliveryId === e.id ? " checked" : ""} onchange="toggleReceiptPrintDelivery('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(e.phone || "Утасгүй")}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Түгээгч олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintDeliveryPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
 let receiptPrintWorkerPickerDismissBound = false;
 function toggleReceiptPrintWorkerPicker(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
+  state.receiptPrintDeliveryPickerOpen = false;
   state.receiptPrintWorkerPickerOpen = !state.receiptPrintWorkerPickerOpen;
   render();
 }
 function closeReceiptPrintWorkerPicker(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
   state.receiptPrintWorkerPickerOpen = false;
+  render();
+}
+function toggleReceiptPrintDeliveryPicker(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.receiptPrintWorkerPickerOpen = false;
+  state.receiptPrintDeliveryPickerOpen = !state.receiptPrintDeliveryPickerOpen;
+  render();
+}
+function closeReceiptPrintDeliveryPicker(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.receiptPrintDeliveryPickerOpen = false;
   render();
 }
 function toggleReceiptPrintWorker(id, ev) {
@@ -3219,16 +3252,43 @@ function setReceiptPrintDelivery(id) {
   state.selectedWarehouseOrderId = "";
   render();
 }
+function toggleReceiptPrintDelivery(id, ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  const current = state.receiptPrintDeliveryId || "";
+  state.receiptPrintDeliveryId = current === id ? "" : id;
+  state.receiptPrintWorkerSyncKey = "";
+  state.selectedWarehouseOrderId = "";
+  state.receiptPrintDeliveryPickerOpen = true;
+  render();
+}
+function clearReceiptPrintDelivery(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.receiptPrintDeliveryId = "";
+  state.receiptPrintWorkerSyncKey = "";
+  state.selectedWarehouseOrderId = "";
+  state.receiptPrintDeliveryPickerOpen = true;
+  render();
+}
 function bindReceiptPrintWorkerPickerDismiss() {
   if (receiptPrintWorkerPickerDismissBound) return;
   receiptPrintWorkerPickerDismissBound = true;
   document.addEventListener(
     "click",
     (ev) => {
-      if (!state.receiptPrintWorkerPickerOpen) return;
-      const picker = document.querySelector("[data-receipt-worker-picker]");
-      if (picker?.contains(ev.target)) return;
-      state.receiptPrintWorkerPickerOpen = false;
+      const workerOpen = state.receiptPrintWorkerPickerOpen;
+      const deliveryOpen = state.receiptPrintDeliveryPickerOpen;
+      if (!workerOpen && !deliveryOpen) return;
+      const workerPicker = document.querySelector("[data-receipt-worker-picker]");
+      const deliveryPicker = document.querySelector(
+        "[data-receipt-delivery-picker]",
+      );
+      if (workerOpen && workerPicker?.contains(ev.target)) return;
+      if (deliveryOpen && deliveryPicker?.contains(ev.target)) return;
+      closeReceiptPrintPickersState();
+      if (ev.target.closest?.(".wh-date-filters")) {
+        closeReceiptPrintPickersVisual();
+        return;
+      }
       render();
     },
     true,
@@ -3298,12 +3358,44 @@ function warehouseActiveWorkerIds(orders) {
   const hasOrder = new Set((orders || []).map((o) => o.employeeId));
   return (state.selectedWorkers || []).filter((id) => hasOrder.has(id));
 }
+function warehouseDateDisplayText(day = state.filters.warehouseDate || "") {
+  const iso = day || todayIso();
+  return iso.replace(/-/g, ".");
+}
 function warehouseDateFiltersHtml() {
   const day = state.filters.warehouseDate || "",
-    today = todayIso(),
-    displayDay = day || today,
-    live = !day;
-  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><input type="date" value="${displayDay}" onchange="setWarehouseDate(this.value)" class="wh-date-filters__date app-input" aria-label="Огноо сонгох"><span class="wh-date-filters__hint">${live ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+    live = !day,
+    display = warehouseDateDisplayText(day);
+  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><button type="button" onclick="warehouseDateModal()" class="wh-date-filters__date app-input" aria-label="Огноо сонгох"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg></button><span class="wh-date-filters__hint">${live ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+}
+function warehouseDateModal() {
+  closeReceiptPrintPickersState();
+  closeReceiptPrintPickersVisual();
+  const day = state.filters.warehouseDate || todayIso();
+  box(
+    "Огноо сонгох",
+    `<div class="p-5 space-y-4 wh-date-modal"><p class="wh-date-modal__desc">Захиалга харах өдрөө сонгоно уу.</p><label class="wh-date-modal__field"><span class="wh-date-modal__label">Огноо</span><input id="warehouse-date-modal-input" type="date" value="${esc(day)}" class="wh-date-modal__input app-input"></label><div class="wh-date-modal__actions"><button type="button" onclick="closeModal()" class="btn btn--secondary btn--block">Болих</button><button type="button" onclick="applyWarehouseDateFromModal()" class="btn btn--primary btn--block">Сонгох</button></div></div>`,
+    "max-w-sm",
+    { dialog: true, closeLabel: "Огноо сонгогч хаах" },
+  );
+  requestAnimationFrame(() => {
+    const el = document.getElementById("warehouse-date-modal-input");
+    if (!el) return;
+    if (typeof el.showPicker === "function") {
+      try {
+        el.showPicker();
+        return;
+      } catch (_) {}
+    }
+    el.focus();
+  });
+}
+function applyWarehouseDateFromModal() {
+  const el = document.getElementById("warehouse-date-modal-input");
+  const day = el?.value || "";
+  if (!day) return alert("Огноо сонгоно уу");
+  closeModal();
+  setWarehouseDate(day);
 }
 function clearWarehouseDate() {
   state.filters.warehouseDate = "";
@@ -5567,7 +5659,7 @@ function workerOrdersList() {
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 function workerViewTabsHtml(tab) {
-  return `<div class="seg-tabs worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Захиалга үүсгэх</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Жагсаалт</button></div>`;
+  return `<div class="worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Захиалга үүсгэх</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Жагсаалт</button></div>`;
 }
 function workerView() {
   const tab = state.filters.worker,
@@ -8336,9 +8428,15 @@ Object.assign(window, {
   setWorkerOrderDate,
   clearWarehouseDate,
   setWarehouseDate,
+  warehouseDateModal,
+  applyWarehouseDateFromModal,
   receiptFilterToggle,
   receiptFilterClear,
   setReceiptPrintDelivery,
+  toggleReceiptPrintDelivery,
+  toggleReceiptPrintDeliveryPicker,
+  closeReceiptPrintDeliveryPicker,
+  clearReceiptPrintDelivery,
   toggleReceiptPrintWorker,
   toggleReceiptPrintWorkerPicker,
   closeReceiptPrintWorkerPicker,
