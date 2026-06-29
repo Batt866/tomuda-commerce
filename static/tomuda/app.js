@@ -1152,8 +1152,16 @@ function syncBackendMarkers(payload, stateData) {
   backendLastSaved = JSON.stringify({ state: persistentState() });
   if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
 }
+function isEditingCountQty() {
+  const el = document.activeElement;
+  return (
+    state.currentView === "count" &&
+    el?.classList?.contains?.("count-row__input")
+  );
+}
 function applyRemoteState(payload) {
   if (!payload?.state) return false;
+  if (isEditingCountQty()) return false;
   const session = captureSessionSnapshot();
   const pickerCategory = state.filters.workerCategory;
   const reopenPicker = pickerOpen();
@@ -3667,6 +3675,40 @@ function ensureCountSessionQuiet() {
   state.countOpeningStock = {};
   state.countSessionStartedAt = new Date().toISOString();
   snapshotCountOpeningStock();
+  refreshCountViewSessionUi();
+}
+function refreshCountRowMeta(id) {
+  const p = state.products.find((x) => x.id === id);
+  const input = document.querySelector(
+    `input[data-count-product-id="${CSS.escape(id)}"]`,
+  );
+  const meta = input?.closest(".count-row")?.querySelector(".count-row__stats");
+  if (!p || !meta) return;
+  const stats = countProductStats(p);
+  if (countSessionActive()) {
+    meta.innerHTML = `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`;
+  } else {
+    meta.innerHTML = `<span>Бүртгэл: <b>${stats.system}</b></span>`;
+  }
+}
+function refreshCountViewSessionUi() {
+  document.querySelector(".count-view__hint")?.remove();
+  document
+    .querySelectorAll(".count-row [data-count-product-id]")
+    .forEach((input) => {
+      const id = input.getAttribute("data-count-product-id");
+      if (id) refreshCountRowMeta(id);
+    });
+}
+function updateCountMetricsInPlace() {
+  if (state.countDone || state.currentView !== "count") return;
+  const list = countFilteredProducts();
+  const counted = list.filter((p) => countValue(p.id) !== null).length;
+  const values = document.querySelectorAll(
+    ".count-view .metrics-bar--count .metrics-bar__value",
+  );
+  if (values[0]) values[0].textContent = String(counted);
+  if (values[1]) values[1].textContent = String(list.length);
 }
 function updateCountRowDiffDisplay(id, inputEl) {
   const p = state.products.find((x) => x.id === id);
@@ -3686,22 +3728,26 @@ function updateCountRowDiffDisplay(id, inputEl) {
       : "text-tone-danger font-semibold"
   }`;
 }
+function countQtyFocus(id, el) {
+  ensureCountSessionQuiet();
+}
 function countQtyInput(id, el) {
   ensureCountSessionQuiet();
-  const raw = String(el?.value ?? "").trim();
-  if (raw === "") delete state.countQty[id];
+  const digits = String(el?.value ?? "").replace(/\D/g, "");
+  if (digits !== el.value) el.value = digits;
+  if (!digits) delete state.countQty[id];
   else {
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n < 0) return;
+    const n = Number(digits);
+    if (!Number.isFinite(n)) return;
     state.countQty[id] = n;
   }
   state.countDone = false;
   updateCountRowDiffDisplay(id, el);
+  updateCountMetricsInPlace();
 }
 function countQtyCommit(id, el) {
   countQtyInput(id, el);
   scheduleBackendSave();
-  render();
 }
 function countMetricsTotals(products) {
   let opening = 0,
@@ -3770,7 +3816,7 @@ function countRow(p) {
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input onfocus="ensureCountSessionQuiet()" oninput="countQtyInput('${p.id}', this)" onblur="countQtyCommit('${p.id}', this)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input data-count-product-id="${p.id}" onfocus="countQtyFocus('${p.id}', this)" oninput="countQtyInput('${p.id}', this)" onblur="countQtyCommit('${p.id}', this)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -8252,6 +8298,7 @@ Object.assign(window, {
   exportCountExcel,
   setCountQty,
   ensureCountSessionQuiet,
+  countQtyFocus,
   countQtyInput,
   countQtyCommit,
   saveStockAlertSettings,
