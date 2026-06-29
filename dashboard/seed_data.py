@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from dashboard.permissions import ALL_PERMISSION_KEYS
+
 
 PRODUCTS = [
     {
@@ -254,6 +256,7 @@ EMPLOYEES = [
         "role": "admin",
         "totalSales": 0,
         "commissionRate": 0,
+        "permissions": list(ALL_PERMISSION_KEYS),
     },
 ]
 

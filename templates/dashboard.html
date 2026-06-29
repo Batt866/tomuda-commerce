@@ -241,8 +241,8 @@
         }
       }
     </style>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260629-count-mobile" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260629-count-mobile" as="script" />
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260629-permissions" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260629-permissions" as="script" />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
     <script>
       tailwind.config = {
@@ -278,7 +278,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260629-count-mobile"
+      href="{% static 'tomuda/styles.css' %}?v=20260629-permissions"
     />
   </head>
   <body>
@@ -354,8 +354,9 @@
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
+    <script src="{% static 'tomuda/permissions.js' %}?v=20260629-permissions"></script>
     <script
-      src="{% static 'tomuda/app.js' %}?v=20260629-count-mobile"
+      src="{% static 'tomuda/app.js' %}?v=20260629-permissions"
       onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
     ></script>
   </body>

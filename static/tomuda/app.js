@@ -695,24 +695,52 @@ function deliveryFieldsForNewOrder() {
 function currentRole() {
   return state.currentEmployee?.role || "";
 }
+function permApi() {
+  return window.TOMUDA_PERMISSIONS || null;
+}
+function resolveEmployeePermissions(emp = state.currentEmployee) {
+  return permApi()?.resolveEmployeePermissions(emp) || new Set();
+}
+function hasPermission(key, emp = state.currentEmployee) {
+  return permApi()?.hasPermission(key, emp) ?? false;
+}
 function isAdmin() {
-  return currentRole() === "admin";
+  return hasPermission("settings.view");
+}
+function canManageProducts() {
+  return hasPermission("products.create") || hasPermission("products.edit");
+}
+function canManageEmployees() {
+  return hasPermission("employees.create") || hasPermission("employees.edit");
 }
 function canDelete() {
-  return state.isLoggedIn && state.currentEmployee?.role === "admin";
+  if (!state.isLoggedIn) return false;
+  return (
+    hasPermission("products.edit") ||
+    hasPermission("employees.edit") ||
+    hasPermission("customers.create") ||
+    hasPermission("orders.edit")
+  );
 }
 function requireAdminDelete() {
   if (canDelete()) return true;
-  alertModal("Эрхгүй", "Зөвхөн админ устгах эрхтэй.");
+  alertModal("Эрхгүй", "Устгах эрхгүй.");
   return false;
 }
 function defaultViewForRole(r) {
+  const emp = state.employees.find((e) => e.role === r);
+  if (emp && permApi()) {
+    const nav = permApi().allowedNavForEmployee(emp);
+    if (nav.length) return nav[0][0];
+  }
   if (r === "admin") return "admin";
   if (r === "delivery") return "delivery";
   if (r === "warehouse") return "warehouse";
   return "worker";
 }
-function canAccessView(viewId, r = currentRole()) {
+function canAccessView(viewId) {
+  if (permApi()) return permApi().canAccessView(viewId, state.currentEmployee);
+  const r = currentRole();
   if (r === "admin") return true;
   if (r === "delivery") return viewId === "delivery";
   if (r === "warehouse") return viewId === "warehouse";
@@ -720,13 +748,39 @@ function canAccessView(viewId, r = currentRole()) {
     return ["worker", "customers", "products", "warehouse"].includes(viewId);
   return false;
 }
-function allowedNavIds(r = currentRole()) {
+function allowedNavIds() {
+  if (permApi()) {
+    return permApi()
+      .allowedNavForEmployee(state.currentEmployee)
+      .map(([id]) => id);
+  }
+  const r = currentRole();
   if (r === "admin")
     return ["worker", "customers", "products", "warehouse", "count", "admin"];
   if (r === "warehouse") return ["warehouse"];
   if (r === "delivery") return ["delivery"];
   if (r === "sales") return ["worker", "customers", "products", "warehouse"];
   return ["worker", "customers", "products"];
+}
+function ensureEmployeePermissions() {
+  if (!permApi()) return;
+  state.employees.forEach((e) => {
+    if (!Array.isArray(e.permissions)) return;
+    e.permissions = permApi().normalizeKeys(e.permissions);
+  });
+}
+function employeePermissionsSelected(e, role = "sales") {
+  if (e?.permissions?.length) return permApi().normalizeKeys(e.permissions);
+  return permApi().templateForRole(role || e?.role || "sales");
+}
+function syncEmployeePermissionsFromRole() {
+  const form = document.querySelector("[data-employee-form]");
+  if (!form || !permApi()) return;
+  const role = form.querySelector("#employeeRoleSelect")?.value || "sales";
+  const keys = new Set(permApi().templateForRole(role));
+  form.querySelectorAll('input[name="permissions"]').forEach((el) => {
+    el.checked = keys.has(el.value);
+  });
 }
 const EMPLOYEE_EMAIL_DEFAULTS = {
   admin: "admin@tomuda.mn",
@@ -749,6 +803,7 @@ function ensureEmployeeEmails() {
   });
 }
 function canTakeOrdersRole(r) {
+  if (permApi()) return hasPermission("orders.create");
   return r === "sales" || r === "admin";
 }
 function orderActor() {
@@ -764,7 +819,7 @@ function orderActor() {
 }
 function orderEmployeeChoices() {
   const sales = state.employees.filter((e) => e.role === "sales");
-  if (!isAdmin()) return sales;
+  if (!hasPermission("employees.view")) return sales;
   const admins = state.employees.filter((e) => e.role === "admin");
   return [...admins, ...sales];
 }
@@ -878,6 +933,11 @@ const MOBILE_NAV_SVG = {
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
 function sidebarNavForRole(role) {
+  if (permApi() && state.currentEmployee) {
+    return permApi()
+      .allowedNavForEmployee(state.currentEmployee)
+      .map(([id, label]) => [id, label]);
+  }
   if (role === "delivery") return [["delivery", "Хүргэлт"]];
   if (role === "admin")
     return [
@@ -899,9 +959,10 @@ function sidebarNavForRole(role) {
     ["warehouse", "Агуулах"],
     ["count", "Тооллого"],
     ["admin", "Админ"],
-  ].filter(([id]) => allowedNavIds(role).includes(id));
+  ].filter(([id]) => allowedNavIds().includes(id));
 }
 function bottomNavForRole(role) {
+  const allowed = new Set(allowedNavIds());
   const mobileIds = {
     admin: ["worker", "customers", "products", "warehouse", "count", "admin"],
     sales: ["worker", "customers", "products", "warehouse"],
@@ -909,7 +970,7 @@ function bottomNavForRole(role) {
     delivery: ["delivery"],
   };
   const ids = mobileIds[role] || mobileIds.sales;
-  return sidebarNavForRole(role).filter(([id]) => ids.includes(id));
+  return sidebarNavForRole(role).filter(([id]) => ids.includes(id) && allowed.has(id));
 }
 function mobileNavIcon(id) {
   const paths = MOBILE_NAV_SVG[id];
@@ -1138,6 +1199,7 @@ function applyPersistentState(data) {
     state.workerQty = {};
   ensureSettings();
   ensureEmployeePercentDiscount();
+  ensureEmployeePermissions();
   ensureDeliverySelection();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
@@ -2303,7 +2365,15 @@ async function saveBackendState() {
       console.warn("Backend pre-save merge failed", error);
     }
   }
-  const body = JSON.stringify({ state: persistentState() });
+  const body = JSON.stringify({
+    state: persistentState(),
+    actor: state.currentEmployee
+      ? {
+          id: state.currentEmployee.id,
+          email: state.currentEmployee.email,
+        }
+      : null,
+  });
   if (body === backendLastSaved) return;
   backendSaving = true;
   try {
@@ -2320,6 +2390,15 @@ async function saveBackendState() {
       const payload = await res.json();
       syncBackendSaveMarker();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+    } else if (res.status === 403) {
+      let msg = "Эрх хүрэлцэхгүй";
+      try {
+        const err = await res.json();
+        if (err?.detail) msg = String(err.detail);
+      } catch {
+        /* ignore */
+      }
+      alertModal("Хадгалах амжилтгүй", msg);
     }
   } catch (error) {
     console.warn("Backend state save failed", error);
@@ -2397,12 +2476,12 @@ function adminHubActionCard(action, label, iconKey) {
 }
 function adminHubHtml() {
   const main = [
-    ["employees", "Ажилтан", "employees"],
-    ["inventory", "Агуулах", "inventory"],
-    ["reports", "Тайлан", "reports"],
-    ["promotions", "Урамшуулал", "promotions"],
-    ["warehouseReceipts", "Баримтууд", "stock"],
-  ];
+    ["employees", "Ажилтан", "employees", "employees.view"],
+    ["inventory", "Агуулах", "inventory", "warehouse.view"],
+    ["reports", "Тайлан", "reports", "reports.view"],
+    ["promotions", "Урамшуулал", "promotions", "settings.view"],
+    ["warehouseReceipts", "Баримтууд", "stock", "warehouse.view"],
+  ].filter(([, , , perm]) => hasPermission(perm));
   const settings = [
     ["stockAlertModal()", "ҮЛДЭГДЭЛ САНУУЛАХ", "stock"],
     [
@@ -2411,7 +2490,13 @@ function adminHubHtml() {
       "employees",
     ],
   ];
-  return `<section class="admin-hub"><h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__grid">${main.map(([id, label, icon]) => adminHubCard(id, label, icon)).join("")}</div><h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div></section>`;
+  const settingsHtml = hasPermission("settings.view")
+    ? `<h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div>`
+    : "";
+  if (!main.length && !settingsHtml) {
+    return `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`;
+  }
+  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__grid">${main.map(([id, label, icon]) => adminHubCard(id, label, icon)).join("")}</div>` : ""}${settingsHtml}</section>`;
 }
 function adminView() {
   ensureSettings();
@@ -3124,7 +3209,7 @@ function customerListRow(c, actionsHtml, active = false) {
 function customersView() {
   const q = state.searches.customers || "",
     rows = sortCustomersByName(state.customers.filter((c) => customerMatchesQuery(c, q))),
-    downloadBtn = isAdmin()
+    downloadBtn = hasPermission("reports.view")
       ? `<button type="button" onclick="confirmCustomerExcel()" class="btn btn--sm btn--secondary shrink-0">${EXCEL_FILE_DOWNLOAD}</button>`
       : "";
   return `<div class="space-y-4">${pageHead("Харилцагч", `${downloadBtn}<button type="button" onclick="customerModal()" class="btn btn--sm btn--primary shrink-0">Харилцагч нэмэх</button>`)}<div class="list-panel"><div class="list-panel__toolbar"><input data-focus="customers" value="${esc(q)}" oninput="search('customers',this.value)" placeholder="Нэр, РД-ээр хайх..." class="list-panel__search app-input" autocomplete="off"></div><div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
@@ -3478,24 +3563,91 @@ function receiptPeopleFiltersHtml() {
   return `<div class="receipt-people-filters">${clearAll}${receiptFilterGroup("delivery", "Түгээгч", deliveries, deliveryIds)}</div>`;
 }
 function confirmCustomerExcel() {
-  if (!isAdmin()) return;
+  if (!hasPermission("reports.view")) return;
   if (!state.customers.length) return alert("Харилцагч байхгүй");
   confirmDataExport("Excel татах", customerExcel);
 }
 function confirmProductsExport() {
-  confirmDataExport("Excel татах", () => {
-    csv(
-      "products.csv",
-      state.products.map((p) => [
-        p.barcode,
-        p.name,
-        p.category,
-        p.price,
-        p.stock,
-        p.unit,
-      ]),
+  if (!productsExportList().length) return alert("Бараа байхгүй");
+  confirmDataExport("Excel татах", exportProductsExcel);
+}
+function productsExportList() {
+  const q = state.searches.products || "",
+    cat = state.filters.category;
+  return state.products
+    .filter(
+      (p) =>
+        (p.name.toLowerCase().includes(q.toLowerCase()) ||
+          String(p.barcode || "").includes(q)) &&
+        (cat === "all" || p.category === cat),
+    )
+    .sort(
+      (a, b) =>
+        String(a.category || "").localeCompare(
+          String(b.category || ""),
+          "mn",
+        ) || String(a.name || "").localeCompare(String(b.name || ""), "mn"),
     );
-  });
+}
+function productExcelHeaders() {
+  return [
+    "№",
+    "Баркод",
+    "Барааны нэр",
+    "Төрөл",
+    "Борлуулалтын үнэ",
+    "Өртөг үнэ",
+    "Үлдэгдэл",
+    "Нэгж",
+  ];
+}
+function productExcelDataRows(products = productsExportList()) {
+  return products.map((p, i) => [
+    i + 1,
+    p.barcode || "-",
+    p.name || "",
+    p.category || "",
+    Number(p.price) || 0,
+    productCostPrice(p),
+    Number(p.stock) || 0,
+    p.unit || "ширхэг",
+  ]);
+}
+function productSheetDateLabel() {
+  const d = new Date();
+  return `Огноо: ${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+function productSheetProductsGrouped(products = productsExportList()) {
+  const groups = [];
+  let cur = "";
+  let index = 0;
+  for (const p of products) {
+    const cat = p.category || "Бусад";
+    if (cat !== cur) {
+      groups.push({ type: "cat", name: cat });
+      cur = cat;
+    }
+    index += 1;
+    groups.push({ type: "product", product: p, index });
+  }
+  return groups;
+}
+function exportProductsExcel() {
+  exportProductsExcelXlsx().catch(() => exportProductsExcelFallback());
+}
+function exportProductsExcelFallback() {
+  const products = productsExportList();
+  if (!products.length) return alert("Бараа байхгүй");
+  const stamp = new Date().toISOString().slice(0, 10);
+  excel(`baraa-${stamp}.csv`, [
+    ["Барааны жагсаалт"],
+    [
+      `${productSheetDateLabel()} · Нийт: ${products.length} бараа`,
+    ],
+    [],
+    productExcelHeaders(),
+    ...productExcelDataRows(products),
+  ]);
 }
 function confirmInventoryExport() {
   confirmDataExport("Excel татах", () => {
@@ -3526,7 +3678,7 @@ function confirmEmployeeExcel() {
   confirmDataExport("Excel татах", employeeExcel);
 }
 function customerExcel() {
-  if (!isAdmin()) return;
+  if (!hasPermission("reports.view")) return;
   if (!state.customers.length) return alert("Харилцагч байхгүй");
   const rows = [
     [
@@ -3604,18 +3756,21 @@ function productsView() {
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join(
       "",
-    )}</select>${isAdmin() ? `<div class="products-toolbar__actions"><button type="button" onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл</button><button type="button" onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div>` : ""}</div><div class="product-list${isAdmin() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+    )}</select>${canManageProducts() ? `<div class="products-toolbar__actions"><button type="button" onclick="categoryModal()" class="px-4 py-3 bg-secondary rounded">Төрөл</button><button type="button" onclick="productModal()" class="px-4 py-3 bg-primary text-primary-foreground rounded">Бараа нэмэх</button></div>` : ""}</div><div class="product-list${canManageProducts() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
-  const actions = isAdmin();
-  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span><span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
+  const actions = canManageProducts();
+  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span>${actions ? `<span class="product-list__col product-list__col--cost">Өртөг үнэ</span>` : ""}<span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
 }
 function productCard(p) {
-  const adminActions = isAdmin()
+  const adminActions = canManageProducts()
     ? `<div class="product-card__actions"><button type="button" onclick="confirmEditProduct('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
     : "";
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
-  return `<article class="product-card"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
+  const costLine = hasPermission("warehouse.edit")
+    ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
+    : "";
+  return `<article class="product-card"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -3656,10 +3811,13 @@ function inventoryStockModal(id, tab) {
   const isIn = tab === "in",
     title = isIn ? "Орлого авах" : "Зарлага гаргах",
     actionLabel = isIn ? "Орлого" : "Зарлага",
-    btnClass = isIn ? "btn--primary" : "btn--danger";
+    btnClass = isIn ? "btn--primary" : "btn--danger",
+    costField = isIn
+      ? `<label class="block"><span class="field-label">Өртөг үнэ</span><input name="costPrice" type="number" min="1" step="1" value="${productCostPrice(p) || ""}" required inputmode="numeric" class="field-input app-input" aria-label="Өртөг үнэ"></label><p class="text-xs text-muted-foreground">Тооллогын зөрүү дүн тооцоолох өртөг үнэ.</p>`
+      : "";
   box(
     title,
-    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImage(p)}" alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="number" min="1" placeholder="1" required inputmode="numeric" autofocus class="field-input app-input"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
+    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImage(p)}" alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="number" min="1" placeholder="1" required inputmode="numeric" ${isIn ? "" : "autofocus"} class="field-input app-input"></label>${costField}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
     "max-w-md",
   );
 }
@@ -3667,21 +3825,33 @@ function applyStockFromModal(e, id, type) {
   e.preventDefault();
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  const q = Number(new FormData(e.target).get("quantity") || 0);
+  const formData = new FormData(e.target);
+  const q = Number(formData.get("quantity") || 0);
   if (!Number.isFinite(q) || q < 1) {
     alert("Тоо оруулна уу");
     return;
+  }
+  const isIn = type === "in";
+  let costPrice = null;
+  if (isIn) {
+    costPrice = Number(formData.get("costPrice") || 0);
+    if (!Number.isFinite(costPrice) || costPrice <= 0) {
+      alert("Өртөг үнэ оруулна уу");
+      return;
+    }
   }
   if (type === "out" && q > p.stock) {
     alert("Үлдэгдэл хүрэлцэхгүй байна!");
     return;
   }
-  const isIn = type === "in",
-    title = isIn ? "Орлого авах" : "Зарлага гаргах",
+  const title = isIn ? "Орлого авах" : "Зарлага гаргах",
     actionLabel = isIn ? "орлого" : "зарлага",
     afterStock = isIn ? p.stock + q : p.stock - q,
-    summaryHtml = `<p><b>${esc(p.name)}</b> — <b>${q}</b> ${esc(p.unit || "ш")} ${actionLabel} хийх үү?</p><p class="text-sm text-muted-foreground mt-2">Одоо: ${p.stock} ${esc(p.unit || "ш")} → Дараа: ${afterStock} ${esc(p.unit || "ш")}</p>`,
-    finalMessage = `<p><strong>${esc(p.name)}</strong>-д <strong>${q}</strong> ${esc(p.unit || "ш")} ${actionLabel} бүртгэхдээ итгэлтэй байна уу?</p><p class="text-sm text-muted-foreground mt-2">Үлдэгдэл: ${p.stock} ${esc(p.unit || "ш")} → ${afterStock} ${esc(p.unit || "ш")}</p>`;
+    costLine = isIn
+      ? `<p class="text-sm text-muted-foreground mt-1">Өртөг үнэ: <b>${fmt(costPrice)}</b></p>`
+      : "",
+    summaryHtml = `<p><b>${esc(p.name)}</b> — <b>${q}</b> ${esc(p.unit || "ш")} ${actionLabel} хийх үү?</p>${costLine}<p class="text-sm text-muted-foreground mt-2">Одоо: ${p.stock} ${esc(p.unit || "ш")} → Дараа: ${afterStock} ${esc(p.unit || "ш")}</p>`,
+    finalMessage = `<p><strong>${esc(p.name)}</strong>-д <strong>${q}</strong> ${esc(p.unit || "ш")} ${actionLabel} бүртгэхдээ итгэлтэй байна уу?</p>${costLine}<p class="text-sm text-muted-foreground mt-2">Үлдэгдэл: ${p.stock} ${esc(p.unit || "ш")} → ${afterStock} ${esc(p.unit || "ш")}</p>`;
   confirmModal(title, summaryHtml, {
     confirmLabel: "Тийм",
     danger: !isIn,
@@ -3689,7 +3859,7 @@ function applyStockFromModal(e, id, type) {
       confirmModal("Баталгаажуулах", finalMessage, {
         confirmLabel: "Батлах",
         onConfirm: () => {
-          if (applyStock(id, type, q)) closeModal();
+          if (applyStock(id, type, q, costPrice)) closeModal();
         },
         danger: !isIn,
         closable: true,
@@ -3815,6 +3985,27 @@ function countBookDiff(stats) {
   if (stats.final === null) return null;
   return stats.final - stats.system;
 }
+function productCostPrice(p) {
+  return Number(p?.costPrice) || 0;
+}
+function countQtyAmount(qty, p) {
+  return Number(qty || 0) * productCostPrice(p);
+}
+function countDiffAmount(diff, p) {
+  if (diff === null || diff === undefined) return null;
+  return diff * productCostPrice(p);
+}
+function countDiffAmountText(diff, p) {
+  const cost = productCostPrice(p);
+  if (!cost) return "-";
+  const amt = countDiffAmount(diff, p);
+  if (amt === null) return "-";
+  return fmt(amt);
+}
+function countDiffQtyText(diff) {
+  if (diff === null) return "-";
+  return diff > 0 ? `+${diff}` : String(diff);
+}
 function countSessionActive() {
   return !!state.countSessionStartedAt;
 }
@@ -3848,9 +4039,9 @@ function refreshCountRowMeta(id) {
   if (!p || !meta) return;
   const stats = countProductStats(p);
   if (countSessionActive()) {
-    meta.innerHTML = `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`;
+    meta.innerHTML = `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
   } else {
-    meta.innerHTML = `<span>Бүртгэл: <b>${stats.system}</b></span>`;
+    meta.innerHTML = `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
   }
 }
 function syncCountInputsFromState() {
@@ -3872,30 +4063,42 @@ function syncCountInputsFromState() {
 function updateCountMetricsInPlace() {
   if (state.countDone || state.currentView !== "count") return;
   const list = countFilteredProducts();
-  const counted = list.filter((p) => countValue(p.id) !== null).length;
+  const countedProducts = list.filter((p) => countValue(p.id) !== null);
+  const counted = countedProducts.length;
   const values = document.querySelectorAll(
     ".count-view .metrics-bar--count .metrics-bar__value",
   );
   if (values[0]) values[0].textContent = String(counted);
   if (values[1]) values[1].textContent = String(list.length);
+  if (countSessionActive() && counted) {
+    const t = countMetricsTotals(countedProducts);
+    if (values[2]) values[2].textContent = fmt(t.openingValue);
+    if (values[3]) values[3].textContent = fmt(t.soldValue);
+    if (values[4]) values[4].textContent = fmt(t.expendedValue);
+    if (values[5]) values[5].textContent = fmt(t.diffValue);
+  }
 }
 function updateCountRowDiffDisplay(id, inputEl) {
   const p = state.products.find((x) => x.id === id);
   const row = inputEl?.closest(".count-row");
   const diffEl = row?.querySelector(".count-row__diff");
+  const diffAmtEl = row?.querySelector(".count-row__diff-amt");
   if (!p || !diffEl) return;
   const raw = String(inputEl.value ?? "").trim();
   const final =
     raw === "" || !Number.isFinite(Number(raw)) ? null : Number(raw);
   const system = Number(p.stock) || 0;
   const diff = final === null ? null : final - system;
-  diffEl.textContent =
-    diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff);
-  diffEl.className = `count-row__diff ${
+  const diffClass =
     diff === null || diff === 0
       ? "text-muted-foreground"
-      : "count-row__diff count-result-table__diff--bad"
-  }`;
+      : "count-result-table__diff--bad";
+  diffEl.textContent = countDiffQtyText(diff);
+  diffEl.className = `count-row__diff ${diffClass}`;
+  if (diffAmtEl) {
+    diffAmtEl.textContent = countDiffAmountText(diff, p);
+    diffAmtEl.className = `count-row__diff-amt ${diffClass}`;
+  }
 }
 function countQtyFocus(id, el) {
   clearTimeout(countBlurSaveTimer);
@@ -3960,9 +4163,11 @@ function initCountInputHandlers() {
       clearTimeout(countBlurSaveTimer);
       countBlurSaveTimer = setTimeout(() => {
         countBlurSaveTimer = null;
-        if (document.activeElement?.matches?.(
-          ".count-row__input[data-count-product-id]",
-        )) {
+        if (
+          document.activeElement?.matches?.(
+            ".count-row__input[data-count-product-id]",
+          )
+        ) {
           return;
         }
         if (!el.isConnected) return;
@@ -3976,16 +4181,38 @@ function countMetricsTotals(products) {
   let opening = 0,
     sold = 0,
     expended = 0,
-    final = 0;
+    final = 0,
+    openingValue = 0,
+    soldValue = 0,
+    expendedValue = 0,
+    finalValue = 0,
+    diffValue = 0;
   for (const p of products) {
     const stats = countProductStats(p);
     if (stats.final === null) continue;
+    const cost = productCostPrice(p);
     opening += stats.opening;
     sold += stats.sold;
     expended += stats.expended;
     final += stats.final;
+    openingValue += stats.opening * cost;
+    soldValue += stats.sold * cost;
+    expendedValue += stats.expended * cost;
+    finalValue += stats.final * cost;
+    const diff = countBookDiff(stats);
+    if (diff !== null) diffValue += diff * cost;
   }
-  return { opening, sold, expended, final };
+  return {
+    opening,
+    sold,
+    expended,
+    final,
+    openingValue,
+    soldValue,
+    expendedValue,
+    finalValue,
+    diffValue,
+  };
 }
 function snapshotCountOpeningStock() {
   const opening = {};
@@ -4004,17 +4231,34 @@ function countView() {
     metricsHtml = state.countDone
       ? (() => {
           const t = countMetricsTotals(countedProducts);
-          return metricsBar(
+          const diffTone =
+            t.diffValue !== 0 ? "text-tone-danger" : "text-tone-success";
+          return `${metricsBar(
             `${card("Эхний үлдэгдэл", t.opening)}${card("Борлуулсан", t.sold)}${card("Зарлагдсан", t.expended)}${card("Эцсийн үлдэгдэл", t.final)}`,
             "4",
             "count",
-          );
+          )}${metricsBar(
+            `${card("Эхний дүн", fmt(t.openingValue))}${card("Борлуулалт", fmt(t.soldValue))}${card("Зарлага", fmt(t.expendedValue))}${card("Зөрүү дүн", fmt(t.diffValue), diffTone)}`,
+            "4",
+            "count count-values",
+          )}`;
         })()
-      : metricsBar(
-          `${card("Тоолсон", counted)}${card("Бараа", list.length)}`,
-          "2",
-          "count",
-        );
+      : (() => {
+          const base = metricsBar(
+            `${card("Тоолсон", counted)}${card("Бараа", list.length)}`,
+            "2",
+            "count",
+          );
+          if (!countSessionActive() || !countedProducts.length) return base;
+          const t = countMetricsTotals(countedProducts);
+          const diffTone =
+            t.diffValue !== 0 ? "text-tone-danger" : "text-tone-success";
+          return `${base}${metricsBar(
+            `${card("Эхний дүн", fmt(t.openingValue))}${card("Борлуулалт", fmt(t.soldValue))}${card("Зарлага", fmt(t.expendedValue))}${card("Зөрүү дүн", fmt(t.diffValue), diffTone)}`,
+            "4",
+            "count count-values",
+          )}`;
+        })();
   const sessionHint =
     countSessionActive() || state.countDone
       ? ""
@@ -4034,15 +4278,16 @@ function countView() {
 function countRow(p) {
   const stats = countProductStats(p),
     diff = countBookDiff(stats),
-    diffText = diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff),
+    diffText = countDiffQtyText(diff),
+    diffAmtText = countDiffAmountText(diff, p),
     diffClass =
       diff === null || diff === 0
         ? "text-muted-foreground"
         : "count-result-table__diff--bad",
     metaHtml = countSessionActive()
-      ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
-      : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
+      ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`
+      : `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span><span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span></div></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -4077,18 +4322,19 @@ function countMismatchesForList(list) {
 function countResult(mismatches) {
   const list = countFilteredProducts().filter((p) => countValue(p.id) !== null);
   const mismatchCount = mismatches.length;
-  const headHtml = `<div class="count-result-table__head" aria-hidden="false"><span class="count-result-table__head-name">Бараа</span><span class="count-result-table__head-num" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num">Борлуулсан</span><span class="count-result-table__head-num">Зарлагдсан</span><span class="count-result-table__head-num">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num">Зөрүү</span></div>`;
+  const headHtml = `<div class="count-result-table__head" aria-hidden="false"><span class="count-result-table__head-name">Бараа</span><span class="count-result-table__head-num" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num">Борлуулсан</span><span class="count-result-table__head-num">Зарлагдсан</span><span class="count-result-table__head-num">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num">Өртөг үнэ</span><span class="count-result-table__head-num">Зөрүү</span><span class="count-result-table__head-num">Зөрүү дүн</span></div>`;
   const rowHtml = list
     .map((p) => {
       const stats = countProductStats(p),
         diff = countBookDiff(stats),
+        cost = productCostPrice(p),
         diffClass =
           diff === null || diff === 0
             ? "count-result-table__diff"
             : "count-result-table__diff count-result-table__diff--bad",
-        diffText =
-          diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff);
-      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num" data-label="Эхний үлдэгдэл">${stats.opening}</span><span class="count-result-table__num" data-label="Борлуулсан">${stats.sold}</span><span class="count-result-table__num" data-label="Зарлагдсан">${stats.expended}</span><span class="count-result-table__num" data-label="Эцсийн үлдэгдэл">${stats.final}</span><span class="${diffClass}" data-label="Зөрүү">${diffText}</span></div>`;
+        diffText = countDiffQtyText(diff),
+        diffAmtText = countDiffAmountText(diff, p);
+      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num" data-label="Эхний үлдэгдэл">${stats.opening}</span><span class="count-result-table__num" data-label="Борлуулсан">${stats.sold}</span><span class="count-result-table__num" data-label="Зарлагдсан">${stats.expended}</span><span class="count-result-table__num" data-label="Эцсийн үлдэгдэл">${stats.final}</span><span class="count-result-table__num" data-label="Өртөг үнэ">${cost ? fmt(cost) : "-"}</span><span class="${diffClass}" data-label="Зөрүү">${diffText}</span><span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн">${diffAmtText}</span></div>`;
     })
     .join("");
   const badgeClass = mismatchCount
@@ -4106,6 +4352,7 @@ function countExcelRows() {
   return countExportProducts().map((p) => {
     const stats = countProductStats(p);
     const diff = countBookDiff(stats);
+    const cost = productCostPrice(p);
     return [
       p.name,
       p.barcode || "-",
@@ -4114,7 +4361,9 @@ function countExcelRows() {
       stats.sold,
       stats.expended,
       stats.final,
+      cost,
       diff,
+      countDiffAmount(diff, p),
       p.unit || "ш",
     ];
   });
@@ -4179,7 +4428,120 @@ function xlsxCellXml(ref, styleId, value, kind) {
 function xlsxRowXml(rowNum, height, cells) {
   const ht = height ? ` ht="${height}" customHeight="1"` : "";
   const body = cells.join("");
-  return `<row r="${rowNum}" spans="1:8"${ht}>${body}</row>`;
+  return `<row r="${rowNum}" spans="1:10"${ht}>${body}</row>`;
+}
+const COUNT_XLSX_LAST_COL = "J";
+const PRODUCT_XLSX_LAST_COL = "H";
+const PRODUCT_SHEET_TEMPLATE =
+  "/static/tomuda/templates/count-sheet-template.xls";
+function buildProductSheetXml() {
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const products = productsExportList();
+  const dateLabel = productSheetDateLabel();
+  const groups = productSheetProductsGrouped(products);
+  const rows = [];
+  const merges = [
+    `A1:${PRODUCT_XLSX_LAST_COL}1`,
+    `A2:${PRODUCT_XLSX_LAST_COL}2`,
+  ];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(
+      `<row r="${rowNum}" spans="1:8"${height ? ` ht="${height}" customHeight="1"` : ""}>${cells.join("")}</row>`,
+    );
+    rowNum += 1;
+  };
+  const emptyCells = (row, from = "A", to = PRODUCT_XLSX_LAST_COL, style = 1) => {
+    const cols = "ABCDEFGH".slice(
+      "ABCDEFGH".indexOf(from),
+      "ABCDEFGH".indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
+  pushRow(43.5, [
+    xlsxCellXml("A1", 13, si("Барааны жагсаалт"), "s"),
+    ...emptyCells(1, "B", PRODUCT_XLSX_LAST_COL),
+  ]);
+  pushRow(28.5, [
+    xlsxCellXml("A2", 3, si(`Нийт бараа: ${products.length}`), "s"),
+    ...emptyCells(2, "B", "G"),
+    xlsxCellXml(`H2`, 14, si(dateLabel), "s"),
+  ]);
+  pushRow(12, emptyCells(3));
+  pushRow(18, [
+    xlsxCellXml("A4", 7, si("№"), "s"),
+    xlsxCellXml("B4", 7, si("Баркод"), "s"),
+    xlsxCellXml("C4", 7, si("Барааны нэр"), "s"),
+    xlsxCellXml("D4", 7, si("Төрөл"), "s"),
+    xlsxCellXml("E4", 7, si("Борлуулалтын үнэ"), "s"),
+    xlsxCellXml("F4", 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml("G4", 7, si("Үлдэгдэл"), "s"),
+    xlsxCellXml("H4", 7, si("Нэгж"), "s"),
+  ]);
+  for (const item of groups) {
+    if (item.type === "cat") {
+      const r = rowNum;
+      pushRow(18, [
+        xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
+        ...emptyCells(r, "B", PRODUCT_XLSX_LAST_COL),
+      ]);
+      merges.push(`A${r}:${PRODUCT_XLSX_LAST_COL}${r}`);
+      continue;
+    }
+    const p = item.product;
+    const r = rowNum;
+    pushRow(15.75, [
+      xlsxCellXml(`A${r}`, 10, item.index, "n"),
+      xlsxCellXml(`B${r}`, 9, si(p.barcode || "-"), "s"),
+      xlsxCellXml(`C${r}`, 8, si(p.name || ""), "s"),
+      xlsxCellXml(`D${r}`, 8, si(p.category || ""), "s"),
+      xlsxCellXml(`E${r}`, 10, Number(p.price) || 0, "n"),
+      xlsxCellXml(`F${r}`, 10, productCostPrice(p), "n"),
+      xlsxCellXml(`G${r}`, 10, Number(p.stock) || 0, "n"),
+      xlsxCellXml(`H${r}`, 8, si(p.unit || "ширхэг"), "s"),
+    ]);
+  }
+  const lastRow = rowNum - 1;
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${PRODUCT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="6" customWidth="1"/><col min="2" max="2" width="16" customWidth="1"/><col min="3" max="3" width="28" customWidth="1"/><col min="4" max="4" width="16" customWidth="1"/><col min="5" max="5" width="14" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="10" customWidth="1"/><col min="8" max="8" width="12" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+}
+async function exportProductsExcelXlsx() {
+  if (typeof JSZip === "undefined") {
+    throw new Error("JSZip missing");
+  }
+  const products = productsExportList();
+  if (!products.length) return alert("Бараа байхгүй");
+  const stamp = new Date().toISOString().slice(0, 10);
+  const { sharedStringsXml, sheetXml } = buildProductSheetXml();
+  const tpl = await fetch(PRODUCT_SHEET_TEMPLATE).then((r) => {
+    if (!r.ok) throw new Error("template missing");
+    return r.arrayBuffer();
+  });
+  const zip = await JSZip.loadAsync(tpl);
+  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `baraa-${stamp}.xls`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 function buildCountSheetXml() {
   const strings = [];
@@ -4199,16 +4561,16 @@ function buildCountSheetXml() {
   const mismatchCount = countMismatchesForList(products).length;
   const groups = countSheetProductsGrouped();
   const rows = [];
-  const merges = ["A1:H1", "F2:H2"];
+  const merges = [`A1:${COUNT_XLSX_LAST_COL}1`, `F2:${COUNT_XLSX_LAST_COL}2`];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells));
     rowNum += 1;
   };
-  const emptyCells = (row, from = "A", to = "H", style = 1) => {
-    const cols = "ABCDEFGH".slice(
-      "ABCDEFGH".indexOf(from),
-      "ABCDEFGH".indexOf(to) + 1,
+  const emptyCells = (row, from = "A", to = COUNT_XLSX_LAST_COL, style = 1) => {
+    const cols = "ABCDEFGHIJ".slice(
+      "ABCDEFGHIJ".indexOf(from),
+      "ABCDEFGHIJ".indexOf(to) + 1,
     );
     return cols
       .split("")
@@ -4216,7 +4578,7 @@ function buildCountSheetXml() {
   };
   pushRow(43.5, [
     xlsxCellXml("A1", 13, si("Тооллогын тайлан"), "s"),
-    ...emptyCells(1, "B", "H"),
+    ...emptyCells(1, "B", COUNT_XLSX_LAST_COL),
   ]);
   pushRow(28.5, [
     xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
@@ -4225,11 +4587,10 @@ function buildCountSheetXml() {
     xlsxCellXml("D2", 5, null, "empty"),
     xlsxCellXml("E2", 5, null, "empty"),
     xlsxCellXml("F2", 14, si(dateLabel), "s"),
-    xlsxCellXml("G2", 14, null, "empty"),
-    xlsxCellXml("H2", 14, null, "empty"),
+    ...emptyCells(2, "G", COUNT_XLSX_LAST_COL, 14),
   ]);
   pushRow(24, [
-    xlsxCellXml("A3", 3, si("Нийт дүн:"), "s"),
+    xlsxCellXml("A3", 3, si("Нийт (ш):"), "s"),
     xlsxCellXml("B3", 5, null, "empty"),
     xlsxCellXml("C3", 10, totals.opening, "n"),
     xlsxCellXml("D3", 10, totals.sold, "n"),
@@ -4241,32 +4602,47 @@ function buildCountSheetXml() {
       si(mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"),
       "s",
     ),
-    xlsxCellXml("H3", 5, null, "empty"),
+    ...emptyCells(3, "H", COUNT_XLSX_LAST_COL),
   ]);
-  pushRow(16.5, emptyCells(4));
+  pushRow(24, [
+    xlsxCellXml("A4", 3, si("Нийт (₮):"), "s"),
+    xlsxCellXml("B4", 5, null, "empty"),
+    xlsxCellXml("C4", 10, totals.openingValue, "n"),
+    xlsxCellXml("D4", 10, totals.soldValue, "n"),
+    xlsxCellXml("E4", 10, totals.expendedValue, "n"),
+    xlsxCellXml("F4", 10, totals.finalValue, "n"),
+    xlsxCellXml("I4", 10, totals.diffValue, "n"),
+    ...emptyCells(4, "G", "H"),
+    xlsxCellXml("J4", 5, null, "empty"),
+  ]);
+  pushRow(16.5, emptyCells(5));
   pushRow(30.75, [
-    xlsxCellXml("A5", 7, si("Бараа"), "s"),
-    xlsxCellXml("B5", 7, si("Баркод"), "s"),
-    xlsxCellXml("C5", 7, si("Эхний үлдэгдэл"), "s"),
-    xlsxCellXml("D5", 7, si("Борлуулсан"), "s"),
-    xlsxCellXml("E5", 7, si("Зарлагдсан"), "s"),
-    xlsxCellXml("F5", 7, si("Эцсийн үлдэгдэл"), "s"),
-    xlsxCellXml("G5", 7, si("Зөрүү"), "s"),
-    xlsxCellXml("H5", 7, si("Нэгж"), "s"),
+    xlsxCellXml("A6", 7, si("Бараа"), "s"),
+    xlsxCellXml("B6", 7, si("Баркод"), "s"),
+    xlsxCellXml("C6", 7, si("Эхний үлдэгдэл"), "s"),
+    xlsxCellXml("D6", 7, si("Борлуулсан"), "s"),
+    xlsxCellXml("E6", 7, si("Зарлагдсан"), "s"),
+    xlsxCellXml("F6", 7, si("Эцсийн үлдэгдэл"), "s"),
+    xlsxCellXml("G6", 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml("H6", 7, si("Зөрүү"), "s"),
+    xlsxCellXml("I6", 7, si("Зөрүү дүн"), "s"),
+    xlsxCellXml("J6", 7, si("Нэгж"), "s"),
   ]);
   for (const item of groups) {
     if (item.type === "cat") {
       const r = rowNum;
-      merges.push(`A${r}:H${r}`);
+      merges.push(`A${r}:${COUNT_XLSX_LAST_COL}${r}`);
       pushRow(24, [
         xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
-        ...emptyCells(r, "B", "H", 15),
+        ...emptyCells(r, "B", COUNT_XLSX_LAST_COL, 15),
       ]);
       continue;
     }
     const p = item.product;
     const stats = countProductStats(p);
     const diff = countBookDiff(stats);
+    const cost = productCostPrice(p);
+    const diffAmount = countDiffAmount(diff, p) ?? 0;
     const r = rowNum;
     pushRow(15.75, [
       xlsxCellXml(`A${r}`, 8, si(p.name), "s"),
@@ -4275,8 +4651,10 @@ function buildCountSheetXml() {
       xlsxCellXml(`D${r}`, 10, stats.sold, "n"),
       xlsxCellXml(`E${r}`, 10, stats.expended, "n"),
       xlsxCellXml(`F${r}`, 10, stats.final ?? 0, "n"),
-      xlsxCellXml(`G${r}`, 10, diff ?? 0, "n"),
-      xlsxCellXml(`H${r}`, 8, si(p.unit || "ш"), "s"),
+      xlsxCellXml(`G${r}`, 10, cost, "n"),
+      xlsxCellXml(`H${r}`, 10, diff ?? 0, "n"),
+      xlsxCellXml(`I${r}`, 10, diffAmount, "n"),
+      xlsxCellXml(`J${r}`, 8, si(p.unit || "ш"), "s"),
     ]);
   }
   const totalRow = rowNum;
@@ -4288,7 +4666,9 @@ function buildCountSheetXml() {
     xlsxCellXml(`E${totalRow}`, 10, totals.expended, "n"),
     xlsxCellXml(`F${totalRow}`, 10, totals.final, "n"),
     xlsxCellXml(`G${totalRow}`, 10, null, "empty"),
-    xlsxCellXml(`H${totalRow}`, 7, si(""), "s"),
+    xlsxCellXml(`H${totalRow}`, 10, null, "empty"),
+    xlsxCellXml(`I${totalRow}`, 10, totals.diffValue, "n"),
+    xlsxCellXml(`J${totalRow}`, 7, si(""), "s"),
   ]);
   pushRow(16.5, emptyCells(rowNum));
   rowNum += 1;
@@ -4353,7 +4733,7 @@ function buildCountSheetXml() {
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:H${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="12" customWidth="1"/><col min="4" max="4" width="11" customWidth="1"/><col min="5" max="5" width="11" customWidth="1"/><col min="6" max="6" width="13" customWidth="1"/><col min="7" max="7" width="9" customWidth="1"/><col min="8" max="8" width="10" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${COUNT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="12" customWidth="1"/><col min="4" max="4" width="11" customWidth="1"/><col min="5" max="5" width="11" customWidth="1"/><col min="6" max="6" width="13" customWidth="1"/><col min="7" max="7" width="11" customWidth="1"/><col min="8" max="8" width="9" customWidth="1"/><col min="9" max="9" width="12" customWidth="1"/><col min="10" max="10" width="10" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 const COUNT_SHEET_TEMPLATE =
@@ -4396,13 +4776,27 @@ function exportCountExcelFallback() {
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
     [
-      "Нийт дүн",
+      "Нийт (ш)",
       "",
       totals.opening,
       totals.sold,
       totals.expended,
       totals.final,
       mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй",
+      "",
+      "",
+      "",
+    ],
+    [
+      "Нийт (₮)",
+      "",
+      totals.openingValue,
+      totals.soldValue,
+      totals.expendedValue,
+      totals.finalValue,
+      "",
+      "",
+      totals.diffValue,
       "",
     ],
     [],
@@ -4413,18 +4807,22 @@ function exportCountExcelFallback() {
       "Борлуулсан",
       "Зарлагдсан",
       "Эцсийн үлдэгдэл",
+      "Өртөг үнэ",
       "Зөрүү",
+      "Зөрүү дүн",
       "Нэгж",
     ],
     ...rows.map(
-      ([name, barcode, , opening, sold, expended, final, diff, unit]) => [
+      ([name, barcode, , opening, sold, expended, final, cost, diff, diffAmount, unit]) => [
         name,
         barcode,
         opening,
         sold,
         expended,
         final,
+        cost,
         diff,
+        diffAmount,
         unit,
       ],
     ),
@@ -4437,6 +4835,8 @@ function exportCountExcelFallback() {
       totals.expended,
       totals.final,
       "",
+      "",
+      totals.diffValue,
       "",
     ],
   ]);
@@ -5527,7 +5927,7 @@ function employeePercentDiscountToggle(e) {
   return `<label class="employee-pct-toggle shrink-0 flex items-center gap-1.5 text-xs cursor-pointer" title="Хувь тооцох зөвшөөрөл"><input type="checkbox" ${on ? "checked" : ""} onchange="toggleEmployeePercentDiscount('${e.id}',this.checked)" class="w-4 h-4 rounded"><span class="${on ? "text-tone-success" : "text-muted-foreground"}">Хувь</span></label>`;
 }
 function toggleEmployeePercentDiscount(id, allowed) {
-  if (!isAdmin()) return;
+  if (!hasPermission("employees.edit")) return;
   const emp = state.employees.find((e) => e.id === id);
   if (!emp || emp.role !== "sales") return;
   emp.allowPercentDiscount = !!allowed;
@@ -5604,11 +6004,14 @@ function clearEmployeeImage() {
     ?.remove();
 }
 function employeesView() {
+  const addBtn = hasPermission("employees.create")
+    ? `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`
+    : "";
   const editBtn = (e) =>
-    isAdmin()
+    hasPermission("employees.edit")
       ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
       : "";
-  return `<div class="space-y-4">${pageHead("Ажилтан", `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${isAdmin() ? employeePercentDiscountToggle(e) : ""}${canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", addBtn)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${hasPermission("employees.edit") ? employeePercentDiscountToggle(e) : ""}${hasPermission("employees.edit") && canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -6575,7 +6978,7 @@ function confirmEditCustomer(id) {
   });
 }
 function confirmEditProduct(id) {
-  if (!isAdmin()) return;
+  if (!hasPermission("products.edit")) return;
   const p = state.products.find((x) => x.id === id);
   if (!p) return alert("Бараа олдсонгүй");
   confirmModal(
@@ -6589,7 +6992,7 @@ function confirmEditProduct(id) {
   );
 }
 function confirmEditEmployee(id) {
-  if (!isAdmin()) return;
+  if (!hasPermission("employees.edit")) return;
   const e = state.employees.find((x) => x.id === id);
   if (!e) return alert("Ажилтан олдсонгүй");
   confirmModal(
@@ -6760,13 +7163,14 @@ function customerDetail(id) {
   box(c.name, customerDetailHtml(c, id), "max-w-xl");
 }
 function productModal(id) {
-  if (!isAdmin()) return;
+  if (id ? !hasPermission("products.edit") : !hasPermission("products.create")) {
+    return alertModal("Эрхгүй", "Бараа засах эрхгүй.");
+  }
   const isNew = !id;
   const p = state.products.find((x) => x.id === id) || {
     unit: "ширхэг",
     boxQuantity: 1,
     price: 0,
-    costPrice: 0,
     stock: 0,
     minStock: 0,
     country: "Монгол",
@@ -6781,7 +7185,7 @@ function productModal(id) {
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4">${field("price", "Үнэ", isNew ? "" : p.price, "number", "0")}${field("costPrice", "Өртөг", isNew ? "" : p.costPrice, "number", "0")}</div>${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="product-thumb product-thumb--preview"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл нь зөвхөн <b>Агуулах → Орлого авах</b> цэснээс нэмэгдэнэ.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImage(p)}" class="product-thumb product-thumb--preview"><div class="flex-1"><input type="file" accept="image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value="${esc(p.image || "")}"><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Агуулах → Орлого авах</b> цэснээс оруулна.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
 }
 function handleProductImage(input) {
@@ -6964,7 +7368,8 @@ function buildProductDataFromForm(form) {
     if (!state.extraCategories.includes(data.category))
       state.extraCategories.push(data.category);
   }
-  ["price", "costPrice"].forEach((k) => (data[k] = Number(data[k] || 0)));
+  data.price = Number(data.price || 0);
+  delete data.costPrice;
   data.country = String(data.country || "").trim() || "Монгол";
   return { data };
 }
@@ -6979,6 +7384,7 @@ function applyProductSave(data, id) {
       stock: 0,
       minStock: 0,
       boxQuantity: 1,
+      costPrice: 0,
     });
   }
   closeModal();
@@ -6986,7 +7392,9 @@ function applyProductSave(data, id) {
   scheduleBackendSave();
 }
 function saveProduct(e, id) {
-  if (!isAdmin()) return;
+  if (id ? !hasPermission("products.edit") : !hasPermission("products.create")) {
+    return alertModal("Эрхгүй", "Бараа хадгалах эрхгүй.");
+  }
   e.preventDefault();
   const built = buildProductDataFromForm(e.target);
   if (built.error) return alert(built.error);
@@ -6996,7 +7404,7 @@ function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
 }
 function categoryModal() {
-  if (!isAdmin()) return;
+  if (!hasPermission("products.edit")) return;
   const rows = cats()
     .filter(Boolean)
     .sort((a, b) => String(a).localeCompare(String(b), "mn"))
@@ -7017,7 +7425,7 @@ function categoryModal() {
 }
 function addCategory(e) {
   e.preventDefault();
-  if (!isAdmin()) return;
+  if (!hasPermission("products.edit")) return;
   const name = String(new FormData(e.target).get("category") || "").trim();
   if (!name) return alert("Төрөлийн нэр оруулна уу");
   if (cats().includes(name))
@@ -7030,7 +7438,7 @@ function addCategory(e) {
   showInstallToast("Төрөл нэмэгдлээ");
 }
 function confirmDeleteCategory(name) {
-  if (!isAdmin()) return;
+  if (!hasPermission("products.edit")) return;
   const count = categoryProductCount(name);
   if (count > 0) {
     alertModal(
@@ -7061,7 +7469,7 @@ function confirmDeleteCategory(name) {
   );
 }
 function deleteCategoryNow(name) {
-  if (!isAdmin()) return;
+  if (!hasPermission("products.edit")) return;
   state.extraCategories = state.extraCategories.filter((c) => c !== name);
   if (state.filters.category === name) state.filters.category = "all";
   if (state.filters.inventoryCategory === name)
@@ -7074,15 +7482,22 @@ function deleteCategoryNow(name) {
   showInstallToast("Төрөл устгагдлаа");
 }
 function employeeModal(id) {
-  if (!isAdmin()) return;
   const editId = id ? String(id) : "";
+  if (editId) {
+    if (!hasPermission("employees.edit")) {
+      return alertModal("Эрхгүй", "Ажилтан засах эрхгүй.");
+    }
+  } else if (!hasPermission("employees.create")) {
+    return alertModal("Эрхгүй", "Ажилтан нэмэх эрхгүй.");
+  }
   const e = editId ? state.employees.find((x) => x.id === editId) : null;
   if (editId && !e) return alert("Ажилтан олдсонгүй");
   const isEdit = !!editId;
+  const selectedRole = e?.role || "sales";
   const roleOptions = ["sales", "warehouse", "delivery", "admin"]
     .map(
       (r) =>
-        `<option value="${r}" ${(e?.role || "sales") === r ? "selected" : ""}>${role(r)}</option>`,
+        `<option value="${r}" ${selectedRole === r ? "selected" : ""}>${role(r)}</option>`,
     )
     .join("");
   const pctChecked =
@@ -7090,10 +7505,16 @@ function employeeModal(id) {
   const passwordAttrs = isEdit
     ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
+  const permHtml = permApi()
+    ? permApi().permissionsFieldHtml(
+        employeePermissionsSelected(e, selectedRole),
+        selectedRole,
+      )
+    : "";
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
-    "max-w-md",
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField();syncEmployeePermissionsFromRole()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label>${permHtml}</div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    "max-w-lg",
   );
   setTimeout(() => {
     syncEmployeePctField();
@@ -7115,16 +7536,24 @@ function buildEmployeeDataFromForm(form, editId = "") {
   ) {
     return { error: "Энэ email аль хэдийн бүртгэгдсэн байна" };
   }
+  const roleValue = f.role || "sales";
+  const permissions = permApi()
+    ? permApi().permissionsFromForm(form)
+    : permApi()?.templateForRole(roleValue) || [];
+  if (!permissions.length) {
+    return { error: "Дор хаяж нэг эрх сонгоно уу" };
+  }
   return {
     data: {
       name,
       email,
       phone: String(f.phone || "").trim(),
       password,
-      role: f.role || "sales",
+      role: roleValue,
       image: String(f.image || ""),
       allowPercentDiscount:
-        (f.role || "sales") === "sales" && f.allowPercentDiscount === "on",
+        roleValue === "sales" && f.allowPercentDiscount === "on",
+      permissions,
     },
   };
 }
@@ -7138,6 +7567,7 @@ function applyEmployeeSave(data, editId = "") {
     existing.role = data.role;
     existing.image = data.image;
     existing.allowPercentDiscount = data.allowPercentDiscount;
+    existing.permissions = data.permissions;
     if (data.password) existing.password = data.password;
     if (state.currentEmployee?.id === editId) {
       state.currentEmployee = existing;
@@ -7157,6 +7587,7 @@ function applyEmployeeSave(data, editId = "") {
       totalSales: 0,
       commissionRate: 0,
       allowPercentDiscount: data.allowPercentDiscount,
+      permissions: data.permissions,
     });
     showInstallToast("Ажилтан нэмэгдлээ");
   }
@@ -7545,7 +7976,7 @@ function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);
   if (p) p.stock += type === "in" ? qty : -qty;
 }
-function applyStock(id, type, qty) {
+function applyStock(id, type, qty, costPrice) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return false;
   const q =
@@ -7559,6 +7990,9 @@ function applyStock(id, type, qty) {
   if (type === "out" && q > p.stock) {
     alert("Үлдэгдэл хүрэлцэхгүй байна!");
     return false;
+  }
+  if (type === "in" && costPrice != null && Number.isFinite(Number(costPrice))) {
+    p.costPrice = Number(costPrice);
   }
   stock(id, q, type);
   state.inventoryLogs.push({
@@ -8263,11 +8697,11 @@ function saveEmployee(e) {
   e.preventDefault();
   const form = e.target?.closest?.("[data-employee-form]");
   if (!form) return;
-  if (!isAdmin()) {
-    alertModal("Эрхгүй", "Зөвхөн админ ажилтан нэмэх эрхтэй.");
+  const editId = form.getAttribute("data-employee-id") || "";
+  if (editId ? !hasPermission("employees.edit") : !hasPermission("employees.create")) {
+    alertModal("Эрхгүй", "Ажилтан хадгалах эрхгүй.");
     return;
   }
-  const editId = form.getAttribute("data-employee-id") || "";
   const built = buildEmployeeDataFromForm(form, editId);
   if (built.error) return alert(built.error);
   applyEmployeeSave(built.data, editId);
@@ -8580,6 +9014,7 @@ Object.assign(window, {
   savePercentDiscountSettings,
   toggleEmployeePercentDiscount,
   syncEmployeePctField,
+  syncEmployeePermissionsFromRole,
   saveBackendState,
   installPwaApp,
   dismissPwaInstall,
