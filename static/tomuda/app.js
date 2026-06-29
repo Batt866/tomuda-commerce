@@ -1012,22 +1012,41 @@ function canTakeOrdersRole(r) {
   if (permApi()) return hasPermission("orders.create");
   return r === "sales" || r === "admin";
 }
+function salesOrderAgents() {
+  return state.employees
+    .filter((e) => e.role === "sales" || e.role === "admin")
+    .sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+    );
+}
+function ensureOrderEmployeeSelection() {
+  const cur = state.currentEmployee;
+  if (!cur) return;
+  const agents = salesOrderAgents();
+  if (!agents.length) return;
+  const valid = new Set(agents.map((e) => e.id));
+  if (state.orderEmployee && valid.has(state.orderEmployee)) return;
+  if (valid.has(cur.id)) state.orderEmployee = cur.id;
+  else state.orderEmployee = agents[0].id;
+}
+function shouldShowOrderAgentPicker(emp = state.currentEmployee) {
+  if (!emp) return true;
+  if (emp.role === "admin" && canTakeOrdersRole(emp.role)) return true;
+  if (emp.role === "sales" && canTakeOrdersRole(emp.role)) return false;
+  return true;
+}
 function orderActor() {
   const cur = state.currentEmployee;
   if (!cur) return {};
-  if (cur.role === "sales") return cur;
-  if (
-    cur.role === "admin" &&
-    (!state.orderEmployee || state.orderEmployee === cur.id)
-  )
-    return cur;
-  return state.employees.find((x) => x.id === state.orderEmployee) || cur || {};
+  const picked = state.orderEmployee
+    ? state.employees.find((x) => x.id === state.orderEmployee)
+    : null;
+  if (picked) return picked;
+  if (cur.role === "sales" || cur.role === "admin") return cur;
+  return cur;
 }
 function orderEmployeeChoices() {
-  const sales = state.employees.filter((e) => e.role === "sales");
-  if (!hasPermission("employees.view")) return sales;
-  const admins = state.employees.filter((e) => e.role === "admin");
-  return [...admins, ...sales];
+  return salesOrderAgents();
 }
 function orderEmailFields(emp) {
   const actor = emp || state.currentEmployee || {};
@@ -3470,11 +3489,7 @@ function receiptPrintWorkerIds() {
   return idList(state.receiptPrintWorkerIds);
 }
 function receiptSalesEmployees() {
-  return state.employees
-    .filter((e) => e.role === "sales" || e.role === "admin")
-    .sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || ""), "mn"),
-    );
+  return salesOrderAgents();
 }
 function receiptPrintWorkerRoleLabel(role) {
   return role === "admin" ? "Админ" : "ХТ";
@@ -6788,17 +6803,15 @@ function workerStoreSummary(c, compact = false) {
   return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold">${esc(c.name)}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
 }
 function workerOrderAgentField() {
-  const canSelf =
-    state.currentEmployee && canTakeOrdersRole(state.currentEmployee.role);
-  if (!canSelf) {
-    return `<label class="worker-order-field"><span class="worker-order-field__label">Худалдааны төлөөлөгч</span><select onchange="state.orderEmployee=this.value;render()" class="field-input app-input">${orderEmployeeChoices()
-      .map(
-        (e) =>
-          `<option value="${e.id}" ${state.orderEmployee === e.id ? "selected" : ""}>${esc(e.name)} (${role(e.role)})</option>`,
-      )
-      .join("")}</select></label>`;
-  }
-  return `<p class="worker-order-sales">${esc(state.currentEmployee.name)}</p>`;
+  ensureOrderEmployeeSelection();
+  const agents = salesOrderAgents();
+  const selected = state.orderEmployee || state.currentEmployee?.id || "";
+  return `<label class="worker-order-field"><span class="worker-order-field__label">Худалдааны төлөөлөгч</span><select onchange="state.orderEmployee=this.value;render()" class="field-input app-input">${agents
+    .map(
+      (e) =>
+        `<option value="${e.id}" ${selected === e.id ? "selected" : ""}>${esc(e.name)} (${role(e.role)})</option>`,
+    )
+    .join("")}</select></label>`;
 }
 function workerOrderEmptyState() {
   return `<div class="worker-order-empty"><p class="worker-order-empty__text">Бараа байхгүй</p></div>`;
@@ -6886,12 +6899,12 @@ function workerOrderStatsHtml(cart) {
 }
 function workerNewOrderStep(cart) {
   state.deliveryDate = todayIso();
+  ensureOrderEmployeeSelection();
   const customer = state.customers.find((c) => c.id === state.workerCustomer),
-    canSelf =
-      state.currentEmployee && canTakeOrdersRole(state.currentEmployee.role),
-    agentMetaHtml = canSelf
-      ? ""
-      : `<div class="worker-order-meta">${workerOrderAgentField()}</div>`,
+    showAgentPicker = shouldShowOrderAgentPicker(),
+    agentMetaHtml = showAgentPicker
+      ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
+      : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(state.currentEmployee?.name || "-")}</p></div>`,
     paidProducts = workerPaidProductsInCart(),
     hasItems = paidProducts.length > 0,
     listHtml = hasItems
@@ -8558,13 +8571,13 @@ function selectWarehouseOrder(id) {
   render();
 }
 function workerSelectModal() {
+  const agents = salesOrderAgents();
   box(
     "Ажилтан сонгох",
-    `<div class="p-5 space-y-3" data-worker-select-modal>${state.employees
-      .filter((e) => e.role === "sales")
+    `<div class="p-5 space-y-3" data-worker-select-modal>${agents
       .map(
         (e) =>
-          `<label class="flex items-center gap-3 bg-secondary rounded p-3"><input type="checkbox" ${state.selectedWorkers.includes(e.id) ? "checked" : ""} onchange="toggleWorkerOnly('${e.id}')"><span class="font-medium">${e.name}</span></label>`,
+          `<label class="flex items-center gap-3 bg-secondary rounded p-3"><input type="checkbox" ${state.selectedWorkers.includes(e.id) ? "checked" : ""} onchange="toggleWorkerOnly('${e.id}')"><span class="font-medium">${esc(e.name)}</span><span class="text-xs text-muted-foreground">${role(e.role)}</span></label>`,
       )
       .join(
         "",
@@ -8751,6 +8764,7 @@ function login(e) {
   state.isLoggedIn = true;
   state.orderEmployee = emp.id;
   applyLoginRoleDefaults(emp);
+  ensureOrderEmployeeSelection();
   state.currentView = defaultViewForRole(emp.role);
   saveAuthSession();
   render();
