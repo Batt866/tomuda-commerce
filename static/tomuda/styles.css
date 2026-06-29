@@ -3612,6 +3612,22 @@ input::placeholder, textarea::placeholder {
   font-weight: 700;
 }
 
+.count-row__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.count-view__hint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-primary) 8%, var(--hex-card));
+  border: 1px solid color-mix(in srgb, var(--hex-primary) 22%, var(--hex-border));
+  color: var(--hex-muted-foreground);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .count-row__actions {
   display: flex;
   align-items: center;

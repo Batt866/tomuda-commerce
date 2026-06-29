@@ -974,13 +974,37 @@ function mergeRuleArrays(remote = [], local = []) {
   return merged;
 }
 
+function countSessionMs(at) {
+  const ms = new Date(at || 0).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+function applyCountSessionMerge(remote, local, merged) {
+  const src =
+    countSessionMs(local.countSessionStartedAt) >=
+    countSessionMs(remote.countSessionStartedAt)
+      ? local
+      : remote;
+  merged.countQty = { ...(src.countQty || {}) };
+  merged.countOpeningStock = { ...(src.countOpeningStock || {}) };
+  merged.countSessionStartedAt = src.countSessionStartedAt ?? null;
+  merged.countDone = !!src.countDone;
+}
 function mergePersistentStates(remote = {}, local = {}) {
   const merged = {};
   for (const key of MERGE_BY_ID_KEYS) {
     merged[key] = mergeArrayById(remote[key], local[key]);
   }
+  applyCountSessionMerge(remote, local, merged);
   for (const key of persistKeys) {
     if (MERGE_BY_ID_KEYS.includes(key)) continue;
+    if (
+      key === "countQty" ||
+      key === "countOpeningStock" ||
+      key === "countSessionStartedAt" ||
+      key === "countDone"
+    ) {
+      continue;
+    }
     if (key === "promotionRules") {
       const remoteRules = remote.promotionRules || {};
       const localRules = local.promotionRules || {};
@@ -988,20 +1012,6 @@ function mergePersistentStates(remote = {}, local = {}) {
         quantity: mergeRuleArrays(remoteRules.quantity, localRules.quantity),
         price: mergeRuleArrays(remoteRules.price, localRules.price),
         payment: mergeRuleArrays(remoteRules.payment, localRules.payment),
-      };
-      continue;
-    }
-    if (key === "countQty") {
-      merged.countQty = {
-        ...(remote.countQty || {}),
-        ...(local.countQty || {}),
-      };
-      continue;
-    }
-    if (key === "countOpeningStock") {
-      merged.countOpeningStock = {
-        ...(remote.countOpeningStock || {}),
-        ...(local.countOpeningStock || {}),
       };
       continue;
     }
@@ -3613,14 +3623,43 @@ function countSoldQty(productId) {
 }
 function countProductStats(p) {
   const id = p.id;
-  const opening = Number(state.countOpeningStock?.[id] ?? p.stock) || 0;
+  const system = Number(p.stock) || 0;
+  const final = countValue(id);
+  if (!countSessionActive()) {
+    return {
+      opening: system,
+      sold: 0,
+      expended: 0,
+      income: 0,
+      system,
+      expected: system,
+      final,
+    };
+  }
+  const opening = Number(state.countOpeningStock?.[id] ?? system) || 0;
   const sold = countSoldQty(id);
   const expended = countInventoryQty(id, "out");
   const income = countInventoryQty(id, "in");
-  const system = Number(p.stock) || 0;
   const expected = opening + income - sold - expended;
-  const final = countValue(id);
   return { opening, sold, expended, income, system, expected, final };
+}
+function countBookDiff(stats) {
+  if (stats.final === null) return null;
+  return stats.final - stats.system;
+}
+function countSessionActive() {
+  return !!state.countSessionStartedAt;
+}
+function startCountSession() {
+  state.countQty = {};
+  state.countDone = false;
+  state.countOpeningStock = {};
+  state.countSessionStartedAt = new Date().toISOString();
+  snapshotCountOpeningStock();
+  scheduleBackendSave();
+}
+function ensureCountSession() {
+  if (!countSessionActive()) startCountSession();
 }
 function countMetricsTotals(products) {
   let opening = 0,
@@ -3644,19 +3683,7 @@ function snapshotCountOpeningStock() {
   }
   state.countOpeningStock = opening;
 }
-function ensureCountSession() {
-  if (!state.countSessionStartedAt) {
-    state.countSessionStartedAt = new Date().toISOString();
-    snapshotCountOpeningStock();
-  } else if (
-    !state.countOpeningStock ||
-    !Object.keys(state.countOpeningStock).length
-  ) {
-    snapshotCountOpeningStock();
-  }
-}
 function countView() {
-  ensureCountSession();
   const q = state.searches.count || "",
     cat = state.filters.countCategory || "all",
     list = countFilteredProducts(),
@@ -3677,7 +3704,10 @@ function countView() {
           "2",
           "count",
         );
-  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${metricsHtml}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
+  const sessionHint = countSessionActive()
+    ? ""
+    : `<p class="count-view__hint">Шинэ товч дарж тооллого эхлүүлнэ үү. Эхлэхэд одоогийн бүртгэлийн үлдэгдэл хадгалагдана.</p>`;
+  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
     .map(
       (c) =>
         `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
@@ -3689,13 +3719,16 @@ function countView() {
 function countRow(p) {
   const stats = countProductStats(p),
     value = stats.final,
-    diff = value === null ? null : value - stats.expected,
+    diff = countBookDiff(stats),
     diffText = diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff),
     diffClass =
       diff === null || diff === 0
         ? "text-muted-foreground"
-        : "text-tone-danger font-semibold";
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats"><span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span></p></div><div class="count-row__actions"><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү">${diffText}</span></div></div>`;
+        : "text-tone-danger font-semibold",
+    metaHtml = countSessionActive()
+      ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
+      : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"${countSessionActive() ? "" : " disabled"}><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -3708,6 +3741,7 @@ function setCountQty(id, value) {
   if (value === "") delete state.countQty[id];
   else state.countQty[id] = Number(value);
   state.countDone = false;
+  scheduleBackendSave();
   render();
 }
 function countMismatches() {
@@ -3715,7 +3749,7 @@ function countMismatches() {
     .map((p) => {
       const stats = countProductStats(p);
       if (stats.final === null) return null;
-      const diff = stats.final - stats.expected;
+      const diff = countBookDiff(stats);
       return diff === 0
         ? null
         : { product: p, stats, counted: stats.final, diff };
@@ -3731,7 +3765,7 @@ function countResult(mismatches) {
   const rowHtml = list
     .map((p) => {
       const stats = countProductStats(p),
-        diff = stats.final - stats.expected,
+        diff = countBookDiff(stats),
         diffClass =
           diff === 0 ? "text-muted-foreground" : "text-tone-danger font-semibold",
         diffText = diff > 0 ? `+${diff}` : String(diff);
@@ -3747,7 +3781,7 @@ function countExcelRows() {
     .map((p) => {
       const stats = countProductStats(p);
       if (stats.final === null) return null;
-      const diff = stats.final - stats.expected;
+      const diff = countBookDiff(stats);
       return [
         p.barcode || "-",
         p.name,
@@ -4082,24 +4116,25 @@ function confirmCountExcel() {
   confirmDataExport("Excel татах", exportCountExcel);
 }
 function finishCount() {
-  ensureCountSession();
+  if (!countSessionActive()) {
+    return alert("Эхлээд «Шинэ» товч дарж тооллого эхлүүлнэ үү");
+  }
   if (!Object.keys(state.countQty).some((id) => countValue(id) !== null)) {
     return alert("Тоолсон тоо оруулна уу");
   }
   state.countDone = true;
+  scheduleBackendSave();
   render();
   confirmCountExcel();
 }
 function resetCountSession() {
-  state.countQty = {};
-  state.countDone = false;
-  state.countSessionStartedAt = new Date().toISOString();
-  snapshotCountOpeningStock();
+  startCountSession();
   render();
 }
 function confirmNewCount() {
   const hasData =
     state.countDone ||
+    countSessionActive() ||
     Object.keys(state.countQty).some((id) => countValue(id) !== null);
   if (!hasData) {
     resetCountSession();
@@ -4107,9 +4142,9 @@ function confirmNewCount() {
   }
   confirmModal(
     "Шинэ тооллого",
-    "Та шинэ тооллого эхлүүлэх гэж байна уу? Одоогийн тооллогын өгөгдөл арилна.",
+    "Одоогийн тооллогын бүх тоо, эхний үлдэгдэл дахин тооцогдож, шинээр эхэлнэ.",
     {
-      confirmLabel: "Тийм",
+      confirmLabel: "Шинээр эхлүүлэх",
       danger: true,
       onConfirm: resetCountSession,
     },
