@@ -222,6 +222,9 @@ let backendLastSaved = "";
 let serverUpdatedAt = "";
 let backendSaving = false;
 let backendPollTimer = null;
+let countRenderPending = false;
+let countBlurSaveTimer = null;
+let countFocusedProductId = "";
 let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
@@ -1156,8 +1159,21 @@ function isEditingCountQty() {
   const el = document.activeElement;
   return (
     state.currentView === "count" &&
-    el?.classList?.contains?.("count-row__input")
+    el?.matches?.(".count-row__input[data-count-product-id]")
   );
+}
+function safeRender() {
+  if (isEditingCountQty()) {
+    countRenderPending = true;
+    return;
+  }
+  countRenderPending = false;
+  render();
+}
+function flushPendingCountRender() {
+  if (!countRenderPending || isEditingCountQty()) return;
+  countRenderPending = false;
+  render();
 }
 function applyRemoteState(payload) {
   if (!payload?.state) return false;
@@ -1257,6 +1273,7 @@ async function boot() {
     initPickerModalActions();
     initEmployeeModalActions();
     initQtyStepperButtons();
+    initCountInputHandlers();
     initConfirmCard();
     initConfirmDeleteActions();
     initAppBack();
@@ -2190,7 +2207,7 @@ async function saveBackendState() {
     const session = captureSessionSnapshot();
     applyPersistentState(protectedData);
     restoreSessionSnapshot(session);
-    render();
+    safeRender();
     data = protectedData;
   }
   try {
@@ -2201,7 +2218,7 @@ async function saveBackendState() {
         const session = captureSessionSnapshot();
         applyPersistentState(merged);
         restoreSessionSnapshot(session);
-        render();
+        safeRender();
         data = merged;
       } else {
         data = merged;
@@ -3669,13 +3686,14 @@ function startCountSession() {
 function ensureCountSession() {
   if (!countSessionActive()) startCountSession();
 }
-function ensureCountSessionQuiet() {
+function ensureCountSessionQuiet(focusId) {
   if (countSessionActive()) return;
   state.countDone = false;
   state.countOpeningStock = {};
   state.countSessionStartedAt = new Date().toISOString();
   snapshotCountOpeningStock();
-  refreshCountViewSessionUi();
+  document.querySelector(".count-view__hint")?.remove();
+  if (focusId) refreshCountRowMeta(focusId);
 }
 function refreshCountRowMeta(id) {
   const p = state.products.find((x) => x.id === id);
@@ -3691,13 +3709,14 @@ function refreshCountRowMeta(id) {
     meta.innerHTML = `<span>Бүртгэл: <b>${stats.system}</b></span>`;
   }
 }
-function refreshCountViewSessionUi() {
-  document.querySelector(".count-view__hint")?.remove();
+function syncCountInputsFromState() {
   document
-    .querySelectorAll(".count-row [data-count-product-id]")
+    .querySelectorAll(".count-row__input[data-count-product-id]")
     .forEach((input) => {
-      const id = input.getAttribute("data-count-product-id");
-      if (id) refreshCountRowMeta(id);
+      if (input === document.activeElement) return;
+      const id = input.getAttribute("data-count-product-id") || "";
+      const v = countValue(id);
+      input.value = v == null ? "" : String(v);
     });
 }
 function updateCountMetricsInPlace() {
@@ -3729,10 +3748,13 @@ function updateCountRowDiffDisplay(id, inputEl) {
   }`;
 }
 function countQtyFocus(id, el) {
-  ensureCountSessionQuiet();
+  clearTimeout(countBlurSaveTimer);
+  countFocusedProductId = id;
+  ensureCountSessionQuiet(id);
+  if (countSessionActive()) refreshCountRowMeta(id);
 }
 function countQtyInput(id, el) {
-  ensureCountSessionQuiet();
+  if (!countSessionActive()) ensureCountSessionQuiet(id);
   const digits = String(el?.value ?? "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
   if (!digits) delete state.countQty[id];
@@ -3746,8 +3768,56 @@ function countQtyInput(id, el) {
   updateCountMetricsInPlace();
 }
 function countQtyCommit(id, el) {
-  countQtyInput(id, el);
+  if (!el || el.isConnected) countQtyInput(id, el);
   scheduleBackendSave();
+  countFocusedProductId = "";
+  requestAnimationFrame(flushPendingCountRender);
+}
+function initCountInputHandlers() {
+  if (document.documentElement.dataset.countInputBound) return;
+  document.documentElement.dataset.countInputBound = "1";
+  document.addEventListener(
+    "focusin",
+    (e) => {
+      const el = e.target.closest?.(".count-row__input[data-count-product-id]");
+      if (!el) return;
+      const id = el.getAttribute("data-count-product-id") || "";
+      if (id) countQtyFocus(id, el);
+    },
+    true,
+  );
+  document.addEventListener(
+    "input",
+    (e) => {
+      const el = e.target.closest?.(".count-row__input[data-count-product-id]");
+      if (!el) return;
+      const id = el.getAttribute("data-count-product-id") || "";
+      if (id) countQtyInput(id, el);
+    },
+    true,
+  );
+  document.addEventListener(
+    "focusout",
+    (e) => {
+      const el = e.target.closest?.(".count-row__input[data-count-product-id]");
+      if (!el) return;
+      const id = el.getAttribute("data-count-product-id") || "";
+      if (!id) return;
+      const next = e.relatedTarget;
+      if (next?.closest?.(".count-row__input[data-count-product-id]")) return;
+      clearTimeout(countBlurSaveTimer);
+      countBlurSaveTimer = setTimeout(() => {
+        countBlurSaveTimer = null;
+        if (document.activeElement?.matches?.(
+          ".count-row__input[data-count-product-id]",
+        )) {
+          return;
+        }
+        countQtyCommit(id, el);
+      }, 150);
+    },
+    true,
+  );
 }
 function countMetricsTotals(products) {
   let opening = 0,
@@ -3806,7 +3876,6 @@ function countView() {
 }
 function countRow(p) {
   const stats = countProductStats(p),
-    value = stats.final,
     diff = countBookDiff(stats),
     diffText = diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff),
     diffClass =
@@ -3816,7 +3885,7 @@ function countRow(p) {
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input data-count-product-id="${p.id}" onfocus="countQtyFocus('${p.id}', this)" oninput="countQtyInput('${p.id}', this)" onblur="countQtyCommit('${p.id}', this)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -6066,6 +6135,11 @@ function render() {
     if (!app.querySelector(".boot-screen")) app.innerHTML = bootScreenHtml();
     return;
   }
+  if (isEditingCountQty()) {
+    countRenderPending = true;
+    return;
+  }
+  countRenderPending = false;
   if (!state.isLoggedIn) {
     app.innerHTML = loginView();
     return;
@@ -6103,6 +6177,7 @@ function render() {
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
   bindReceiptPrintWorkerPickerDismiss();
+  if (state.currentView === "count") syncCountInputsFromState();
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
   const titleId = opts.titleId || "modal-title",

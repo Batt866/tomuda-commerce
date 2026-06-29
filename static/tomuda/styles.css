@@ -3636,7 +3636,8 @@ input::placeholder, textarea::placeholder {
 }
 
 .count-row__input {
-  width: 52px;
+  width: 72px;
+  min-width: 72px;
   min-height: 36px !important;
   height: 36px;
   padding: 0 4px !important;
@@ -6300,7 +6301,8 @@ input::placeholder, textarea::placeholder {
   }
 
   .count-row__input {
-    width: 48px;
+    width: 64px;
+    min-width: 64px;
     min-height: 34px !important;
     height: 34px;
   }
