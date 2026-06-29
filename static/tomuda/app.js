@@ -3661,6 +3661,48 @@ function startCountSession() {
 function ensureCountSession() {
   if (!countSessionActive()) startCountSession();
 }
+function ensureCountSessionQuiet() {
+  if (countSessionActive()) return;
+  state.countDone = false;
+  state.countOpeningStock = {};
+  state.countSessionStartedAt = new Date().toISOString();
+  snapshotCountOpeningStock();
+}
+function updateCountRowDiffDisplay(id, inputEl) {
+  const p = state.products.find((x) => x.id === id);
+  const row = inputEl?.closest(".count-row");
+  const diffEl = row?.querySelector(".count-row__diff");
+  if (!p || !diffEl) return;
+  const raw = String(inputEl.value ?? "").trim();
+  const final =
+    raw === "" || !Number.isFinite(Number(raw)) ? null : Number(raw);
+  const system = Number(p.stock) || 0;
+  const diff = final === null ? null : final - system;
+  diffEl.textContent =
+    diff === null ? "-" : diff > 0 ? `+${diff}` : String(diff);
+  diffEl.className = `count-row__diff ${
+    diff === null || diff === 0
+      ? "text-muted-foreground"
+      : "text-tone-danger font-semibold"
+  }`;
+}
+function countQtyInput(id, el) {
+  ensureCountSessionQuiet();
+  const raw = String(el?.value ?? "").trim();
+  if (raw === "") delete state.countQty[id];
+  else {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return;
+    state.countQty[id] = n;
+  }
+  state.countDone = false;
+  updateCountRowDiffDisplay(id, el);
+}
+function countQtyCommit(id, el) {
+  countQtyInput(id, el);
+  scheduleBackendSave();
+  render();
+}
 function countMetricsTotals(products) {
   let opening = 0,
     sold = 0,
@@ -3706,7 +3748,7 @@ function countView() {
         );
   const sessionHint = countSessionActive()
     ? ""
-    : `<p class="count-view__hint">Шинэ товч дарж тооллого эхлүүлнэ үү. Эхлэхэд одоогийн бүртгэлийн үлдэгдэл хадгалагдана.</p>`;
+    : `<p class="count-view__hint">Тоо оруулах эсвэл «Шинэ» дарж тооллого эхлүүлнэ.</p>`;
   return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
     .map(
       (c) =>
@@ -3728,7 +3770,7 @@ function countRow(p) {
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>`;
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input onchange="setCountQty('${p.id}',this.value)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"${countSessionActive() ? "" : " disabled"}><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
+  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input onfocus="ensureCountSessionQuiet()" oninput="countQtyInput('${p.id}', this)" onblur="countQtyCommit('${p.id}', this)" value="${value ?? ""}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span></div></div>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -4117,7 +4159,7 @@ function confirmCountExcel() {
 }
 function finishCount() {
   if (!countSessionActive()) {
-    return alert("Эхлээд «Шинэ» товч дарж тооллого эхлүүлнэ үү");
+    return alert("Тоолсон тоо оруулна уу");
   }
   if (!Object.keys(state.countQty).some((id) => countValue(id) !== null)) {
     return alert("Тоолсон тоо оруулна уу");
@@ -8209,6 +8251,9 @@ Object.assign(window, {
   confirmCountExcel,
   exportCountExcel,
   setCountQty,
+  ensureCountSessionQuiet,
+  countQtyInput,
+  countQtyCommit,
   saveStockAlertSettings,
   stockAlertModal,
   percentDiscountSettingsModal,
