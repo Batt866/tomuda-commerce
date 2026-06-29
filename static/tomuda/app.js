@@ -695,14 +695,220 @@ function deliveryFieldsForNewOrder() {
 function currentRole() {
   return state.currentEmployee?.role || "";
 }
+if (!window.TOMUDA_PERMISSIONS) {
+  (function installTomudaPermissions() {
+    const CATALOG = [
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        permissions: [{ key: "dashboard.view", label: "Dashboard харах" }],
+      },
+      {
+        id: "warehouse",
+        label: "Агуулах",
+        permissions: [
+          { key: "warehouse.view", label: "Агуулах харах" },
+          { key: "warehouse.edit", label: "Агуулах засах" },
+        ],
+      },
+      {
+        id: "products",
+        label: "Бараа",
+        permissions: [
+          { key: "products.view", label: "Бараа харах" },
+          { key: "products.create", label: "Бараа нэмэх" },
+          { key: "products.edit", label: "Бараа засах" },
+        ],
+      },
+      {
+        id: "customers",
+        label: "Харилцагч",
+        permissions: [
+          { key: "customers.view", label: "Харилцагч харах" },
+          { key: "customers.create", label: "Харилцагч нэмэх" },
+        ],
+      },
+      {
+        id: "orders",
+        label: "Захиалга",
+        permissions: [
+          { key: "orders.view", label: "Захиалга харах" },
+          { key: "orders.create", label: "Захиалга үүсгэх" },
+          { key: "orders.edit", label: "Захиалга засах" },
+        ],
+      },
+      {
+        id: "reports",
+        label: "Тайлан",
+        permissions: [{ key: "reports.view", label: "Тайлан харах" }],
+      },
+      {
+        id: "employees",
+        label: "Ажилтан",
+        permissions: [
+          { key: "employees.view", label: "Ажилтан харах" },
+          { key: "employees.create", label: "Ажилтан нэмэх" },
+          { key: "employees.edit", label: "Ажилтан засах" },
+        ],
+      },
+      {
+        id: "settings",
+        label: "Тохиргоо",
+        permissions: [{ key: "settings.view", label: "Тохиргоо харах" }],
+      },
+    ];
+    const ALL_KEYS = CATALOG.flatMap((c) => c.permissions.map((p) => p.key));
+    const ROLE_TEMPLATES = {
+      admin: [...ALL_KEYS],
+      sales: [
+        "dashboard.view",
+        "orders.view",
+        "orders.create",
+        "orders.edit",
+        "customers.view",
+        "customers.create",
+        "products.view",
+        "warehouse.view",
+      ],
+      warehouse: ["warehouse.view", "warehouse.edit", "products.view"],
+      delivery: ["orders.view"],
+    };
+    const VIEW_PERMISSION = {
+      admin: "dashboard.view",
+      worker: "orders.view",
+      warehouse: "warehouse.view",
+      inventory: "warehouse.view",
+      count: "warehouse.edit",
+      products: "products.view",
+      customers: "customers.view",
+      employees: "employees.view",
+      reports: "reports.view",
+      promotions: "settings.view",
+      warehouseReceipts: "warehouse.view",
+      delivery: "orders.view",
+      orders: "orders.view",
+    };
+    const NAV_ITEMS = [
+      ["worker", "Захиалга үүсгэх", "orders.view"],
+      ["customers", "Харилцагч", "customers.view"],
+      ["products", "Бараа", "products.view"],
+      ["warehouse", "Агуулах", "warehouse.view"],
+      ["count", "Тооллого", "warehouse.edit"],
+      ["employees", "Ажилтан", "employees.view"],
+      ["inventory", "Агуулахын бүртгэл", "warehouse.view"],
+      ["reports", "Тайлан", "reports.view"],
+      ["promotions", "Урамшуулал", "settings.view"],
+      ["admin", "Админ", "dashboard.view"],
+      ["delivery", "Хүргэлт", "orders.view"],
+    ];
+    function normalizeKeys(list) {
+      if (!Array.isArray(list)) return [];
+      return list.filter((k) => ALL_KEYS.includes(k));
+    }
+    function resolveEmployeePermissions(emp) {
+      if (!emp) return new Set();
+      const custom = normalizeKeys(emp.permissions);
+      if (custom.length) return new Set(custom);
+      const role = emp.role || "sales";
+      return new Set(ROLE_TEMPLATES[role] || []);
+    }
+    function hasPermission(key, emp) {
+      if (!key) return false;
+      return resolveEmployeePermissions(emp).has(key);
+    }
+    function canAccessView(viewId, emp) {
+      const perm = VIEW_PERMISSION[viewId];
+      if (!perm) return false;
+      return hasPermission(perm, emp);
+    }
+    function allowedNavForEmployee(emp) {
+      return NAV_ITEMS.filter(([, , perm]) => hasPermission(perm, emp));
+    }
+    function permissionsFromForm(form) {
+      const keys = [];
+      form.querySelectorAll('input[name="permissions"]:checked').forEach((el) => {
+        if (ALL_KEYS.includes(el.value)) keys.push(el.value);
+      });
+      return keys;
+    }
+    function permissionsFieldHtml(selectedKeys = [], role = "sales") {
+      const selected = new Set(normalizeKeys(selectedKeys));
+      const escHtml = (s) =>
+        String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      const blocks = CATALOG.map((cat) => {
+        const items = cat.permissions
+          .map((p) => {
+            const checked = selected.has(p.key) ? " checked" : "";
+            return `<label class="perm-check"><input type="checkbox" name="permissions" value="${escHtml(p.key)}"${checked}><span>${escHtml(p.label)}</span></label>`;
+          })
+          .join("");
+        return `<fieldset class="perm-group"><legend class="perm-group__title">${escHtml(cat.label)}</legend><div class="perm-group__items">${items}</div></fieldset>`;
+      }).join("");
+      return `<section class="perm-panel"><div class="perm-panel__head"><p class="perm-panel__title">Эрх (Permissions)</p><button type="button" class="perm-panel__reset text-xs text-primary" onclick="syncEmployeePermissionsFromRole()">Эрхийг албан туслах (${escHtml(role || "sales")})</button></div><p class="perm-panel__hint">Ажилтанд харагдах цэс, үйлдлийг сонгоно.</p>${blocks}</section>`;
+    }
+    function templateForRole(role) {
+      return [...(ROLE_TEMPLATES[role] || ROLE_TEMPLATES.sales)];
+    }
+    window.TOMUDA_PERMISSIONS = {
+      CATALOG,
+      ALL_KEYS,
+      ROLE_TEMPLATES,
+      VIEW_PERMISSION,
+      NAV_ITEMS,
+      normalizeKeys,
+      resolveEmployeePermissions,
+      hasPermission,
+      canAccessView,
+      allowedNavForEmployee,
+      permissionsFromForm,
+      permissionsFieldHtml,
+      templateForRole,
+    };
+  })();
+}
 function permApi() {
   return window.TOMUDA_PERMISSIONS || null;
+}
+function syncCurrentEmployeeFromState() {
+  const id = state.currentEmployee?.id;
+  if (!id) return;
+  const fresh = state.employees.find((e) => e.id === id);
+  if (fresh) state.currentEmployee = fresh;
 }
 function resolveEmployeePermissions(emp = state.currentEmployee) {
   return permApi()?.resolveEmployeePermissions(emp) || new Set();
 }
 function hasPermission(key, emp = state.currentEmployee) {
-  return permApi()?.hasPermission(key, emp) ?? false;
+  if (permApi()) return permApi().hasPermission(key, emp);
+  const r = emp?.role || currentRole();
+  if (r === "admin") return true;
+  if (r === "warehouse")
+    return (
+      key.startsWith("warehouse.") ||
+      key === "products.view" ||
+      key === "dashboard.view"
+    );
+  if (r === "delivery") return key === "orders.view";
+  if (r === "sales")
+    return [
+      "dashboard.view",
+      "orders.view",
+      "orders.create",
+      "orders.edit",
+      "customers.view",
+      "customers.create",
+      "products.view",
+      "warehouse.view",
+    ].includes(key);
+  return false;
+}
+function employeePermissionSummary(emp) {
+  const count = resolveEmployeePermissions(emp).size;
+  return count ? `${count} эрх` : "Эрхгүй";
 }
 function isAdmin() {
   return hasPermission("settings.view");
@@ -1200,6 +1406,7 @@ function applyPersistentState(data) {
   ensureSettings();
   ensureEmployeePercentDiscount();
   ensureEmployeePermissions();
+  syncCurrentEmployeeFromState();
   ensureDeliverySelection();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
@@ -6011,7 +6218,7 @@ function employeesView() {
     hasPermission("employees.edit")
       ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
       : "";
-  return `<div class="space-y-4">${pageHead("Ажилтан", addBtn)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${hasPermission("employees.edit") ? employeePercentDiscountToggle(e) : ""}${hasPermission("employees.edit") && canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", addBtn)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"} · ${employeePermissionSummary(e)}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${hasPermission("employees.edit") ? employeePercentDiscountToggle(e) : ""}${hasPermission("employees.edit") && canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -6076,7 +6283,7 @@ function restoreAuthSession() {
     state.orderEmployee = emp.id;
     const view = data.currentView;
     state.currentView =
-      view && canAccessView(view, emp.role)
+      view && canAccessView(view)
         ? view
         : defaultViewForRole(emp.role);
     applyLoginRoleDefaults(emp);
@@ -6734,6 +6941,7 @@ function render() {
     app.innerHTML = loginView();
     return;
   }
+  syncCurrentEmployeeFromState();
   const r = currentRole();
   if (!canAccessView(state.currentView, r)) {
     state.currentView = defaultViewForRole(r);
@@ -7505,15 +7713,13 @@ function employeeModal(id) {
   const passwordAttrs = isEdit
     ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
-  const permHtml = permApi()
-    ? permApi().permissionsFieldHtml(
-        employeePermissionsSelected(e, selectedRole),
-        selectedRole,
-      )
-    : "";
+  const permHtml = permApi().permissionsFieldHtml(
+    employeePermissionsSelected(e, selectedRole),
+    selectedRole,
+  );
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField();syncEmployeePermissionsFromRole()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label>${permHtml}</div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" placeholder="Утас" inputmode="tel" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div>${permHtml}<select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField();syncEmployeePermissionsFromRole()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-lg",
   );
   setTimeout(() => {

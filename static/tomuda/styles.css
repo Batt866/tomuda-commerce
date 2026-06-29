@@ -9435,6 +9435,13 @@ input::placeholder, textarea::placeholder {
   text-underline-offset: 2px;
 }
 
+.perm-panel__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--hex-muted-foreground);
+}
+
 .perm-group {
   margin: 0 0 12px;
   padding: 10px 12px;
