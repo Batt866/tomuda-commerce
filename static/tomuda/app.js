@@ -1278,7 +1278,7 @@ const MOBILE_NAV_SHORT = {
   worker: "Захиалга",
   customers: "Харилцагч",
   products: "Бараа",
-  warehouse: "Нярав",
+  warehouse: "Агуулах",
   delivery: "Хүргэлт",
   count: "Тооллого",
   employees: "Ажилтан",
