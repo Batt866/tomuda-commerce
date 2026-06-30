@@ -341,20 +341,26 @@ function receiptPaymentChecksHtml(paid, bank) {
 function receiptHeaderHtml(logoSrc, o) {
   return `<header class="receipt-header"><img src="${logoSrc}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</h2>`;
 }
-function receiptTableRowsHtml(o) {
-  return (o.items || [])
-    .filter((i) => !i.isPromoFree)
+const RECEIPT_FIRST_PAGE_ITEM_LIMIT = 10;
+function receiptPaidItems(o) {
+  return (o.items || []).filter((i) => !i.isPromoFree);
+}
+function receiptPromoItems(o) {
+  return (o.items || []).filter((i) => i.isPromoFree);
+}
+function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
+  return (items || [])
     .map((i, n) => {
       const p = state.products.find((x) => x.id === i.productId) || {};
-      return `<tr><td>${n + 1}</td><td>${esc(i.productName)}</td><td>${esc(p.unit || "ш")}</td><td>${esc(p.barcode || "-")}</td><td>${i.quantity}</td><td>${receiptMoney(i.price)}</td><td>${receiptMoney(i.total)}</td></tr>`;
+      return `<tr><td>${startIndex + n + 1}</td><td>${esc(i.productName)}</td><td>${esc(p.unit || "ш")}</td><td>${esc(p.barcode || "-")}</td><td>${i.quantity}</td><td>${receiptMoney(i.price)}</td><td>${receiptMoney(i.total)}</td></tr>`;
     })
     .join("");
 }
-function receiptTableHtml(o) {
-  return `<table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${receiptTableRowsHtml(o)}</tbody></table>`;
+function receiptTableHtml(o, opts = {}) {
+  return `<table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${receiptTableRowsHtml(o, opts.items, opts.startIndex || 0)}</tbody></table>`;
 }
 function receiptPromoRowsHtml(o) {
-  const promoItems = (o.items || []).filter((i) => i.isPromoFree);
+  const promoItems = receiptPromoItems(o);
   if (!promoItems.length) {
     return `<div class="receipt-promo-row receipt-promo-row--empty"><span></span><span></span><strong>0</strong></div>`;
   }
@@ -394,6 +400,15 @@ function receiptTotalsBlockHtml(o, { excel = false } = {}) {
 }
 function receiptPageHtml(o, logoSrc) {
   return `${receiptHeaderHtml(logoSrc, o)}${receiptInfoSectionHtml(o)}${receiptTableHtml(o)}<section class="receipt-footer-block">${receiptTotalsBlockHtml(o)}</section>`;
+}
+function receiptPrintPageHtml(o, logoSrc) {
+  const items = receiptPaidItems(o);
+  if (items.length <= RECEIPT_FIRST_PAGE_ITEM_LIMIT) {
+    return `<div class="receipt-page">${receiptPageHtml(o, logoSrc)}</div>`;
+  }
+  const firstItems = items.slice(0, RECEIPT_FIRST_PAGE_ITEM_LIMIT),
+    restItems = items.slice(RECEIPT_FIRST_PAGE_ITEM_LIMIT);
+  return `<div class="receipt-page">${receiptHeaderHtml(logoSrc, o)}${receiptInfoSectionHtml(o)}${receiptTableHtml(o, { items: firstItems })}</div><div class="receipt-page receipt-page--continued">${receiptTableHtml(o, { items: restItems, startIndex: RECEIPT_FIRST_PAGE_ITEM_LIMIT })}<section class="receipt-footer-block">${receiptTotalsBlockHtml(o)}</section></div>`;
 }
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
@@ -9520,7 +9535,7 @@ function receiptDetail(id) {
   orderReceiptModal(id);
 }
 function receipt(o) {
-  return `<div class="print-receipt"><div class="receipt-page">${receiptPageHtml(orderReceiptSnapshot(o), BRAND.receiptLogo)}</div></div>`;
+  return `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), BRAND.receiptLogo)}</div>`;
 }
 function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);

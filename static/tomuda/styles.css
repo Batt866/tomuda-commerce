@@ -9101,6 +9101,10 @@ input::placeholder, textarea::placeholder {
     page-break-after: always;
     break-after: page;
   }
+  .print-receipt .receipt-page:not(:last-child) {
+    page-break-after: always;
+    break-after: page;
+  }
   .receipt-page { width: 190mm; margin: 0 auto; padding: 4mm 3mm; font-size: 10.5px; line-height: 1.22; font-family: "Roboto", Arial, sans-serif; }
   .receipt-header { display: grid; grid-template-columns: 22mm 1fr; gap: 4mm; align-items: start; margin-bottom: 3mm; }
   .receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
