@@ -300,33 +300,15 @@ const RECEIPT_PERCENT_DISCOUNT = 3;
 const RECEIPT_FONT = '"Roboto", Arial, sans-serif';
 const RECEIPT_FONT_LINK =
   "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap";
-const RECEIPT_COMPANY = {
-  name: "ТОМУДА ГРУПП",
-  address1:
-    "Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хотхон - 2 /13312/",
-  address2: "Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357",
-  accountName: "ТОМУДА групп",
-  regNo: "5397987",
-  bank: "Хаан банк",
-  iban: "60000500",
-  accountNo: "51333333307",
-};
-const RECEIPT_TABLE_MIN_ROWS = 20;
-function receiptDeliveryDateLabel(o) {
-  return orderDeliveryDay(o) || "-";
-}
-function receiptCustomerAddress(c = {}) {
-  return (
-    [c.province, c.district, c.khoroo, c.address].filter(Boolean).join(", ") ||
-    "-"
-  );
-}
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
     delivery = resolveOrderDelivery(o),
     paid = o.paymentTerm === "cash" || o.isPaid,
-    bank = o.paymentTerm === "credit" && !o.isPaid;
+    bank = o.paymentTerm === "credit" && !o.isPaid,
+    addr =
+      [c.province, c.district, c.khoroo, c.address].filter(Boolean).join(", ") ||
+      "-";
   return {
     c,
     salesName: esc(o.employeeName || sales.name || "-"),
@@ -337,34 +319,33 @@ function receiptPartyFields(o) {
     customerReg: esc(c.registrationNumber || "-"),
     companyName: esc(c.companyName || "-"),
     customerPhone: esc(c.phone1 || "-"),
-    address: esc(receiptCustomerAddress(c)),
+    address: esc(addr),
     paid,
     bank,
   };
+}
+function receiptInfoSectionHtml(o) {
+  const f = receiptPartyFields(o);
+  return `<section class="receipt-info"><div class="receipt-info__col"><p><span>Худалдааны төлөөлөгч:</span><b>${f.salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${f.salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${f.deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${f.deliveryPhone}</b></p><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></div><div class="receipt-info__col"><p><span>Харилцагч:</span><b>${f.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${f.customerReg}</b></p><p><span>Компанийн нэр:</span><b>${f.companyName}</b></p><p><span>Утасны дугаар:</span><b>${f.customerPhone}</b></p><p><span>Төлбөрийн нөхцөл:</span><b>${receiptPaymentChecksHtml(f.paid, f.bank)}</b></p><p class="receipt-address"><span>Хаяг:</span><b>${f.address}</b></p></div></section>`;
+}
+function receiptExcelInfoGridHtml(o) {
+  const f = receiptPartyFields(o);
+  return `<table class="receipt-info" role="presentation"><tr><td><p><span>Худалдааны төлөөлөгч:</span><b>${f.salesName}</b></p><p><span>Худалдааны төлөөлөгчийн утас:</span><b>${f.salesPhone}</b></p><p><span>Түгээгчийн нэр:</span><b>${f.deliveryName}</b></p><p><span>Түгээгчийн утас:</span><b>${f.deliveryPhone}</b></p><p><span>Дансны нэр:</span><b>ТОМУДА групп</b></p><p><span>Регистрийн дугаар:</span><b>5397987</b></p><p><span>Банкны нэр:</span><b>Хаан банк</b></p><p><span>Дансны дугаар:</span><b>51333333307</b></p></td><td><p><span>Харилцагч:</span><b>${f.customerName}</b></p><p><span>Регистрийн дугаар:</span><b>${f.customerReg}</b></p><p><span>Компанийн нэр:</span><b>${f.companyName}</b></p><p><span>Утасны дугаар:</span><b>${f.customerPhone}</b></p><p><span>Төлбөрийн нөхцөл:</span><b>${receiptPaymentChecksHtml(f.paid, f.bank)}</b></p><p class="receipt-address"><span>Хаяг:</span><b>${f.address}</b></p></td></tr></table>`;
 }
 function receiptPaymentChecksHtml(paid, bank) {
   return `<span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлнээр&nbsp;&nbsp;<span class="receipt-check">${bank ? "☑" : "☐"}</span> Дансаар`;
 }
 function receiptHeaderHtml(logoSrc, o) {
-  const deliveryDate = receiptDeliveryDateLabel(o);
-  return `<header class="receipt-header"><img src="${logoSrc}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>${RECEIPT_COMPANY.name}</h1><p>${RECEIPT_COMPANY.address1}</p><p>${RECEIPT_COMPANY.address2}</p></div><div class="receipt-date"><p>Хүргэлтийн огноо:</p><b>${deliveryDate}</b></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</h2>`;
-}
-function receiptMetaGridHtml(o) {
-  const f = receiptPartyFields(o);
-  return `<table class="receipt-meta-grid" role="presentation"><tbody><tr><td class="receipt-meta-grid__label">Худалдааны төлөөлөгч:</td><td class="receipt-meta-grid__value">${f.salesName}</td><td class="receipt-meta-grid__label">Харилцагч:</td><td class="receipt-meta-grid__value">${f.customerName}</td></tr><tr><td class="receipt-meta-grid__label">Худалдааны төлөөлөгчийн утас:</td><td class="receipt-meta-grid__value">${f.salesPhone}</td><td class="receipt-meta-grid__label">Регистерийн дугаар:</td><td class="receipt-meta-grid__value">${f.customerReg}</td></tr><tr><td class="receipt-meta-grid__label">Түгээгчийн нэр:</td><td class="receipt-meta-grid__value">${f.deliveryName}</td><td class="receipt-meta-grid__label">Компаний нэр:</td><td class="receipt-meta-grid__value">${f.companyName}</td></tr><tr><td class="receipt-meta-grid__label">Түгээгчийн утас:</td><td class="receipt-meta-grid__value">${f.deliveryPhone}</td><td class="receipt-meta-grid__label">Утасны дугаар:</td><td class="receipt-meta-grid__value">${f.customerPhone}</td></tr><tr><td class="receipt-meta-grid__label">Дансны нэр:</td><td class="receipt-meta-grid__value">${RECEIPT_COMPANY.accountName}</td><td class="receipt-meta-grid__label">Төлбөрийн нөхцөл:</td><td class="receipt-meta-grid__value receipt-meta-grid__checks">${receiptPaymentChecksHtml(f.paid, f.bank)}</td></tr><tr><td class="receipt-meta-grid__label">Регистерийн дугаар:</td><td class="receipt-meta-grid__value">${RECEIPT_COMPANY.regNo}</td><td class="receipt-meta-grid__label receipt-meta-grid__label--stack" rowspan="3">Хүргэлтийн хаяг:</td><td class="receipt-meta-grid__value receipt-meta-grid__address" rowspan="3">${f.address}</td></tr><tr><td class="receipt-meta-grid__label">Банкны нэр:</td><td class="receipt-meta-grid__value">${RECEIPT_COMPANY.bank}</td></tr><tr><td class="receipt-meta-grid__label">Дансны дугаар:</td><td class="receipt-meta-grid__value receipt-meta-grid__account"><span>IBAN: ${RECEIPT_COMPANY.iban}</span><strong>${RECEIPT_COMPANY.accountNo}</strong></td></tr></tbody></table>`;
+  return `<header class="receipt-header"><img src="${logoSrc}" alt="ТОМУДА" class="receipt-logo"><div class="receipt-company"><h1>ТОМУДА групп ХХК</h1><p>Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/</p><p>Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357</p></div></header><h2 class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</h2>`;
 }
 function receiptTableRowsHtml(o) {
-  const items = (o.items || []).filter((i) => !i.isPromoFree);
-  const rows = items.map((i, n) => {
-    const p = state.products.find((x) => x.id === i.productId) || {};
-    return `<tr><td>${n + 1}</td><td>${esc(i.productName)}</td><td>${esc(p.unit || "ш")}</td><td>${esc(p.barcode || "-")}</td><td class="receipt-table__qty">${i.quantity}</td><td>${receiptMoney(i.price)}</td><td>${receiptMoney(i.total)}</td></tr>`;
-  });
-  for (let n = rows.length; n < RECEIPT_TABLE_MIN_ROWS; n += 1) {
-    rows.push(
-      `<tr class="receipt-table__pad"><td>${n + 1}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`,
-    );
-  }
-  return rows.join("");
+  return (o.items || [])
+    .filter((i) => !i.isPromoFree)
+    .map((i, n) => {
+      const p = state.products.find((x) => x.id === i.productId) || {};
+      return `<tr><td>${n + 1}</td><td>${esc(i.productName)}</td><td>${esc(p.unit || "ш")}</td><td>${esc(p.barcode || "-")}</td><td>${i.quantity}</td><td>${receiptMoney(i.price)}</td><td>${receiptMoney(i.total)}</td></tr>`;
+    })
+    .join("");
 }
 function receiptTableHtml(o) {
   return `<table class="receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Тоо/ш</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${receiptTableRowsHtml(o)}</tbody></table>`;
@@ -381,8 +362,9 @@ function receiptPromoRowsHtml(o) {
     )
     .join("");
 }
-function receiptTotalsBlockHtml(o) {
-  const discount = orderDiscountAmount(o),
+function receiptTotalsBlockHtml(o, { excel = false } = {}) {
+  const gross = orderGrossTotal(o),
+    discount = orderDiscountAmount(o),
     payable = orderPayableTotal(o),
     sub = payable / 1.1,
     vat = payable - sub,
@@ -393,11 +375,22 @@ function receiptTotalsBlockHtml(o) {
         : 0,
     grandLabel = pct
       ? `Таны нийт төлөх дүн (Бэлэн төлөлтийн ${pct}% хасагдав)`
-      : "Таны нийт төлөх дүн";
-  return `<div class="receipt-return-note"><span class="receipt-return-note__label">Буцаалтын тэмдэглэгээ:</span><div class="receipt-return-note__area"></div></div>${settlement ? `<div class="receipt-settlement-note">${esc(settlement)}</div>` : ""}${receiptGrossPercentNoticeHtml(o)}<section class="receipt-promo-block"><div class="receipt-promo-head"><b>Урамшуулал</b><span>Үнэтрүүлэгч</span><span>Дүн</span></div>${receiptPromoRowsHtml(o)}</section><section class="receipt-totals"><div class="receipt-total-line"><b>Бараа ажил үйлчилгээний дүн</b><strong>${receiptMoney(sub)}</strong></div><div class="receipt-total-line"><b>НӨАТ</b><strong>${receiptMoney(vat)}</strong></div>${discount ? `<div class="receipt-total-line"><b>Хөнгөлөлт (${pct}%)</b><strong>-${receiptMoney(discount)}</strong></div>` : ""}<div class="receipt-grand-total"><span class="receipt-grand-total__label">${grandLabel}</span><strong class="receipt-grand-total__amount">${receiptMoney(payable)}</strong></div></section><section class="receipt-warning"><p>Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.</p><p><b>Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.</b></p><p>Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p><b>Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</b></p></section><footer class="receipt-sign"><p><span>Хүлээлгэн өгсөн ажилтны гарын үсэг:</span><b></b></p><p><span>Хүлээн авсан ажилтны гарын үсэг:</span><b></b></p></footer>`;
+      : "Таны нийт төлөх дүн",
+    promoRows = receiptPromoRowsHtml(o),
+    grossBar = excel
+      ? `<div class="receipt-gross-bar"><table role="presentation"><tr><td>Хувь хасагдаагүй нийт үнийн дүн</td><td><strong>${receiptMoney(gross)}</strong></td></tr></table></div>`
+      : `<div class="receipt-gross-bar"><span>Хувь хасагдаагүй нийт үнийн дүн</span><strong>${receiptMoney(gross)}</strong></div>`,
+    totalLine = (label, value) =>
+      excel
+        ? `<div class="receipt-total-line"><table role="presentation"><tr><td><b>${label}</b></td><td><strong>${value}</strong></td></tr></table></div>`
+        : `<div class="receipt-total-line"><b>${label}</b><strong>${value}</strong></div>`,
+    grandTotal = excel
+      ? `<div class="receipt-grand-total"><table role="presentation"><tr><td class="receipt-grand-total__label">${grandLabel}</td><td class="receipt-grand-total__amount"><strong>${receiptMoney(payable)}</strong></td></tr></table></div>`
+      : `<div class="receipt-grand-total"><span class="receipt-grand-total__label">${grandLabel}</span><strong class="receipt-grand-total__amount">${receiptMoney(payable)}</strong></div>`;
+  return `${grossBar}${settlement ? `<div class="receipt-settlement-note">${esc(settlement)}</div>` : ""}${receiptGrossPercentNoticeHtml(o)}<section class="receipt-promo-block"><div class="receipt-promo-head"><b>Урамшуулал</b><span>Үнэтрүүлэгч</span><span>Дүн</span></div>${promoRows}</section><section class="receipt-totals">${totalLine("Бараа ажил үйлчилгээний дүн", receiptMoney(sub))}${totalLine("НӨАТ", receiptMoney(vat))}${discount ? totalLine(`Хөнгөлөлт (${pct}%)`, `-${receiptMoney(discount)}`) : ""}${grandTotal}</section><section class="receipt-warning"><p>Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.</p><p><b>Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.</b></p><p>Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p><b>Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</b></p></section><footer class="receipt-sign"><p><span>Хүлээлгэн өгсөн ажилтны гарын үсэг:</span><b></b></p><p><span>Хүлээн авсан ажилтны гарын үсэг:</span><b></b></p></footer>`;
 }
 function receiptPageHtml(o, logoSrc) {
-  return `${receiptHeaderHtml(logoSrc, o)}${receiptMetaGridHtml(o)}${receiptTableHtml(o)}<section class="receipt-footer-block">${receiptTotalsBlockHtml(o)}</section>`;
+  return `${receiptHeaderHtml(logoSrc, o)}${receiptInfoSectionHtml(o)}${receiptTableHtml(o)}<section class="receipt-footer-block">${receiptTotalsBlockHtml(o)}</section>`;
 }
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
@@ -1305,6 +1298,7 @@ function currentPageTitle(nav) {
   }
   const extra = {
     employees: "Ажилтан",
+    employeePermissions: "Эрх үүсгэх",
     inventory: "Агуулах",
     reports: "Тайлан",
     promotions: "Урамшуулал",
@@ -2849,7 +2843,11 @@ function adminHubHtml() {
     ["reports", "Тайлан", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "settings.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "warehouse.view"],
-  ].filter(([, , , perm]) => hasPermission(perm));
+    ["employeePermissions", "Эрх үүсгэх", "employees", "__permissions__"],
+  ].filter(([id, , , perm]) => {
+    if (id === "employeePermissions") return canManageEmployeePermissions();
+    return hasPermission(perm);
+  });
   const settings = [
     ["stockAlertModal()", "ҮЛДЭГДЭЛ САНУУЛАХ", "stock"],
     [
@@ -3106,51 +3104,45 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-excel-sheet { display: block; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page { width: 720px; margin: 0 auto; padding: 12px 10px; font-size: 11px; line-height: 1.25; font-family: ${RECEIPT_FONT}; }
-.receipt-header { display: table; width: 100%; margin-bottom: 8px; table-layout: fixed; }
-.receipt-logo { width: 64px; height: 64px; object-fit: contain; display: table-cell; vertical-align: top; }
-.receipt-company { display: table-cell; vertical-align: top; padding: 0 8px; }
-.receipt-date { display: table-cell; vertical-align: top; text-align: right; white-space: nowrap; width: 120px; }
-.receipt-date p { margin: 0 0 2px; font-size: 10px; color: #444; }
-.receipt-date b { font-size: 11px; font-weight: 700; }
-.receipt-company h1 { font-size: 16px; margin: 0 0 4px; font-weight: 800; letter-spacing: 0.02em; }
+.receipt-header { display: table; width: 100%; margin-bottom: 8px; }
+.receipt-logo { width: 64px; height: 64px; object-fit: contain; display: inline-block; vertical-align: top; }
+.receipt-company { display: inline-block; vertical-align: top; width: calc(100% - 72px); padding-left: 8px; }
+.receipt-company h1 { font-size: 16px; margin: 0 0 4px; font-weight: 800; }
 .receipt-company p { margin: 2px 0; }
 .receipt-title { text-align: center; font-family: ${RECEIPT_FONT}; font-size: 18px; margin: 10px 0 14px; font-weight: 900; }
-.receipt-meta-grid { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }
-.receipt-meta-grid td { border: 1px solid #777; padding: 4px 5px; vertical-align: top; }
-.receipt-meta-grid__label { width: 24%; color: #444; }
-.receipt-meta-grid__value { font-weight: 700; }
-.receipt-meta-grid__label--stack { vertical-align: top; }
-.receipt-meta-grid__address { line-height: 1.35; font-weight: 700; }
-.receipt-meta-grid__account span { display: block; font-weight: 400; margin-bottom: 2px; }
-.receipt-meta-grid__account strong { display: block; font-size: 12px; }
-.receipt-meta-grid__checks { font-weight: 400; }
+.receipt-info { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.receipt-info td { vertical-align: top; width: 50%; padding: 0 10px 0 0; }
+.receipt-info p { margin: 3px 0; }
+.receipt-info span { display: inline-block; min-width: 150px; color: #444; }
+.receipt-info b { font-weight: 800; }
+.receipt-address b { display: inline-block; max-width: 320px; }
 .receipt-check { font-size: 13px; }
 .receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 0; table-layout: fixed; }
 .receipt-table th, .receipt-table td { border: 1px solid #777; padding: 4px 5px; text-align: left; vertical-align: middle; }
-.receipt-table tbody td { border-top: none; border-bottom: 1px dashed #999; }
-.receipt-table tbody tr:last-child td { border-bottom: 1px solid #777; }
-.receipt-table th { font-weight: 800; text-align: center; background: #f3f3f3; border-bottom: 1px solid #777; }
+.receipt-table th { font-weight: 800; text-align: center; background: #f3f3f3; }
 .receipt-table th:nth-child(1), .receipt-table td:nth-child(1) { width: 28px; text-align: right; }
 .receipt-table th:nth-child(n+5), .receipt-table td:nth-child(n+5) { text-align: right; }
-.receipt-table__qty { font-weight: 800; }
-.receipt-return-note { display: table; width: 100%; border-collapse: collapse; margin-top: 8px; }
-.receipt-return-note__label { display: table-cell; width: 150px; padding: 6px 8px 6px 0; vertical-align: top; font-weight: 700; white-space: nowrap; }
-.receipt-return-note__area { display: table-cell; min-height: 28px; background: #eceff2; border: 1px solid #c8ced4; }
+.receipt-gross-bar { background: #e8ebee; padding: 6px 8px; font-weight: 800; margin-bottom: 4px; }
+.receipt-gross-bar table { width: 100%; border-collapse: collapse; }
+.receipt-gross-bar td { border: none; padding: 0; }
+.receipt-gross-bar td:last-child { text-align: right; font-size: 14px; white-space: nowrap; }
 .receipt-gross-note { background: #fff3cd; color: #7a5b00; text-align: center; padding: 6px 8px; font-size: 11px; font-weight: 700; line-height: 1.4; margin: 6px 0; }
-.receipt-settlement-note { background: #fff3cd; text-align: center; padding: 6px 8px; font-weight: 700; margin: 6px 0; }
-.receipt-promo-block { margin: 8px 0; font-size: 11px; }
-.receipt-promo-head, .receipt-promo-row { display: table; width: 100%; border-bottom: 1px dotted #999; padding: 2px 0; }
-.receipt-promo-head b, .receipt-promo-head span, .receipt-promo-row span, .receipt-promo-row strong { display: table-cell; }
-.receipt-promo-head b { font-size: 14px; font-weight: 800; }
+.receipt-settlement-note { background: #fff3cd; text-align: center; padding: 6px 8px; font-weight: 700; margin-bottom: 6px; }
+.receipt-promo-block { margin-bottom: 8px; padding: 4px 6px; border: 1.2px solid #16899a; background: #e8f6f3; color: #0f5f68; font-size: 11px; }
+.receipt-promo-head, .receipt-promo-row { display: table; width: 100%; border-bottom: 1px dotted #6fb6ac; padding: 2px 0; }
+.receipt-promo-head b { font-size: 14px; }
+.receipt-promo-row span, .receipt-promo-row strong { display: table-cell; }
 .receipt-promo-row strong { text-align: right; font-weight: 800; width: 90px; }
 .receipt-totals { margin-top: 6px; }
-.receipt-total-line { display: table; width: 100%; border-bottom: 1px dotted #999; padding: 3px 0; font-size: 12px; }
-.receipt-total-line b, .receipt-total-line strong { display: table-cell; }
-.receipt-total-line strong { text-align: right; font-weight: 800; white-space: nowrap; width: 120px; }
-.receipt-grand-total { display: table; width: 100%; background: #d9dde2; color: #111; padding: 8px 10px; margin-top: 4px; font-weight: 800; }
-.receipt-grand-total__label, .receipt-grand-total__amount { display: table-cell; vertical-align: middle; }
+.receipt-total-line { border-bottom: 1px dotted #999; padding: 3px 0; font-size: 12px; }
+.receipt-total-line table { width: 100%; border-collapse: collapse; }
+.receipt-total-line td { border: none; padding: 0; }
+.receipt-total-line td:last-child { text-align: right; font-weight: 800; white-space: nowrap; }
+.receipt-grand-total { background: #5f6b78; color: #fff; padding: 8px 10px; margin-top: 4px; font-weight: 800; }
+.receipt-grand-total table { width: 100%; border-collapse: collapse; color: #fff; }
+.receipt-grand-total td { border: none; padding: 0; vertical-align: middle; }
 .receipt-grand-total__label { font-size: 12px; line-height: 1.35; }
-.receipt-grand-total__amount { text-align: right; font-size: 22px; font-weight: 900; white-space: nowrap; width: 120px; }
+.receipt-grand-total__amount { text-align: right; font-size: 22px; font-weight: 900; white-space: nowrap; }
 .receipt-warning { background: #edf0f2; text-align: center; padding: 8px 12px; margin: 10px 0; font-size: 11px; }
 .receipt-warning p { margin: 3px 0; }
 .receipt-sign { margin-top: 12px; font-size: 12px; }
@@ -3177,7 +3169,7 @@ async function getReceiptExcelLogoDataUri() {
   }
 }
 function receiptExcelPage(o, logoSrc) {
-  return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptPageHtml(o, logoSrc)}</div></div>`;
+  return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptHeaderHtml(logoSrc, o)}${receiptExcelInfoGridHtml(o)}${receiptTableHtml(o)}<section class="receipt-footer-block">${receiptTotalsBlockHtml(o, { excel: true })}</section></div></div>`;
 }
 function buildReceiptExcelDocument(orders, logoSrc) {
   const pages = orders
@@ -4174,13 +4166,10 @@ function productCard(p) {
   const catLine = p.category || "-";
   const stock = p.stock ?? 0;
   const stockClass = isLowStock(p) ? " catalog-card__stat--warn" : "";
-  const costMeta = hasPermission("warehouse.edit")
-    ? `<p class="catalog-card__meta">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "—"}</p>`
-    : "";
   const actions = canManageProducts()
     ? `<footer class="catalog-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${p.id}')" class="catalog-card__btn catalog-card__btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="catalog-card__btn catalog-card__btn--delete">Устгах</button></footer>`
     : "";
-  return `<article class="catalog-card product-card catalog-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="catalog-card__media"><img src="${productImage(p)}" alt="${esc(p.name)}" class="catalog-card__img" loading="lazy" decoding="async"></div><div class="catalog-card__body"><h3 class="catalog-card__title" title="${esc(p.name)}">${esc(p.name)}</h3><p class="catalog-card__value">${fmt(p.price)}</p><div class="catalog-card__split">${catalogCardStat("Үлд", stock, stockClass)}${catalogCardStat("Ан", catLine)}</div>${costMeta}<p class="catalog-card__meta catalog-card__meta--mono">${esc(p.barcode || "—")}</p></div>${actions}</article>`;
+  return `<article class="catalog-card product-card catalog-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="catalog-card__media product-card__media"><img src="${productImage(p)}" alt="${esc(p.name)}" class="catalog-card__img" loading="lazy" decoding="async"></div><div class="catalog-card__body product-card__body"><div class="product-card__field product-card__field--name"><span class="product-card__label">Нэр</span><span class="product-card__text" title="${esc(p.name)}">${esc(p.name)}</span></div><div class="product-card__field product-card__field--price"><span class="product-card__label">Үнэ</span><span class="product-card__text product-card__text--price">${fmt(p.price)}</span></div><div class="catalog-card__split product-card__split">${catalogCardStat("Үлд", stock, stockClass)}${catalogCardStat("Ан", catLine)}</div></div></div>${actions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -4693,14 +4682,14 @@ function countView() {
       : `<p class="count-view__hint">Тоо оруулах эсвэл «Шинэ» дарж тооллого эхлүүлнэ.</p>`;
   const countListPanel = state.countDone
     ? ""
-    : `<div class="line-panel">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "count", value: q, placeholder: "Хайх..." }) })}<div class="inventory-categories flex flex-wrap gap-2 px-0 pb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
+    : `<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
         .map(
           (c) =>
             `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
         )
         .join(
           "",
-        )}</div><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
+        )}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
   return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}${countListPanel}<div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
@@ -5220,6 +5209,30 @@ function warehouseSheetDateLabel() {
   }
   return countSheetDateLabel();
 }
+function warehousePrepareProduct(row) {
+  const id = row.productId;
+  const name = row.productName;
+  if (id) {
+    const byId = state.products.find((x) => String(x.id) === String(id));
+    if (byId) return byId;
+  }
+  if (name) {
+    const key = String(name).trim().toLowerCase();
+    const byName = state.products.find(
+      (x) => String(x.name || "").trim().toLowerCase() === key,
+    );
+    if (byName) return byName;
+  }
+  return {
+    id: id || name || "",
+    name: name || id || "-",
+    category: "Бусад",
+    unit: "",
+    barcode: "",
+    stock: 0,
+    boxQuantity: 0,
+  };
+}
 function warehouseOrderProductsGrouped(orders) {
   const map = {};
   orders.forEach((o) =>
@@ -5237,11 +5250,7 @@ function warehouseOrderProductsGrouped(orders) {
   );
   const items = Object.values(map)
     .map((row) => {
-      const p = state.products.find((x) => x.id === row.productId) || {
-        id: row.productId,
-        name: row.productName || row.productId,
-        category: "Бусад",
-      };
+      const p = warehousePrepareProduct(row);
       return { product: p, qty: row.qty };
     })
     .sort(
@@ -5403,14 +5412,14 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     const r = rowNum;
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
-      xlsxCellXml(`B${r}`, 8, si(p.unit || ""), "s"),
+      xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
       xlsxBarcodeCell(`C${r}`, 9, p.barcode, si),
       xlsxOptionalNum(`D${r}`, 10, packs),
       xlsxOptionalNum(`E${r}`, 10, pieces),
       xlsxCellXml(`F${r}`, 8, Number(p.stock) || 0, "n"),
     ]);
   }
-  pushRow(null, emptyCells(rowNum, "A", "E", 2));
+  pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   pushRow(47.25, []);
   const sign1 = rowNum;
   merges.push(`A${sign1}:B${sign1}`, `C${sign1}:E${sign1}`);
@@ -5425,6 +5434,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ),
     xlsxCellXml(`D${sign1}`, 18, null, "empty"),
     xlsxCellXml(`E${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign1}`, 18, null, "empty"),
   ]);
   const sign2 = rowNum;
   merges.push(`C${sign2}:E${sign2}`);
@@ -5434,6 +5444,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`C${sign2}`, 16, si("гарын үсэг"), "s"),
     xlsxCellXml(`D${sign2}`, 16, null, "empty"),
     xlsxCellXml(`E${sign2}`, 16, null, "empty"),
+    xlsxCellXml(`F${sign2}`, 16, null, "empty"),
   ]);
   const sign3 = rowNum;
   merges.push(`A${sign3}:B${sign3}`, `C${sign3}:E${sign3}`);
@@ -5448,13 +5459,17 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ),
     xlsxCellXml(`D${sign3}`, 18, null, "empty"),
     xlsxCellXml(`E${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign3}`, 18, null, "empty"),
   ]);
   const sign4 = rowNum;
   merges.push(`C${sign4}:E${sign4}`);
   pushRow(null, [
+    xlsxCellXml(`A${sign4}`, 12, null, "empty"),
+    xlsxCellXml(`B${sign4}`, 12, null, "empty"),
     xlsxCellXml(`C${sign4}`, 16, si("гарын үсэг"), "s"),
     xlsxCellXml(`D${sign4}`, 16, null, "empty"),
     xlsxCellXml(`E${sign4}`, 16, null, "empty"),
+    xlsxCellXml(`F${sign4}`, 16, null, "empty"),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -5512,7 +5527,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     const { packs, pieces } = pickerQtyToParts(item.qty, p);
     sheetRows.push([
       p.name || "",
-      p.unit || "",
+      p.unit || "ширхэг",
       p.barcode || "",
       packs || "",
       pieces || "",
@@ -6767,10 +6782,7 @@ function employeesView() {
   const addBtn = hasPermission("employees.create")
     ? `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`
     : "";
-  const permBtn = canManageEmployeePermissions()
-    ? `<button type="button" onclick="openEmployeePermissionsPage()" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Эрх үүсгэх</button>`
-    : "";
-  const headActions = [permBtn, addBtn].filter(Boolean).join("");
+  const headActions = addBtn;
   const editBtn = (e) =>
     hasPermission("employees.edit")
       ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
@@ -7318,14 +7330,22 @@ function clearDeliveryEmployee() {
 function qtyDetail(orders) {
   const map = {};
   orders.forEach((o) =>
-    o.items.forEach(
-      (i) => (map[i.productId] = (map[i.productId] || 0) + i.quantity),
-    ),
+    o.items.forEach((i) => {
+      const key = i.productId || i.productName;
+      if (!map[key]) {
+        map[key] = {
+          productId: i.productId,
+          productName: i.productName,
+          qty: 0,
+        };
+      }
+      map[key].qty += i.quantity;
+    }),
   );
-  return Object.entries(map)
-    .map(([id, qty]) => ({
-      product: state.products.find((p) => p.id === id) || {},
-      qty,
+  return Object.values(map)
+    .map((row) => ({
+      product: warehousePrepareProduct(row),
+      qty: row.qty,
     }))
     .sort((a, b) => b.qty - a.qty);
 }
@@ -8352,13 +8372,9 @@ function employeeModal(id) {
   const passwordAttrs = isEdit
     ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
-  const permHtml = permApi().permissionsFieldHtml(
-    employeePermissionsSelected(e, selectedRole),
-    selectedRole,
-  );
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div>${permHtml}<select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField();syncEmployeePermissionsFromRole()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label><p class="text-xs text-muted-foreground">Эрхийг Админ → Эрх үүсгэх хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-lg",
   );
   setTimeout(() => {
@@ -8382,8 +8398,13 @@ function buildEmployeeDataFromForm(form, editId = "") {
     return { error: "Энэ email аль хэдийн бүртгэгдсэн байна" };
   }
   const roleValue = f.role || "sales";
+  const existing = editId
+    ? state.employees.find((emp) => emp.id === editId)
+    : null;
   const permissions = permApi()
-    ? permApi().permissionsFromForm(form)
+    ? existing?.permissions?.length && existing.role === roleValue
+      ? permApi().normalizeKeys(existing.permissions)
+      : permApi().templateForRole(roleValue)
     : permApi()?.templateForRole(roleValue) || [];
   if (!permissions.length) {
     return { error: "Дор хаяж нэг эрх сонгоно уу" };
