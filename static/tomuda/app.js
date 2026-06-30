@@ -3289,14 +3289,348 @@ function exportOrderReceiptsExcelCsv(orders) {
   });
   excel(`zahialgiin-barimt-${stamp}.csv`, sheetRows);
 }
+const RECEIPT_XLSX_LAST_COL = "K";
+const RECEIPT_XLSX_TEMPLATE =
+  "/static/tomuda/templates/receipt-template.xls";
+const RECEIPT_COMPANY_ADDRESS =
+  "Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/                                             Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357";
+function excelSerialFromDate(value) {
+  const d = value ? new Date(value) : new Date();
+  if (Number.isNaN(d.getTime())) return excelSerialFromDate(new Date());
+  return (
+    (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
+      Date.UTC(1899, 11, 30)) /
+    86400000
+  );
+}
+function createReceiptStringContext() {
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  return { strings, si };
+}
+function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) {
+  const { strings, si } = ctx;
+  const merges = ["C3:J3", "C2:J2"];
+  const rows = [];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(xlsxRowXml(rowNum, height, cells, RECEIPT_XLSX_LAST_COL));
+    rowNum += 1;
+  };
+  const emptyCells = (row, from = "A", to = RECEIPT_XLSX_LAST_COL, style = 1) => {
+    const cols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      .slice("ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(from), "ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(to) + 1);
+    return cols.split("").map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
+  const metaPairRow = (row, leftLabel, leftValue, rightLabel, rightValue) => [
+    xlsxCellXml(`B${row}`, 3, si(leftLabel), "s"),
+    xlsxCellXml(`D${row}`, 4, si(leftValue), "s"),
+    xlsxCellXml(`F${row}`, 3, si(rightLabel), "s"),
+    xlsxCellXml(`I${row}`, 4, si(rightValue), "s"),
+    ...emptyCells(row, "A", "A"),
+    ...emptyCells(row, "E", "E"),
+    ...emptyCells(row, "G", "H"),
+    ...emptyCells(row, "J", RECEIPT_XLSX_LAST_COL),
+  ];
+  const f = receiptPartyFields(o);
+  const receiptNo = formatReceiptNumber(o);
+  const items = (o.items || []).filter((i) => !i.isPromoFree);
+  const promoItems = (o.items || []).filter((i) => i.isPromoFree);
+  const discount = orderDiscountAmount(o);
+  const payable = orderPayableTotal(o);
+  const sub = payable / 1.1;
+  const vat = payable - sub;
+  const pct =
+    o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+      : 0;
+  const paid = o.paymentTerm === "cash" || o.isPaid;
+  const bank = o.paymentTerm === "credit" && !o.isPaid;
+  const settlement = settlementNoteText(o);
+  const grossNotice =
+    !o.applyPercentDiscount && isCashPayment(o.paymentTerm) && !orderInWarehouseLiveSession(o)
+      ? `Анхаар: Захиалгыг өнөөдөрт шилжүүлээгүй тохиолдолд хувь (${percentDiscountRate()}%) хасагдаагүй энэ дүнгээр тооцоо хийгдэнэ.`
+      : "";
+  pushRow(20.25, [
+    xlsxCellXml("C1", 13, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml("K1", 3, si("Хүргэлтийн огноо:"), "s"),
+    ...emptyCells(1, "A", "B"),
+    ...emptyCells(1, "D", "J"),
+  ]);
+  pushRow(27, [
+    xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
+    xlsxCellXml("K2", 12, excelSerialFromDate(o.createdAt), "n"),
+    ...emptyCells(2, "A", "B"),
+    ...emptyCells(2, "L", RECEIPT_XLSX_LAST_COL),
+  ]);
+  pushRow(31.5, [
+    xlsxCellXml("C3", 13, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(3, "A", "B"),
+    ...emptyCells(3, "K", RECEIPT_XLSX_LAST_COL, 13),
+  ]);
+  pushRow(14.25, metaPairRow(rowNum, "Худалдааны төлөөлөгч:", f.salesName, "Харилцагч:", f.customerName));
+  pushRow(14.25, metaPairRow(rowNum, "Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg));
+  pushRow(14.25, metaPairRow(rowNum, "Түгээгчийн нэр:", f.deliveryName, "Компаний нэр:", f.companyName));
+  pushRow(14.25, metaPairRow(rowNum, "Түгээгчийн утас:", f.deliveryPhone, "Утасны дугаар:", f.customerPhone));
+  pushRow(14.25, emptyCells(rowNum));
+  const bankNameRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${bankNameRow}`, 3, si("Дансны нэр:"), "s"),
+    xlsxCellXml(`D${bankNameRow}`, 4, si("ТОМУДА групп"), "s"),
+    xlsxCellXml(`F${bankNameRow}`, 3, si("Хүргэлтийн хаяг:"), "s"),
+    ...emptyCells(bankNameRow, "A", "A"),
+    ...emptyCells(bankNameRow, "E", "E"),
+    ...emptyCells(bankNameRow, "G", RECEIPT_XLSX_LAST_COL),
+  ]);
+  merges.push(`B${bankNameRow}:C${bankNameRow}`, `D${bankNameRow}:E${bankNameRow}`);
+  const bankRegRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${bankRegRow}`, 3, si("Регистерийн дугаар:"), "s"),
+    xlsxCellXml(`D${bankRegRow}`, 4, si("5397987"), "s"),
+    xlsxCellXml(`F${bankRegRow}`, 4, si(f.address), "s"),
+    ...emptyCells(bankRegRow, "A", "A"),
+    ...emptyCells(bankRegRow, "E", "E"),
+    ...emptyCells(bankRegRow, "G", RECEIPT_XLSX_LAST_COL),
+  ]);
+  merges.push(`D${bankRegRow}:E${bankRegRow}`, `F${bankRegRow}:K${bankRegRow}`);
+  const bankTitleRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${bankTitleRow}`, 3, si("Банкны нэр:"), "s"),
+    xlsxCellXml(`D${bankTitleRow}`, 4, si("Хаан банк"), "s"),
+    ...emptyCells(bankTitleRow, "A", "A"),
+    ...emptyCells(bankTitleRow, "E", RECEIPT_XLSX_LAST_COL),
+  ]);
+  merges.push(`D${bankTitleRow}:E${bankTitleRow}`);
+  const bankAcctRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${bankAcctRow}`, 3, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(`D${bankAcctRow}`, 4, si("51333333307"), "s"),
+    ...emptyCells(bankAcctRow, "A", "A"),
+    ...emptyCells(bankAcctRow, "E", RECEIPT_XLSX_LAST_COL),
+  ]);
+  merges.push(`D${bankAcctRow}:E${bankAcctRow}`);
+  pushRow(14.25, emptyCells(rowNum));
+  const headerRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
+    xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
+    ...emptyCells(headerRow, "A", "A"),
+    ...emptyCells(headerRow, "C", "D"),
+    ...emptyCells(headerRow, "G", "G"),
+    ...emptyCells(headerRow, "I", "I"),
+  ]);
+  items.forEach((item, index) => {
+    const p = state.products.find((x) => x.id === item.productId) || {};
+    const r = rowNum;
+    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
+    pushRow(14.25, [
+      xlsxCellXml(`A${r}`, 10, index + 1, "n"),
+      xlsxCellXml(`B${r}`, 8, si(item.productName || ""), "s"),
+      xlsxCellXml(`E${r}`, 8, si(p.unit || "ш"), "s"),
+      xlsxBarcodeCell(`F${r}`, 9, p.barcode, si),
+      xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n"),
+      xlsxCellXml(`J${r}`, 10, Number(item.price) || 0, "n"),
+      xlsxCellXml(`K${r}`, 10, Number(item.total) || 0, "n"),
+      xlsxCellXml(`C${r}`, 8, null, "empty"),
+      xlsxCellXml(`D${r}`, 8, null, "empty"),
+      xlsxCellXml(`G${r}`, 8, null, "empty"),
+      xlsxCellXml(`I${r}`, 10, null, "empty"),
+    ]);
+  });
+  pushRow(14.25, emptyCells(rowNum));
+  const noteRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${noteRow}`, 8, si("Буцаалтын тэмдэглэгээ:"), "s"),
+    ...emptyCells(noteRow, "A", "A"),
+    ...emptyCells(noteRow, "C", RECEIPT_XLSX_LAST_COL),
+  ]);
+  if (settlement || grossNotice) {
+    const settleRow = rowNum;
+    merges.push(`B${settleRow}:K${settleRow}`);
+    pushRow(14.25, [
+      xlsxCellXml(`B${settleRow}`, 8, si(settlement || grossNotice), "s"),
+      ...emptyCells(settleRow, "A", "A"),
+      ...emptyCells(settleRow, "C", RECEIPT_XLSX_LAST_COL),
+    ]);
+  }
+  if (promoItems.length) {
+    promoItems.forEach((item, idx) => {
+      const r = rowNum;
+      if (idx === 0) {
+        pushRow(14.25, [
+          xlsxCellXml(`C${r}`, 15, si("Урамшуулал"), "s"),
+          xlsxCellXml(`E${r}`, 8, si(item.productName || ""), "s"),
+          xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n"),
+          xlsxCellXml(`J${r}`, 10, 0, "n"),
+          xlsxCellXml(`K${r}`, 10, 0, "n"),
+          ...emptyCells(r, "A", "B"),
+          ...emptyCells(r, "D", "D"),
+          ...emptyCells(r, "F", "G"),
+          ...emptyCells(r, "I", "I"),
+        ]);
+        merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
+      } else {
+        pushRow(14.25, [
+          xlsxCellXml(`E${r}`, 8, si(item.productName || ""), "s"),
+          xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n"),
+          xlsxCellXml(`J${r}`, 10, 0, "n"),
+          xlsxCellXml(`K${r}`, 10, 0, "n"),
+          ...emptyCells(r, "A", "D"),
+          ...emptyCells(r, "F", "G"),
+          ...emptyCells(r, "I", "I"),
+        ]);
+        merges.push(`E${r}:G${r}`, `H${r}:I${r}`);
+      }
+    });
+  }
+  const totalRows = [
+    ["Бараа ажил үйлчилгээний дүн", sub],
+    ["НӨАТ", vat],
+  ];
+  if (discount) totalRows.push([`Хөнгөлөлт (${pct}%)`, -discount]);
+  totalRows.push([
+    pct
+      ? `Таны нийт төлөх дүн (Бэлэн төлөлтийн ${pct}% хасагдав)`
+      : "Таны нийт төлөх дүн",
+    payable,
+  ]);
+  totalRows.forEach(([label, amount], idx) => {
+    const r = rowNum;
+    const labelStyle = idx === totalRows.length - 1 ? 10 : 8;
+    const amountStyle = idx === totalRows.length - 1 ? 10 : 12;
+    merges.push(`B${r}:D${r}`, `E${r}:K${r}`);
+    pushRow(14.25, [
+      xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
+      xlsxCellXml(`E${r}`, amountStyle, Number(amount) || 0, "n"),
+      ...emptyCells(r, "A", "A"),
+      ...emptyCells(r, "F", RECEIPT_XLSX_LAST_COL),
+    ]);
+  });
+  pushRow(14.25, emptyCells(rowNum));
+  const payRow = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`B${payRow}`, 8, si("Төлбөрийн нөхцөл"), "s"),
+    xlsxCellXml(`E${payRow}`, paid ? 10 : 8, si(paid ? "☑ Бэлэн" : "Бэлэн"), "s"),
+    xlsxCellXml(`H${payRow}`, bank ? 10 : 8, si(bank ? "☑ Зээлээр" : "Зээлээр"), "s"),
+    ...emptyCells(payRow, "A", "A"),
+    ...emptyCells(payRow, "C", "D"),
+    ...emptyCells(payRow, "F", "G"),
+    ...emptyCells(payRow, "I", RECEIPT_XLSX_LAST_COL),
+  ]);
+  [
+    "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.",
+    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.",
+    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно",
+    "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
+  ].forEach((text) => {
+    const r = rowNum;
+    merges.push(`B${r}:K${r}`);
+    pushRow(14.25, [
+      xlsxCellXml(`B${r}`, 8, si(text), "s"),
+      ...emptyCells(r, "A", "A"),
+      ...emptyCells(r, "C", RECEIPT_XLSX_LAST_COL),
+    ]);
+  });
+  pushRow(14.25, emptyCells(rowNum));
+  const sign1 = rowNum;
+  merges.push(`B${sign1}:E${sign1}`);
+  pushRow(null, [
+    xlsxCellXml(`B${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"), "s"),
+    ...emptyCells(sign1, "A", "A"),
+    ...emptyCells(sign1, "F", RECEIPT_XLSX_LAST_COL),
+  ]);
+  pushRow(14.25, emptyCells(rowNum));
+  const sign2 = rowNum;
+  merges.push(`B${sign2}:E${sign2}`);
+  pushRow(null, [
+    xlsxCellXml(`B${sign2}`, 17, si("Хүлээн авсан ажилтны гарын үсэг:"), "s"),
+    ...emptyCells(sign2, "A", "A"),
+    ...emptyCells(sign2, "F", RECEIPT_XLSX_LAST_COL),
+  ]);
+  const lastRow = rowNum - 1;
+  const mergeXml = [...new Set(merges)].map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="6.25" customWidth="1"/><col min="3" max="3" width="17.38" customWidth="1"/><col min="4" max="4" width="3.88" customWidth="1"/><col min="5" max="5" width="10.38" customWidth="1"/><col min="6" max="6" width="9.62" customWidth="1"/><col min="7" max="7" width="5.62" customWidth="1"/><col min="8" max="8" width="4.88" customWidth="1"/><col min="9" max="9" width="3.75" customWidth="1"/><col min="10" max="10" width="9.25" customWidth="1"/><col min="11" max="11" width="9.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(strings),
+    sheetXml,
+    sheetName: opts.sheetName || `Баримт ${receiptNo}`.slice(0, 31),
+  };
+}
+function buildReceiptWorkbookXml(orders) {
+  const ctx = createReceiptStringContext();
+  const sheets = orders.map((order, index) => {
+    const built = buildReceiptSheetXml(order, ctx, {
+      sheetName: `Баримт ${index + 1}`,
+    });
+    return { id: index + 1, name: built.sheetName, sheetXml: built.sheetXml };
+  });
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s) => `<sheet name="${xlsxXmlEsc(s.name)}" sheetId="${s.id}" r:id="rId${s.id}"/>`).join("")}</sheets></workbook>`;
+  const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s) => `<Relationship Id="rId${s.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${s.id}.xml"/>`).join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId${sheets.length + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>`;
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((s) => `<Override PartName="/xl/worksheets/sheet${s.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>`;
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
+    sheets,
+    workbookXml,
+    workbookRelsXml,
+    contentTypesXml,
+  };
+}
+async function exportOrderReceiptsExcelXlsx(orders) {
+  if (typeof JSZip === "undefined") throw new Error("JSZip missing");
+  const tpl = await fetch(RECEIPT_XLSX_TEMPLATE).then((r) => {
+    if (!r.ok) throw new Error("template missing");
+    return r.arrayBuffer();
+  });
+  const zip = await JSZip.loadAsync(tpl);
+  const built = buildReceiptWorkbookXml(orders);
+  zip.file("xl/sharedStrings.xml", built.sharedStringsXml);
+  zip.file("xl/workbook.xml", built.workbookXml);
+  zip.file("xl/_rels/workbook.xml.rels", built.workbookRelsXml);
+  zip.file("[Content_Types].xml", built.contentTypesXml);
+  built.sheets.forEach((sheet) => {
+    zip.file(`xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
+  });
+  Object.keys(zip.files)
+    .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
+    .forEach((name) => {
+      const id = Number(name.match(/sheet(\d+)/)[1]);
+      if (!built.sheets.some((s) => s.id === id)) zip.remove(name);
+    });
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = receiptExcelFileName(orders);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return;
   try {
-    const logoSrc = await getReceiptExcelLogoDataUri();
-    const html = buildReceiptExcelDocument(orders, logoSrc);
-    downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
+    await exportOrderReceiptsExcelXlsx(orders);
   } catch {
-    exportOrderReceiptsExcelCsv(orders);
+    try {
+      const logoSrc = await getReceiptExcelLogoDataUri();
+      const html = buildReceiptExcelDocument(orders, logoSrc);
+      downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
+    } catch {
+      exportOrderReceiptsExcelCsv(orders);
+    }
   }
 }
 function confirmVisibleOrderReceiptsExcel(searchKey = "warehouseOrders") {
