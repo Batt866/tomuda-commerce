@@ -3316,9 +3316,21 @@ function createReceiptStringContext() {
   };
   return { strings, si };
 }
+function receiptXlsxStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="m/d/yy"/></numFmts><fonts count="6"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="19"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+}
+function receiptDrawingXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="tomuda-logo.png"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+}
+function receiptDrawingRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
+}
+function receiptSheetRelsXml(sheetId) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${sheetId}.xml"/></Relationships>`;
+}
 function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) {
   const { strings, si } = ctx;
-  const merges = ["C3:J3", "C2:J2"];
+  const merges = ["A1:B2", "C1:F1", "C2:J2", "C3:J3"];
   const rows = [];
   let rowNum = 1;
   const pushRow = (height, cells) => {
@@ -3367,7 +3379,7 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
   ]);
   pushRow(27, [
     xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
-    xlsxCellXml("K2", 12, excelSerialFromDate(o.createdAt), "n"),
+    xlsxCellXml("K2", 18, excelSerialFromDate(o.createdAt), "n"),
     ...emptyCells(2, "A", "B"),
     ...emptyCells(2, "L", RECEIPT_XLSX_LAST_COL),
   ]);
@@ -3431,18 +3443,36 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ...emptyCells(headerRow, "G", "G"),
     ...emptyCells(headerRow, "I", "I"),
   ]);
-  items.forEach((item, index) => {
-    const p = state.products.find((x) => x.id === item.productId) || {};
+  const itemSlots = Math.max(20, items.length);
+  Array.from({ length: itemSlots }).forEach((_, index) => {
+    const item = items[index];
+    const p = item
+      ? state.products.find((x) => x.id === item.productId) || {}
+      : {};
     const r = rowNum;
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushRow(14.25, [
-      xlsxCellXml(`A${r}`, 10, index + 1, "n"),
-      xlsxCellXml(`B${r}`, 8, si(item.productName || ""), "s"),
-      xlsxCellXml(`E${r}`, 8, si(p.unit || "ш"), "s"),
-      xlsxBarcodeCell(`F${r}`, 9, p.barcode, si),
-      xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n"),
-      xlsxCellXml(`J${r}`, 10, Number(item.price) || 0, "n"),
-      xlsxCellXml(`K${r}`, 10, Number(item.total) || 0, "n"),
+      item
+        ? xlsxCellXml(`A${r}`, 10, index + 1, "n")
+        : xlsxCellXml(`A${r}`, 10, null, "empty"),
+      item
+        ? xlsxCellXml(`B${r}`, 8, si(item.productName || ""), "s")
+        : xlsxCellXml(`B${r}`, 8, null, "empty"),
+      item
+        ? xlsxCellXml(`E${r}`, 8, si(p.unit || "ш"), "s")
+        : xlsxCellXml(`E${r}`, 8, null, "empty"),
+      item
+        ? xlsxBarcodeCell(`F${r}`, 9, p.barcode, si)
+        : xlsxCellXml(`F${r}`, 9, null, "empty"),
+      item
+        ? xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n")
+        : xlsxCellXml(`H${r}`, 10, null, "empty"),
+      item
+        ? xlsxCellXml(`J${r}`, 10, Number(item.price) || 0, "n")
+        : xlsxCellXml(`J${r}`, 10, null, "empty"),
+      item
+        ? xlsxCellXml(`K${r}`, 10, Number(item.total) || 0, "n")
+        : xlsxCellXml(`K${r}`, 10, null, "empty"),
       xlsxCellXml(`C${r}`, 8, null, "empty"),
       xlsxCellXml(`D${r}`, 8, null, "empty"),
       xlsxCellXml(`G${r}`, 8, null, "empty"),
@@ -3456,45 +3486,50 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ...emptyCells(noteRow, "A", "A"),
     ...emptyCells(noteRow, "C", RECEIPT_XLSX_LAST_COL),
   ]);
-  if (settlement || grossNotice) {
-    const settleRow = rowNum;
-    merges.push(`B${settleRow}:K${settleRow}`);
+  const settleRow = rowNum;
+  merges.push(`B${settleRow}:K${settleRow}`);
+  pushRow(14.25, [
+    xlsxCellXml(`B${settleRow}`, 8, si(settlement || grossNotice || ""), "s"),
+    ...emptyCells(settleRow, "A", "A"),
+    ...emptyCells(settleRow, "C", RECEIPT_XLSX_LAST_COL),
+  ]);
+  const promoSlots = Math.max(2, promoItems.length);
+  Array.from({ length: promoSlots }).forEach((_, idx) => {
+    const item = promoItems[idx],
+      r = rowNum;
+    merges.push(`E${r}:G${r}`, `H${r}:I${r}`);
+    if (idx === 0) merges.push(`C${r}:D${r}`);
     pushRow(14.25, [
-      xlsxCellXml(`B${settleRow}`, 8, si(settlement || grossNotice), "s"),
-      ...emptyCells(settleRow, "A", "A"),
-      ...emptyCells(settleRow, "C", RECEIPT_XLSX_LAST_COL),
+      idx === 0
+        ? xlsxCellXml(`C${r}`, 15, si("Урамшуулал"), "s")
+        : xlsxCellXml(`C${r}`, 8, null, "empty"),
+      item
+        ? xlsxCellXml(`E${r}`, 8, si(item.productName || ""), "s")
+        : xlsxCellXml(`E${r}`, 8, null, "empty"),
+      item
+        ? xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n")
+        : xlsxCellXml(`H${r}`, 10, null, "empty"),
+      xlsxCellXml(`J${r}`, 10, item ? 0 : null, item ? "n" : "empty"),
+      xlsxCellXml(`K${r}`, 10, item ? 0 : null, item ? "n" : "empty"),
+      ...emptyCells(r, "A", "B"),
+      ...emptyCells(r, "D", "D"),
+      ...emptyCells(r, "F", "G"),
+      ...emptyCells(r, "I", "I"),
     ]);
-  }
-  if (promoItems.length) {
-    promoItems.forEach((item, idx) => {
-      const r = rowNum;
-      if (idx === 0) {
-        pushRow(14.25, [
-          xlsxCellXml(`C${r}`, 15, si("Урамшуулал"), "s"),
-          xlsxCellXml(`E${r}`, 8, si(item.productName || ""), "s"),
-          xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n"),
-          xlsxCellXml(`J${r}`, 10, 0, "n"),
-          xlsxCellXml(`K${r}`, 10, 0, "n"),
-          ...emptyCells(r, "A", "B"),
-          ...emptyCells(r, "D", "D"),
-          ...emptyCells(r, "F", "G"),
-          ...emptyCells(r, "I", "I"),
-        ]);
-        merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
-      } else {
-        pushRow(14.25, [
-          xlsxCellXml(`E${r}`, 8, si(item.productName || ""), "s"),
-          xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n"),
-          xlsxCellXml(`J${r}`, 10, 0, "n"),
-          xlsxCellXml(`K${r}`, 10, 0, "n"),
-          ...emptyCells(r, "A", "D"),
-          ...emptyCells(r, "F", "G"),
-          ...emptyCells(r, "I", "I"),
-        ]);
-        merges.push(`E${r}:G${r}`, `H${r}:I${r}`);
-      }
-    });
-  }
+  });
+  const discountRow = rowNum;
+  merges.push(`B${discountRow}:D${discountRow}`, `E${discountRow}:K${discountRow}`);
+  pushRow(14.25, [
+    xlsxCellXml(
+      `B${discountRow}`,
+      8,
+      si(discount ? `Хөнгөлөлт (${pct}%)` : ""),
+      "s",
+    ),
+    xlsxCellXml(`E${discountRow}`, 12, discount ? -discount : 0, "n"),
+    ...emptyCells(discountRow, "A", "A"),
+    ...emptyCells(discountRow, "F", RECEIPT_XLSX_LAST_COL),
+  ]);
   const totalRows = [
     ["Бараа ажил үйлчилгээний дүн", sub],
     ["НӨАТ", vat],
@@ -3530,14 +3565,14 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ...emptyCells(payRow, "I", RECEIPT_XLSX_LAST_COL),
   ]);
   [
-    "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлнэ үү.",
-    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаарна уу.",
+    "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
+    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай. ",
     "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно",
     "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
-  ].forEach((text) => {
+  ].forEach((text, index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    pushRow(14.25, [
+    pushRow(index === 0 ? 23.25 : 14.25, [
       xlsxCellXml(`B${r}`, 8, si(text), "s"),
       ...emptyCells(r, "A", "A"),
       ...emptyCells(r, "C", RECEIPT_XLSX_LAST_COL),
@@ -3559,26 +3594,33 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ...emptyCells(sign2, "A", "A"),
     ...emptyCells(sign2, "F", RECEIPT_XLSX_LAST_COL),
   ]);
+  pushRow(14.25, emptyCells(rowNum));
+  pushRow(14.25, emptyCells(rowNum));
   const lastRow = rowNum - 1;
   const mergeXml = [...new Set(merges)].map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="6.25" customWidth="1"/><col min="3" max="3" width="17.38" customWidth="1"/><col min="4" max="4" width="3.88" customWidth="1"/><col min="5" max="5" width="10.38" customWidth="1"/><col min="6" max="6" width="9.62" customWidth="1"/><col min="7" max="7" width="5.62" customWidth="1"/><col min="8" max="8" width="4.88" customWidth="1"/><col min="9" max="9" width="3.75" customWidth="1"/><col min="10" max="10" width="9.25" customWidth="1"/><col min="11" max="11" width="9.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const drawingXml = opts.hasLogo ? `<drawing r:id="rId1"/>` : "";
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="6.25" customWidth="1"/><col min="3" max="3" width="17.38" customWidth="1"/><col min="4" max="4" width="3.88" customWidth="1"/><col min="5" max="5" width="10.38" customWidth="1"/><col min="6" max="6" width="9.62" customWidth="1"/><col min="7" max="7" width="5.62" customWidth="1"/><col min="8" max="8" width="4.88" customWidth="1"/><col min="9" max="9" width="3.75" customWidth="1"/><col min="10" max="10" width="9.25" customWidth="1"/><col min="11" max="11" width="9.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells>${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return {
     sharedStringsXml: xlsxSharedStringsXml(strings),
     sheetXml,
     sheetName: opts.sheetName || `Баримт ${receiptNo}`.slice(0, 31),
   };
 }
-function buildReceiptWorkbookXml(orders) {
+function buildReceiptWorkbookXml(orders, opts = {}) {
   const ctx = createReceiptStringContext();
   const sheets = orders.map((order, index) => {
     const built = buildReceiptSheetXml(order, ctx, {
       sheetName: `Баримт ${index + 1}`,
+      hasLogo: opts.hasLogo,
     });
     return { id: index + 1, name: built.sheetName, sheetXml: built.sheetXml };
   });
   const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s) => `<sheet name="${xlsxXmlEsc(s.name)}" sheetId="${s.id}" r:id="rId${s.id}"/>`).join("")}</sheets></workbook>`;
   const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s) => `<Relationship Id="rId${s.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${s.id}.xml"/>`).join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId${sheets.length + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>`;
-  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((s) => `<Override PartName="/xl/worksheets/sheet${s.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>`;
+  const drawingContentTypes = opts.hasLogo
+    ? `<Default Extension="png" ContentType="image/png"/>${sheets.map((s) => `<Override PartName="/xl/drawings/drawing${s.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join("")}`
+    : "";
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${drawingContentTypes}<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((s) => `<Override PartName="/xl/worksheets/sheet${s.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>`;
   return {
     sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
     sheets,
@@ -3593,15 +3635,25 @@ async function exportOrderReceiptsExcelXlsx(orders) {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
+  const logoBuffer = await fetch(BRAND.logoBlue)
+    .then((r) => (r.ok ? r.arrayBuffer() : null))
+    .catch(() => null);
   const zip = await JSZip.loadAsync(tpl);
-  const built = buildReceiptWorkbookXml(orders);
+  const built = buildReceiptWorkbookXml(orders, { hasLogo: !!logoBuffer });
   zip.file("xl/sharedStrings.xml", built.sharedStringsXml);
   zip.file("xl/workbook.xml", built.workbookXml);
   zip.file("xl/_rels/workbook.xml.rels", built.workbookRelsXml);
+  zip.file("xl/styles.xml", receiptXlsxStylesXml());
   zip.file("[Content_Types].xml", built.contentTypesXml);
   built.sheets.forEach((sheet) => {
     zip.file(`xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
+    if (logoBuffer) {
+      zip.file(`xl/worksheets/_rels/sheet${sheet.id}.xml.rels`, receiptSheetRelsXml(sheet.id));
+      zip.file(`xl/drawings/drawing${sheet.id}.xml`, receiptDrawingXml());
+      zip.file(`xl/drawings/_rels/drawing${sheet.id}.xml.rels`, receiptDrawingRelsXml());
+    }
   });
+  if (logoBuffer) zip.file("xl/media/receipt-logo.png", logoBuffer);
   Object.keys(zip.files)
     .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/.test(name))
     .forEach((name) => {
@@ -3888,29 +3940,44 @@ function customerRegistrationDisplay(c) {
 function customerRegistrationDigits(c) {
   return customerRegistrationDisplay(c).replace(/\D/g, "");
 }
+function registrationSearchKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
 function findCustomerByRegistrationNumber(registrationNumber, excludeId = "") {
-  const reg = normalizeRegistrationNumber(registrationNumber);
-  if (!reg) return null;
+  const queryKey = registrationSearchKey(registrationNumber);
+  const queryDigits = normalizeRegistrationNumber(registrationNumber);
+  if (!queryKey && !queryDigits) return null;
   return (
-    state.customers.find(
-      (c) =>
-        c.id !== excludeId &&
-        normalizeRegistrationNumber(c.registrationNumber) === reg,
-    ) || null
+    state.customers.find((c) => {
+      if (c.id === excludeId) return false;
+      const storedKey = registrationSearchKey(c.registrationNumber);
+      const storedDigits = normalizeRegistrationNumber(c.registrationNumber);
+      if (queryKey && storedKey && queryKey === storedKey) return true;
+      if (queryDigits && storedDigits && queryDigits === storedDigits)
+        return true;
+      return false;
+    }) || null
   );
 }
 function customerMatchesQuery(c, q) {
-  const needle = String(q || "")
-    .trim()
-    .toLowerCase();
+  const needle = registrationSearchKey(q);
   if (!needle) return true;
   const nameMatch = String(c.name || "")
     .toLowerCase()
     .includes(needle);
-  const rdNeedle = needle.replace(/\D/g, "");
-  const rdMatch =
-    !!rdNeedle && customerRegistrationDigits(c).includes(rdNeedle);
-  return nameMatch || rdMatch;
+  const companyMatch = String(c.companyName || "")
+    .toLowerCase()
+    .includes(needle);
+  const rdKey = registrationSearchKey(c.registrationNumber);
+  const rdMatch = !!rdKey && rdKey.includes(needle);
+  const rdDigitsNeedle = needle.replace(/\D/g, "");
+  const rdDigits = rdKey.replace(/\D/g, "");
+  const rdDigitsMatch =
+    !!rdDigitsNeedle && !!rdDigits && rdDigits.includes(rdDigitsNeedle);
+  return nameMatch || companyMatch || rdMatch || rdDigitsMatch;
 }
 function sortCustomersByName(customers) {
   return [...(customers || [])].sort((a, b) =>
@@ -4505,11 +4572,13 @@ function productsView() {
   ]
     .filter(Boolean)
     .join("");
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}<div class="product-list${canManageProducts() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${isAdmin() ? " product-list--show-cost" : ""}`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
-  const actions = canManageProducts();
-  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span>${actions ? `<span class="product-list__col product-list__col--cost">Өртөг үнэ</span>` : ""}<span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
+  const actions = canManageProducts(),
+    showCost = isAdmin();
+  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span>${showCost ? `<span class="product-list__col product-list__col--cost">Өртөг үнэ</span>` : ""}<span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
 }
 function productDetailRow(label, valueHtml) {
   return `<div class="customer-detail__row"><div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
@@ -4536,7 +4605,7 @@ function productDetailHtml(p, id) {
   if (packSize) {
     rows.push(productDetailRow("Багц", `${packSize} ш/багц`));
   }
-  if (hasPermission("warehouse.edit")) {
+  if (isAdmin()) {
     const cost = productCostPrice(p);
     rows.push(
       productDetailRow(
@@ -4567,9 +4636,9 @@ function productDetail(id) {
 function productCard(p) {
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
   const adminActions = canManageProducts()
-    ? `<div class="product-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
+    ? `<div class="product-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${esc(p.id)}')" class="product-card__action-btn product-card__action-btn--edit" aria-label="Бараа засах" title="Засах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5z"/></svg></button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete" aria-label="Бараа устгах" title="Устгах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button></div>`
     : "";
-  const costLine = hasPermission("warehouse.edit")
+  const costLine = isAdmin()
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
     : "";
   return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
@@ -8149,7 +8218,7 @@ function enhanceMobileNumericInputs(root = document) {
     });
     container
       .querySelectorAll(
-        'input[name="registrationNumber"], input[name="barcode"], input[data-promo-digits="1"], input[data-count-product-id], input[data-receipt-qty], input.qty-stepper__input, input.count-row__input',
+        'input[name="barcode"], input[data-promo-digits="1"], input[data-count-product-id], input[data-receipt-qty], input.qty-stepper__input, input.count-row__input',
       )
       .forEach((el) => {
         if (el.type === "password" || el.type === "email") return;
@@ -8175,7 +8244,7 @@ function field(name, label, value = "", type = "text", placeholder = "") {
 }
 function customerRegistrationField(value = "") {
   const attrs = inputAttrs(value, "Регистрийн дугаар");
-  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${attrs} oninput="scheduleCustomerRegistryLookup(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
+  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="text" autocomplete="off" ${attrs} oninput="scheduleCustomerRegistryLookup(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
 }
 function customerProvinceField(value = "") {
   const selected = (value || "").trim() || "Улаанбаатар";

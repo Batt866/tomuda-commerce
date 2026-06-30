@@ -1810,20 +1810,28 @@ a.customer-card__line .customer-card__icon {
 
 .product-card__action-btn {
   flex: 0 0 auto;
-  min-width: 58px;
-  width: 58px;
-  min-height: 32px;
-  height: 32px;
-  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  width: 36px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0;
   border: none;
-  border-radius: 8px;
-  font-size: 11px;
+  border-radius: 10px;
+  font-size: 0;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   box-shadow: none !important;
+}
+
+.product-card__action-btn .ui-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .product-card__action-btn--edit {
@@ -1858,8 +1866,8 @@ a.customer-card__line .customer-card__icon {
     display: contents;
   }
 
-  .product-list:not(.product-list--readonly) .product-list__head,
-  .product-list:not(.product-list--readonly) .product-card {
+  .product-list--show-cost .product-list__head,
+  .product-list--show-cost .product-card {
     --product-cols: minmax(220px, 2fr) minmax(120px, 1fr) 88px 88px 80px minmax(150px, 1.2fr) 116px;
   }
 
@@ -1952,7 +1960,7 @@ a.customer-card__line .customer-card__icon {
     justify-self: start;
   }
 
-  .product-list:not(.product-list--readonly) .product-card__cost {
+  .product-list--show-cost .product-card__cost {
     grid-column: 4;
     font-size: 13px;
     font-weight: 600;
@@ -1965,7 +1973,7 @@ a.customer-card__line .customer-card__icon {
     justify-self: start;
   }
 
-  .product-list:not(.product-list--readonly) .product-card__badge {
+  .product-list--show-cost .product-card__badge {
     grid-column: 5;
   }
 
@@ -1980,7 +1988,7 @@ a.customer-card__line .customer-card__icon {
     white-space: nowrap;
   }
 
-  .product-list:not(.product-list--readonly) .product-card__barcode {
+  .product-list--show-cost .product-card__barcode {
     grid-column: 6;
   }
 
@@ -1998,18 +2006,18 @@ a.customer-card__line .customer-card__icon {
     align-self: center;
   }
 
-  .product-list:not(.product-list--readonly) .product-card__actions {
+  .product-list--show-cost .product-card__actions {
     grid-column: 7;
   }
 
   .product-card__action-btn {
     flex: 0 0 auto;
-    min-width: 0;
-    width: auto;
-    min-height: 28px;
-    height: 28px;
-    padding: 0 10px;
-    font-size: 12px;
+    min-width: 32px;
+    width: 32px;
+    min-height: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 0;
   }
 
   .customer-list {
@@ -3397,6 +3405,8 @@ button:focus-visible,
 
 .app-main__inner {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .mobile-top-bar {
@@ -3905,7 +3915,9 @@ button:focus-visible,
     padding-right: var(--app-gutter) !important;
     scroll-padding-top: var(--mobile-top-bar-offset);
     flex: 1 1 auto;
+    min-width: 0;
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -7492,11 +7504,13 @@ input::placeholder, textarea::placeholder {
 /* Агуулах — баримтууд */
 .wh-receipts {
   border-radius: 0;
-  overflow: visible;
+  overflow: hidden;
   background: transparent;
   border: none;
   border-top: 1px solid var(--hex-border);
   border-bottom: 1px solid var(--hex-border);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .wh-receipts__head {
@@ -8099,6 +8113,8 @@ input::placeholder, textarea::placeholder {
 .wh-receipts__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .wh-receipt-list {
@@ -8108,6 +8124,8 @@ input::placeholder, textarea::placeholder {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid var(--hex-border);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .wh-receipt-list__item--selectable {
@@ -8270,6 +8288,12 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+
+.wh-receipt-sheet__brand > div {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .wh-receipt-sheet__logo {
@@ -8291,6 +8315,9 @@ input::placeholder, textarea::placeholder {
   font-size: 12px;
   font-weight: 700;
   color: var(--hex-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wh-receipt-sheet__brand .wh-receipt-detail__pill {
@@ -8331,6 +8358,12 @@ input::placeholder, textarea::placeholder {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
+}
+
+.wh-receipt-sheet__table td.wh-receipt-sheet__name {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .wh-receipt-sheet__table th,
