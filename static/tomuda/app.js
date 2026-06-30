@@ -1381,6 +1381,36 @@ function persistentState() {
     return data;
   }, {});
 }
+const LOCAL_PENDING_STATE_KEY = "tomuda-pending-state";
+function saveLocalPendingState() {
+  try {
+    localStorage.setItem(
+      LOCAL_PENDING_STATE_KEY,
+      JSON.stringify({ state: persistentState(), savedAt: new Date().toISOString() }),
+    );
+  } catch (error) {
+    console.warn("Local pending state save failed", error);
+  }
+}
+function readLocalPendingState() {
+  try {
+    const raw = localStorage.getItem(LOCAL_PENDING_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.state && typeof parsed.state === "object"
+      ? parsed.state
+      : null;
+  } catch {
+    return null;
+  }
+}
+function clearLocalPendingState() {
+  try {
+    localStorage.removeItem(LOCAL_PENDING_STATE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 const MERGE_BY_ID_KEYS = ["customers", "products", "employees", "orders"];
 const DELETION_GUARDED_KEYS = ["customers", "products"];
 
@@ -1810,6 +1840,10 @@ async function boot() {
     const payload = await fetchBackendStateWithRetry();
     if (payload?.state) {
       syncBackendMarkers(payload, payload.state);
+      const pendingState = readLocalPendingState();
+      if (pendingState) {
+        applyPersistentState(mergePersistentStates(persistentState(), pendingState));
+      }
     } else {
       setBootStatus(
         "Холбогдож чадсангүй",
@@ -2808,6 +2842,7 @@ function dismissPwaInstall(remember = true) {
     localStorage.setItem("pwa-install-dismissed", String(Date.now()));
 }
 function scheduleBackendSave() {
+  saveLocalPendingState();
   if (!backendReady) return;
   clearTimeout(backendSaveTimer);
   backendSaveTimer = setTimeout(saveBackendState, 350);
@@ -2846,7 +2881,10 @@ async function saveBackendState() {
         }
       : null,
   });
-  if (body === backendLastSaved) return;
+  if (body === backendLastSaved) {
+    clearLocalPendingState();
+    return;
+  }
   backendSaving = true;
   try {
     const res = await fetch(`${API_BASE}/state`, {
@@ -2861,6 +2899,7 @@ async function saveBackendState() {
     if (res.ok) {
       const payload = await res.json();
       syncBackendSaveMarker();
+      clearLocalPendingState();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
     } else if (res.status === 403) {
       let msg = "Эрх хүрэлцэхгүй";
