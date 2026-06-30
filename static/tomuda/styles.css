@@ -9209,8 +9209,8 @@ input::placeholder, textarea::placeholder {
     justify-content: space-between;
     align-items: center;
     gap: 5mm;
-    background: #7a838d;
-    color: #fff;
+    background: #eef0f2;
+    color: #111827;
     padding: 3.5mm 4mm;
     margin-top: 2mm;
     font-weight: 800;

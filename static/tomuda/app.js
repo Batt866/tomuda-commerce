@@ -3206,8 +3206,8 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-total-line table { width: 100%; border-collapse: collapse; }
 .receipt-total-line td { border: none; padding: 0; }
 .receipt-total-line td:last-child { text-align: right; font-weight: 800; white-space: nowrap; }
-.receipt-grand-total { background: #7a838d; color: #fff; padding: 8px 10px; margin-top: 4px; font-weight: 800; }
-.receipt-grand-total table { width: 100%; border-collapse: collapse; color: #fff; }
+.receipt-grand-total { background: #eef0f2; color: #111827; padding: 8px 10px; margin-top: 4px; font-weight: 800; }
+.receipt-grand-total table { width: 100%; border-collapse: collapse; color: #111827; }
 .receipt-grand-total td { border: none; padding: 0; vertical-align: middle; }
 .receipt-grand-total__label { font-size: 12px; line-height: 1.35; }
 .receipt-grand-total__amount { text-align: right; font-size: 22px; font-weight: 900; white-space: nowrap; }
