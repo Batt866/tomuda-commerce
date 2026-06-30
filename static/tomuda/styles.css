@@ -10737,21 +10737,6 @@ body.image-lightbox-open {
   gap: 8px;
   align-items: center;
   padding: 10px 16px;
-}
-
-.stock-in-table__head--entry,
-.stock-in-table__row--entry {
-  grid-template-columns:
-    minmax(140px, 1.6fr)
-    minmax(88px, 1fr)
-    minmax(56px, 0.7fr)
-    minmax(72px, 0.8fr)
-    minmax(88px, 0.9fr);
-}
-
-.stock-in-table--receipt .stock-in-table__head,
-.stock-in-table--receipt .stock-in-table__row,
-.stock-in-table--receipt .stock-in-table__foot {
   grid-template-columns:
     minmax(140px, 1.4fr)
     minmax(88px, 1fr)
@@ -10761,14 +10746,9 @@ body.image-lightbox-open {
 }
 
 @media (min-width: 640px) {
-  .stock-in-table__head--entry,
-  .stock-in-table__row--entry {
-    min-width: 560px;
-  }
-
-  .stock-in-table--receipt .stock-in-table__head,
-  .stock-in-table--receipt .stock-in-table__row,
-  .stock-in-table--receipt .stock-in-table__foot {
+  .stock-in-table--full .stock-in-table__head,
+  .stock-in-table--full .stock-in-table__row,
+  .stock-in-table--full .stock-in-table__foot {
     min-width: 760px;
   }
 }
@@ -10785,11 +10765,11 @@ body.image-lightbox-open {
   color: var(--hex-muted-foreground);
 }
 
-.stock-in-table__head span:nth-child(n + 3) {
+.stock-in-table__head span:nth-child(n + 3):not(:nth-child(n + 5)) {
   text-align: center;
 }
 
-.stock-in-table--receipt .stock-in-table__head span:nth-child(n + 5) {
+.stock-in-table__head span:nth-child(n + 5) {
   text-align: right;
 }
 
@@ -10863,6 +10843,11 @@ body.image-lightbox-open {
 
 .stock-in-table__cost .stock-in-table__input {
   text-align: right;
+}
+
+.stock-in-table__row--readonly .stock-in-table__qty {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-in-table__foot {

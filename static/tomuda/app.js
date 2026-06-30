@@ -5257,19 +5257,33 @@ function stockInEntryRow(p) {
       : productCostPrice(p)
         ? esc(String(productCostPrice(p)))
         : "";
+  const qty = stockInLineQty(p);
+  const cost = stockInLineCost(p);
+  const unitText = qty > 0 && cost ? fmt(cost) : "-";
+  const totalText = qty > 0 && cost ? fmt(qty * cost) : "-";
   const packCell = packSize
     ? `<input data-stock-in-pack data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} багц">`
     : `<span class="stock-in-table__muted">-</span>`;
-  return `<div class="stock-in-table__row stock-in-table__row--entry"><span class="stock-in-table__name">${esc(p.name)}</span><span class="stock-in-table__barcode">${esc(p.barcode || "-")}</span><span class="stock-in-table__pack">${packCell}</span><span class="stock-in-table__qty"><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></span><span class="stock-in-table__cost"><input data-stock-in-cost data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${costVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} өртөг үнэ"></span></div>`;
+  return `<div class="stock-in-table__row" data-stock-in-row="${esc(p.id)}"><span class="stock-in-table__name">${esc(p.name)}</span><span class="stock-in-table__barcode">${esc(p.barcode || "-")}</span><span class="stock-in-table__pack">${packCell}</span><span class="stock-in-table__qty"><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></span><span class="stock-in-table__cost"><input data-stock-in-cost data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${costVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} өртөг үнэ"></span><span class="stock-in-table__money" data-stock-in-unit>${unitText}</span><span class="stock-in-table__money stock-in-table__money--total" data-stock-in-total>${totalText}</span></div>`;
 }
 function stockInReceiptRow(line) {
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
+  return `<div class="stock-in-table__row stock-in-table__row--readonly"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
 }
-function stockInTableHead(mode = "entry") {
-  if (mode === "entry") {
-    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Багц</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
-  }
+function stockInTableHead() {
   return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Багц</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
+}
+function stockInDraftTotal() {
+  return state.products.reduce((sum, p) => {
+    const qty = stockInLineQty(p);
+    if (qty <= 0) return sum;
+    return sum + qty * stockInLineCost(p);
+  }, 0);
+}
+function stockInTableFoot(total) {
+  return `<div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total" data-stock-in-foot-total>${fmt(total)}</span></div>`;
+}
+function stockInTableSignatures(date) {
+  return `<footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________ (гарын үсэг)</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________ (гарын үсэг)</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer>`;
 }
 function stockInEntryTable(list) {
   const groups = stockInProductsGrouped(list);
@@ -5280,7 +5294,8 @@ function stockInEntryTable(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="stock-in-table"><div class="stock-in-table__scroll">${stockInTableHead("entry")}<div class="stock-in-table__body">${rows || `<p class="stock-in-table__empty">Бараа олдсонгүй</p>`}</div></div></div>`;
+  const date = stockInReceiptDateParts(state.stockInSessionStartedAt);
+  return `<section class="stock-in-receipt-panel"><div class="stock-in-table stock-in-table--full"><div class="stock-in-table__scroll">${stockInTableHead()}<div class="stock-in-table__body">${rows || `<p class="stock-in-table__empty">Бараа олдсонгүй</p>`}</div>${stockInTableFoot(stockInDraftTotal())}</div></div>${stockInTableSignatures(date)}</section>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -5303,7 +5318,7 @@ function stockInReceiptPanel(receipt) {
     )
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________ (гарын үсэг)</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________ (гарын үсэг)</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--full"><div class="stock-in-table__scroll">${stockInTableHead()}<div class="stock-in-table__body">${rows}</div>${stockInTableFoot(receipt.totalAmount)}</div></div>${stockInTableSignatures(date)}<footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -5381,6 +5396,23 @@ function stockInDraftInput(id, field, raw) {
   const text = String(raw ?? "").trim();
   if (!text) delete entry[field];
   else entry[field] = text.replace(/[^\d]/g, "");
+  syncStockInRowTotals(id);
+}
+function syncStockInRowTotals(productId) {
+  const p = state.products.find((x) => x.id === productId);
+  if (!p) return;
+  const row = document.querySelector(`[data-stock-in-row="${productId}"]`);
+  if (!row) return;
+  const qty = stockInLineQty(p);
+  const cost = stockInLineCost(p);
+  const unitEl = row.querySelector("[data-stock-in-unit]");
+  const totalEl = row.querySelector("[data-stock-in-total]");
+  const unitText = qty > 0 && cost ? fmt(cost) : "-";
+  const totalText = qty > 0 && cost ? fmt(qty * cost) : "-";
+  if (unitEl) unitEl.textContent = unitText;
+  if (totalEl) totalEl.textContent = totalText;
+  const footEl = document.querySelector("[data-stock-in-foot-total]");
+  if (footEl) footEl.textContent = fmt(stockInDraftTotal());
 }
 function initStockInInputHandlers() {
   if (document.documentElement.dataset.stockInInputBound) return;
