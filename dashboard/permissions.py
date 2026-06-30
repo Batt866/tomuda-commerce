@@ -186,6 +186,27 @@ def _order_within_retention(order: dict[str, Any], now: datetime | None = None) 
     return created + timedelta(days=31) >= (now or datetime.utcnow())
 
 
+def _created_order_stock_usage(
+    old_orders: dict[str, dict[str, Any]],
+    new_orders: dict[str, dict[str, Any]],
+) -> dict[str, float]:
+    usage: dict[str, float] = {}
+    for order_id, order in new_orders.items():
+        if order_id in old_orders:
+            continue
+        for item in order.get("items") or []:
+            product_id = str(item.get("productId") or "")
+            if not product_id:
+                continue
+            try:
+                qty = float(item.get("quantity") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty > 0:
+                usage[product_id] = usage.get(product_id, 0) + qty
+    return usage
+
+
 def _has_any_permission(perms: set[str], *keys: str) -> bool:
     return any(k in perms for k in keys)
 
@@ -275,12 +296,21 @@ def validate_state_mutation(
 
     old_products = _by_id(old_state.get("products") or [])
     new_products = _by_id(new_state.get("products") or [])
+    created_order_stock = _created_order_stock_usage(old_orders, new_orders)
     for product_id, new_product in new_products.items():
         old_product = old_products.get(product_id)
         if not old_product:
             continue
         if old_product.get("stock") != new_product.get("stock") and "warehouse.edit" not in perms:
-            return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+            try:
+                old_stock = float(old_product.get("stock") or 0)
+                new_stock = float(new_product.get("stock") or 0)
+            except (TypeError, ValueError):
+                return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+            allowed_decrease = created_order_stock.get(product_id, 0)
+            actual_decrease = old_stock - new_stock
+            if actual_decrease < 0 or abs(actual_decrease - allowed_decrease) > 0.0001:
+                return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
         if old_product.get("costPrice") != new_product.get("costPrice") and "warehouse.edit" not in perms:
             return False, "Өртөг үнэ өөрчлөх эрхгүй"
 
