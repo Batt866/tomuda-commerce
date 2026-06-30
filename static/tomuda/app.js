@@ -1842,7 +1842,12 @@ async function boot() {
       syncBackendMarkers(payload, payload.state);
       const pendingState = readLocalPendingState();
       if (pendingState) {
-        applyPersistentState(mergePersistentStates(persistentState(), pendingState));
+        try {
+          applyPersistentState(mergePersistentStates(persistentState(), pendingState));
+        } catch (error) {
+          console.warn("Pending state restore failed", error);
+          clearLocalPendingState();
+        }
       }
     } else {
       setBootStatus(
