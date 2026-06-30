@@ -2182,7 +2182,11 @@ a.customer-card__line .customer-card__icon {
 }
 
 .product-detail__img {
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  padding: 8px;
+  box-sizing: border-box;
+  background: var(--hex-secondary);
 }
 
 .product-detail .customer-detail__hero {
@@ -2252,8 +2256,11 @@ a.customer-card__line .customer-card__icon {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  object-fit: cover;
-  background: var(--hex-card);
+  object-fit: contain;
+  object-position: center;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--hex-secondary);
   border: var(--thumb-border);
   box-shadow: var(--thumb-shadow);
 }
@@ -4739,8 +4746,11 @@ input::placeholder, textarea::placeholder {
   height: var(--thumb-md);
   display: block;
   border-radius: var(--thumb-radius);
-  object-fit: cover;
-  background: var(--hex-card);
+  object-fit: contain;
+  object-position: center;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--hex-secondary);
   border: var(--thumb-border);
   box-shadow: var(--thumb-shadow);
 }
@@ -5697,9 +5707,11 @@ input::placeholder, textarea::placeholder {
   align-self: center;
   display: block;
   border-radius: 8px;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
-  background: transparent;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--hex-secondary);
   border: none;
   box-shadow: none;
 }
