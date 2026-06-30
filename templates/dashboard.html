@@ -3,26 +3,51 @@
 <html lang="mn">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#16899a" />
-    <meta name="description" content="Борлуулалт, агуулах, захиалга удирдах систем" />
+    <meta
+      name="description"
+      content="Импорт, түгээлт, захиалга удирдах систем"
+    />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="apple-mobile-web-app-title" content="ТОМУДА" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}?v=20260630-logo" />
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tomuda/icons/icon-180.png' %}?v=20260630-logo" />
-    <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}?v=20260630-logo" />
-    <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}?v=20260630-logo" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="192x192"
+      href="{% static 'tomuda/icons/icon-192.png' %}?v=20260630-logo"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="{% static 'tomuda/icons/icon-180.png' %}?v=20260630-logo"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="192x192"
+      href="{% static 'tomuda/icons/icon-192.png' %}?v=20260630-logo"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="{% static 'tomuda/icons/apple-touch-icon.png' %}?v=20260630-logo"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap"
       rel="stylesheet"
     />
-    <title>ТОМУДА - Борлуулалт, агуулах</title>
+    <title>ТОМУДА - Импорт, түгээлт</title>
     <style>
       html,
       body {
@@ -54,8 +79,8 @@
         background:
           linear-gradient(90deg, rgba(22, 137, 154, 0.08) 1px, transparent 1px)
             0 0 / 42px 42px,
-          linear-gradient(0deg, rgba(22, 137, 154, 0.06) 1px, transparent 1px)
-            0 0 / 42px 42px,
+          linear-gradient(0deg, rgba(22, 137, 154, 0.06) 1px, transparent 1px) 0
+            0 / 42px 42px,
           #f4f7f8;
       }
       .boot-screen::before {
@@ -247,8 +272,16 @@
         }
       }
     </style>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260630-boot-cache-fix" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260630-boot-cache-fix" as="script" />
+    <link
+      rel="preload"
+      href="{% static 'tomuda/styles.css' %}?v=20260630-boot-cache-fix"
+      as="style"
+    />
+    <link
+      rel="preload"
+      href="{% static 'tomuda/app.js' %}?v=20260630-boot-cache-fix"
+      as="script"
+    />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
     <script>
       tailwind.config = {
@@ -302,7 +335,7 @@
             />
             <div class="boot-screen__brand-copy">
               <p class="boot-screen__brand-name">ТОМУДА</p>
-              <p class="boot-screen__brand-sub">Борлуулалт, агуулах</p>
+              <p class="boot-screen__brand-sub">Импорт, түгээлт</p>
             </div>
           </div>
           <div class="boot-screen__copy">
@@ -311,7 +344,9 @@
               Мэдээлэл татаж байна. Түр хүлээнэ үү
             </p>
           </div>
-          <div class="boot-screen__progress" aria-hidden="true"><span></span></div>
+          <div class="boot-screen__progress" aria-hidden="true">
+            <span></span>
+          </div>
           <div class="boot-screen__status-row" aria-hidden="true">
             <span class="boot-screen__pulse"></span>
             <span>Сервертэй холбогдож байна</span>
@@ -326,22 +361,43 @@
     </div>
     <div id="modal"></div>
     <div id="confirm-card-overlay" class="confirm-card-overlay" hidden>
-      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-card-title">
+      <div
+        class="confirm-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-card-title"
+      >
         <div class="confirm-card__head">
           <h3 id="confirm-card-title" class="confirm-card__title"></h3>
-          <button type="button" id="confirm-card-close" class="confirm-card__close" hidden aria-label="Хаах"><span aria-hidden="true">✕</span></button>
+          <button
+            type="button"
+            id="confirm-card-close"
+            class="confirm-card__close"
+            hidden
+            aria-label="Хаах"
+          >
+            <span aria-hidden="true">✕</span>
+          </button>
         </div>
         <p id="confirm-card-message" class="confirm-card__message"></p>
         <div class="confirm-card__actions">
-          <button type="button" id="confirm-card-yes" class="confirm-card__btn confirm-card__btn--danger"></button>
-          <button type="button" id="confirm-card-no" class="confirm-card__btn confirm-card__btn--cancel">Үгүй</button>
+          <button
+            type="button"
+            id="confirm-card-yes"
+            class="confirm-card__btn confirm-card__btn--danger"
+          ></button>
+          <button
+            type="button"
+            id="confirm-card-no"
+            class="confirm-card__btn confirm-card__btn--cancel"
+          >
+            Үгүй
+          </button>
         </div>
       </div>
     </div>
     <div id="print-root" aria-hidden="true"></div>
-    <script
-      src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"
-    ></script>
+    <script src="{% static 'tomuda/vendor/leaflet/leaflet.js' %}?v=20260527-map-local"></script>
     <script src="{% static 'tomuda/data.js' %}?v=20260527-menu-icon"></script>
     <script>
       window.__showTomudaFatal = function (msg) {
@@ -354,7 +410,7 @@
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#039;");
         el.innerHTML =
-          '<div class="boot-screen boot-screen--error"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="{% static 'tomuda/branding/logo-blue.png' %}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Борлуулалт, агуулах</p></div></div><div class="boot-screen__copy"><p class="boot-screen__title">Алдаа</p><p class="boot-screen__detail">' +
+          '<div class="boot-screen boot-screen--error"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="{% static 'tomuda/branding/logo-blue.png' %}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Импорт, түгээлт</p></div></div><div class="boot-screen__copy"><p class="boot-screen__title">Алдаа</p><p class="boot-screen__detail">' +
           safe +
           '</p></div><button type="button" class="boot-screen__retry" onclick="location.reload()">Дахин оролдох</button></div></div>';
       };
@@ -363,7 +419,11 @@
     <script src="{% static 'tomuda/permissions.js' %}?v=20260630-perm-view-deps"></script>
     <script
       src="{% static 'tomuda/app.js' %}?v=20260630-boot-cache-fix"
-      onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
+      onerror="
+        __showTomudaFatal(
+          'App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.',
+        )
+      "
     ></script>
   </body>
 </html>

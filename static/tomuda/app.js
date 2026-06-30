@@ -270,10 +270,6 @@ async function fetchJsonWithTimeout(url, ms = 90000) {
 }
 async function wakeBackendWithRetry() {
   for (let attempt = 0; attempt < BOOT_WAKE_MAX; attempt++) {
-    setBootStatus(
-      "Сервер асаж байна",
-      `Render сервер сэрж байна. Түр хүлээнэ үү (${attempt + 1}/${BOOT_WAKE_MAX})`,
-    );
     try {
       const payload = await fetchJsonWithTimeout(`${API_BASE}/health`, 90000);
       if (payload?.ok) return true;
@@ -289,10 +285,6 @@ async function wakeBackendWithRetry() {
 async function fetchBackendStateWithRetry() {
   if (!(await wakeBackendWithRetry())) return null;
   for (let attempt = 0; attempt < BOOT_STATE_MAX; attempt++) {
-    setBootStatus(
-      BOOT_TITLE_TEXT,
-      `Мэдээлэл татаж байна. Түр хүлээнэ үү (${attempt + 1}/${BOOT_STATE_MAX})`,
-    );
     try {
       const payload = await fetchJsonWithTimeout(`${API_BASE}/state`, 90000);
       if (payload?.state) return payload;
@@ -643,7 +635,7 @@ function receiptGrossPercentNoticeHtml(o) {
   if (!o || o.applyPercentDiscount || !isCashPayment(o.paymentTerm)) return "";
   if (orderInWarehouseLiveSession(o)) return "";
   const rate = percentDiscountRate();
-  return `<div class="receipt-gross-note">Тооцоог өдөртөө хийгээгүй тохиолдолд (${rate}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!</div>`;
+  return `<div class="receipt-gross-note">Тооцоог өдөртөө хийгээгүй тохиолдолд (${rate}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.</div>`;
 }
 function settlementMonthOptions(selected) {
   const cur = selected || String(new Date().getMonth() + 1);
@@ -1717,7 +1709,7 @@ function onVisibilityPoll() {
   if (document.visibilityState === "visible") pollBackendState();
 }
 function bootScreenHtml(message = BOOT_LOADING_TEXT, showRetry = false) {
-  return `<div class="boot-screen${showRetry ? " boot-screen--error" : ""}" aria-live="polite"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="${BRAND.logoBlue}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Борлуулалт, агуулах</p></div></div><div class="boot-screen__copy"><p id="boot-title" class="boot-screen__title">${BOOT_TITLE_TEXT}</p><p id="boot-detail" class="boot-screen__detail">${esc(message)}</p></div><div class="boot-screen__progress" aria-hidden="true"><span></span></div><div class="boot-screen__status-row" aria-hidden="true"><span class="boot-screen__pulse"></span><span>Сервертэй холбогдож байна</span></div><div class="boot-screen__preview" aria-hidden="true"><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span></div><button type="button" id="boot-retry" class="boot-screen__retry${showRetry ? "" : " hidden"}" onclick="location.reload()">Дахин оролдох</button></div></div>`;
+  return `<div class="boot-screen${showRetry ? " boot-screen--error" : ""}" aria-live="polite"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="${BRAND.logoBlue}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Импорт, түгээлт</p></div></div><div class="boot-screen__copy"><p id="boot-title" class="boot-screen__title">${BOOT_TITLE_TEXT}</p><p id="boot-detail" class="boot-screen__detail">${esc(message)}</p></div><div class="boot-screen__progress" aria-hidden="true"><span></span></div><div class="boot-screen__status-row" aria-hidden="true"><span class="boot-screen__pulse"></span><span>Сервертэй холбогдож байна</span></div><div class="boot-screen__preview" aria-hidden="true"><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span></div><button type="button" id="boot-retry" class="boot-screen__retry${showRetry ? "" : " hidden"}" onclick="location.reload()">Дахин оролдох</button></div></div>`;
 }
 function showBootRetry() {
   document.querySelector(".boot-screen")?.classList.add("boot-screen--error");
@@ -7524,10 +7516,7 @@ function saveAuthSession() {
     localStorage.removeItem(AUTH_SESSION_KEY);
     return;
   }
-  localStorage.setItem(
-    AUTH_SESSION_KEY,
-    JSON.stringify(authSessionPayload()),
-  );
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(authSessionPayload()));
 }
 function restoreAuthSession() {
   try {
@@ -7614,7 +7603,7 @@ function loginView() {
   const installBtn = isNativeApp()
     ? ""
     : `<button type="button" onclick="installAppOnPhone()" class="btn btn--secondary btn--block">${pwaInstallLabel()}</button>`;
-  return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Борлуулалт, агуулах удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
+  return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Импорт, түгээлт удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
 }
 function workerOrdersList() {
   let list = state.orders.filter((o) => o.status !== "cancelled");
