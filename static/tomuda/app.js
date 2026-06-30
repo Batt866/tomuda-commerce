@@ -270,6 +270,10 @@ async function fetchJsonWithTimeout(url, ms = 90000) {
 }
 async function wakeBackendWithRetry() {
   for (let attempt = 0; attempt < BOOT_WAKE_MAX; attempt++) {
+    setBootStatus(
+      "Сервер асаж байна",
+      `Render сервер сэрж байна. Түр хүлээнэ үү (${attempt + 1}/${BOOT_WAKE_MAX})`,
+    );
     try {
       const payload = await fetchJsonWithTimeout(`${API_BASE}/health`, 90000);
       if (payload?.ok) return true;
@@ -285,6 +289,10 @@ async function wakeBackendWithRetry() {
 async function fetchBackendStateWithRetry() {
   if (!(await wakeBackendWithRetry())) return null;
   for (let attempt = 0; attempt < BOOT_STATE_MAX; attempt++) {
+    setBootStatus(
+      BOOT_TITLE_TEXT,
+      `Мэдээлэл татаж байна. Түр хүлээнэ үү (${attempt + 1}/${BOOT_STATE_MAX})`,
+    );
     try {
       const payload = await fetchJsonWithTimeout(`${API_BASE}/state`, 90000);
       if (payload?.state) return payload;
@@ -635,7 +643,7 @@ function receiptGrossPercentNoticeHtml(o) {
   if (!o || o.applyPercentDiscount || !isCashPayment(o.paymentTerm)) return "";
   if (orderInWarehouseLiveSession(o)) return "";
   const rate = percentDiscountRate();
-  return `<div class="receipt-gross-note">Анхаар: Захиалгыг өнөөдөрт шилжүүлээгүй тохиолдолд хувь (${rate}%) хасагдаагүй энэ дүнгээр тооцоо хийгдэнэ.</div>`;
+  return `<div class="receipt-gross-note">Тооцоог өдөртөө хийгээгүй тохиолдолд (${rate}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!</div>`;
 }
 function settlementMonthOptions(selected) {
   const cur = selected || String(new Date().getMonth() + 1);
