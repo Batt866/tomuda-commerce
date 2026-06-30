@@ -207,6 +207,26 @@ def _created_order_stock_usage(
     return usage
 
 
+def _is_order_stock_update(
+    old_product: dict[str, Any],
+    new_product: dict[str, Any],
+    allowed_decrease: float,
+) -> bool:
+    old_copy = dict(old_product)
+    new_copy = dict(new_product)
+    try:
+        old_stock = float(old_copy.get("stock") or 0)
+        new_stock = float(new_copy.get("stock") or 0)
+    except (TypeError, ValueError):
+        return False
+    old_copy["stock"] = new_copy["stock"]
+    return (
+        old_copy == new_copy
+        and allowed_decrease > 0
+        and abs((old_stock - new_stock) - allowed_decrease) <= 0.0001
+    )
+
+
 def _has_any_permission(perms: set[str], *keys: str) -> bool:
     return any(k in perms for k in keys)
 
@@ -227,6 +247,10 @@ def validate_state_mutation(
         return False, "Нэвтэрсэн ажилтан олдсонгүй"
 
     perms = resolve_permissions(employee)
+
+    old_orders = _by_id(old_state.get("orders") or [])
+    new_orders = _by_id(new_state.get("orders") or [])
+    created_order_stock = _created_order_stock_usage(old_orders, new_orders)
 
     if _settings_changed(old_state, new_state) and "settings.view" not in perms:
         return False, "Тохиргоо өөрчлөх эрхгүй"
@@ -270,11 +294,21 @@ def validate_state_mutation(
             ]
             if missing_log:
                 return False, f"{key} устгах баталгаажуулалт дутуу"
+        if key == "products" and updated:
+            old_product_map = _by_id(old_state.get("products") or [])
+            new_product_map = _by_id(new_state.get("products") or [])
+            updated = {
+                item_id
+                for item_id in updated
+                if not _is_order_stock_update(
+                    old_product_map[item_id],
+                    new_product_map[item_id],
+                    created_order_stock.get(item_id, 0),
+                )
+            }
         if updated and not _has_any_permission(perms, *edit_keys):
             return False, f"{key} засах эрхгүй"
 
-    old_orders = _by_id(old_state.get("orders") or [])
-    new_orders = _by_id(new_state.get("orders") or [])
     deleted_orders = set(old_orders) - set(new_orders)
     protected_deleted_orders = [
         order_id
@@ -296,7 +330,6 @@ def validate_state_mutation(
 
     old_products = _by_id(old_state.get("products") or [])
     new_products = _by_id(new_state.get("products") or [])
-    created_order_stock = _created_order_stock_usage(old_orders, new_orders)
     for product_id, new_product in new_products.items():
         old_product = old_products.get(product_id)
         if not old_product:
