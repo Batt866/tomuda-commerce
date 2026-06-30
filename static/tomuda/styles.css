@@ -2187,6 +2187,8 @@ a.customer-card__line .customer-card__icon {
   padding: 8px;
   box-sizing: border-box;
   background: var(--hex-secondary);
+  border: none;
+  box-shadow: none;
 }
 
 .product-detail .customer-detail__hero {
@@ -2201,7 +2203,7 @@ a.customer-card__line .customer-card__icon {
   width: min(100%, 300px);
   height: min(68vw, 300px);
   max-height: 300px;
-  border-radius: 12px;
+  border-radius: 0;
 }
 
 .product-detail .customer-detail__hero-text {
@@ -2255,14 +2257,14 @@ a.customer-card__line .customer-card__icon {
 .stock-alert-thumb {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: 0;
   object-fit: contain;
   object-position: center;
   padding: 4px;
   box-sizing: border-box;
   background: var(--hex-secondary);
-  border: var(--thumb-border);
-  box-shadow: var(--thumb-shadow);
+  border: none;
+  box-shadow: none;
 }
 
 .stock-alert-row__name {
@@ -4745,20 +4747,20 @@ input::placeholder, textarea::placeholder {
   width: var(--thumb-md);
   height: var(--thumb-md);
   display: block;
-  border-radius: var(--thumb-radius);
+  border-radius: 0;
   object-fit: contain;
   object-position: center;
   padding: 4px;
   box-sizing: border-box;
   background: var(--hex-secondary);
-  border: var(--thumb-border);
-  box-shadow: var(--thumb-shadow);
+  border: none;
+  box-shadow: none;
 }
 
 .product-thumb--preview {
   width: 88px;
   height: 88px;
-  border-radius: 14px;
+  border-radius: 0;
 }
 
 .worker-view__tabs {
@@ -5706,7 +5708,7 @@ input::placeholder, textarea::placeholder {
   flex-shrink: 0;
   align-self: center;
   display: block;
-  border-radius: 8px;
+  border-radius: 0;
   object-fit: contain;
   object-position: center;
   padding: 4px;
@@ -7300,7 +7302,7 @@ input::placeholder, textarea::placeholder {
   .product-thumb {
     width: 48px;
     height: 48px;
-    border-radius: 11px;
+    border-radius: 0;
   }
 
   .worker-add-plus--compact {
