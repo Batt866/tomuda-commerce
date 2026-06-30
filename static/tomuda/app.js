@@ -7431,6 +7431,46 @@ function getSavedLogin() {
   }
 }
 const AUTH_SESSION_KEY = "tomuda-session";
+function cleanSessionQtyMap(raw) {
+  const result = {};
+  if (!raw || typeof raw !== "object") return result;
+  Object.entries(raw).forEach(([id, value]) => {
+    const product = state.products.find((p) => p.id === id);
+    if (!product) return;
+    const qty = Math.floor(Number(value) || 0);
+    if (qty > 0) result[id] = Math.min(qty, product.stock);
+  });
+  return result;
+}
+function authSessionPayload() {
+  return {
+    employeeId: state.currentEmployee.id,
+    currentView: state.currentView,
+    filters: { ...state.filters },
+    searches: { ...state.searches },
+    workerCustomer: state.workerCustomer || "",
+    workerStoreReady: !!state.workerStoreReady,
+    workerQty: { ...(state.workerQty || {}) },
+    paymentTerm: state.paymentTerm || "cash",
+    isPaid: !!state.isPaid,
+    settlementAgreed: !!state.settlementAgreed,
+    settlementMonth: state.settlementMonth || "",
+    settlementDay: state.settlementDay || "",
+    applyPercentDiscount: !!state.applyPercentDiscount,
+    orderEmployee: state.orderEmployee || "",
+    deliveryDate: state.deliveryDate || "",
+    selectedWorkers: [...(state.selectedWorkers || [])],
+    selectedWarehouseOrderId: state.selectedWarehouseOrderId || "",
+    receiptPrintWorkerIds: [...(state.receiptPrintWorkerIds || [])],
+    receiptPrintDeliveryId: state.receiptPrintDeliveryId || "",
+    receiptPrintOrderIds: [...(state.receiptPrintOrderIds || [])],
+    selectedDeliveryId: state.selectedDeliveryId || "",
+    deliveryName: state.deliveryName || "",
+    deliveryPhone: state.deliveryPhone || "",
+    deliveryStoreId: state.deliveryStoreId || "",
+    deliveryStoreReady: !!state.deliveryStoreReady,
+  };
+}
 function syncEmployeePctField() {
   const roleEl = document.getElementById("employeeRoleSelect");
   const field = document.getElementById("employeePctField");
@@ -7463,10 +7503,7 @@ function saveAuthSession() {
   }
   localStorage.setItem(
     AUTH_SESSION_KEY,
-    JSON.stringify({
-      employeeId: state.currentEmployee.id,
-      currentView: state.currentView,
-    }),
+    JSON.stringify(authSessionPayload()),
   );
 }
 function restoreAuthSession() {
@@ -7482,10 +7519,44 @@ function restoreAuthSession() {
     state.currentEmployee = emp;
     state.isLoggedIn = true;
     state.orderEmployee = emp.id;
+    applyLoginRoleDefaults(emp);
     const view = data.currentView;
     state.currentView =
       view && canAccessView(view) ? view : defaultViewForRole(emp.role);
-    applyLoginRoleDefaults(emp);
+    state.filters = { ...state.filters, ...(data.filters || {}) };
+    state.searches = { ...state.searches, ...(data.searches || {}) };
+    state.workerCustomer = state.customers.some(
+      (c) => c.id === data.workerCustomer,
+    )
+      ? data.workerCustomer
+      : "";
+    state.workerStoreReady = !!state.workerCustomer && !!data.workerStoreReady;
+    state.workerQty = cleanSessionQtyMap(data.workerQty);
+    state.paymentTerm = data.paymentTerm === "credit" ? "credit" : "cash";
+    state.isPaid =
+      typeof data.isPaid === "boolean"
+        ? data.isPaid
+        : paidFromPaymentTerm(state.paymentTerm);
+    state.settlementAgreed = !!data.settlementAgreed;
+    state.settlementMonth = data.settlementMonth || "";
+    state.settlementDay = data.settlementDay || "";
+    state.applyPercentDiscount = !!data.applyPercentDiscount;
+    state.orderEmployee = data.orderEmployee || emp.id;
+    state.deliveryDate = data.deliveryDate || "";
+    state.selectedWorkers = idList(data.selectedWorkers);
+    state.selectedWarehouseOrderId = data.selectedWarehouseOrderId || "";
+    state.receiptPrintWorkerIds = idList(data.receiptPrintWorkerIds);
+    state.receiptPrintDeliveryId = data.receiptPrintDeliveryId || "";
+    state.receiptPrintOrderIds = idList(data.receiptPrintOrderIds);
+    state.selectedDeliveryId =
+      data.selectedDeliveryId || state.selectedDeliveryId || "";
+    state.deliveryName = data.deliveryName || state.deliveryName || "";
+    state.deliveryPhone = data.deliveryPhone || state.deliveryPhone || "";
+    state.deliveryStoreId = data.deliveryStoreId || "";
+    state.deliveryStoreReady =
+      !!data.deliveryStoreReady && !!state.deliveryStoreId;
+    if (!canApplyPercentDiscount(emp)) state.applyPercentDiscount = false;
+    ensureOrderEmployeeSelection();
     return true;
   } catch {
     localStorage.removeItem(AUTH_SESSION_KEY);
@@ -8151,6 +8222,7 @@ function render() {
   if (!canAccessView(state.currentView, r)) {
     state.currentView = defaultViewForRole(r);
   }
+  saveAuthSession();
   const map = {
     admin: adminView,
     orders: ordersView,
