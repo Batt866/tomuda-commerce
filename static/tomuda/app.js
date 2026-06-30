@@ -628,6 +628,21 @@ function orderCreatedDay(o) {
   if (created) return created;
   return orderDeliveryDay(o);
 }
+function orderRetentionExpiresAt(o) {
+  const day = orderCreatedDay(o);
+  if (!day) return 0;
+  const expires = new Date(`${day}T23:59:59`);
+  if (Number.isNaN(expires.getTime())) return 0;
+  expires.setMonth(expires.getMonth() + 1);
+  return expires.getTime();
+}
+function orderWithinRetention(o, now = Date.now()) {
+  const expires = orderRetentionExpiresAt(o);
+  return !expires || expires >= now;
+}
+function retainedOrders(orders = [], now = Date.now()) {
+  return (orders || []).filter((o) => orderWithinRetention(o, now));
+}
 function settlementNoteText(o) {
   if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
   return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлэхээр тохиролцов`;
@@ -1454,6 +1469,7 @@ function mergePersistentStates(remote = {}, local = {}) {
         ? deletionKeyForCollection(key)
         : "",
     });
+    if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
   merged.deletionLog = deletionLog;
   applyCountSessionMerge(remote, local, merged);
@@ -1574,6 +1590,14 @@ function protectAccidentalDeletions(data) {
       }
       return o;
     });
+    const currentOrderIds = new Set(protectedData.orders.map((o) => o.id));
+    const restoredOrders = baseline.orders.filter(
+      (o) => !currentOrderIds.has(o.id) && orderWithinRetention(o),
+    );
+    if (restoredOrders.length) {
+      protectedData.orders = [...protectedData.orders, ...restoredOrders];
+    }
+    protectedData.orders = retainedOrders(protectedData.orders);
   }
   return protectedData;
 }
@@ -1594,6 +1618,7 @@ function applyPersistentState(data) {
   ensureEmployeePermissions();
   syncCurrentEmployeeFromState();
   ensureDeliverySelection();
+  state.orders = retainedOrders(state.orders);
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
@@ -5971,7 +5996,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     .map((e) => e.name);
   const groups = warehouseOrderProductsGrouped(orders);
   const rows = [];
-  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `C2:D2`, `E2:F2`];
+  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `E2:F2`, `E3:F3`];
   let rowNum = 1;
   let catIndex = 0;
   const pushRow = (height, cells) => {
@@ -6023,28 +6048,34 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(28.5, [
     xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
     xlsxCellXml("B2", 4, si(warehouseEmp), "s"),
-    xlsxCellXml("C2", 14, si(orderDateLabel), "s"),
-    xlsxCellXml("D2", 14, null, "empty"),
-    xlsxCellXml("E2", 14, si(printedDateLabel), "s"),
+    xlsxCellXml("C2", 5, null, "empty"),
+    xlsxCellXml("D2", 6, null, "empty"),
+    xlsxCellXml("E2", 14, si(orderDateLabel), "s"),
     xlsxCellXml("F2", 14, null, "empty"),
   ]);
   if (workerNames.length) {
-    pushRow(
-      20.25,
-      warehousePrepareMetaRow(
-        rowNum,
-        "Захиалга авсан ажилтан:",
-        workerNames[0],
-      ),
-    );
+    const firstWorkerRow = rowNum;
+    pushRow(20.25, [
+      xlsxCellXml(`A${firstWorkerRow}`, 3, si("Захиалга авсан ажилтан:"), "s"),
+      xlsxCellXml(`B${firstWorkerRow}`, 4, si(workerNames[0]), "s"),
+      xlsxCellXml(`C${firstWorkerRow}`, 5, null, "empty"),
+      xlsxCellXml(`D${firstWorkerRow}`, 6, null, "empty"),
+      xlsxCellXml(`E${firstWorkerRow}`, 14, si(printedDateLabel), "s"),
+      xlsxCellXml(`F${firstWorkerRow}`, 14, null, "empty"),
+    ]);
     for (let i = 1; i < workerNames.length; i += 1) {
       pushRow(16.5, warehousePrepareWorkerExtraRow(rowNum, workerNames[i]));
     }
   } else {
-    pushRow(
-      20.25,
-      warehousePrepareMetaRow(rowNum, "Захиалга авсан ажилтан:", "-"),
-    );
+    const firstWorkerRow = rowNum;
+    pushRow(20.25, [
+      xlsxCellXml(`A${firstWorkerRow}`, 3, si("Захиалга авсан ажилтан:"), "s"),
+      xlsxCellXml(`B${firstWorkerRow}`, 4, si("-"), "s"),
+      xlsxCellXml(`C${firstWorkerRow}`, 5, null, "empty"),
+      xlsxCellXml(`D${firstWorkerRow}`, 6, null, "empty"),
+      xlsxCellXml(`E${firstWorkerRow}`, 14, si(printedDateLabel), "s"),
+      xlsxCellXml(`F${firstWorkerRow}`, 14, null, "empty"),
+    ]);
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
@@ -6181,10 +6212,10 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? workerNames
         .map(
           (name, idx) =>
-            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td><td></td><td></td><td></td><td></td></tr>`,
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td><td></td><td></td>${idx === 0 ? `<td colspan="2" class="date">${h(printedDateLabel)}</td>` : "<td></td><td></td>"}</tr>`,
         )
         .join("")
-    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td></td><td></td><td></td></tr>`;
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td></td><td colspan="2" class="date">${h(printedDateLabel)}</td></tr>`;
   const itemRows = [];
   for (const item of groups) {
     if (item.type === "cat") {
@@ -6224,7 +6255,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
 <tr><td colspan="6" class="title">Бараа бэлдэх хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td colspan="2" class="date">${h(orderDateLabel)}</td><td colspan="2" class="date">${h(printedDateLabel)}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td></td><td colspan="2" class="date">${h(orderDateLabel)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>

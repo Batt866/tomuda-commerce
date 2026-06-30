@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 PERM_ACTIONS: list[dict[str, str]] = [
@@ -167,6 +168,24 @@ def _deletion_log_has(state: dict[str, Any], type_id: str, item_id: str) -> bool
     return False
 
 
+def _iso_day(value: Any) -> str:
+    raw = str(value or "")
+    if len(raw) >= 10:
+        return raw[:10]
+    return ""
+
+
+def _order_within_retention(order: dict[str, Any], now: datetime | None = None) -> bool:
+    day = _iso_day(order.get("createdAt") or order.get("deliveryDate"))
+    if not day:
+        return True
+    try:
+        created = datetime.fromisoformat(day)
+    except ValueError:
+        return True
+    return created + timedelta(days=31) >= (now or datetime.utcnow())
+
+
 def _has_any_permission(perms: set[str], *keys: str) -> bool:
     return any(k in perms for k in keys)
 
@@ -235,6 +254,14 @@ def validate_state_mutation(
 
     old_orders = _by_id(old_state.get("orders") or [])
     new_orders = _by_id(new_state.get("orders") or [])
+    deleted_orders = set(old_orders) - set(new_orders)
+    protected_deleted_orders = [
+        order_id
+        for order_id in deleted_orders
+        if _order_within_retention(old_orders[order_id])
+    ]
+    if protected_deleted_orders:
+        return False, "1 сарын доторх захиалга устгах боломжгүй"
     for order_id, new_order in new_orders.items():
         old_order = old_orders.get(order_id)
         if old_order is None:
