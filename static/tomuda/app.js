@@ -49,6 +49,7 @@ const state = {
   receiptPrintDeliveryPickerOpen: false,
   receiptPrintOrderIds: [],
   receiptPrintWorkerSyncKey: "",
+  permissionEmployeePickerOpen: false,
   selectedDeliveryId: "",
   deliveryName: "",
   deliveryPhone: "",
@@ -972,11 +973,46 @@ function syncEmployeePermissionsFromRole() {
     el.checked = keys.has(el.value);
   });
 }
-function togglePermissionEmployee(id) {
+function togglePermissionEmployee(id, ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
   state.permissionEmployeeIds = state.permissionEmployeeIds || [];
   const idx = state.permissionEmployeeIds.indexOf(id);
   if (idx >= 0) state.permissionEmployeeIds.splice(idx, 1);
   else state.permissionEmployeeIds.push(id);
+  state.permissionEmployeePickerOpen = true;
+  render();
+}
+function permissionEmployeeSummary(selected = idList(state.permissionEmployeeIds)) {
+  if (!selected.length) return "Сонгох";
+  if (selected.length === 1) {
+    const emp = state.employees.find((e) => e.id === selected[0]);
+    return emp?.name || "1 сонгосон";
+  }
+  return `${selected.length} ажилтан сонгосон`;
+}
+function permissionEmployeePickerHtml() {
+  const people = [...state.employees].sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+  );
+  const selected = idList(state.permissionEmployeeIds);
+  const open = !!state.permissionEmployeePickerOpen;
+  const summary = permissionEmployeeSummary(selected);
+  return `<div class="wh-receipt-picker${open ? " is-open" : ""}" data-permission-employee-picker><button type="button" class="wh-receipt-picker__trigger" onclick="togglePermissionEmployeePicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Ажилтан" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearPermissionEmployees(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onchange="togglePermissionEmployee('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(role(e.role))}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closePermissionEmployeePicker(event)">Болсон</button></div></div>` : ""}</div>`;
+}
+function togglePermissionEmployeePicker(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.permissionEmployeePickerOpen = !state.permissionEmployeePickerOpen;
+  render();
+}
+function closePermissionEmployeePicker(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.permissionEmployeePickerOpen = false;
+  render();
+}
+function clearPermissionEmployees(ev) {
+  if (ev?.stopPropagation) ev.stopPropagation();
+  state.permissionEmployeeIds = [];
+  state.permissionEmployeePickerOpen = true;
   render();
 }
 function selectedPermissionEmployees() {
@@ -1022,24 +1058,14 @@ function employeePermissionsView() {
   if (!canManageEmployeePermissions()) {
     return `<div class="space-y-4">${pageHead("Эрх үүсгэх")}<p class="text-sm text-muted-foreground">Эрх хүрэлцэхгүй.</p></div>`;
   }
-  const selectedIds = new Set(state.permissionEmployeeIds || []);
   const selectedEmployees = selectedPermissionEmployees();
   const permHtml = permApi().permissionsFieldHtml(
     mergedPermissionSelection(),
     selectedEmployees[0]?.role || "sales",
     { hideRoleReset: !selectedEmployees.length },
   );
-  const employeePick =
-    state.employees.length ?
-      state.employees
-        .map((e) => {
-          const active = selectedIds.has(e.id);
-          return `<label class="perm-employee-chip"><input type="checkbox" ${active ? "checked" : ""} onchange="togglePermissionEmployee('${esc(e.id)}')" aria-label="${esc(e.name)} сонгох"><span>${esc(e.name)}</span><span class="text-xs text-muted-foreground">${esc(role(e.role))}</span></label>`;
-        })
-        .join("")
-    : `<p class="text-sm text-muted-foreground">Ажилтан байхгүй</p>`;
   const saveBtn = `<button type="button" onclick="saveGrantedPermissions()" class="btn btn--primary btn--sm shrink-0">Хадгалах</button>`;
-  return `<div class="space-y-4 perm-grant-page">${pageHead("Эрх үүсгэх", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p><div class="perm-grant-employees__list">${employeePick}</div>${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${permHtml}</div>`;
+  return `<div class="space-y-4 perm-grant-page">${pageHead("Эрх үүсгэх", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p>${permissionEmployeePickerHtml()}${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${permHtml}</div>`;
 }
 const EMPLOYEE_EMAIL_DEFAULTS = {
   admin: "admin@tomuda.mn",
@@ -1573,6 +1599,7 @@ function closeReceiptPrintPickersVisual() {
 function closeReceiptPrintPickersState() {
   state.receiptPrintWorkerPickerOpen = false;
   state.receiptPrintDeliveryPickerOpen = false;
+  state.permissionEmployeePickerOpen = false;
 }
 function safeRender() {
   if (isEditingCountQty()) {
@@ -3536,19 +3563,13 @@ function customerCardPhonesHtml(c) {
     )
     .join("")}</div>`;
 }
-function catalogCardStat(label, value, extraClass = "") {
-  const text = value == null || value === "" ? "—" : String(value);
-  return `<div class="catalog-card__stat${extraClass ? ` ${extraClass}` : ""}"><span class="catalog-card__stat-label">${esc(label)}</span><span class="catalog-card__stat-value" title="${esc(text)}">${esc(text)}</span></div>`;
+function customerListHead() {
+  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
-  const phone1 = String(c.phone1 || "").trim();
-  const phone2 = String(c.phone2 || "").trim();
-  const email = String(c.email || "").trim();
-  const rd = customerRegistrationDisplay(c) || "—";
-  const primary = phone1 || email || phone2 || "—";
-  const phoneStat = phone1 || phone2 || "—";
-  return `<article class="catalog-card customer-card${active ? " customer-card--active" : ""}"><div class="catalog-card__media catalog-card__media--avatar">${customerAvatarHtml(c, "catalog-card__avatar customer-card__avatar")}</div><div class="catalog-card__body"><h3 class="catalog-card__title" title="${esc(c.name)}">${esc(c.name)}</h3><p class="catalog-card__value">${esc(primary)}</p><div class="catalog-card__split">${catalogCardStat("РД", rd)}${catalogCardStat("Утас", phoneStat)}</div><p class="catalog-card__meta" title="${esc(addr)}"><span class="catalog-card__meta-icon">${customerCardPinIcon()}</span><span>${esc(addr)}</span></p></div><footer class="catalog-card__actions catalog-card__actions--3">${actionsHtml}</footer></article>`;
+  const sub = customerSubtitle(c);
+  return `<article class="customer-card${active ? " customer-card--active" : ""}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(c.name)}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function customersView() {
   const q = state.searches.customers || "",
@@ -3561,7 +3582,7 @@ function customersView() {
     ]
       .filter(Boolean)
       .join("");
-  return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), actions: toolbarActions })}<div class="list-panel__table"><div class="list-panel__body catalog-grid customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty catalog-grid__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), actions: toolbarActions })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Excel файл татах уу?") {
   confirmModal(title, message, {
@@ -3769,13 +3790,16 @@ function bindReceiptPrintWorkerPickerDismiss() {
     (ev) => {
       const workerOpen = state.receiptPrintWorkerPickerOpen;
       const deliveryOpen = state.receiptPrintDeliveryPickerOpen;
-      if (!workerOpen && !deliveryOpen) return;
+      const permOpen = state.permissionEmployeePickerOpen;
+      if (!workerOpen && !deliveryOpen && !permOpen) return;
       const workerPicker = document.querySelector("[data-receipt-worker-picker]");
       const deliveryPicker = document.querySelector(
         "[data-receipt-delivery-picker]",
       );
+      const permPicker = document.querySelector("[data-permission-employee-picker]");
       if (workerOpen && workerPicker?.contains(ev.target)) return;
       if (deliveryOpen && deliveryPicker?.contains(ev.target)) return;
+      if (permOpen && permPicker?.contains(ev.target)) return;
       closeReceiptPrintPickersState();
       if (ev.target.closest?.(".wh-date-filters")) {
         closeReceiptPrintPickersVisual();
@@ -4070,11 +4094,11 @@ function customerAddress(c) {
 }
 function customerRow(c) {
   const deleteBtn = canDelete()
-    ? `<button type="button" data-confirm-delete="customer" data-id="${esc(c.id)}" class="catalog-card__btn catalog-card__btn--delete">Устгах</button>`
+    ? `<button type="button" data-confirm-delete="customer" data-id="${esc(c.id)}" class="customer-card__btn customer-card__btn--danger">Устгах</button>`
     : "";
   return customerListRow(
     c,
-    `<button type="button" onclick="customerDetail('${c.id}')" class="catalog-card__btn catalog-card__btn--ghost">Харах</button><button type="button" onclick="confirmEditCustomer('${c.id}')" class="catalog-card__btn catalog-card__btn--primary">Засах</button>${deleteBtn}`,
+    `<button type="button" onclick="customerDetail('${c.id}')" class="customer-card__btn customer-card__btn--ghost">Харах</button><button type="button" onclick="confirmEditCustomer('${c.id}')" class="customer-card__btn customer-card__btn--primary">Засах</button>${deleteBtn}`,
   );
 }
 function workerPickCard(c) {
@@ -4107,7 +4131,11 @@ function productsView() {
   ]
     .filter(Boolean)
     .join("");
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}<div class="catalog-grid product-list${canManageProducts() ? "" : " product-list--readonly"}">${list.length ? list.map(productCard).join("") : `<div class="line-panel__empty catalog-grid__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}<div class="product-list${canManageProducts() ? "" : " product-list--readonly"}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+}
+function productListHead() {
+  const actions = canManageProducts();
+  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span>${actions ? `<span class="product-list__col product-list__col--cost">Өртөг үнэ</span>` : ""}<span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
 }
 function productDetailRow(label, valueHtml) {
   return `<div class="customer-detail__row"><div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
@@ -4163,13 +4191,14 @@ function productDetail(id) {
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
 function productCard(p) {
-  const catLine = p.category || "-";
-  const stock = p.stock ?? 0;
-  const stockClass = isLowStock(p) ? " catalog-card__stat--warn" : "";
-  const actions = canManageProducts()
-    ? `<footer class="catalog-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${p.id}')" class="catalog-card__btn catalog-card__btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="catalog-card__btn catalog-card__btn--delete">Устгах</button></footer>`
+  const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
+  const adminActions = canManageProducts()
+    ? `<div class="product-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
     : "";
-  return `<article class="catalog-card product-card catalog-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="catalog-card__media product-card__media"><img src="${productImage(p)}" alt="${esc(p.name)}" class="catalog-card__img" loading="lazy" decoding="async"></div><div class="catalog-card__body product-card__body"><div class="product-card__field product-card__field--name"><span class="product-card__label">Нэр</span><span class="product-card__text" title="${esc(p.name)}">${esc(p.name)}</span></div><div class="product-card__field product-card__field--price"><span class="product-card__label">Үнэ</span><span class="product-card__text product-card__text--price">${fmt(p.price)}</span></div><div class="catalog-card__split product-card__split">${catalogCardStat("Үлд", stock, stockClass)}${catalogCardStat("Ан", catLine)}</div></div></div>${actions}</article>`;
+  const costLine = hasPermission("warehouse.edit")
+    ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
+    : "";
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -6778,16 +6807,28 @@ function clearEmployeeImage() {
     )
     ?.remove();
 }
+function employeeListHead() {
+  return `<div class="employee-list__head" aria-hidden="true"><span>Ажилтан</span><span>Эрх / холбоо барих</span><span class="employee-list__head-actions">Үйлдэл</span></div>`;
+}
+function employeeRow(e) {
+  const canEdit = hasPermission("employees.edit");
+  const editBtn = canEdit
+    ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="employee-card__btn employee-card__btn--ghost">Засах</button>`
+    : "";
+  const deleteBtn =
+    canEdit && canDelete()
+      ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="employee-card__btn employee-card__btn--danger">Устгах</button>`
+      : "";
+  const pctToggle = canEdit ? employeePercentDiscountToggle(e) : "";
+  const meta = `${role(e.role)} · ${e.email || "-"} · ${employeePermissionSummary(e)}`;
+  return `<article class="employee-card"><header class="employee-card__head">${employeeAvatarHtml(e)}<div class="employee-card__identity"><h3 class="employee-card__name">${esc(e.name)}</h3><p class="employee-card__sub">${esc(meta)}</p></div></header><p class="employee-card__meta">${esc(meta)}</p><footer class="employee-card__actions">${editBtn}${pctToggle}${deleteBtn}</footer></article>`;
+}
 function employeesView() {
   const addBtn = hasPermission("employees.create")
     ? `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`
     : "";
   const headActions = addBtn;
-  const editBtn = (e) =>
-    hasPermission("employees.edit")
-      ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="px-3 py-2 bg-secondary rounded text-sm shrink-0">Засах</button>`
-      : "";
-  return `<div class="space-y-4">${pageHead("Ажилтан", headActions)}<div class="line-panel"><div class="line-list employee-list">${state.employees.map((e) => `<div class="line-list__row line-list__row--static employee-row">${employeeAvatarHtml(e)}<div class="min-w-0 flex-1"><p class="font-medium truncate">${e.name}</p><p class="line-list__meta">${role(e.role)} · ${e.email || "-"} · ${employeePermissionSummary(e)}</p></div><div class="flex items-center gap-2 shrink-0">${editBtn(e)}${hasPermission("employees.edit") ? employeePercentDiscountToggle(e) : ""}${hasPermission("employees.edit") && canDelete() ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="px-3 py-2 tone tone--danger rounded text-sm">×</button>` : ""}</div></div>`).join("")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Ажилтан", headActions)}<div class="line-panel"><div class="employee-list">${employeeListHead()}${state.employees.map(employeeRow).join("")}</div></div></div>`;
 }
 function getSavedLogin() {
   try {
@@ -9788,6 +9829,9 @@ Object.assign(window, {
   syncEmployeePermissionsFromRole,
   openEmployeePermissionsPage,
   togglePermissionEmployee,
+  togglePermissionEmployeePicker,
+  closePermissionEmployeePicker,
+  clearPermissionEmployees,
   saveGrantedPermissions,
   saveBackendState,
   installPwaApp,
