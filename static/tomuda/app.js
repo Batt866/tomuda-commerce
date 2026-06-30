@@ -3188,8 +3188,8 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-gross-bar td:last-child { text-align: right; font-size: 14px; white-space: nowrap; }
 .receipt-gross-note { background: #fff3cd; color: #7a5b00; text-align: center; padding: 6px 8px; font-size: 11px; font-weight: 700; line-height: 1.4; margin: 6px 0; }
 .receipt-settlement-note { background: #fff3cd; text-align: center; padding: 6px 8px; font-weight: 700; margin-bottom: 6px; }
-.receipt-promo-block { margin-bottom: 8px; padding: 4px 6px; border: 1.2px solid #16899a; background: #e8f6f3; color: #0f5f68; font-size: 11px; }
-.receipt-promo-head, .receipt-promo-row { display: table; width: 100%; border-bottom: 1px dotted #6fb6ac; padding: 2px 0; }
+.receipt-promo-block { margin-bottom: 8px; padding: 4px 6px; border: 1px solid #777; background: #fff; color: #111; font-size: 11px; }
+.receipt-promo-head, .receipt-promo-row { display: table; width: 100%; border-bottom: 1px dotted #999; padding: 2px 0; }
 .receipt-promo-head b { font-size: 14px; }
 .receipt-promo-row span, .receipt-promo-row strong { display: table-cell; }
 .receipt-promo-row strong { text-align: right; font-weight: 800; width: 90px; }
@@ -6100,53 +6100,65 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
   const groups = warehouseOrderProductsGrouped(orders);
-  const sheetRows = [
-    ["Бараа бэлдэх хуудас"],
-    ["Агуулахын ажилтан:", warehouseEmp, "", "", warehouseSheetDateLabel()],
-    ["Захиалга авсан ажилтан:", workerNames[0] || "-"],
-    ...workerNames.slice(1).map((name) => ["", name]),
-    [],
-    [
-      "Барааны нэр төрөл",
-      "Хэмжих нэгж",
-      "Баркод",
-      "Багц",
-      "Ширхэг",
-      "Үлдэгдэл",
-    ],
-  ];
+  const h = (value) => xlsxXmlEsc(value ?? "");
+  const workerRows = workerNames.length
+    ? workerNames
+        .map(
+          (name, idx) =>
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td><td></td><td></td><td></td><td></td></tr>`,
+        )
+        .join("")
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td></td><td></td><td></td></tr>`;
+  const itemRows = [];
   for (const item of groups) {
     if (item.type === "cat") {
-      sheetRows.push([item.name]);
+      itemRows.push(`<tr><td colspan="6" class="cat">${h(item.name)}</td></tr>`);
       continue;
     }
     const p = item.product;
     const { packs, pieces } = pickerQtyToParts(item.qty, p);
-    sheetRows.push([
-      p.name || "",
-      p.unit || "ширхэг",
-      p.barcode || "",
-      packs || "",
-      pieces || "",
-      Number(p.stock) || 0,
-    ]);
+    itemRows.push(
+      `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${packs || ""}</td><td class="num">${pieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`,
+    );
   }
-  sheetRows.push(
-    [],
-    [
-      "Хүлээлгэн өгсөн ажилтан:",
-      "",
-      "/...................................................../",
-    ],
-    ["", "", "гарын үсэг"],
-    [
-      "Хүлээн авсан ажилтан:",
-      "",
-      "/...................................................../",
-    ],
-    ["гарын үсэг"],
-  );
-  excel(`aguulah-beldeh-${stamp}.csv`, sheetRows);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; color: #000; }
+table.prepare { width: 900px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
+.prepare col:nth-child(1) { width: 275px; }
+.prepare col:nth-child(2) { width: 142px; }
+.prepare col:nth-child(3) { width: 150px; }
+.prepare col:nth-child(4) { width: 82px; }
+.prepare col:nth-child(5) { width: 88px; }
+.prepare col:nth-child(6) { width: 162px; }
+.prepare td, .prepare th { border: 1px solid #555; padding: 2px 4px; vertical-align: middle; }
+.title { height: 72px; text-align: center; font-size: 32px; font-weight: 800; }
+.meta-label { text-align: right; font-weight: 700; white-space: nowrap; }
+.meta-value { font-weight: 400; }
+.date { text-align: center; font-size: 20px; }
+.blank td { height: 30px; }
+.head th { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: 2px solid #000; }
+.cat { text-align: center; font-weight: 800; height: 36px; }
+.barcode { mso-number-format:"\\@"; text-align: left; }
+.num { text-align: right; }
+.spacer td { height: 88px; }
+.sign-label { text-align: right; font-weight: 700; }
+.sign-line { text-align: center; }
+.sign-hint { text-align: center; font-size: 14px; border-top: none !important; }
+</style></head><body><table class="prepare">
+<colgroup><col><col><col><col><col><col></colgroup>
+<tr><td colspan="6" class="title">Бараа бэлдэх хуудас</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td></td><td colspan="2" class="date">${h(warehouseSheetDateLabel())}</td></tr>
+${workerRows}
+<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
+${itemRows.join("")}
+<tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td colspan="2" class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="3" class="sign-line">/...................................................../</td><td></td></tr>
+<tr><td colspan="2"></td><td colspan="3" class="sign-hint">гарын үсэг</td><td></td></tr>
+<tr><td colspan="2" class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="3" class="sign-line">/...................................................../</td><td></td></tr>
+<tr><td colspan="2"></td><td colspan="3" class="sign-hint">гарын үсэг</td><td></td></tr>
+</table></body></html>`;
+  downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
 function exportWarehousePrepareExcel(orders, workerIds) {
   exportWarehousePrepareExcelXlsx(orders, workerIds).catch(() =>

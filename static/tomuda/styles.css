@@ -9168,9 +9168,9 @@ input::placeholder, textarea::placeholder {
   .receipt-promo-block {
     margin-bottom: 3mm;
     padding: 1.5mm 2mm;
-    border: 1.2px solid #16899a;
-    background: #e8f6f3;
-    color: #0f5f68;
+    border: 1px solid #777;
+    background: #fff;
+    color: #111;
     font-size: 11px;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
@@ -9182,11 +9182,11 @@ input::placeholder, textarea::placeholder {
     gap: 2mm;
     align-items: center;
     padding: 1mm 0;
-    border-bottom: 1px dotted #6fb6ac;
+    border-bottom: 1px dotted #999;
   }
   .receipt-promo-head {
     font-weight: 800;
-    color: #0d6570;
+    color: #111;
   }
   .receipt-promo-head b {
     font-size: 15px;
