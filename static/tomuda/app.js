@@ -5843,16 +5843,27 @@ async function exportCountExcelXlsx() {
 const WAREHOUSE_PREPARE_LAST_COL = "F";
 const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
-function warehouseSheetDateLabel() {
-  const raw = state.filters.warehouseDate || todayIso();
+function warehouseDateLabel(prefix, raw = todayIso()) {
   const parts = String(raw).split("-");
   if (parts.length === 3) {
     const y = Number(parts[0]);
     const m = Number(parts[1]);
     const d = Number(parts[2]);
-    if (y && m && d) return `Огноо: ${y}/${m}/${d}`;
+    if (y && m && d) return `${prefix}: ${y}/${m}/${d}`;
   }
-  return countSheetDateLabel();
+  return `${prefix}: ${raw}`;
+}
+function warehouseSheetDateLabel() {
+  return warehouseDateLabel("Огноо", state.filters.warehouseDate || todayIso());
+}
+function warehouseOrderDateLabel() {
+  return warehouseDateLabel(
+    "Захиалга авсан огноо",
+    state.filters.warehouseDate || todayIso(),
+  );
+}
+function warehousePrintedDateLabel() {
+  return warehouseDateLabel("Хэвлэсэн огноо", todayIso());
 }
 function warehousePrepareProduct(row) {
   const id = row.productId;
@@ -5953,13 +5964,14 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     return idx;
   };
   const warehouseEmp = state.currentEmployee?.name || "-";
-  const dateLabel = warehouseSheetDateLabel();
+  const orderDateLabel = warehouseOrderDateLabel();
+  const printedDateLabel = warehousePrintedDateLabel();
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
   const groups = warehouseOrderProductsGrouped(orders);
   const rows = [];
-  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `E2:F2`];
+  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `C2:D2`, `E2:F2`];
   let rowNum = 1;
   let catIndex = 0;
   const pushRow = (height, cells) => {
@@ -6011,9 +6023,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(28.5, [
     xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
     xlsxCellXml("B2", 4, si(warehouseEmp), "s"),
-    xlsxCellXml("C2", 5, null, "empty"),
-    xlsxCellXml("D2", 6, null, "empty"),
-    xlsxCellXml("E2", 14, si(dateLabel), "s"),
+    xlsxCellXml("C2", 14, si(orderDateLabel), "s"),
+    xlsxCellXml("D2", 14, null, "empty"),
+    xlsxCellXml("E2", 14, si(printedDateLabel), "s"),
     xlsxCellXml("F2", 14, null, "empty"),
   ]);
   if (workerNames.length) {
@@ -6125,7 +6137,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.12890625" customWidth="1"/><col min="2" max="2" width="12.74609375" customWidth="1"/><col min="3" max="3" width="13.73046875" customWidth="1"/><col min="4" max="4" width="7.35546875" customWidth="1"/><col min="5" max="5" width="8.08984375" customWidth="1"/><col min="6" max="6" width="14.5859375" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="34" customWidth="1"/><col min="2" max="2" width="12.5" customWidth="1"/><col min="3" max="3" width="20" customWidth="1"/><col min="4" max="4" width="7" customWidth="1"/><col min="5" max="5" width="8" customWidth="1"/><col min="6" max="6" width="12.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
@@ -6158,6 +6170,8 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const stamp = new Date().toISOString().slice(0, 10);
   const warehouseEmp = state.currentEmployee?.name || "-";
+  const orderDateLabel = warehouseOrderDateLabel();
+  const printedDateLabel = warehousePrintedDateLabel();
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
@@ -6185,14 +6199,15 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
   }
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.prepare { width: 900px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
-.prepare col:nth-child(1) { width: 275px; }
-.prepare col:nth-child(2) { width: 142px; }
-.prepare col:nth-child(3) { width: 150px; }
-.prepare col:nth-child(4) { width: 82px; }
-.prepare col:nth-child(5) { width: 88px; }
-.prepare col:nth-child(6) { width: 162px; }
+table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
+.prepare col:nth-child(1) { width: 345px; }
+.prepare col:nth-child(2) { width: 125px; }
+.prepare col:nth-child(3) { width: 205px; }
+.prepare col:nth-child(4) { width: 70px; }
+.prepare col:nth-child(5) { width: 80px; }
+.prepare col:nth-child(6) { width: 175px; }
 .prepare td, .prepare th { border: 1px solid #555; padding: 2px 4px; vertical-align: middle; }
+.prepare td:first-child { overflow-wrap: anywhere; }
 .title { height: 72px; text-align: center; font-size: 32px; font-weight: 800; }
 .meta-label { text-align: right; font-weight: 700; white-space: nowrap; }
 .meta-value { font-weight: 400; }
@@ -6209,7 +6224,7 @@ table.prepare { width: 900px; border-collapse: collapse; table-layout: fixed; fo
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
 <tr><td colspan="6" class="title">Бараа бэлдэх хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td></td><td colspan="2" class="date">${h(warehouseSheetDateLabel())}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td colspan="2" class="date">${h(orderDateLabel)}</td><td colspan="2" class="date">${h(printedDateLabel)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
