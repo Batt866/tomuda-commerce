@@ -64,6 +64,7 @@ const state = {
   receiptEditOriginalItems: null,
   extraCategories: [],
   inventoryLogs: [],
+  deletionLog: [],
   countQty: {},
   countDone: false,
   countOpeningStock: {},
@@ -205,6 +206,7 @@ const persistKeys = [
   "orders",
   "extraCategories",
   "inventoryLogs",
+  "deletionLog",
   "countQty",
   "countDone",
   "countOpeningStock",
@@ -1366,8 +1368,40 @@ function persistentState() {
   }, {});
 }
 const MERGE_BY_ID_KEYS = ["customers", "products", "employees", "orders"];
+const DELETION_GUARDED_KEYS = ["customers", "products"];
 
-function mergeArrayById(remote = [], local = []) {
+function deletionKeyForCollection(collectionKey) {
+  return collectionKey === "customers"
+    ? "customer"
+    : collectionKey === "products"
+      ? "product"
+      : collectionKey;
+}
+function normalizeDeletionLog(log = []) {
+  if (!Array.isArray(log)) return [];
+  const seen = new Set();
+  return log
+    .filter((entry) => entry && entry.type && entry.id)
+    .filter((entry) => {
+      const key = `${entry.type}:${entry.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(-500);
+}
+function deletionLogHas(log = [], type, id) {
+  return normalizeDeletionLog(log).some(
+    (entry) => entry.type === type && String(entry.id) === String(id),
+  );
+}
+function mergedDeletionLog(remote = {}, local = {}) {
+  return normalizeDeletionLog([
+    ...(remote.deletionLog || []),
+    ...(local.deletionLog || []),
+  ]);
+}
+function mergeArrayById(remote = [], local = [], opts = {}) {
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), item);
@@ -1375,6 +1409,12 @@ function mergeArrayById(remote = [], local = []) {
   (local || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), item);
   });
+  const tombstones = opts.deletionLog || [];
+  if (opts.deletionType) {
+    for (const id of [...map.keys()]) {
+      if (deletionLogHas(tombstones, opts.deletionType, id)) map.delete(id);
+    }
+  }
   return Array.from(map.values());
 }
 
@@ -1407,9 +1447,16 @@ function applyCountSessionMerge(remote, local, merged) {
 }
 function mergePersistentStates(remote = {}, local = {}) {
   const merged = {};
+  const deletionLog = mergedDeletionLog(remote, local);
   for (const key of MERGE_BY_ID_KEYS) {
-    merged[key] = mergeArrayById(remote[key], local[key]);
+    merged[key] = mergeArrayById(remote[key], local[key], {
+      deletionLog,
+      deletionType: DELETION_GUARDED_KEYS.includes(key)
+        ? deletionKeyForCollection(key)
+        : "",
+    });
   }
+  merged.deletionLog = deletionLog;
   applyCountSessionMerge(remote, local, merged);
   for (const key of persistKeys) {
     if (MERGE_BY_ID_KEYS.includes(key)) continue;
@@ -1454,6 +1501,7 @@ function mergePersistentStates(remote = {}, local = {}) {
       );
       continue;
     }
+    if (key === "deletionLog") continue;
     merged[key] =
       local[key] !== undefined && local[key] !== null
         ? local[key]
@@ -1461,8 +1509,7 @@ function mergePersistentStates(remote = {}, local = {}) {
   }
   return merged;
 }
-function protectDeletionsForNonAdmin(data) {
-  if (canDelete()) return data;
+function protectAccidentalDeletions(data) {
   let baseline = null;
   try {
     baseline = JSON.parse(backendLastSaved).state;
@@ -1471,12 +1518,29 @@ function protectDeletionsForNonAdmin(data) {
   }
   if (!baseline) return data;
   const protectedData = { ...data };
-  for (const key of ["customers", "products", "employees"]) {
+  const deletionLog = normalizeDeletionLog([
+    ...(baseline.deletionLog || []),
+    ...(protectedData.deletionLog || []),
+  ]);
+  protectedData.deletionLog = deletionLog;
+  for (const key of DELETION_GUARDED_KEYS) {
     const current = protectedData[key] || [];
     const base = baseline[key] || [];
     const currentIds = new Set(current.map((x) => x.id));
-    const restored = base.filter((x) => !currentIds.has(x.id));
+    const deletionType = deletionKeyForCollection(key);
+    const restored = base.filter(
+      (x) => !currentIds.has(x.id) && !deletionLogHas(deletionLog, deletionType, x.id),
+    );
     if (restored.length) protectedData[key] = [...current, ...restored];
+  }
+  if (!canDelete()) {
+    for (const key of ["employees"]) {
+      const current = protectedData[key] || [];
+      const base = baseline[key] || [];
+      const currentIds = new Set(current.map((x) => x.id));
+      const restored = base.filter((x) => !currentIds.has(x.id));
+      if (restored.length) protectedData[key] = [...current, ...restored];
+    }
   }
   const baseRules = baseline.promotionRules || {
     quantity: [],
@@ -1525,6 +1589,7 @@ function applyPersistentState(data) {
     state.promotionRules.payment = [];
   if (!state.workerQty || typeof state.workerQty !== "object")
     state.workerQty = {};
+  state.deletionLog = normalizeDeletionLog(state.deletionLog);
   ensureSettings();
   ensureEmployeePercentDiscount();
   ensureEmployeePermissions();
@@ -2725,7 +2790,7 @@ function scheduleBackendSave() {
 }
 async function saveBackendState() {
   backendSaveTimer = null;
-  const protectedData = protectDeletionsForNonAdmin(persistentState());
+  const protectedData = protectAccidentalDeletions(persistentState());
   if (JSON.stringify(protectedData) !== JSON.stringify(persistentState())) {
     const session = captureSessionSnapshot();
     applyPersistentState(protectedData);
@@ -4187,11 +4252,10 @@ function receiptPrintWorkerSyncToken() {
   return receiptPrintWorkerIds().slice().sort().join("|");
 }
 function receiptFilterOptions() {
-  const workerIds = receiptPrintWorkerIds(),
-    deliveryId = state.receiptPrintDeliveryId || "";
+  const workerIds = receiptPrintWorkerIds();
   return {
     workerIds: workerIds.length ? workerIds : receiptWorkerIds(),
-    deliveryIds: deliveryId ? [deliveryId] : receiptDeliveryIds(),
+    deliveryIds: [],
   };
 }
 function receiptPrintDeliveryIds() {
@@ -4201,17 +4265,14 @@ function receiptPrintDeliveryIds() {
 function receiptPrintWorkerOrders(workerIds = receiptPrintWorkerIds()) {
   const ids = new Set(workerIds);
   if (!ids.size) return [];
-  const deliveryIds = receiptPrintDeliveryIds();
   const rows = filterWarehouseOrders(
     state.orders.filter(
       (o) =>
         ids.has(o.employeeId) &&
-        (!deliveryIds.length ||
-          deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
         (state.filters.order === "all" || o.status === state.filters.order),
     ),
   );
-  return sortOrdersBySelectedPeople(rows, workerIds, deliveryIds);
+  return sortOrdersBySelectedPeople(rows, workerIds);
 }
 function syncReceiptPrintSelection(orders) {
   const workerIds = receiptPrintWorkerIds();
@@ -4407,7 +4468,9 @@ function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
 }
 function warehouseOrdersForSelectedWorkers() {
   const ids = new Set(state.selectedWorkers || []);
-  if (!ids.size) return [];
+  if (!ids.size) {
+    return sortOrdersBySelectedPeople(filterWarehouseOrders(state.orders));
+  }
   const orders = filterWarehouseOrders(
     state.orders.filter((o) => ids.has(o.employeeId)),
   );
@@ -7960,12 +8023,18 @@ function workerChooser(orders) {
       .reduce((s, i) => s + i.quantity, 0),
     total = orders.reduce((s, o) => s + orderAmount(o), 0),
     activeWorkerIds = warehouseActiveWorkerIds(orders),
+    hasSelection = !!state.selectedWorkers.length,
+    hasOrders = !!orders.length,
     names = state.employees
       .filter((e) => activeWorkerIds.includes(e.id))
       .map((e) => e.name)
       .join(", "),
-    detail = qtyDetail(orders);
-  return `<section class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: state.selectedWorkers.length ? excelDownloadBtn("confirmEmployeeExcel()", { disabled: !orders.length }) : "" })}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${names ? "" : "text-muted-foreground"}">${names || (state.selectedWorkers.length ? "Захиалга алга" : "Сонгох")}</span></button>${state.selectedWorkers.length ? `<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">Сонгосон ХТ дээр захиалга алга</p>`}</div>` : `<div class="p-4 text-center text-sm text-muted-foreground bg-secondary/50 rounded">Худалдааны төлөөлөгчөө сонгоно уу</div>`}</section>`;
+    detail = qtyDetail(orders),
+    chooserLabel = hasSelection ? names || "Захиалга алга" : "Бүх ХТ",
+    emptyText = hasSelection
+      ? "Сонгосон ХТ дээр захиалга алга"
+      : "Өнөөдрийн захиалга алга";
+  return `<section class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button><div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -9980,11 +10049,14 @@ function toggleWorkerOnly(id) {
   workerSelectModal();
 }
 function employeeExcel() {
-  if (!state.selectedWorkers.length) return alert("Ажилтан сонгоно уу");
   const orders = warehouseOrdersForSelectedWorkers(),
     workerIds = warehouseActiveWorkerIds(orders);
   if (!orders.length || !workerIds.length)
-    return alert("Сонгосон ХТ дээр захиалга алга");
+    return alert(
+      state.selectedWorkers.length
+        ? "Сонгосон ХТ дээр захиалга алга"
+        : "Өнөөдрийн захиалга алга",
+    );
   exportWarehousePrepareExcel(orders, workerIds);
 }
 function saveWorker() {
@@ -10287,13 +10359,28 @@ function cancelOrderNow(id) {
   if (!canDelete()) return;
   setOrder(id, "cancelled");
 }
+function recordDeletion(type, id) {
+  if (!["product", "customer"].includes(type) || !id) return;
+  state.deletionLog = normalizeDeletionLog([
+    ...(state.deletionLog || []),
+    {
+      type,
+      id,
+      deletedAt: new Date().toISOString(),
+      actorId: state.currentEmployee?.id || "",
+    },
+  ]);
+}
 function deleteNow(type, id) {
   if (!canDelete()) return;
-  if (type === "product")
+  if (type === "product") {
+    recordDeletion("product", id);
     state.products = state.products.filter((p) => p.id !== id);
+  }
   if (type === "employee")
     state.employees = state.employees.filter((e) => e.id !== id);
   if (type === "customer") {
+    recordDeletion("customer", id);
     state.customers = state.customers.filter((c) => c.id !== id);
     if (state.workerCustomer === id) {
       state.workerCustomer = "";

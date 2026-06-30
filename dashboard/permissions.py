@@ -160,6 +160,13 @@ def _collection_mutations(
     return created, updated, deleted
 
 
+def _deletion_log_has(state: dict[str, Any], type_id: str, item_id: str) -> bool:
+    for entry in state.get("deletionLog") or []:
+        if str(entry.get("type") or "") == type_id and str(entry.get("id") or "") == item_id:
+            return True
+    return False
+
+
 def _has_any_permission(perms: set[str], *keys: str) -> bool:
     return any(k in perms for k in keys)
 
@@ -214,6 +221,15 @@ def validate_state_mutation(
             return False, f"{key} нэмэх эрхгүй"
         if deleted and not _has_any_permission(perms, *delete_keys):
             return False, f"{key} устгах эрхгүй"
+        if key in {"products", "customers"}:
+            type_id = "product" if key == "products" else "customer"
+            missing_log = [
+                item_id
+                for item_id in deleted
+                if not _deletion_log_has(new_state, type_id, item_id)
+            ]
+            if missing_log:
+                return False, f"{key} устгах баталгаажуулалт дутуу"
         if updated and not _has_any_permission(perms, *edit_keys):
             return False, f"{key} засах эрхгүй"
 
