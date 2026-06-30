@@ -832,7 +832,7 @@ const role = (r) =>
   ({
     admin: "Админ",
     sales: "Худалдааны төлөөлөгч",
-    warehouse: "Агуулах",
+    warehouse: "Нярав",
     delivery: "Түгээгч",
   })[r] || "Ажилчин";
 function deliveryEmployees() {
@@ -1242,7 +1242,7 @@ const MOBILE_NAV_SHORT = {
   worker: "Захиалга",
   customers: "Харилцагч",
   products: "Бараа",
-  warehouse: "Агуулах",
+  warehouse: "Нярав",
   delivery: "Хүргэлт",
   count: "Тооллого",
   employees: "Ажилтан",
@@ -1282,10 +1282,10 @@ function sidebarNavForRole(role) {
   if (role === "delivery") return [["delivery", "Хүргэлт"]];
   if (role === "admin")
     return [
-      ["worker", "Захиалга үүсгэх"],
+      ["worker", "Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
+      ["warehouse", "Нярав"],
       ["count", "Тооллого"],
       ["employees", "Ажилтан"],
       ["inventory", "Агуулахын бүртгэл"],
@@ -1294,10 +1294,10 @@ function sidebarNavForRole(role) {
       ["admin", "Админ"],
     ];
   return [
-    ["worker", "Захиалга үүсгэх"],
+    ["worker", "Шинэ захиалга"],
     ["customers", "Харилцагч"],
     ["products", "Бараа"],
-    ["warehouse", "Агуулах"],
+    ["warehouse", "Нярав"],
     ["count", "Тооллого"],
     ["admin", "Админ"],
   ].filter(([id]) => allowedNavIds().includes(id));
@@ -1363,7 +1363,7 @@ function currentPageTitle(nav) {
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрх үүсгэх",
-    inventory: "Агуулах",
+    inventory: "Нярав",
     reports: "Тайлан",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
@@ -1876,6 +1876,7 @@ async function boot() {
     initCountInputHandlers();
     initConfirmCard();
     initConfirmDeleteActions();
+    initImageLightbox();
     initAppBack();
     window.__tomudaBooted = true;
     render();
@@ -1892,6 +1893,7 @@ async function boot() {
 }
 function canAppBack() {
   if (!state.isLoggedIn) return false;
+  if (imageLightboxOpen()) return true;
   const confirmOverlay = document.getElementById("confirm-card-overlay");
   if (confirmOverlay && !confirmOverlay.hidden) return true;
   if (barcodeScanning) return true;
@@ -1948,6 +1950,11 @@ function handleAppBack() {
   const confirmOverlay = document.getElementById("confirm-card-overlay");
   if (confirmOverlay && !confirmOverlay.hidden) {
     closeConfirmCard();
+    return true;
+  }
+
+  if (imageLightboxOpen()) {
+    closeImageLightbox();
     return true;
   }
 
@@ -3032,7 +3039,7 @@ function adminHubActionCard(action, label, iconKey) {
 function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
-    ["inventory", "Агуулах", "inventory", "warehouse.view"],
+    ["inventory", "Нярав", "inventory", "warehouse.view"],
     ["reports", "Тайлан", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "settings.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "warehouse.view"],
@@ -4889,7 +4896,7 @@ function inventoryView() {
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
           p.barcode.includes(q)),
     );
-  return `<div class="space-y-4">${pageHead("Агуулах")}<div class="seg-tabs seg-tabs--3">${[
+  return `<div class="space-y-4">${pageHead("Нярав")}<div class="seg-tabs seg-tabs--3">${[
     ["stock", "Үлдэгдэл"],
     ["in", "Орлого авах"],
     ["out", "Зарлага гаргах"],
@@ -7805,7 +7812,7 @@ function workerOrdersList() {
   return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 function workerViewTabsHtml(tab) {
-  return `<div class="worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Захиалга үүсгэх</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Жагсаалт</button></div>`;
+  return `<div class="worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Шинэ захиалга</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Захиалга харах</button></div>`;
 }
 function workerView() {
   const tab = state.filters.worker,
@@ -7851,7 +7858,7 @@ function scrollWorkerOrdersToDate() {
 }
 function warehouseView() {
   const orders = warehouseOrdersForSelectedWorkers();
-  return `<div class="space-y-3">${pageHead("Агуулах")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
+  return `<div class="space-y-3">${pageHead("Нярав")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
 }
 function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";
@@ -8480,6 +8487,66 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
   modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
   requestAnimationFrame(() => enhanceMobileNumericInputs(document));
   if (!wasOpen) pushAppHistory();
+}
+const IMAGE_LIGHTBOX_SKIP =
+  ".receipt-logo, .boot-screen__logo, .wh-receipt-sheet__logo, .auth-card__logo, .tomuda-logo, #image-lightbox img";
+let imageLightboxEl = null;
+function imageLightboxOpen() {
+  return imageLightboxEl && !imageLightboxEl.hidden;
+}
+function isZoomableImage(img) {
+  if (!img?.src || img.tagName !== "IMG") return false;
+  if (img.closest(IMAGE_LIGHTBOX_SKIP)) return false;
+  return !!img.closest("#app, #modal, .picker-qty-sheet, [data-picker-qty-sheet]");
+}
+function ensureImageLightbox() {
+  if (imageLightboxEl) return imageLightboxEl;
+  imageLightboxEl = document.createElement("div");
+  imageLightboxEl.id = "image-lightbox";
+  imageLightboxEl.className = "image-lightbox";
+  imageLightboxEl.hidden = true;
+  imageLightboxEl.innerHTML =
+    '<button type="button" class="image-lightbox__backdrop" data-image-lightbox-close aria-label="Хаах"></button><div class="image-lightbox__frame" role="dialog" aria-modal="true" aria-label="Зураг"><img class="image-lightbox__img" alt=""><button type="button" class="image-lightbox__close btn btn--secondary btn--sm" data-image-lightbox-close aria-label="Хаах"><span aria-hidden="true">✕</span></button></div>';
+  document.body.appendChild(imageLightboxEl);
+  imageLightboxEl.addEventListener("click", (e) => {
+    if (e.target.closest("[data-image-lightbox-close]")) closeImageLightbox();
+  });
+  return imageLightboxEl;
+}
+function openImageLightbox(src, alt = "") {
+  const root = ensureImageLightbox();
+  const img = root.querySelector(".image-lightbox__img");
+  if (img) {
+    img.src = src;
+    img.alt = alt;
+  }
+  root.hidden = false;
+  document.body.classList.add("image-lightbox-open");
+}
+function closeImageLightbox() {
+  if (!imageLightboxEl || imageLightboxEl.hidden) return;
+  imageLightboxEl.hidden = true;
+  document.body.classList.remove("image-lightbox-open");
+  const img = imageLightboxEl.querySelector(".image-lightbox__img");
+  if (img) img.removeAttribute("src");
+}
+function initImageLightbox() {
+  if (document.documentElement.dataset.imageLightboxBound) return;
+  document.documentElement.dataset.imageLightboxBound = "1";
+  document.addEventListener(
+    "click",
+    (e) => {
+      const img = e.target.closest("img");
+      if (!img || !isZoomableImage(img)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openImageLightbox(img.currentSrc || img.src, img.alt || "");
+    },
+    true,
+  );
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && imageLightboxOpen()) closeImageLightbox();
+  });
 }
 function closeModal() {
   closeConfirmCard();

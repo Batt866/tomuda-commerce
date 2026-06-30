@@ -10576,3 +10576,63 @@ input::placeholder, textarea::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.image-lightbox[hidden] {
+  display: none !important;
+}
+
+.image-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 0.82);
+  cursor: zoom-out;
+}
+
+.image-lightbox__frame {
+  position: relative;
+  z-index: 1;
+  max-width: min(96vw, 720px);
+  max-height: 92vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-lightbox__img {
+  max-width: 100%;
+  max-height: 92vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  background: #fff;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.35);
+}
+
+.image-lightbox__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+}
+
+body.image-lightbox-open {
+  overflow: hidden;
+}
+
+#app img:not(.receipt-logo):not(.boot-screen__logo):not(.wh-receipt-sheet__logo):not(.auth-card__logo):not(.tomuda-logo),
+#modal img:not(.receipt-logo),
+.picker-qty-sheet img,
+[data-picker-qty-sheet] img {
+  cursor: zoom-in;
+}
