@@ -69,6 +69,11 @@ const state = {
   countDone: false,
   countOpeningStock: {},
   countSessionStartedAt: null,
+  stockInEmployeeId: "",
+  stockInDraft: {},
+  stockInDone: false,
+  stockInReceipt: null,
+  stockInSessionStartedAt: null,
   settings: {
     stockAlertEnabled: true,
     stockAlertMin: 10,
@@ -1967,6 +1972,7 @@ async function boot() {
     initEmployeeModalActions();
     initQtyStepperButtons();
     initCountInputHandlers();
+    initStockInInputHandlers();
     initConfirmCard();
     initConfirmDeleteActions();
     initImageLightbox();
@@ -5046,14 +5052,371 @@ function inventoryView() {
     )
     .join(
       "",
-    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: excelDownloadBtn("confirmInventoryExport()") })}<div class="inventory-categories flex flex-wrap gap-2"><button type="button" onclick="setInventoryCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
+    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" ? (state.stockInDone ? excelDownloadBtn("confirmStockInExcel()") : "") : excelDownloadBtn("confirmInventoryExport()") })}<div class="inventory-categories flex flex-wrap gap-2"><button type="button" onclick="setInventoryCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
     .map(
       (c) =>
         `<button type="button" onclick="setInventoryCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${c}</button>`,
     )
     .join(
       "",
-    )}</div></div>${tab === "stock" ? stockGrid(list) : stockActionList(list, tab)}</div>`;
+    )}</div></div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockActionList(list, tab)}</div>`;
+}
+function stockInEmployees() {
+  return [...state.employees].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", "mn"),
+  );
+}
+function ensureStockInSession() {
+  if (!state.stockInSessionStartedAt) {
+    state.stockInSessionStartedAt = new Date().toISOString();
+    state.stockInDone = false;
+    state.stockInReceipt = null;
+    if (!state.stockInEmployeeId && state.currentEmployee?.id) {
+      state.stockInEmployeeId = state.currentEmployee.id;
+    }
+  }
+}
+function stockInSessionActive() {
+  return !!state.stockInSessionStartedAt && !state.stockInDone;
+}
+function stockInDraftEntry(id) {
+  if (!state.stockInDraft[id]) state.stockInDraft[id] = {};
+  return state.stockInDraft[id];
+}
+function stockInLineQty(p) {
+  const d = state.stockInDraft[p.id] || {};
+  const packSize = productPackSize(p);
+  const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+  const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
+  if (packSize) return packs * packSize + pieces;
+  return pieces;
+}
+function stockInLineCost(p) {
+  const d = state.stockInDraft[p.id] || {};
+  const custom = Number(d.costPrice);
+  if (Number.isFinite(custom) && custom > 0) return custom;
+  return productCostPrice(p) || 0;
+}
+function stockInHasEntries() {
+  return state.products.some((p) => stockInLineQty(p) > 0);
+}
+function stockInEntryProducts(list) {
+  return list.filter((p) => stockInLineQty(p) > 0);
+}
+function startStockInSession() {
+  state.stockInDraft = {};
+  state.stockInDone = false;
+  state.stockInReceipt = null;
+  state.stockInSessionStartedAt = new Date().toISOString();
+  if (!state.stockInEmployeeId && state.currentEmployee?.id) {
+    state.stockInEmployeeId = state.currentEmployee.id;
+  }
+}
+function resetStockInSession() {
+  startStockInSession();
+  render();
+}
+function setStockInEmployee(id) {
+  ensureStockInSession();
+  state.stockInEmployeeId = id || "";
+  render();
+}
+function stockInEmployeeName() {
+  return state.employees.find((e) => e.id === state.stockInEmployeeId)?.name || "-";
+}
+function stockInProductsGrouped(products) {
+  const sorted = [...products].sort((a, b) => {
+    const byCat = (a.category || "").localeCompare(b.category || "", "mn");
+    if (byCat) return byCat;
+    return (a.name || "").localeCompare(b.name || "", "mn");
+  });
+  const groups = [];
+  let lastCat = null;
+  for (const p of sorted) {
+    const cat = p.category || "Бусад";
+    if (cat !== lastCat) {
+      groups.push({ type: "cat", name: cat });
+      lastCat = cat;
+    }
+    groups.push({ type: "product", product: p });
+  }
+  return groups;
+}
+function stockInReceiptDateParts(at) {
+  const d = at ? new Date(at) : new Date();
+  return { day: d.getDate(), month: d.getMonth() + 1, year: d.getFullYear() };
+}
+function buildStockInReceiptSnapshot() {
+  const lines = stockInEntryProducts(state.products).map((p) => {
+    const d = state.stockInDraft[p.id] || {};
+    const qty = stockInLineQty(p);
+    const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+    const cost = stockInLineCost(p);
+    return {
+      productId: p.id,
+      productName: p.name,
+      category: p.category || "",
+      barcode: p.barcode || "",
+      packs,
+      quantity: qty,
+      costPrice: cost,
+      unitPrice: cost,
+      totalPrice: qty * cost,
+    };
+  });
+  return {
+    id: String(Date.now()),
+    createdAt: new Date().toISOString(),
+    employeeId: state.stockInEmployeeId,
+    employeeName: stockInEmployeeName(),
+    lines,
+    totalAmount: lines.reduce((s, l) => s + l.totalPrice, 0),
+  };
+}
+function applyStockInReceipt(receipt) {
+  for (const line of receipt.lines) {
+    const p = state.products.find((x) => x.id === line.productId);
+    if (!p) continue;
+    if (line.costPrice > 0) p.costPrice = line.costPrice;
+    stock(line.productId, line.quantity, "in");
+    state.inventoryLogs.push({
+      id: nextInventoryLogId(),
+      productId: line.productId,
+      productName: line.productName,
+      type: "in",
+      quantity: line.quantity,
+      costPrice: line.costPrice,
+      packs: line.packs,
+      date: receipt.createdAt,
+      employeeName: receipt.employeeName,
+    });
+  }
+  scheduleBackendSave();
+}
+function finishStockIn() {
+  ensureStockInSession();
+  if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
+  if (!stockInHasEntries()) return alert("Орлого оруулна уу");
+  for (const p of state.products) {
+    const qty = stockInLineQty(p);
+    if (qty <= 0) continue;
+    if (!stockInLineCost(p)) {
+      alert(`${p.name}: Өртөг үнэ оруулна уу`);
+      return;
+    }
+  }
+  const receipt = buildStockInReceiptSnapshot();
+  applyStockInReceipt(receipt);
+  state.stockInReceipt = receipt;
+  state.stockInDone = true;
+  render();
+}
+function confirmFinishStockIn() {
+  ensureStockInSession();
+  if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
+  if (!stockInHasEntries()) return alert("Орлого оруулна уу");
+  confirmModal("Орлого дуусгах", "Орлого бүртгэж баримт үүсгэх үү?", {
+    confirmLabel: "Дуусгах",
+    onConfirm: finishStockIn,
+  });
+}
+function confirmNewStockIn() {
+  const hasData = stockInHasEntries() || state.stockInDone;
+  if (!hasData) {
+    resetStockInSession();
+    return;
+  }
+  confirmModal("Шинэ орлого", "Одоогийн орлогыг цэвэрлээд шинээр эхлүүлэх үү?", {
+    confirmLabel: "Шинээр эхлүүлэх",
+    danger: true,
+    onConfirm: resetStockInSession,
+  });
+}
+function stockInEmployeeField() {
+  ensureStockInSession();
+  const employees = stockInEmployees();
+  const selected = state.stockInEmployeeId || "";
+  const options = [`<option value="">Ажилтан сонгох</option>`]
+    .concat(
+      employees.map(
+        (e) =>
+          `<option value="${esc(e.id)}"${selected === e.id ? " selected" : ""}>${esc(e.name)}</option>`,
+      ),
+    )
+    .join("");
+  return `<label class="stock-in-employee"><span class="stock-in-employee__label">Ажилтан</span><select class="field-input app-input" onchange="setStockInEmployee(this.value)">${options}</select></label>`;
+}
+function stockInEntryRow(p) {
+  const d = state.stockInDraft[p.id] || {};
+  const packSize = productPackSize(p);
+  const packsVal = d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
+  const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
+  const costVal =
+    d.costPrice != null && d.costPrice !== ""
+      ? esc(String(d.costPrice))
+      : productCostPrice(p)
+        ? esc(String(productCostPrice(p)))
+        : "";
+  const packCell = packSize
+    ? `<input data-stock-in-pack data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} багц">`
+    : `<span class="stock-in-table__muted">-</span>`;
+  return `<div class="stock-in-table__row stock-in-table__row--entry"><span class="stock-in-table__name">${esc(p.name)}</span><span class="stock-in-table__barcode">${esc(p.barcode || "-")}</span><span class="stock-in-table__pack">${packCell}</span><span class="stock-in-table__qty"><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></span><span class="stock-in-table__cost"><input data-stock-in-cost data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${costVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} өртөг үнэ"></span></div>`;
+}
+function stockInReceiptRow(line) {
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
+}
+function stockInTableHead(mode = "entry") {
+  if (mode === "entry") {
+    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Багц</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
+  }
+  return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Багц</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
+}
+function stockInEntryTable(list) {
+  const groups = stockInProductsGrouped(list);
+  const rows = groups
+    .map((item) =>
+      item.type === "cat"
+        ? `<div class="stock-in-table__cat">${esc(item.name)}</div>`
+        : stockInEntryRow(item.product),
+    )
+    .join("");
+  return `<div class="stock-in-table"><div class="stock-in-table__scroll">${stockInTableHead("entry")}<div class="stock-in-table__body">${rows || `<p class="stock-in-table__empty">Бараа олдсонгүй</p>`}</div></div></div>`;
+}
+function stockInReceiptGroupedLines(lines) {
+  const byCat = {};
+  for (const line of lines) {
+    const cat = line.category || "Бусад";
+    if (!byCat[cat]) byCat[cat] = [];
+    byCat[cat].push(line);
+  }
+  return Object.keys(byCat)
+    .sort((a, b) => a.localeCompare(b, "mn"))
+    .flatMap((cat) => [{ type: "cat", name: cat }, ...byCat[cat].map((line) => ({ type: "line", line }))]);
+}
+function stockInReceiptPanel(receipt) {
+  const groups = stockInReceiptGroupedLines(receipt.lines);
+  const rows = groups
+    .map((item) =>
+      item.type === "cat"
+        ? `<div class="stock-in-table__cat">${esc(item.name)}</div>`
+        : stockInReceiptRow(item.line),
+    )
+    .join("");
+  const date = stockInReceiptDateParts(receipt.createdAt);
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________ (гарын үсэг)</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________ (гарын үсэг)</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+}
+function stockInPanel(list) {
+  ensureStockInSession();
+  if (state.stockInDone && state.stockInReceipt) {
+    return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInReceiptPanel(state.stockInReceipt)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
+  }
+  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInEntryTable(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
+}
+function exportStockInExcel() {
+  const receipt = state.stockInReceipt;
+  if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
+  exportStockInExcelFallback(receipt);
+}
+function confirmStockInExcel() {
+  if (!state.stockInDone || !state.stockInReceipt?.lines?.length) {
+    return alert("Эхлээд орлогоо дуусгана уу");
+  }
+  confirmDataExport("Excel татах", exportStockInExcel);
+}
+function exportStockInExcelFallback(receipt) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const date = stockInReceiptDateParts(receipt.createdAt);
+  const h = (value) => xlsxXmlEsc(value ?? "");
+  const bodyRows = stockInReceiptGroupedLines(receipt.lines)
+    .map((item) => {
+      if (item.type === "cat") {
+        return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
+      }
+      const line = item.line;
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${line.costPrice}</td><td class="num">${line.unitPrice}</td><td class="num">${line.totalPrice}</td></tr>`;
+    })
+    .join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; color: #000; }
+table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+.stock-in col:nth-child(1) { width: 260px; }
+.stock-in col:nth-child(2) { width: 140px; }
+.stock-in col:nth-child(3) { width: 80px; }
+.stock-in col:nth-child(4) { width: 100px; }
+.stock-in col:nth-child(5) { width: 120px; }
+.stock-in col:nth-child(6) { width: 120px; }
+.stock-in col:nth-child(7) { width: 140px; }
+.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
+.title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
+.meta td { border: none; padding: 4px 0; }
+.head th { text-align: center; font-weight: 800; background: #eef0f2; }
+.cat { text-align: center; font-weight: 800; background: #f7f7f7; }
+.barcode { mso-number-format:"\\@"; text-align: center; }
+.num { text-align: right; }
+.total td { font-weight: 800; }
+.sign td { border: none; padding-top: 18px; }
+</style></head><body><table class="stock-in">
+<colgroup><col><col><col><col><col><col><col></colgroup>
+<tr><td colspan="7" class="title">Орлого авах баримт</td></tr>
+<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)}</td><td colspan="3">Огноо: ${date.day} / ${date.month} / ${date.year}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+${bodyRows}
+<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${receipt.totalAmount}</td></tr>
+<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________ (гарын үсэг)</td></tr>
+<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________ (гарын үсэг)</td></tr>
+<tr class="sign"><td colspan="7">Баримтын огноо: ${date.day} / ${date.month} / ${date.year}</td></tr>
+</table></body></html>`;
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `orlogo-avah-${stamp}.xls`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function stockInDraftInput(id, field, raw) {
+  ensureStockInSession();
+  state.stockInDone = false;
+  state.stockInReceipt = null;
+  const entry = stockInDraftEntry(id);
+  const text = String(raw ?? "").trim();
+  if (!text) delete entry[field];
+  else entry[field] = text.replace(/[^\d]/g, "");
+}
+function initStockInInputHandlers() {
+  if (document.documentElement.dataset.stockInInputBound) return;
+  document.documentElement.dataset.stockInInputBound = "1";
+  document.addEventListener(
+    "input",
+    (e) => {
+      const pack = e.target.closest?.("[data-stock-in-pack]");
+      if (pack) {
+        stockInDraftInput(
+          pack.getAttribute("data-product-id") || "",
+          "packs",
+          pack.value,
+        );
+        return;
+      }
+      const qty = e.target.closest?.("[data-stock-in-qty]");
+      if (qty) {
+        stockInDraftInput(
+          qty.getAttribute("data-product-id") || "",
+          "qty",
+          qty.value,
+        );
+        return;
+      }
+      const cost = e.target.closest?.("[data-stock-in-cost]");
+      if (cost) {
+        stockInDraftInput(
+          cost.getAttribute("data-product-id") || "",
+          "costPrice",
+          cost.value,
+        );
+      }
+    },
+    true,
+  );
 }
 function stockActionRow(p, tab) {
   return `<button type="button" onclick="inventoryStockModal('${esc(p.id)}','${tab}')" class="inventory-stock-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-thumb inventory-stock-row__thumb"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></span></div></button>`;
@@ -10797,6 +11160,10 @@ Object.assign(window, {
   confirmCustomerExcel,
   confirmProductsExport,
   confirmInventoryExport,
+  confirmFinishStockIn,
+  confirmNewStockIn,
+  confirmStockInExcel,
+  setStockInEmployee,
   confirmReportExport,
   confirmEmployeeExcel,
   confirmOrderReceiptsExcel,
