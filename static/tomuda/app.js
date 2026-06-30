@@ -4190,15 +4190,129 @@ function productDetail(id) {
   if (!p) return;
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
+const PRODUCT_SWIPE_WIDTH = 156;
+function closeProductSwipe(row) {
+  if (!row) return;
+  row.classList.remove("is-open", "is-dragging");
+  const surface = row.querySelector(".product-swipe__surface");
+  if (surface) surface.style.transform = "";
+}
+function closeAllProductSwipes() {
+  document.querySelectorAll(".product-swipe.is-open").forEach(closeProductSwipe);
+}
+function productCardTap(id, ev) {
+  const row = ev?.currentTarget?.closest?.("[data-product-swipe]");
+  if (row) {
+    if (row.dataset.swipeDragged === "1") {
+      row.dataset.swipeDragged = "";
+      return;
+    }
+    if (row.classList.contains("is-open")) {
+      closeProductSwipe(row);
+      return;
+    }
+    const open = document.querySelector(".product-swipe.is-open");
+    if (open && open !== row) {
+      closeProductSwipe(open);
+      return;
+    }
+  }
+  productDetail(id);
+}
+let productSwipeEventsBound = false;
+function bindProductSwipeEvents() {
+  if (productSwipeEventsBound) return;
+  productSwipeEventsBound = true;
+  let activeRow = null;
+  let startX = 0;
+  let startY = 0;
+  let startOffset = 0;
+  let tracking = false;
+  let dragging = false;
+  const mqDesktop = () => window.matchMedia("(min-width: 1024px)").matches;
+  const surfaceFor = (row) => row?.querySelector(".product-swipe__surface");
+  const snapRow = (row, open) => {
+    if (!row) return;
+    document.querySelectorAll(".product-swipe.is-open").forEach((other) => {
+      if (other !== row) closeProductSwipe(other);
+    });
+    row.classList.toggle("is-open", open);
+    const surface = surfaceFor(row);
+    if (surface) surface.style.transform = "";
+  };
+  document.addEventListener(
+    "pointerdown",
+    (ev) => {
+      if (mqDesktop()) return;
+      const surface = ev.target.closest(".product-swipe__surface");
+      if (!surface || ev.target.closest("button")) return;
+      const row = surface.closest("[data-product-swipe]");
+      if (!row) return;
+      activeRow = row;
+      startX = ev.clientX;
+      startY = ev.clientY;
+      startOffset = row.classList.contains("is-open") ? -PRODUCT_SWIPE_WIDTH : 0;
+      tracking = true;
+      dragging = false;
+      row.dataset.swipeDragged = "";
+      surface.setPointerCapture?.(ev.pointerId);
+    },
+    { passive: true },
+  );
+  document.addEventListener(
+    "pointermove",
+    (ev) => {
+      if (!tracking || !activeRow) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!dragging) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+        dragging = true;
+        activeRow.classList.add("is-dragging");
+      }
+      ev.preventDefault();
+      const x = Math.min(0, Math.max(-PRODUCT_SWIPE_WIDTH, startOffset + dx));
+      const surface = surfaceFor(activeRow);
+      if (surface) surface.style.transform = `translateX(${x}px)`;
+    },
+    { passive: false },
+  );
+  const finishSwipe = (ev) => {
+    if (!tracking || !activeRow) return;
+    const row = activeRow;
+    const surface = surfaceFor(row);
+    surface?.releasePointerCapture?.(ev.pointerId);
+    row.classList.remove("is-dragging");
+    if (dragging) {
+      row.dataset.swipeDragged = "1";
+      const dx = ev.clientX - startX;
+      const open = startOffset + dx <= -PRODUCT_SWIPE_WIDTH / 2;
+      snapRow(row, open);
+    }
+    tracking = false;
+    dragging = false;
+    activeRow = null;
+  };
+  document.addEventListener("pointerup", finishSwipe);
+  document.addEventListener("pointercancel", finishSwipe);
+  document.addEventListener("click", (ev) => {
+    if (mqDesktop()) return;
+    if (ev.target.closest("[data-product-swipe]")) return;
+    closeAllProductSwipes();
+  });
+}
 function productCard(p) {
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
-  const adminActions = canManageProducts()
-    ? `<div class="product-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`
-    : "";
   const costLine = hasPermission("warehouse.edit")
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
     : "";
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span></div>${adminActions}</article>`;
+  const body = `<div class="product-card__main"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span></div>`;
+  const keyNav = `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productCardTap('${esc(p.id)}',event)}"`;
+  if (!canManageProducts()) {
+    return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" ${keyNav}>${body}</article>`;
+  }
+  const actions = `<div class="product-swipe__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${p.id}')" class="product-card__action-btn product-card__action-btn--edit">Засах</button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete">Устгах</button></div>`;
+  return `<div class="product-swipe" data-product-swipe="${esc(p.id)}">${actions}<article class="product-card product-card--clickable product-swipe__surface" role="button" tabindex="0" onclick="productCardTap('${esc(p.id)}', event)" ${keyNav}>${body}</article></div>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -7592,6 +7706,7 @@ function render() {
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
   bindReceiptPrintWorkerPickerDismiss();
+  bindProductSwipeEvents();
   if (state.currentView === "count" && !state.countDone) syncCountInputsFromState();
   requestAnimationFrame(() => enhanceMobileNumericInputs(document));
 }
@@ -9675,6 +9790,7 @@ Object.assign(window, {
   saveCustomer,
   customerDetail,
   productDetail,
+  productCardTap,
   productModal,
   handleProductImage,
   fillProductFromBarcode,
