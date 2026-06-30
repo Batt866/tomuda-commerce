@@ -16,6 +16,12 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tomuda/icons/icon-180.png' %}" />
     <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
     <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
     <title>ТОМУДА - Борлуулалт, агуулах</title>
     <style>
       html,
@@ -241,8 +247,8 @@
         }
       }
     </style>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260629-count-excel-clear" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260629-count-excel-clear" as="script" />
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260630-product-detail" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260630-product-detail" as="script" />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
     <script>
       tailwind.config = {
@@ -278,7 +284,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260629-count-excel-clear"
+      href="{% static 'tomuda/styles.css' %}?v=20260630-product-detail"
     />
   </head>
   <body>
@@ -354,9 +360,9 @@
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
-    <script src="{% static 'tomuda/permissions.js' %}?v=20260629-count-excel-clear"></script>
+    <script src="{% static 'tomuda/permissions.js' %}?v=20260629-perm-table"></script>
     <script
-      src="{% static 'tomuda/app.js' %}?v=20260629-count-excel-clear"
+      src="{% static 'tomuda/app.js' %}?v=20260630-product-detail"
       onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
     ></script>
   </body>

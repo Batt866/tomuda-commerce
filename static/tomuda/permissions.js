@@ -1,73 +1,64 @@
 /**
- * Tomuda permission catalog — add new keys here and mirror in dashboard/permissions.py
+ * Tomuda permission catalog — mirror in dashboard/permissions.py
  */
 (function () {
-  const CATALOG = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      permissions: [
-        { key: "dashboard.view", label: "Dashboard харах" },
-      ],
-    },
-    {
-      id: "warehouse",
-      label: "Агуулах",
-      permissions: [
-        { key: "warehouse.view", label: "Агуулах харах" },
-        { key: "warehouse.edit", label: "Агуулах засах" },
-      ],
-    },
-    {
-      id: "products",
-      label: "Бараа",
-      permissions: [
-        { key: "products.view", label: "Бараа харах" },
-        { key: "products.create", label: "Бараа нэмэх" },
-        { key: "products.edit", label: "Бараа засах" },
-      ],
-    },
+  const PERM_ACTIONS = [
+    { id: "view", label: "Харах" },
+    { id: "create", label: "Нэмэх" },
+    { id: "edit", label: "Засах" },
+    { id: "delete", label: "Устгах" },
+  ];
+
+  const PERM_MODULES = [
+    { id: "dashboard", label: "Dashboard", actions: ["view"] },
+    { id: "products", label: "Бараа", actions: ["view", "create", "edit", "delete"] },
     {
       id: "customers",
       label: "Харилцагч",
-      permissions: [
-        { key: "customers.view", label: "Харилцагч харах" },
-        { key: "customers.create", label: "Харилцагч нэмэх" },
-      ],
+      actions: ["view", "create", "edit", "delete"],
     },
-    {
-      id: "orders",
-      label: "Захиалга",
-      permissions: [
-        { key: "orders.view", label: "Захиалга харах" },
-        { key: "orders.create", label: "Захиалга үүсгэх" },
-        { key: "orders.edit", label: "Захиалга засах" },
-      ],
-    },
-    {
-      id: "reports",
-      label: "Тайлан",
-      permissions: [
-        { key: "reports.view", label: "Тайлан харах" },
-      ],
-    },
+    { id: "warehouse", label: "Агуулах", actions: ["view", "edit"] },
+    { id: "orders", label: "Баримт", actions: ["view", "create", "edit", "delete"] },
+    { id: "reports", label: "Тайлан", actions: ["view"] },
     {
       id: "employees",
       label: "Ажилтан",
-      permissions: [
-        { key: "employees.view", label: "Ажилтан харах" },
-        { key: "employees.create", label: "Ажилтан нэмэх" },
-        { key: "employees.edit", label: "Ажилтан засах" },
-      ],
+      actions: ["view", "create", "edit", "delete"],
     },
     {
-      id: "settings",
-      label: "Тохиргоо",
-      permissions: [
-        { key: "settings.view", label: "Тохиргоо харах" },
-      ],
+      id: "permissions",
+      label: "Эрх",
+      actions: ["view", "create", "edit", "delete"],
     },
+    { id: "settings", label: "Тохиргоо", actions: ["view"] },
   ];
+
+  const ACTION_LABELS = {
+    view: "харах",
+    create: "нэмэх",
+    edit: "засах",
+    delete: "устгах",
+  };
+
+  function permissionKey(moduleId, actionId) {
+    return `${moduleId}.${actionId}`;
+  }
+
+  function permissionLabel(moduleLabel, actionId) {
+    const mod = PERM_MODULES.find((m) => m.label === moduleLabel);
+    const label = mod?.label || moduleLabel;
+    return `${label} ${ACTION_LABELS[actionId] || actionId}`;
+  }
+
+  const CATALOG = PERM_MODULES.map((mod) => ({
+    id: mod.id,
+    label: mod.label,
+    permissions: mod.actions.map((actionId) => ({
+      key: permissionKey(mod.id, actionId),
+      label: permissionLabel(mod.label, actionId),
+      action: actionId,
+    })),
+  }));
 
   const ALL_KEYS = CATALOG.flatMap((c) => c.permissions.map((p) => p.key));
 
@@ -80,14 +71,11 @@
       "orders.edit",
       "customers.view",
       "customers.create",
+      "customers.edit",
       "products.view",
       "warehouse.view",
     ],
-    warehouse: [
-      "warehouse.view",
-      "warehouse.edit",
-      "products.view",
-    ],
+    warehouse: ["warehouse.view", "warehouse.edit", "products.view"],
     delivery: ["orders.view"],
   };
 
@@ -100,6 +88,7 @@
     products: "products.view",
     customers: "customers.view",
     employees: "employees.view",
+    employeePermissions: "permissions.view",
     reports: "reports.view",
     promotions: "settings.view",
     warehouseReceipts: "warehouse.view",
@@ -150,14 +139,15 @@
   }
 
   function permissionsFromForm(form) {
+    const root = form || document;
     const keys = [];
-    form.querySelectorAll('input[name="permissions"]:checked').forEach((el) => {
+    root.querySelectorAll('input[name="permissions"]:checked').forEach((el) => {
       if (ALL_KEYS.includes(el.value)) keys.push(el.value);
     });
     return keys;
   }
 
-  function permissionsFieldHtml(selectedKeys = [], role = "sales") {
+  function permissionsFieldHtml(selectedKeys = [], role = "sales", opts = {}) {
     const selected = new Set(normalizeKeys(selectedKeys));
     const esc =
       typeof window !== "undefined" && window.esc
@@ -168,28 +158,49 @@
               .replace(/</g, "&lt;")
               .replace(/>/g, "&gt;")
               .replace(/"/g, "&quot;");
-    const blocks = CATALOG.map((cat) => {
-      const items = cat.permissions
-        .map((p) => {
-          const checked = selected.has(p.key) ? " checked" : "";
-          return `<label class="perm-check"><input type="checkbox" name="permissions" value="${esc(p.key)}"${checked}><span>${esc(p.label)}</span></label>`;
-        })
-        .join("");
-      return `<fieldset class="perm-group"><legend class="perm-group__title">${esc(cat.label)}</legend><div class="perm-group__items">${items}</div></fieldset>`;
+    const hideRoleReset = !!opts.hideRoleReset;
+    const formAttr = opts.formAttr ? ` ${opts.formAttr}` : ' data-permissions-form';
+    const resetBtn = hideRoleReset
+      ? ""
+      : `<button type="button" class="perm-panel__reset text-xs text-primary" onclick="syncEmployeePermissionsFromRole()">Эрхийг албан туслах (${esc(role || "sales")})</button>`;
+    const headCells = PERM_ACTIONS.map(
+      (a) => `<th scope="col" class="perm-table__action">${esc(a.label)}</th>`,
+    ).join("");
+    const rows = PERM_MODULES.map((mod) => {
+      const cells = PERM_ACTIONS.map((action) => {
+        if (!mod.actions.includes(action.id)) {
+          return `<td class="perm-table__cell perm-table__cell--na"><span class="perm-table__na" aria-hidden="true">—</span></td>`;
+        }
+        const key = permissionKey(mod.id, action.id);
+        const checked = selected.has(key) ? " checked" : "";
+        return `<td class="perm-table__cell"><label class="perm-table__check"><input type="checkbox" name="permissions" value="${esc(key)}"${checked} aria-label="${esc(mod.label)} — ${esc(action.label)}"><span class="perm-table__box" aria-hidden="true"></span></label></td>`;
+      }).join("");
+      return `<tr class="perm-table__row"><th scope="row" class="perm-table__module">${esc(mod.label)}</th>${cells}</tr>`;
     }).join("");
-    return `<section class="perm-panel"><div class="perm-panel__head"><p class="perm-panel__title">Эрх (Permissions)</p><button type="button" class="perm-panel__reset text-xs text-primary" onclick="syncEmployeePermissionsFromRole()">Эрхийг албан туслах (${esc(role || "sales")})</button></div>${blocks}</section>`;
+    return `<section class="perm-panel"${formAttr}><div class="perm-panel__head"><div><p class="perm-panel__title">Эрх (Permissions)</p><p class="perm-panel__hint">Модуль бүрт харах, нэмэх, засах, устгах эрхийг сонгоно.</p></div>${resetBtn}</div><div class="perm-table-wrap"><table class="perm-table"><thead class="perm-table__head"><tr><th scope="col" class="perm-table__module">Модуль</th>${headCells}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
   function templateForRole(role) {
     return [...(ROLE_TEMPLATES[role] || ROLE_TEMPLATES.sales)];
   }
 
+  function mergePermissionsForEmployees(employees) {
+    const union = new Set();
+    (employees || []).forEach((emp) => {
+      resolveEmployeePermissions(emp).forEach((k) => union.add(k));
+    });
+    return [...union];
+  }
+
   window.TOMUDA_PERMISSIONS = {
     CATALOG,
     ALL_KEYS,
+    PERM_ACTIONS,
+    PERM_MODULES,
     ROLE_TEMPLATES,
     VIEW_PERMISSION,
     NAV_ITEMS,
+    permissionKey,
     normalizeKeys,
     resolveEmployeePermissions,
     hasPermission,
@@ -198,5 +209,6 @@
     permissionsFromForm,
     permissionsFieldHtml,
     templateForRole,
+    mergePermissionsForEmployees,
   };
 })();
