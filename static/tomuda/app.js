@@ -739,6 +739,19 @@ function normalizeOrderReceiptNumbers() {
     o.receiptMonth = month;
   }
 }
+function nextOrderId() {
+  let max = 0;
+  for (const o of state.orders || []) {
+    const raw = String(o?.id || "");
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  let next = max + 1;
+  while ((state.orders || []).some((o) => String(o?.id) === String(next))) {
+    next += 1;
+  }
+  return String(next);
+}
 function buildNewOrder(fields) {
   const createdAt = fields.createdAt || new Date().toISOString();
   const receiptMonth = receiptMonthKey({ createdAt });
@@ -746,7 +759,7 @@ function buildNewOrder(fields) {
   const stored = isoDay(fields.deliveryDate);
   const deliveryDate = stored ? fields.deliveryDate : created || todayIso();
   return {
-    id: String(state.orders.length + 1),
+    id: nextOrderId(),
     receiptMonth,
     receiptSeq: nextReceiptSeq(receiptMonth),
     createdAt,
@@ -1382,6 +1395,7 @@ function persistentState() {
   }, {});
 }
 const LOCAL_PENDING_STATE_KEY = "tomuda-pending-state";
+const LOCAL_ORDERS_BACKUP_KEY = "tomuda-orders-backup";
 function saveLocalPendingState() {
   try {
     localStorage.setItem(
@@ -1390,6 +1404,19 @@ function saveLocalPendingState() {
     );
   } catch (error) {
     console.warn("Local pending state save failed", error);
+  }
+}
+function saveLocalOrdersBackup() {
+  try {
+    localStorage.setItem(
+      LOCAL_ORDERS_BACKUP_KEY,
+      JSON.stringify({
+        orders: retainedOrders(state.orders || []),
+        savedAt: new Date().toISOString(),
+      }),
+    );
+  } catch (error) {
+    console.warn("Local orders backup failed", error);
   }
 }
 function readLocalPendingState() {
@@ -1404,12 +1431,48 @@ function readLocalPendingState() {
     return null;
   }
 }
+function readLocalOrdersBackup() {
+  try {
+    const raw = localStorage.getItem(LOCAL_ORDERS_BACKUP_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return retainedOrders(
+      Array.isArray(parsed?.orders) ? parsed.orders : [],
+    );
+  } catch {
+    return [];
+  }
+}
 function clearLocalPendingState() {
   try {
     localStorage.removeItem(LOCAL_PENDING_STATE_KEY);
   } catch {
     /* ignore */
   }
+}
+function clearLocalOrdersBackup() {
+  try {
+    localStorage.removeItem(LOCAL_ORDERS_BACKUP_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+function clearOrderPersistenceCache() {
+  clearLocalPendingState();
+  clearLocalOrdersBackup();
+}
+function persistOrderSnapshot() {
+  saveLocalPendingState();
+  saveLocalOrdersBackup();
+}
+function mergeBootPersistentState(backendState, pendingState, ordersBackup) {
+  let merged = mergePersistentStates(backendState, pendingState || {});
+  if (ordersBackup.length) {
+    merged.orders = retainedOrders(
+      mergeArrayById(merged.orders, ordersBackup),
+    );
+  }
+  return merged;
 }
 const MERGE_BY_ID_KEYS = ["customers", "products", "employees", "orders"];
 const DELETION_GUARDED_KEYS = ["customers", "products"];
@@ -1841,12 +1904,19 @@ async function boot() {
     if (payload?.state) {
       syncBackendMarkers(payload, payload.state);
       const pendingState = readLocalPendingState();
-      if (pendingState) {
+      const ordersBackup = readLocalOrdersBackup();
+      if (pendingState || ordersBackup.length) {
         try {
-          applyPersistentState(mergePersistentStates(persistentState(), pendingState));
+          applyPersistentState(
+            mergeBootPersistentState(
+              persistentState(),
+              pendingState,
+              ordersBackup,
+            ),
+          );
         } catch (error) {
           console.warn("Pending state restore failed", error);
-          clearLocalPendingState();
+          clearOrderPersistenceCache();
         }
       }
     } else {
@@ -1877,6 +1947,7 @@ async function boot() {
     initConfirmCard();
     initConfirmDeleteActions();
     initImageLightbox();
+    initPageUnloadPersist();
     initAppBack();
     window.__tomudaBooted = true;
     render();
@@ -2854,14 +2925,28 @@ function dismissPwaInstall(remember = true) {
     localStorage.setItem("pwa-install-dismissed", String(Date.now()));
 }
 function scheduleBackendSave() {
-  saveLocalPendingState();
+  persistOrderSnapshot();
   if (!backendReady) return;
   clearTimeout(backendSaveTimer);
   backendSaveTimer = setTimeout(saveBackendState, 350);
 }
-async function saveBackendState() {
+async function flushBackendSave() {
+  if (!backendReady) return false;
+  clearTimeout(backendSaveTimer);
+  backendSaveTimer = null;
+  persistOrderSnapshot();
+  await saveBackendState();
+  if (!localStateDirty()) return true;
+  await sleep(600);
+  await saveBackendState();
+  return !localStateDirty();
+}
+async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
   const protectedData = protectAccidentalDeletions(persistentState());
+  if (protectedData.orders) {
+    protectedData.orders = retainedOrders(protectedData.orders);
+  }
   if (JSON.stringify(protectedData) !== JSON.stringify(persistentState())) {
     const session = captureSessionSnapshot();
     applyPersistentState(protectedData);
@@ -2894,7 +2979,7 @@ async function saveBackendState() {
       : null,
   });
   if (body === backendLastSaved) {
-    clearLocalPendingState();
+    clearOrderPersistenceCache();
     return;
   }
   backendSaving = true;
@@ -2911,7 +2996,7 @@ async function saveBackendState() {
     if (res.ok) {
       const payload = await res.json();
       syncBackendSaveMarker();
-      clearLocalPendingState();
+      clearOrderPersistenceCache();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
     } else if (res.status === 403) {
       let msg = "Эрх хүрэлцэхгүй";
@@ -2921,13 +3006,44 @@ async function saveBackendState() {
       } catch {
         /* ignore */
       }
+      persistOrderSnapshot();
       alertModal("Хадгалах амжилтгүй", msg);
+    } else {
+      persistOrderSnapshot();
+      if (retry >= 2) {
+        alertModal(
+          "Хадгалах амжилтгүй",
+          "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+        );
+      } else {
+        backendSaving = false;
+        await sleep(900 * (retry + 1));
+        return saveBackendState(retry + 1);
+      }
     }
   } catch (error) {
     console.warn("Backend state save failed", error);
+    persistOrderSnapshot();
+    if (retry >= 2) {
+      alertModal(
+        "Хадгалах амжилтгүй",
+        "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу.",
+      );
+    } else {
+      backendSaving = false;
+      await sleep(900 * (retry + 1));
+      return saveBackendState(retry + 1);
+    }
   } finally {
     backendSaving = false;
   }
+}
+function initPageUnloadPersist() {
+  if (document.documentElement.dataset.pageUnloadPersistBound) return;
+  document.documentElement.dataset.pageUnloadPersistBound = "1";
+  const persist = () => persistOrderSnapshot();
+  window.addEventListener("pagehide", persist);
+  window.addEventListener("beforeunload", persist);
 }
 
 function go(view, opts = {}) {
@@ -10238,7 +10354,7 @@ function employeeExcel() {
     );
   exportWarehousePrepareExcel(orders, workerIds);
 }
-function saveWorker() {
+async function saveWorker() {
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
   const c = state.customers.find((x) => x.id === state.workerCustomer),
     e = orderActor(),
@@ -10283,8 +10399,11 @@ function saveWorker() {
   state.filters.worker = "orders";
   state.workerOrdersArrived = true;
   state.workerHighlightOrderId = order.id;
-  scheduleBackendSave();
+  persistOrderSnapshot();
   render();
+  flushBackendSave().catch((error) =>
+    console.warn("Order backend save failed", error),
+  );
   pushAppHistory();
   requestAnimationFrame(() => {
     document
