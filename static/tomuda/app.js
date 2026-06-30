@@ -5917,10 +5917,12 @@ function warehousePrepareProduct(row) {
     boxQuantity: 0,
   };
 }
-function warehouseOrderProductsGrouped(orders) {
+function warehouseOrderProductsGrouped(orders, opts = {}) {
+  const promoOnly = !!opts.promoOnly;
   const map = {};
   orders.forEach((o) =>
     o.items.forEach((i) => {
+      if (!!i.isPromoFree !== promoOnly) return;
       const key = i.productId || i.productName;
       if (!map[key]) {
         map[key] = {
@@ -5960,6 +5962,12 @@ function warehouseOrderProductsGrouped(orders) {
   }
   return groups;
 }
+function warehouseOrderPrepareSections(orders) {
+  return {
+    regular: warehouseOrderProductsGrouped(orders, { promoOnly: false }),
+    promo: warehouseOrderProductsGrouped(orders, { promoOnly: true }),
+  };
+}
 function xlsxOptionalNum(ref, styleId, value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n === 0) {
@@ -5994,7 +6002,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
-  const groups = warehouseOrderProductsGrouped(orders);
+  const sections = warehouseOrderPrepareSections(orders);
   const rows = [];
   const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `E2:F2`, `E3:F3`];
   let rowNum = 1;
@@ -6087,7 +6095,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`E${headerRow}`, 7, si("Ширхэг"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Үлдэгдэл"), "s"),
   ]);
-  for (const item of groups) {
+  const pushPrepareGroups = (groups) => {
+    for (const item of groups) {
     if (item.type === "cat") {
       const r = rowNum;
       const catHeight =
@@ -6113,6 +6122,17 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       xlsxOptionalNum(`E${r}`, 10, pieces),
       xlsxCellXml(`F${r}`, 8, Number(p.stock) || 0, "n"),
     ]);
+    }
+  };
+  pushPrepareGroups(sections.regular);
+  if (sections.promo.length) {
+    const promoHeadRow = rowNum;
+    merges.push(`A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`);
+    pushRow(27.75, [
+      xlsxCellXml(`A${promoHeadRow}`, 15, si("Урамшуулалтай бараа"), "s"),
+      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
+    ]);
+    pushPrepareGroups(sections.promo);
   }
   pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   pushRow(47.25, []);
@@ -6206,7 +6226,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
-  const groups = warehouseOrderProductsGrouped(orders);
+  const sections = warehouseOrderPrepareSections(orders);
   const h = (value) => xlsxXmlEsc(value ?? "");
   const workerRows = workerNames.length
     ? workerNames
@@ -6216,18 +6236,20 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
         )
         .join("")
     : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td></td><td colspan="2" class="date">${h(printedDateLabel)}</td></tr>`;
-  const itemRows = [];
-  for (const item of groups) {
-    if (item.type === "cat") {
-      itemRows.push(`<tr><td colspan="6" class="cat">${h(item.name)}</td></tr>`);
-      continue;
-    }
-    const p = item.product;
-    const { packs, pieces } = pickerQtyToParts(item.qty, p);
-    itemRows.push(
-      `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${packs || ""}</td><td class="num">${pieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`,
-    );
-  }
+  const renderGroupRows = (groups) =>
+    groups
+      .map((item) => {
+        if (item.type === "cat") {
+          return `<tr><td colspan="6" class="cat">${h(item.name)}</td></tr>`;
+        }
+        const p = item.product;
+        const { packs, pieces } = pickerQtyToParts(item.qty, p);
+        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${packs || ""}</td><td class="num">${pieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
+      })
+      .join("");
+  const promoRows = sections.promo.length
+    ? `<tr><td colspan="6" class="cat promo-head">Урамшуулалтай бараа</td></tr>${renderGroupRows(sections.promo)}`
+    : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
 table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
@@ -6246,6 +6268,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .blank td { height: 30px; }
 .head th { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: 2px solid #000; }
 .cat { text-align: center; font-weight: 800; height: 36px; }
+.promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; }
 .num { text-align: right; }
 .spacer td { height: 88px; }
@@ -6259,7 +6282,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
-${itemRows.join("")}
+${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr><td colspan="2" class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="3" class="sign-line">/...................................................../</td><td></td></tr>
 <tr><td colspan="2"></td><td colspan="3" class="sign-hint">гарын үсэг</td><td></td></tr>
