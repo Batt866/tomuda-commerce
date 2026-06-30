@@ -1,8 +1,11 @@
-const CACHE = "tomuda-v14";
+const CACHE = "tomuda-v15";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
   "/static/tomuda/vendor/tailwindcdn.js",
+  "/manifest.webmanifest",
+  "/static/tomuda/icons/icon-192.png?v=20260630-logo",
+  "/static/tomuda/icons/icon-512.png?v=20260630-logo",
 ];
 
 self.addEventListener("install", (event) => {

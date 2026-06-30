@@ -22,7 +22,7 @@ def service_worker(request):
 
 
 @require_GET
-@cache_control(max_age=86400)
+@cache_control(max_age=0, no_cache=True, no_store=True, must_revalidate=True)
 def web_manifest(request):
     manifest_path = Path(settings.BASE_DIR) / "static" / "tomuda" / "manifest.webmanifest"
     data = json.loads(manifest_path.read_text(encoding="utf-8"))

@@ -2581,7 +2581,7 @@ function showAndroidInstallCoach() {
   const el = document.createElement("div");
   el.id = "install-coach";
   el.className = "ios-install-coach";
-  el.innerHTML = `<div class="ios-install-coach-backdrop" onclick="dismissInstallCoach()"></div><div class="ios-install-coach-panel"><p class="ios-install-coach-title">📱 Android дээр суулгах</p><p class="install-coach-warn"><b>Play Protect блокловол:</b> «More details» → «Install anyway» дарна. Энэ нь манай app, аюулгүй.</p><p class="ios-install-coach-step">1. <b>TOMUDA.apk</b> файл дээр дарна</p><p class="ios-install-coach-step">2. «App blocked» гарвал → <b>More details</b></p><p class="ios-install-coach-step">3. <b>Install anyway</b> дарна</p><p class="ios-install-coach-step">4. «Unknown apps» зөвшөөрнө</p><button type="button" class="ios-install-coach-btn" onclick="downloadAndroidApk()">Дахин татах</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:var(--hex-secondary);color:var(--hex-foreground)" onclick="dismissInstallCoach()">Ойлголоо</button></div>`;
+  el.innerHTML = `<div class="ios-install-coach-backdrop" onclick="dismissInstallCoach()"></div><div class="ios-install-coach-panel"><p class="ios-install-coach-title">📱 Android дээр суулгах</p><p class="ios-install-coach-step">1. Энэ хуудсыг <b>Chrome</b> browser дээр нээнэ</p><p class="ios-install-coach-step">2. Баруун дээд <b>⋮</b> menu дарна</p><p class="ios-install-coach-step">3. <b>Install app</b> эсвэл <b>Add to Home screen</b> сонгоно</p><p class="ios-install-coach-step">4. Нүүр дэлгэцээс <b>TOMUDA</b> app-аар нээнэ</p><button type="button" class="ios-install-coach-btn" onclick="openInChrome()">Chrome дээр нээх</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:var(--hex-secondary);color:var(--hex-foreground)" onclick="downloadAndroidApk()">APK татах</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:transparent;color:var(--hex-muted-foreground)" onclick="dismissInstallCoach()">Хаах</button></div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("ios-install-coach--visible"));
 }
@@ -2623,11 +2623,9 @@ function installAppOnPhone() {
         showInstallToast("Chrome нээгдэж байна...");
         return;
       }
-      downloadAndroidApk();
       showAndroidInstallCoach();
       return;
     }
-    downloadAndroidApk();
     showAndroidInstallCoach();
   });
 }

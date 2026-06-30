@@ -12,10 +12,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ТОМУДА" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tomuda/icons/icon-180.png' %}" />
-    <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}" />
-    <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}" />
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}?v=20260630-logo" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tomuda/icons/icon-180.png' %}?v=20260630-logo" />
+    <link rel="apple-touch-icon" sizes="192x192" href="{% static 'tomuda/icons/icon-192.png' %}?v=20260630-logo" />
+    <link rel="apple-touch-icon" href="{% static 'tomuda/icons/apple-touch-icon.png' %}?v=20260630-logo" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -247,8 +247,8 @@
         }
       }
     </style>
-    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260630-receipt-template-fixed" as="style" />
-    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260630-receipt-template-fixed" as="script" />
+    <link rel="preload" href="{% static 'tomuda/styles.css' %}?v=20260630-install-logo" as="style" />
+    <link rel="preload" href="{% static 'tomuda/app.js' %}?v=20260630-install-logo" as="script" />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
     <script>
       tailwind.config = {
@@ -284,7 +284,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260630-receipt-template-fixed"
+      href="{% static 'tomuda/styles.css' %}?v=20260630-install-logo"
     />
   </head>
   <body>
@@ -362,7 +362,7 @@
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
     <script src="{% static 'tomuda/permissions.js' %}?v=20260630-perm-view-deps"></script>
     <script
-      src="{% static 'tomuda/app.js' %}?v=20260630-receipt-template-fixed"
+      src="{% static 'tomuda/app.js' %}?v=20260630-install-logo"
       onerror="__showTomudaFatal('App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.')"
     ></script>
   </body>

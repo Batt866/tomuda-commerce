@@ -13,9 +13,11 @@ PWA_DIR = ROOT / "static/tomuda/icons"
 ANDROID_RES = ROOT / "android/app/src/main/res"
 
 # Padding so OS masks (iOS squircle / Android adaptive) do not clip the mark.
-PWA_LOGO_SCALE = 0.70
-ADAPTIVE_LOGO_SCALE = 0.58
-ICON_BG = (0, 0, 0, 255)
+# The previous icon filled too much of the canvas, so some launchers showed only
+# the leading T after applying their own mask.
+PWA_LOGO_SCALE = 0.56
+ADAPTIVE_LOGO_SCALE = 0.46
+ICON_BG = (255, 255, 255, 255)
 
 
 def compose_icon(logo: Image.Image, canvas_size: int, scale: float, background):
