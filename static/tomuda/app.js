@@ -309,8 +309,9 @@ function receiptPartyFields(o) {
     paid = o.paymentTerm === "cash" || o.isPaid,
     bank = o.paymentTerm === "credit" && !o.isPaid,
     addr =
-      [c.province, c.district, c.khoroo, c.address].filter(Boolean).join(", ") ||
-      "-";
+      [c.province, c.district, c.khoroo, c.address]
+        .filter(Boolean)
+        .join(", ") || "-";
   return {
     c,
     salesName: esc(o.employeeName || sales.name || "-"),
@@ -966,8 +967,9 @@ function syncEmployeePermissionsFromRole() {
   if (!root || !permApi()) return;
   const role =
     form?.querySelector("#employeeRoleSelect")?.value ||
-    state.employees.find((e) => (state.permissionEmployeeIds || []).includes(e.id))
-      ?.role ||
+    state.employees.find((e) =>
+      (state.permissionEmployeeIds || []).includes(e.id),
+    )?.role ||
     "sales";
   const keys = new Set(permApi().templateForRole(role));
   root.querySelectorAll('input[name="permissions"]').forEach((el) => {
@@ -984,7 +986,9 @@ function togglePermissionEmployee(id, ev) {
   state.permissionEmployeePickerOpen = true;
   render();
 }
-function permissionEmployeeSummary(selected = idList(state.permissionEmployeeIds)) {
+function permissionEmployeeSummary(
+  selected = idList(state.permissionEmployeeIds),
+) {
   if (!selected.length) return "Сонгох";
   if (selected.length === 1) {
     const emp = state.employees.find((e) => e.id === selected[0]);
@@ -1196,8 +1200,7 @@ function canPageBack() {
   ].includes(state.currentView);
 }
 const pageHead = (title, action = "", opts = {}) => {
-  const showBack =
-    opts.back !== false && (opts.back === true || canPageBack());
+  const showBack = opts.back !== false && (opts.back === true || canPageBack());
   const back = showBack ? pageBackBtnHtml() : "";
   if (action || showBack) {
     return `<div class="page-head page-head--row${showBack ? " page-head--with-back" : ""}">${back}<h2 class="page-head__title">${title}</h2>${action ? `<div class="page-head__actions">${action}</div>` : ""}</div>`;
@@ -1277,7 +1280,9 @@ function bottomNavForRole(role) {
     delivery: ["delivery"],
   };
   const ids = mobileIds[role] || mobileIds.sales;
-  return sidebarNavForRole(role).filter(([id]) => ids.includes(id) && allowed.has(id));
+  return sidebarNavForRole(role).filter(
+    ([id]) => ids.includes(id) && allowed.has(id),
+  );
 }
 function mobileNavIcon(id) {
   const paths = MOBILE_NAV_SVG[id];
@@ -3136,7 +3141,7 @@ function buildOrderReceiptExcelRows(o) {
 function orderReceiptSnapshot(o) {
   return {
     ...o,
-    items: (o.items || []).map((i) => ({ ...i })),
+    items: orderItemsWithPromos(o),
   };
 }
 const RECEIPT_EXCEL_STYLES = `
@@ -3263,8 +3268,7 @@ function exportOrderReceiptsExcelCsv(orders) {
   excel(`zahialgiin-barimt-${stamp}.csv`, sheetRows);
 }
 const RECEIPT_XLSX_LAST_COL = "K";
-const RECEIPT_XLSX_TEMPLATE =
-  "/static/tomuda/templates/receipt-template.xls";
+const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 const RECEIPT_COMPANY_ADDRESS =
   "Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/                                             Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357";
 function excelSerialFromDate(value) {
@@ -3301,7 +3305,11 @@ function receiptDrawingRelsXml() {
 function receiptSheetRelsXml(sheetId) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${sheetId}.xml"/></Relationships>`;
 }
-function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) {
+function buildReceiptSheetXml(
+  o,
+  ctx = createReceiptStringContext(),
+  opts = {},
+) {
   const { strings, si } = ctx;
   const merges = ["A1:B2", "C1:F1", "C2:J2", "C3:J3"];
   const rows = [];
@@ -3310,10 +3318,19 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     rows.push(xlsxRowXml(rowNum, height, cells, RECEIPT_XLSX_LAST_COL));
     rowNum += 1;
   };
-  const emptyCells = (row, from = "A", to = RECEIPT_XLSX_LAST_COL, style = 1) => {
-    const cols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      .slice("ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(from), "ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(to) + 1);
-    return cols.split("").map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  const emptyCells = (
+    row,
+    from = "A",
+    to = RECEIPT_XLSX_LAST_COL,
+    style = 1,
+  ) => {
+    const cols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(from),
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
   const metaPairRow = (row, leftLabel, leftValue, rightLabel, rightValue) => [
     xlsxCellXml(`B${row}`, 3, si(leftLabel), "s"),
@@ -3341,8 +3358,10 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
   const bank = o.paymentTerm === "credit" && !o.isPaid;
   const settlement = settlementNoteText(o);
   const grossNotice =
-    !o.applyPercentDiscount && isCashPayment(o.paymentTerm) && !orderInWarehouseLiveSession(o)
-      ? `Анхаар: Захиалгыг өнөөдөрт шилжүүлээгүй тохиолдолд хувь (${percentDiscountRate()}%) хасагдаагүй энэ дүнгээр тооцоо хийгдэнэ.`
+    !o.applyPercentDiscount &&
+    isCashPayment(o.paymentTerm) &&
+    !orderInWarehouseLiveSession(o)
+      ? `Өдөртөө тооцоог хийгээгүй тохиолдолд (${percentDiscountRate()}%) -н хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
   pushRow(20.25, [
     xlsxCellXml("C1", 13, si("ТОМУДА ГРУПП"), "s"),
@@ -3361,10 +3380,46 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ...emptyCells(3, "A", "B"),
     ...emptyCells(3, "K", RECEIPT_XLSX_LAST_COL, 13),
   ]);
-  pushRow(14.25, metaPairRow(rowNum, "Худалдааны төлөөлөгч:", f.salesName, "Харилцагч:", f.customerName));
-  pushRow(14.25, metaPairRow(rowNum, "Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg));
-  pushRow(14.25, metaPairRow(rowNum, "Түгээгчийн нэр:", f.deliveryName, "Компаний нэр:", f.companyName));
-  pushRow(14.25, metaPairRow(rowNum, "Түгээгчийн утас:", f.deliveryPhone, "Утасны дугаар:", f.customerPhone));
+  pushRow(
+    14.25,
+    metaPairRow(
+      rowNum,
+      "Худалдааны төлөөлөгч:",
+      f.salesName,
+      "Харилцагч:",
+      f.customerName,
+    ),
+  );
+  pushRow(
+    14.25,
+    metaPairRow(
+      rowNum,
+      "Худалдааны төлөөлөгчийн утас:",
+      f.salesPhone,
+      "Регистерийн дугаар:",
+      f.customerReg,
+    ),
+  );
+  pushRow(
+    14.25,
+    metaPairRow(
+      rowNum,
+      "Түгээгчийн нэр:",
+      f.deliveryName,
+      "Компаний нэр:",
+      f.companyName,
+    ),
+  );
+  pushRow(
+    14.25,
+    metaPairRow(
+      rowNum,
+      "Түгээгчийн утас:",
+      f.deliveryPhone,
+      "Утасны дугаар:",
+      f.customerPhone,
+    ),
+  );
   pushRow(14.25, emptyCells(rowNum));
   const bankNameRow = rowNum;
   pushRow(14.25, [
@@ -3375,7 +3430,10 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ...emptyCells(bankNameRow, "E", "E"),
     ...emptyCells(bankNameRow, "G", RECEIPT_XLSX_LAST_COL),
   ]);
-  merges.push(`B${bankNameRow}:C${bankNameRow}`, `D${bankNameRow}:E${bankNameRow}`);
+  merges.push(
+    `B${bankNameRow}:C${bankNameRow}`,
+    `D${bankNameRow}:E${bankNameRow}`,
+  );
   const bankRegRow = rowNum;
   pushRow(14.25, [
     xlsxCellXml(`B${bankRegRow}`, 3, si("Регистерийн дугаар:"), "s"),
@@ -3491,7 +3549,10 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
     ]);
   });
   const discountRow = rowNum;
-  merges.push(`B${discountRow}:D${discountRow}`, `E${discountRow}:K${discountRow}`);
+  merges.push(
+    `B${discountRow}:D${discountRow}`,
+    `E${discountRow}:K${discountRow}`,
+  );
   pushRow(14.25, [
     xlsxCellXml(
       `B${discountRow}`,
@@ -3530,8 +3591,18 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
   const payRow = rowNum;
   pushRow(14.25, [
     xlsxCellXml(`B${payRow}`, 8, si("Төлбөрийн нөхцөл"), "s"),
-    xlsxCellXml(`E${payRow}`, paid ? 10 : 8, si(paid ? "☑ Бэлэн" : "Бэлэн"), "s"),
-    xlsxCellXml(`H${payRow}`, bank ? 10 : 8, si(bank ? "☑ Зээлээр" : "Зээлээр"), "s"),
+    xlsxCellXml(
+      `E${payRow}`,
+      paid ? 10 : 8,
+      si(paid ? "☑ Бэлэн" : "Бэлэн"),
+      "s",
+    ),
+    xlsxCellXml(
+      `H${payRow}`,
+      bank ? 10 : 8,
+      si(bank ? "☑ Зээлээр" : "Зээлээр"),
+      "s",
+    ),
     ...emptyCells(payRow, "A", "A"),
     ...emptyCells(payRow, "C", "D"),
     ...emptyCells(payRow, "F", "G"),
@@ -3555,7 +3626,12 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
   const sign1 = rowNum;
   merges.push(`B${sign1}:E${sign1}`);
   pushRow(null, [
-    xlsxCellXml(`B${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"), "s"),
+    xlsxCellXml(
+      `B${sign1}`,
+      17,
+      si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"),
+      "s",
+    ),
     ...emptyCells(sign1, "A", "A"),
     ...emptyCells(sign1, "F", RECEIPT_XLSX_LAST_COL),
   ]);
@@ -3570,7 +3646,9 @@ function buildReceiptSheetXml(o, ctx = createReceiptStringContext(), opts = {}) 
   pushRow(14.25, emptyCells(rowNum));
   pushRow(14.25, emptyCells(rowNum));
   const lastRow = rowNum - 1;
-  const mergeXml = [...new Set(merges)].map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const mergeXml = [...new Set(merges)]
+    .map((ref) => `<mergeCell ref="${ref}"/>`)
+    .join("");
   const drawingXml = opts.hasLogo ? `<drawing r:id="rId1"/>` : "";
   const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="6.25" customWidth="1"/><col min="3" max="3" width="17.38" customWidth="1"/><col min="4" max="4" width="3.88" customWidth="1"/><col min="5" max="5" width="10.38" customWidth="1"/><col min="6" max="6" width="9.62" customWidth="1"/><col min="7" max="7" width="5.62" customWidth="1"/><col min="8" max="8" width="4.88" customWidth="1"/><col min="9" max="9" width="3.75" customWidth="1"/><col min="10" max="10" width="9.25" customWidth="1"/><col min="11" max="11" width="9.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells>${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return {
@@ -3621,9 +3699,15 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   built.sheets.forEach((sheet) => {
     zip.file(`xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
     if (logoBuffer) {
-      zip.file(`xl/worksheets/_rels/sheet${sheet.id}.xml.rels`, receiptSheetRelsXml(sheet.id));
+      zip.file(
+        `xl/worksheets/_rels/sheet${sheet.id}.xml.rels`,
+        receiptSheetRelsXml(sheet.id),
+      );
       zip.file(`xl/drawings/drawing${sheet.id}.xml`, receiptDrawingXml());
-      zip.file(`xl/drawings/_rels/drawing${sheet.id}.xml.rels`, receiptDrawingRelsXml());
+      zip.file(
+        `xl/drawings/_rels/drawing${sheet.id}.xml.rels`,
+        receiptDrawingRelsXml(),
+      );
     }
   });
   if (logoBuffer) zip.file("xl/media/receipt-logo.png", logoBuffer);
@@ -3782,7 +3866,8 @@ function warehouseOrderDetail(o) {
         ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
         : 0,
     paid = o.paymentTerm === "cash" || o.isPaid,
-    itemRows = (o.items || [])
+    displayItems = orderItemsWithPromos(o),
+    itemRows = displayItems
       .map((i) => {
         const isPromo = !!i.isPromoFree;
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(i.total)}</td></tr>`;
@@ -4008,7 +4093,9 @@ function customerListRow(c, actionsHtml, active = false) {
 }
 function customersView() {
   const q = state.searches.customers || "",
-    rows = sortCustomersByName(state.customers.filter((c) => customerMatchesQuery(c, q))),
+    rows = sortCustomersByName(
+      state.customers.filter((c) => customerMatchesQuery(c, q)),
+    ),
     toolbarActions = [
       hasPermission("reports.view")
         ? excelDownloadBtn("confirmCustomerExcel()")
@@ -4137,7 +4224,9 @@ function receiptPrintWorkerSelectHtml() {
     summary = receiptPrintWorkerSummary(selected);
   return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Худалдааны төлөөлөгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintWorker('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
-function receiptPrintDeliverySummary(deliveryId = state.receiptPrintDeliveryId || "") {
+function receiptPrintDeliverySummary(
+  deliveryId = state.receiptPrintDeliveryId || "",
+) {
   if (!deliveryId) return "Бүгд";
   const emp = state.employees.find((e) => e.id === deliveryId);
   return emp?.name || "Бүгд";
@@ -4227,11 +4316,15 @@ function bindReceiptPrintWorkerPickerDismiss() {
       const deliveryOpen = state.receiptPrintDeliveryPickerOpen;
       const permOpen = state.permissionEmployeePickerOpen;
       if (!workerOpen && !deliveryOpen && !permOpen) return;
-      const workerPicker = document.querySelector("[data-receipt-worker-picker]");
+      const workerPicker = document.querySelector(
+        "[data-receipt-worker-picker]",
+      );
       const deliveryPicker = document.querySelector(
         "[data-receipt-delivery-picker]",
       );
-      const permPicker = document.querySelector("[data-permission-employee-picker]");
+      const permPicker = document.querySelector(
+        "[data-permission-employee-picker]",
+      );
       if (workerOpen && workerPicker?.contains(ev.target)) return;
       if (deliveryOpen && deliveryPicker?.contains(ev.target)) return;
       if (permOpen && permPicker?.contains(ev.target)) return;
@@ -4331,8 +4424,7 @@ function setWarehouseDate(day) {
   render();
 }
 function receiptFilterToggle(kind, id) {
-  const key =
-    kind === "delivery" ? "receiptDeliveryIds" : "receiptWorkerIds";
+  const key = kind === "delivery" ? "receiptDeliveryIds" : "receiptWorkerIds";
   const current = idList(state.searches[key]);
   state.searches[key] = current.includes(id)
     ? current.filter((x) => x !== id)
@@ -4445,9 +4537,7 @@ function exportProductsExcelFallback() {
   const stamp = new Date().toISOString().slice(0, 10);
   excel(`baraa-${stamp}.csv`, [
     ["Барааны жагсаалт"],
-    [
-      `${productSheetDateLabel()} · Нийт: ${products.length} бараа`,
-    ],
+    [`${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
     [],
     productExcelHeaders(),
     ...productExcelDataRows(products),
@@ -4565,8 +4655,12 @@ function productsView() {
     .join("")}</select>`;
   const toolbarActions = [
     excelDownloadBtn("confirmProductsExport()"),
-    canManageProducts() ? pageToolbarSecondaryBtn("Төрөл", "categoryModal()") : "",
-    canManageProducts() ? pageToolbarPrimaryBtn("Бараа нэмэх", "productModal()") : "",
+    canManageProducts()
+      ? pageToolbarSecondaryBtn("Төрөл", "categoryModal()")
+      : "",
+    canManageProducts()
+      ? pageToolbarPrimaryBtn("Бараа нэмэх", "productModal()")
+      : "",
   ]
     .filter(Boolean)
     .join("");
@@ -4608,9 +4702,7 @@ function productDetailHtml(p, id) {
     rows.push(
       productDetailRow(
         "Өртөг үнэ",
-        cost
-          ? esc(fmt(cost))
-          : `<span class="customer-detail__muted">—</span>`,
+        cost ? esc(fmt(cost)) : `<span class="customer-detail__muted">—</span>`,
       ),
     );
   }
@@ -4778,7 +4870,10 @@ function inventoryLogProductId(log) {
     .toLowerCase();
   if (!name) return "";
   const hit = state.products.find(
-    (p) => String(p.name || "").trim().toLowerCase() === name,
+    (p) =>
+      String(p.name || "")
+        .trim()
+        .toLowerCase() === name,
   );
   return hit?.id || "";
 }
@@ -5227,9 +5322,7 @@ function countResult(mismatches) {
   const badgeClass = mismatchCount
     ? "count-result-panel__badge count-result-panel__badge--warn"
     : "count-result-panel__badge count-result-panel__badge--ok";
-  const badgeText = mismatchCount
-    ? `Зөрүүтэй: ${mismatchCount}`
-    : "Зөрүүгүй";
+  const badgeText = mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй";
   return `<section class="count-result-panel"><header class="count-result-panel__head"><div class="count-result-panel__head-copy"><p class="count-result-panel__title">Тооллого хадгалагдлаа</p><p class="count-result-panel__sub">${list.length} бараа тоолсон</p></div><span class="${badgeClass}">${badgeText}</span></header>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="count-result-panel__empty">Тоолсон бараа байхгүй</div>`}${mismatchCount === 0 && list.length ? `<div class="count-result-panel__success">Бүх барааны тоо таарч байна</div>` : ""}<footer class="count-result-panel__foot">${excelDownloadBtn("confirmCountExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function countExportProducts() {
@@ -5350,7 +5443,12 @@ function buildProductSheetXml() {
     );
     rowNum += 1;
   };
-  const emptyCells = (row, from = "A", to = PRODUCT_XLSX_LAST_COL, style = 1) => {
+  const emptyCells = (
+    row,
+    from = "A",
+    to = PRODUCT_XLSX_LAST_COL,
+    style = 1,
+  ) => {
     const cols = "ABCDEFGH".slice(
       "ABCDEFGH".indexOf(from),
       "ABCDEFGH".indexOf(to) + 1,
@@ -5689,7 +5787,10 @@ function warehousePrepareProduct(row) {
   if (name) {
     const key = String(name).trim().toLowerCase();
     const byName = state.products.find(
-      (x) => String(x.name || "").trim().toLowerCase() === key,
+      (x) =>
+        String(x.name || "")
+          .trim()
+          .toLowerCase() === key,
     );
     if (byName) return byName;
   }
@@ -5841,7 +5942,11 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   if (workerNames.length) {
     pushRow(
       20.25,
-      warehousePrepareMetaRow(rowNum, "Захиалга авсан ажилтан:", workerNames[0]),
+      warehousePrepareMetaRow(
+        rowNum,
+        "Захиалга авсан ажилтан:",
+        workerNames[0],
+      ),
     );
     for (let i = 1; i < workerNames.length; i += 1) {
       pushRow(16.5, warehousePrepareWorkerExtraRow(rowNum, workerNames[i]));
@@ -5986,7 +6091,14 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ["Захиалга авсан ажилтан:", workerNames[0] || "-"],
     ...workerNames.slice(1).map((name) => ["", name]),
     [],
-    ["Барааны нэр төрөл", "Хэмжих нэгж", "Баркод", "Багц", "Ширхэг", "Үлдэгдэл"],
+    [
+      "Барааны нэр төрөл",
+      "Хэмжих нэгж",
+      "Баркод",
+      "Багц",
+      "Ширхэг",
+      "Үлдэгдэл",
+    ],
   ];
   for (const item of groups) {
     if (item.type === "cat") {
@@ -6006,9 +6118,17 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
   }
   sheetRows.push(
     [],
-    ["Хүлээлгэн өгсөн ажилтан:", "", "/...................................................../"],
+    [
+      "Хүлээлгэн өгсөн ажилтан:",
+      "",
+      "/...................................................../",
+    ],
     ["", "", "гарын үсэг"],
-    ["Хүлээн авсан ажилтан:", "", "/...................................................../"],
+    [
+      "Хүлээн авсан ажилтан:",
+      "",
+      "/...................................................../",
+    ],
     ["гарын үсэг"],
   );
   excel(`aguulah-beldeh-${stamp}.csv`, sheetRows);
@@ -7038,6 +7158,28 @@ function workerOrderLines() {
     state.paymentTerm,
   );
 }
+function orderPromotionLines(paidItems, paymentTerm) {
+  const paid = (paidItems || []).map((line) => ({ ...line })),
+    gross = paid.reduce((s, l) => s + (Number(l.total) || 0), 0);
+  return applyPaymentPromotions(
+    applyPricePromotions(applyQuantityPromotions(paid), gross),
+    gross,
+    paymentTerm || "cash",
+  ).filter((line) => line.isPromoFree);
+}
+function orderItemsWithPromos(o) {
+  if (!o) return [];
+  const items = (o.items || []).map((line) => ({ ...line })),
+    paid = items.filter((line) => !line.isPromoFree),
+    existingPromo = items.filter((line) => line.isPromoFree),
+    existingPromoKeys = new Set(
+      existingPromo.map((line) => String(line.productId || "")),
+    ),
+    generatedPromo = orderPromotionLines(paid, o.paymentTerm).filter(
+      (line) => !existingPromoKeys.has(String(line.productId || "")),
+    );
+  return [...paid, ...existingPromo, ...generatedPromo];
+}
 function workerCartSummary() {
   const paid = workerPaidLines(),
     gross = paid.reduce((s, l) => s + l.total, 0),
@@ -7342,9 +7484,7 @@ function restoreAuthSession() {
     state.orderEmployee = emp.id;
     const view = data.currentView;
     state.currentView =
-      view && canAccessView(view)
-        ? view
-        : defaultViewForRole(emp.role);
+      view && canAccessView(view) ? view : defaultViewForRole(emp.role);
     applyLoginRoleDefaults(emp);
     return true;
   } catch {
@@ -8044,7 +8184,8 @@ function render() {
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
   bindReceiptPrintWorkerPickerDismiss();
-  if (state.currentView === "count" && !state.countDone) syncCountInputsFromState();
+  if (state.currentView === "count" && !state.countDone)
+    syncCountInputsFromState();
   requestAnimationFrame(() => {
     enhanceMobileNumericInputs(document);
     permApi()?.syncAllPermissionRowDeps?.();
@@ -8213,7 +8354,8 @@ function mobileInputKeyboardAttrs(type, name = "", { decimal = false } = {}) {
 }
 function enhanceMobileNumericInputs(root = document) {
   const scope = root.querySelector("#app") || root.getElementById?.("app");
-  const modalRoot = root.querySelector("#modal") || root.getElementById?.("modal");
+  const modalRoot =
+    root.querySelector("#modal") || root.getElementById?.("modal");
   [scope, modalRoot].filter(Boolean).forEach((container) => {
     container.querySelectorAll('input[type="number"]').forEach((el) => {
       const decimal = el.step && String(el.step).includes(".");
@@ -8502,7 +8644,9 @@ function customerDetail(id) {
   box(c.name, customerDetailHtml(c, id), "max-w-xl");
 }
 function productModal(id) {
-  if (id ? !hasPermission("products.edit") : !hasPermission("products.create")) {
+  if (
+    id ? !hasPermission("products.edit") : !hasPermission("products.create")
+  ) {
     return alertModal("Эрхгүй", "Бараа засах эрхгүй.");
   }
   const isNew = !id;
@@ -8739,7 +8883,9 @@ function applyProductSave(data, id) {
   scheduleBackendSave();
 }
 function saveProduct(e, id) {
-  if (id ? !hasPermission("products.edit") : !hasPermission("products.create")) {
+  if (
+    id ? !hasPermission("products.edit") : !hasPermission("products.create")
+  ) {
     return alertModal("Эрхгүй", "Бараа хадгалах эрхгүй.");
   }
   e.preventDefault();
@@ -8964,7 +9110,13 @@ function applyEmployeeSave(data, editId = "") {
 function orderModal() {
   box(
     "Шинэ захиалга",
-    `<form onsubmit="saveOrder(event)" class="p-5 space-y-4 modal-scroll overflow-y-auto"><select name="customerId" class="w-full px-3 py-3 bg-secondary rounded">${sortCustomersByName(state.customers).map((c) => `<option value="${c.id}">${c.companyName}</option>`).join("")}</select><div class="grid md:grid-cols-2 gap-3">${state.products.map((p) => `<label class="rounded bg-secondary/50 p-3 grid grid-cols-[1fr_80px] gap-2"><span><b>${p.name}</b><small class="block text-muted-foreground">${fmt(p.price)} · Үлд ${p.stock}</small></span><input name="${p.id}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" placeholder="0" class="px-2 py-2 bg-card rounded text-center"></label>`).join("")}</div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form onsubmit="saveOrder(event)" class="p-5 space-y-4 modal-scroll overflow-y-auto"><select name="customerId" class="w-full px-3 py-3 bg-secondary rounded">${sortCustomersByName(
+      state.customers,
+    )
+      .map((c) => `<option value="${c.id}">${c.companyName}</option>`)
+      .join(
+        "",
+      )}</select><div class="grid md:grid-cols-2 gap-3">${state.products.map((p) => `<label class="rounded bg-secondary/50 p-3 grid grid-cols-[1fr_80px] gap-2"><span><b>${p.name}</b><small class="block text-muted-foreground">${fmt(p.price)} · Үлд ${p.stock}</small></span><input name="${p.id}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" placeholder="0" class="px-2 py-2 bg-card rounded text-center"></label>`).join("")}</div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-5xl",
   );
 }
@@ -9153,8 +9305,9 @@ function orderReceiptModal(id, keepDraft = false) {
   if (!o) return;
   state.receiptEditOrderId = id;
   if (!keepDraft || !state.receiptEditItems) {
-    state.receiptEditOriginalItems = o.items.map((i) => ({ ...i }));
-    state.receiptEditItems = o.items.map((i) => ({ ...i }));
+    const items = orderItemsWithPromos(o);
+    state.receiptEditOriginalItems = items.map((i) => ({ ...i }));
+    state.receiptEditItems = items.map((i) => ({ ...i }));
   }
   const draft = receiptEditDraftOrder();
   box(
@@ -9283,7 +9436,8 @@ function printOrderReceiptsNow(ids) {
 }
 function printSelectedOrderReceipts() {
   const ids = idList(state.receiptPrintOrderIds);
-  if (!receiptPrintWorkerIds().length) return alert("Худалдааны төлөөлөгч сонгоно уу");
+  if (!receiptPrintWorkerIds().length)
+    return alert("Худалдааны төлөөлөгч сонгоно уу");
   if (!ids.length) return alert("Хэвлэх захиалга сонгоно уу");
   confirmPrintExport("Баримт хэвлэх", () => printOrderReceiptsNow(ids));
 }
@@ -9294,7 +9448,7 @@ function receiptDetail(id) {
   orderReceiptModal(id);
 }
 function receipt(o) {
-  return `<div class="print-receipt"><div class="receipt-page">${receiptPageHtml(o, BRAND.receiptLogo)}</div></div>`;
+  return `<div class="print-receipt"><div class="receipt-page">${receiptPageHtml(orderReceiptSnapshot(o), BRAND.receiptLogo)}</div></div>`;
 }
 function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);
@@ -9315,7 +9469,11 @@ function applyStock(id, type, qty, costPrice) {
     alert("Үлдэгдэл хүрэлцэхгүй байна!");
     return false;
   }
-  if (type === "in" && costPrice != null && Number.isFinite(Number(costPrice))) {
+  if (
+    type === "in" &&
+    costPrice != null &&
+    Number.isFinite(Number(costPrice))
+  ) {
     p.costPrice = Number(costPrice);
   }
   stock(id, q, type);
@@ -9968,7 +10126,11 @@ function saveEmployee(e) {
   const form = e.target?.closest?.("[data-employee-form]");
   if (!form) return;
   const editId = form.getAttribute("data-employee-id") || "";
-  if (editId ? !hasPermission("employees.edit") : !hasPermission("employees.create")) {
+  if (
+    editId
+      ? !hasPermission("employees.edit")
+      : !hasPermission("employees.create")
+  ) {
     alertModal("Эрхгүй", "Ажилтан хадгалах эрхгүй.");
     return;
   }

@@ -3,7 +3,7 @@
 Энэ заавар нь **Mac унтраасан ч** апп ажиллах **24/7 cloud** deploy-ийг тайлбарлана.  
 Локал `trycloudflare` link нь зөвхөн түр туршилт — production-д **Render** ашиглана.
 
-**GitHub repo:** https://github.com/Batt866/tomuda-commerce  
+**GitHub repo:** [https://github.com/Batt866/tomuda-commerce](https://github.com/Batt866/tomuda-commerce)  
 **Тохиргооны файл:** `render.yaml` (төсөлд бэлэн байгаа)
 
 ---
@@ -29,12 +29,13 @@
 
 `render.yaml` ашиглахад Render автоматаар:
 
-| Үүсэх зүйл | Нэр | Зориулалт |
-|------------|-----|-----------|
-| PostgreSQL (free) | `tomuda-db` | Захиалга, бараа, харилцагчийн өгөгдөл хадгалах |
-| Web service (free) | `tomuda-commerce` | Django + API + PWA хөтөчөөр харуулах |
+| Үүсэх зүйл         | Нэр               | Зориулалт                                      |
+| ------------------ | ----------------- | ---------------------------------------------- |
+| PostgreSQL (free)  | `tomuda-db`       | Захиалга, бараа, харилцагчийн өгөгдөл хадгалах |
+| Web service (free) | `tomuda-commerce` | Django + API + PWA хөтөчөөр харуулах           |
 
 **Build үед автоматаар:**
+
 ```bash
 pip install -r requirements.txt
 python manage.py collectstatic --noinput
@@ -43,6 +44,7 @@ python manage.py seed_tomuda
 ```
 
 **Ажиллах үед:**
+
 ```bash
 gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT
 ```
@@ -93,9 +95,10 @@ git push origin main
 
 ### 3.4 GitHub дээр шалгах
 
-Браузераар нээ: https://github.com/Batt866/tomuda-commerce  
+Браузераар нээ: [https://github.com/Batt866/tomuda-commerce](https://github.com/Batt866/tomuda-commerce)
 
 Дараах файлууд **main** branch дээр байх ёстой:
+
 - `render.yaml`
 - `requirements.txt`
 - `manage.py`
@@ -107,7 +110,7 @@ git push origin main
 
 ### Алхам 4.1 — Render нээх
 
-1. https://render.com руу орно.
+1. [https://render.com](https://render.com) руу орно.
 2. **Get Started for Free** дарна.
 3. **Sign up with GitHub** сонгоно.
 4. GitHub нэвтрэлт → **Authorize Render** (repo хандалт зөвшөөрнө).
@@ -123,7 +126,7 @@ git push origin main
 
 ### Алхам 5.1 — Blueprint эхлүүлэх
 
-1. https://dashboard.render.com нээнэ.
+1. [https://dashboard.render.com](https://dashboard.render.com) нээнэ.
 2. Баруун дээд **New +** товч.
 3. **Blueprint** сонгоно.
 
@@ -132,8 +135,8 @@ git push origin main
 1. **Connect a repository** хэсэгт `Batt866/tomuda-commerce` хайж сонгоно.
 2. Render `render.yaml` уншиж preview харуулна:
 
-   - **Database:** `tomuda-db` (PostgreSQL, free)
-   - **Web Service:** `tomuda-commerce` (Python 3.11, free)
+- **Database:** `tomuda-db` (PostgreSQL, free)
+- **Web Service:** `tomuda-commerce` (Python 3.11, free)
 
 3. Нэр, plan өөрчлөх шаардлагагүй (анх удаа free үлдээнэ).
 
@@ -163,7 +166,6 @@ Starting service with gunicorn...
 
 - Service статус: **Building** → **Deploying** → **Live**
 - Дээд хэсэгт URL гарна, жишээ нь:
-
   ```
   https://tomuda-commerce.onrender.com
   ```
@@ -181,8 +183,9 @@ https://tomuda-commerce.onrender.com/api/health
 ```
 
 **Зөв хариу:**
+
 ```json
-{"ok": true, "app": "tomuda"}
+{ "ok": true, "app": "tomuda" }
 ```
 
 ### 6.2 Апп нээх
@@ -197,11 +200,11 @@ https://tomuda-commerce.onrender.com/
 
 Deploy бүрт `seed_tomuda` ажилладаг. Анхны demo нэвтрэлт (жишээ):
 
-| Email | Нууц үг | Эрх |
-|-------|---------|-----|
-| `admin@tomuda.mn` | `admin` | Админ |
-| `ht@tomuda.mn` | `hasan` | Борлуулалт |
-| `aguulah@tomuda.mn` | `dulam` | Агуулах |
+| Email               | Нууц үг | Эрх        |
+| ------------------- | ------- | ---------- |
+| `admin@tomuda.mn`   | `admin` | Админ      |
+| `ht@tomuda.mn`      | `hasan` | Борлуулалт |
+| `aguulah@tomuda.mn` | `dulam` | Агуулах    |
 
 Production-д нууц үгээ заавал солино (апп дотор ажилтан засах боломжтой).
 
@@ -217,14 +220,14 @@ Production-д нууц үгээ заавал солино (апп дотор а�
 
 `render.yaml`-д урьдчилан тохируулсан:
 
-| Хувьсагч | Утга |
-|----------|------|
-| `DEBUG` | `0` |
-| `SECRET_KEY` | Render автоматаар үүсгэнэ |
-| `ALLOWED_HOSTS` | `.onrender.com` |
+| Хувьсагч               | Утга                                   |
+| ---------------------- | -------------------------------------- |
+| `DEBUG`                | `0`                                    |
+| `SECRET_KEY`           | Render автоматаар үүсгэнэ              |
+| `ALLOWED_HOSTS`        | `.onrender.com`                        |
 | `CSRF_TRUSTED_ORIGINS` | `https://tomuda-commerce.onrender.com` |
-| `DATABASE_URL` | PostgreSQL-ээс автоматаар |
-| `PYTHON_VERSION` | `3.11` |
+| `DATABASE_URL`         | PostgreSQL-ээс автоматаар              |
+| `PYTHON_VERSION`       | `3.11`                                 |
 
 ### URL өөр гарсан бол (чухал)
 
@@ -240,14 +243,11 @@ https://tomuda-commerce-a1b2.onrender.com
 2. Зүүн цэс **Environment**
 3. `CSRF_TRUSTED_ORIGINS` олж засна:
 
-   ```
-   https://tomuda-commerce-a1b2.onrender.com
-   ```
+```
+ https://tomuda-commerce-a1b2.onrender.com
+```
 
-   (`/` төгсгөлгүй, `http` биш `https`)
-
-4. **Save Changes**
-5. Дээд тал **Manual Deploy** → **Deploy latest commit**
+(`/` төгсгөлгүй, `http` биш `https`) 4. **Save Changes** 5. Дээд тал **Manual Deploy** → **Deploy latest commit**
 
 ### Олон домэйн (ирээдүйд)
 
@@ -315,14 +315,14 @@ Build бүрт `python manage.py seed_tomuda` ажиллана. Энэ нь `mai
 
 ## 10. Free tier — юу мэдэх вэ
 
-| Зүйл | Free tier |
-|------|-----------|
-| Mac унтрахад ажиллах уу | ✅ Тийм |
-| HTTPS | ✅ Автомат |
-| PostgreSQL | ✅ (free, хязгаартай) |
-| 15 мин идэвхгүй | Web service «унтрана» |
-| Эхний хүний хурд | 30–90 сек хүлээлт байж болно (cold start) |
-| Сард төлбөр | $0 (free plan) |
+| Зүйл                    | Free tier                                 |
+| ----------------------- | ----------------------------------------- |
+| Mac унтрахад ажиллах уу | ✅ Тийм                                   |
+| HTTPS                   | ✅ Автомат                                |
+| PostgreSQL              | ✅ (free, хязгаартай)                     |
+| 15 мин идэвхгүй         | Web service «унтрана»                     |
+| Эхний хүний хурд        | 30–90 сек хүлээлт байж болно (cold start) |
+| Сард төлбөр             | $0 (free plan)                            |
 
 **Cold start багасгах (сонголт):** [cron-job.org](https://cron-job.org) дээр 14 минут тутам:
 
@@ -351,6 +351,7 @@ Render Dashboard → service → **Upgrade** — илүү тогтвортой, 
 **Logs**-оос улаан мөр уншина.
 
 **Засвар:**
+
 - `requirements.txt` repo-д байгаа эсэх
 - `PYTHON_VERSION=3.11` environment-д байгаа эсэх
 
@@ -359,9 +360,9 @@ Render Dashboard → service → **Upgrade** — илүү тогтвортой, 
 ### 11.3 Build failed — `migrate` эсвэл `seed_tomuda`
 
 **Засвар:**
+
 - Logs-д Python traceback харагдана
 - Локал шалгах:
-
   ```bash
   source .venv/bin/activate
   pip install -r requirements.txt
@@ -400,6 +401,7 @@ Render Dashboard → service → **Upgrade** — илүү тогтвортой, 
 **Шалтгаан:** `DATABASE_URL` холбогдоогүй.
 
 **Засвар:**
+
 1. Blueprint-ээр `tomuda-db` үүссэн эсэх
 2. Web service → **Environment** → `DATABASE_URL` байгаа эсэх
 3. DB, Web нэг **Blueprint/Group**-д байгаа эсэх
@@ -408,11 +410,11 @@ Render Dashboard → service → **Upgrade** — илүү тогтвортой, 
 
 ### 11.8 Локал vs Render
 
-| | Локал + tunnel | Render |
-|--|----------------|--------|
-| URL | `*.trycloudflare.com` | `*.onrender.com` |
-| Mac | Заавал асаалттай | Хэрэггүй |
-| Өгөгдөл | `db.sqlite3` | PostgreSQL |
+|         | Локал + tunnel        | Render           |
+| ------- | --------------------- | ---------------- |
+| URL     | `*.trycloudflare.com` | `*.onrender.com` |
+| Mac     | Заавал асаалттай      | Хэрэггүй         |
+| Өгөгдөл | `db.sqlite3`          | PostgreSQL       |
 
 Локал шалгалт:
 
@@ -443,21 +445,21 @@ PostgreSQL дээр deploy бүрт автоматаар устдаггүй. SQL
 
 ## Хурдан checklist
 
-- [ ] GitHub `main` дээр `render.yaml` байна
-- [ ] Render → Blueprint → `tomuda-commerce` → Apply
-- [ ] Status **Live**
-- [ ] `/api/health` → `{"ok":true}`
-- [ ] `/` нэвтрэх хуудас нээгдэнэ
-- [ ] `CSRF_TRUSTED_ORIGINS` = бодит URL
-- [ ] Ажилтнуудад `https://....onrender.com` илгээгдсэн
-- [ ] Утаснаас PWA суулгасан
+- [x] GitHub `main` дээр `render.yaml` байна
+- [x] Render → Blueprint → `tomuda-commerce` → Apply
+- [x] Status **Live**
+- [x] `/api/health` → `{"ok":true}`
+- [x] `/` нэвтрэх хуудас нээгдэнэ
+- [x] `CSRF_TRUSTED_ORIGINS` = бодит URL
+- [x] Ажилтнуудад `https://....onrender.com` илгээгдсэн
+- [x] Утаснаас PWA суулгасан
 
 ---
 
 ## Тусламж
 
-- Render docs: https://render.com/docs/blueprint-spec  
-- Төслийн богино заавар: `DEPLOY.md`  
+- Render docs: [https://render.com/docs/blueprint-spec](https://render.com/docs/blueprint-spec)
+- Төслийн богино заавар: `DEPLOY.md`
 - Локал deploy link: `./scripts/start-tomuda.sh` (зөвхөн түр)
 
 Алдааны Logs screenshot эсвэл улаан мөрийг илгээвэл тодорхой засвар зааж болно.
