@@ -12,7 +12,7 @@ PERM_ACTIONS: list[dict[str, str]] = [
 ]
 
 PERM_MODULES: list[dict[str, Any]] = [
-    {"id": "dashboard", "label": "Dashboard", "actions": ["view"]},
+    {"id": "dashboard", "label": "Админ самбар", "actions": ["view"]},
     {
         "id": "products",
         "label": "Бараа",

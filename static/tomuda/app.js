@@ -972,6 +972,7 @@ function syncEmployeePermissionsFromRole() {
   root.querySelectorAll('input[name="permissions"]').forEach((el) => {
     el.checked = keys.has(el.value);
   });
+  permApi()?.syncAllPermissionRowDeps?.(root);
 }
 function togglePermissionEmployee(id, ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
@@ -997,7 +998,7 @@ function permissionEmployeePickerHtml() {
   const selected = idList(state.permissionEmployeeIds);
   const open = !!state.permissionEmployeePickerOpen;
   const summary = permissionEmployeeSummary(selected);
-  return `<div class="wh-receipt-picker${open ? " is-open" : ""}" data-permission-employee-picker><button type="button" class="wh-receipt-picker__trigger" onclick="togglePermissionEmployeePicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Ажилтан" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearPermissionEmployees(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onchange="togglePermissionEmployee('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(role(e.role))}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closePermissionEmployeePicker(event)">Болсон</button></div></div>` : ""}</div>`;
+  return `<div class="wh-receipt-picker${open ? " is-open" : ""}" data-permission-employee-picker><button type="button" class="wh-receipt-picker__trigger" onclick="togglePermissionEmployeePicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Ажилтан" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearPermissionEmployees(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="togglePermissionEmployee('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(role(e.role))}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closePermissionEmployeePicker(event)">Болсон</button></div></div>` : ""}</div>`;
 }
 function togglePermissionEmployeePicker(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
@@ -2837,6 +2838,45 @@ function scrollAppMainToTop() {
     document.querySelector(".app-main")?.scrollTo({ top: 0, left: 0 });
   });
 }
+let lastRenderedView = null;
+function captureRenderScroll() {
+  const main = document.querySelector(".app-main");
+  const snap = {
+    sameView: lastRenderedView === state.currentView,
+    mainTop: main?.scrollTop ?? 0,
+    pickerLists: {},
+  };
+  document.querySelectorAll(".wh-receipt-picker.is-open").forEach((picker) => {
+    const key = picker.hasAttribute("data-permission-employee-picker")
+      ? "permission"
+      : picker.hasAttribute("data-receipt-worker-picker")
+        ? "worker"
+        : picker.hasAttribute("data-receipt-delivery-picker")
+          ? "delivery"
+          : "";
+    if (!key) return;
+    const list = picker.querySelector(".wh-receipt-picker__list");
+    if (list) snap.pickerLists[key] = list.scrollTop;
+  });
+  return snap;
+}
+function restoreRenderScroll(snap) {
+  if (!snap?.sameView) return;
+  requestAnimationFrame(() => {
+    const main = document.querySelector(".app-main");
+    if (main) main.scrollTop = snap.mainTop;
+    const pickerSel = {
+      permission: "[data-permission-employee-picker].is-open",
+      worker: "[data-receipt-worker-picker].is-open",
+      delivery: "[data-receipt-delivery-picker].is-open",
+    };
+    for (const [key, sel] of Object.entries(pickerSel)) {
+      if (snap.pickerLists[key] == null) continue;
+      const list = document.querySelector(`${sel} .wh-receipt-picker__list`);
+      if (list) list.scrollTop = snap.pickerLists[key];
+    }
+  });
+}
 function shell(content) {
   const userRole = currentRole();
   const sidebarNav = sidebarNavForRole(userRole);
@@ -3700,7 +3740,7 @@ function receiptPrintWorkerSelectHtml() {
     selected = receiptPrintWorkerIds(),
     open = !!state.receiptPrintWorkerPickerOpen,
     summary = receiptPrintWorkerSummary(selected);
-  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Худалдааны төлөөлөгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onchange="toggleReceiptPrintWorker('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
+  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Худалдааны төлөөлөгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintWorker('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
 function receiptPrintDeliverySummary(deliveryId = state.receiptPrintDeliveryId || "") {
   if (!deliveryId) return "Бүгд";
@@ -3712,7 +3752,7 @@ function receiptPrintDeliverySelectHtml() {
     deliveryId = state.receiptPrintDeliveryId || "",
     open = !!state.receiptPrintDeliveryPickerOpen,
     summary = receiptPrintDeliverySummary(deliveryId);
-  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Түгээгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-delivery-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintDeliveryPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><span class="wh-receipt-picker__value${deliveryId ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Түгээгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${deliveryId ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintDelivery(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${deliveries.length ? deliveries.map((e) => `<label class="wh-receipt-picker__item${deliveryId === e.id ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${deliveryId === e.id ? " checked" : ""} onchange="toggleReceiptPrintDelivery('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(e.phone || "Утасгүй")}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Түгээгч олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintDeliveryPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
+  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Түгээгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-delivery-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintDeliveryPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><span class="wh-receipt-picker__value${deliveryId ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Түгээгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${deliveryId ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintDelivery(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${deliveries.length ? deliveries.map((e) => `<label class="wh-receipt-picker__item${deliveryId === e.id ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${deliveryId === e.id ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintDelivery('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(e.phone || "Утасгүй")}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Түгээгч олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintDeliveryPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
 let receiptPrintWorkerPickerDismissBound = false;
 function toggleReceiptPrintWorkerPicker(ev) {
@@ -4198,7 +4238,7 @@ function productCard(p) {
   const costLine = hasPermission("warehouse.edit")
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
     : "";
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span></div>${adminActions}</article>`;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImage(p)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -4733,7 +4773,7 @@ function countRow(p) {
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
-  return `<div class="count-row"><img src="${productImage(p)}" class="count-row__thumb product-thumb" alt="${esc(p.name)}"><div class="count-row__info"><p class="count-row__name">${esc(p.name)}</p><p class="count-row__meta count-row__stats">${metaHtml}</p></div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span><span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span></div></div></div>`;
+  return `<article class="count-row"><div class="count-row__main"><div class="count-row__lead"><img src="${productImage(p)}" alt="" class="count-row__img" loading="lazy" decoding="async"><p class="count-row__title">${esc(p.name)}</p></div><div class="count-row__meta count-row__stats">${metaHtml}</div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span><span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span></div></div></div></article>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -6728,7 +6768,7 @@ function removePromotionRuleNow(type, index) {
 function employeePercentDiscountToggle(e) {
   if (e.role !== "sales") return "";
   const on = !!e.allowPercentDiscount;
-  return `<label class="employee-pct-toggle shrink-0 flex items-center gap-1.5 text-xs cursor-pointer" title="Хувь тооцох зөвшөөрөл"><input type="checkbox" ${on ? "checked" : ""} onchange="toggleEmployeePercentDiscount('${e.id}',this.checked)" class="w-4 h-4 rounded"><span class="${on ? "text-tone-success" : "text-muted-foreground"}">Хувь</span></label>`;
+  return `<div class="employee-pct-toggle shrink-0 flex items-center gap-1.5 text-xs" title="Хувь тооцох зөвшөөрөл"><span class="employee-pct-toggle__text ${on ? "text-tone-success" : "text-muted-foreground"}">Хувь</span><label class="perm-toggle perm-toggle--sm"><input type="checkbox"${on ? " checked" : ""} onchange="toggleEmployeePercentDiscount('${e.id}',this.checked)" aria-label="Хувь тооцох зөвшөөрөл"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label></div>`;
 }
 function toggleEmployeePercentDiscount(id, allowed) {
   if (!hasPermission("employees.edit")) return;
@@ -7579,7 +7619,10 @@ function render() {
     count: countView,
   };
   const view = map[state.currentView] || workerView;
+  const scrollSnap = captureRenderScroll();
   app.innerHTML = shell(view());
+  lastRenderedView = state.currentView;
+  restoreRenderScroll(scrollSnap);
   if (localStateDirty()) scheduleBackendSave();
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
@@ -7593,7 +7636,10 @@ function render() {
     requestAnimationFrame(scrollWorkerOrdersToDate);
   bindReceiptPrintWorkerPickerDismiss();
   if (state.currentView === "count" && !state.countDone) syncCountInputsFromState();
-  requestAnimationFrame(() => enhanceMobileNumericInputs(document));
+  requestAnimationFrame(() => {
+    enhanceMobileNumericInputs(document);
+    permApi()?.syncAllPermissionRowDeps?.();
+  });
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
   const titleId = opts.titleId || "modal-title",

@@ -10,7 +10,7 @@
   ];
 
   const PERM_MODULES = [
-    { id: "dashboard", label: "Dashboard", actions: ["view"] },
+    { id: "dashboard", label: "Админ самбар", actions: ["view"] },
     { id: "products", label: "Бараа", actions: ["view", "create", "edit", "delete"] },
     {
       id: "customers",
@@ -147,6 +147,42 @@
     return keys;
   }
 
+  function permToggleHtml(key, checked, ariaLabel, esc, actionId, disabled = false) {
+    const dis = disabled ? " disabled" : "";
+    const labelClass = disabled ? "perm-toggle is-disabled" : "perm-toggle";
+    return `<label class="${labelClass}"><input type="checkbox" name="permissions" value="${esc(key)}" data-perm-action="${esc(actionId)}"${checked ? " checked" : ""}${dis} aria-label="${esc(ariaLabel)}" onchange="TOMUDA_PERMISSIONS.syncPermissionRowDeps(this)"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label>`;
+  }
+
+  function syncPermissionRowDeps(changedInput) {
+    const row = changedInput?.closest?.(".perm-matrix__row");
+    if (!row || row.classList.contains("perm-matrix__row--head")) return;
+    const viewInput = row.querySelector(
+      'input[name="permissions"][data-perm-action="view"]',
+    );
+    if (!viewInput) return;
+    const viewOn = viewInput.checked;
+    row
+      .querySelectorAll('input[name="permissions"]:not([data-perm-action="view"])')
+      .forEach((el) => {
+        el.disabled = !viewOn;
+        el.closest(".perm-toggle")?.classList.toggle("is-disabled", !viewOn);
+        if (!viewOn) el.checked = false;
+      });
+  }
+
+  function syncAllPermissionRowDeps(root) {
+    const form = root || document.querySelector("[data-permissions-form]");
+    if (!form) return;
+    form
+      .querySelectorAll(".perm-matrix__row:not(.perm-matrix__row--head)")
+      .forEach((row) => {
+        const viewInput = row.querySelector(
+          'input[name="permissions"][data-perm-action="view"]',
+        );
+        if (viewInput) syncPermissionRowDeps(viewInput);
+      });
+  }
+
   function permissionsFieldHtml(selectedKeys = [], role = "sales", opts = {}) {
     const selected = new Set(normalizeKeys(selectedKeys));
     const esc =
@@ -164,20 +200,26 @@
       ? ""
       : `<button type="button" class="perm-panel__reset text-xs text-primary" onclick="syncEmployeePermissionsFromRole()">Эрхийг албан туслах (${esc(role || "sales")})</button>`;
     const headCells = PERM_ACTIONS.map(
-      (a) => `<th scope="col" class="perm-table__action">${esc(a.label)}</th>`,
+      (a) => `<span class="perm-matrix__head-action">${esc(a.label)}</span>`,
     ).join("");
     const rows = PERM_MODULES.map((mod) => {
+      const viewChecked = mod.actions.includes("view")
+        ? selected.has(permissionKey(mod.id, "view"))
+        : true;
       const cells = PERM_ACTIONS.map((action) => {
         if (!mod.actions.includes(action.id)) {
-          return `<td class="perm-table__cell perm-table__cell--na"><span class="perm-table__na" aria-hidden="true">—</span></td>`;
+          return `<div class="perm-matrix__cell perm-matrix__cell--na"><span class="perm-matrix__action-label">${esc(action.label)}</span><span class="perm-matrix__na" aria-hidden="true">—</span></div>`;
         }
         const key = permissionKey(mod.id, action.id);
-        const checked = selected.has(key) ? " checked" : "";
-        return `<td class="perm-table__cell"><label class="perm-table__check"><input type="checkbox" name="permissions" value="${esc(key)}"${checked} aria-label="${esc(mod.label)} — ${esc(action.label)}"><span class="perm-table__box" aria-hidden="true"></span></label></td>`;
+        const checked = selected.has(key);
+        const aria = `${mod.label} — ${action.label}`;
+        const disabled =
+          action.id !== "view" && mod.actions.includes("view") && !viewChecked;
+        return `<div class="perm-matrix__cell${disabled ? " perm-matrix__cell--disabled" : ""}"><span class="perm-matrix__action-label">${esc(action.label)}</span>${permToggleHtml(key, checked, aria, esc, action.id, disabled)}</div>`;
       }).join("");
-      return `<tr class="perm-table__row"><th scope="row" class="perm-table__module">${esc(mod.label)}</th>${cells}</tr>`;
+      return `<article class="perm-matrix__row" data-perm-module="${esc(mod.id)}"><h3 class="perm-matrix__module">${esc(mod.label)}</h3><div class="perm-matrix__cells">${cells}</div></article>`;
     }).join("");
-    return `<section class="perm-panel"${formAttr}><div class="perm-panel__head"><div><p class="perm-panel__title">Эрх (Permissions)</p><p class="perm-panel__hint">Модуль бүрт харах, нэмэх, засах, устгах эрхийг сонгоно.</p></div>${resetBtn}</div><div class="perm-table-wrap"><table class="perm-table"><thead class="perm-table__head"><tr><th scope="col" class="perm-table__module">Модуль</th>${headCells}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
+    return `<section class="perm-panel"${formAttr}><div class="perm-panel__head"><div><p class="perm-panel__title">Эрх</p><p class="perm-panel__hint">Модуль бүрт харах, нэмэх, засах, устгах эрхийг сонгоно.</p></div>${resetBtn}</div><div class="perm-matrix-wrap"><div class="perm-matrix"><div class="perm-matrix__row perm-matrix__row--head" aria-hidden="true"><span class="perm-matrix__module">Модуль</span>${headCells}</div>${rows}</div></div></section>`;
   }
 
   function templateForRole(role) {
@@ -208,6 +250,8 @@
     allowedNavForEmployee,
     permissionsFromForm,
     permissionsFieldHtml,
+    syncPermissionRowDeps,
+    syncAllPermissionRowDeps,
     templateForRole,
     mergePermissionsForEmployees,
   };
