@@ -550,13 +550,12 @@ function orderReceiptNum(o) {
   return o.id;
 }
 function formatReceiptNumber(o) {
-  const seq = orderReceiptNum(o);
-  const month = o.receiptMonth || receiptMonthKey(o);
-  if (month) {
-    const [y, m] = month.split("-");
-    return `${String(y).slice(-2)}${m}-${seq}`;
+  const day = isoDay(o?.createdAt || o?.deliveryDate || "");
+  if (day) {
+    const [y, m, d] = day.split("-");
+    return `${String(y).slice(-2)}${m}-${d}`;
   }
-  return String(seq);
+  return String(orderReceiptNum(o));
 }
 function receiptMoney(n) {
   return Number(n || 0).toLocaleString();
@@ -743,7 +742,7 @@ function buildNewOrder(fields) {
 function receiptNo(order, size = "md") {
   const n =
     typeof order === "object" && order !== null
-      ? orderReceiptNum(order)
+      ? formatReceiptNumber(order)
       : order;
   return `<span class="receipt-no receipt-no--${size}">№${esc(String(n))}</span>`;
 }
