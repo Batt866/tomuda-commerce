@@ -2488,7 +2488,7 @@ function pwaInAppEscapeSteps() {
   const android = isAndroidDevice();
   const ios = isIosDevice();
   if (android) {
-    return `<div class="tone tone--success tone--block text-sm mb-4"><b>Android:</b> APK файлыг татаад шууд суулгана. Instagram, Facebook дотор ч болно.</div>${androidApkInstallSteps()}`;
+    return `<div class="tone tone--success tone--block text-sm mb-4"><b>Android:</b> APK биш Chrome-ийн <b>Install app</b> ашиглаж суулгана.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span><b>Chrome дээр нээх</b> товч дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Chrome дээр баруун дээд <b>⋮</b> menu дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span><b>Install app</b> эсвэл <b>Add to Home screen</b> сонгоно</span></li></ol><button type="button" onclick="openInChrome()" class="w-full py-3 bg-primary text-primary-foreground rounded font-semibold">Chrome дээр нээх</button>`;
   }
   if (ios) {
     return `<div class="tone tone--danger tone--block text-sm mb-4"><b>${app} дотор суулгах боломжгүй!</b><br>Эхлээд Safari browser руу шилжинэ үү.</div><ol class="space-y-3 text-sm leading-relaxed mb-4"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээд баруун <b>⋯</b> (цэгүүд) дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Safari-аар нээх</b> / <b>Open in Safari</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Safari дээр доод <b>Хуваалцах □↑</b> → <b>Нүүр дэлгэцэнд нэмэх</b></span></li></ol><button type="button" onclick="copyAppLink()" class="w-full py-3 bg-primary text-primary-foreground rounded font-semibold">Link хуулах</button>`;
@@ -2536,19 +2536,6 @@ function showInstallToast(msg) {
 function showStockLimitToast() {
   showInstallToast("Үлдэгдэл хүрэхгүй байна");
 }
-function downloadAndroidApk() {
-  const url = apkDownloadUrl();
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "TOMUDA.apk";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  sessionStorage.setItem("tomuda-apk-downloaded", "1");
-  window.setTimeout(() => {
-    if (document.visibilityState !== "hidden") location.href = url;
-  }, 400);
-}
 async function triggerNativeInstallPrompt() {
   if (!pwaInstallPrompt) return false;
   try {
@@ -2581,7 +2568,7 @@ function showAndroidInstallCoach() {
   const el = document.createElement("div");
   el.id = "install-coach";
   el.className = "ios-install-coach";
-  el.innerHTML = `<div class="ios-install-coach-backdrop" onclick="dismissInstallCoach()"></div><div class="ios-install-coach-panel"><p class="ios-install-coach-title">📱 Android дээр суулгах</p><p class="ios-install-coach-step">1. Энэ хуудсыг <b>Chrome</b> browser дээр нээнэ</p><p class="ios-install-coach-step">2. Баруун дээд <b>⋮</b> menu дарна</p><p class="ios-install-coach-step">3. <b>Install app</b> эсвэл <b>Add to Home screen</b> сонгоно</p><p class="ios-install-coach-step">4. Нүүр дэлгэцээс <b>TOMUDA</b> app-аар нээнэ</p><button type="button" class="ios-install-coach-btn" onclick="openInChrome()">Chrome дээр нээх</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:var(--hex-secondary);color:var(--hex-foreground)" onclick="downloadAndroidApk()">APK татах</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:transparent;color:var(--hex-muted-foreground)" onclick="dismissInstallCoach()">Хаах</button></div>`;
+  el.innerHTML = `<div class="ios-install-coach-backdrop" onclick="dismissInstallCoach()"></div><div class="ios-install-coach-panel"><p class="ios-install-coach-title">📱 Android дээр суулгах</p><p class="ios-install-coach-step">1. Энэ хуудсыг <b>Chrome</b> browser дээр нээнэ</p><p class="ios-install-coach-step">2. Баруун дээд <b>⋮</b> menu дарна</p><p class="ios-install-coach-step">3. <b>Install app</b> эсвэл <b>Add to Home screen</b> сонгоно</p><p class="ios-install-coach-step">4. Нүүр дэлгэцээс <b>TOMUDA</b> app-аар нээнэ</p><button type="button" class="ios-install-coach-btn" onclick="openInChrome()">Chrome дээр нээх</button><button type="button" class="ios-install-coach-btn mt-2" style="margin-top:8px;background:transparent;color:var(--hex-muted-foreground)" onclick="dismissInstallCoach()">Хаах</button></div>`;
   document.body.appendChild(el);
   requestAnimationFrame(() => el.classList.add("ios-install-coach--visible"));
 }
@@ -2630,14 +2617,7 @@ function installAppOnPhone() {
   });
 }
 function checkPendingApkInstallCoach() {
-  if (
-    sessionStorage.getItem("tomuda-apk-downloaded") === "1" &&
-    isAndroidDevice() &&
-    !isNativeApp()
-  ) {
-    sessionStorage.removeItem("tomuda-apk-downloaded");
-    setTimeout(showAndroidInstallCoach, 800);
-  }
+  sessionStorage.removeItem("tomuda-apk-downloaded");
 }
 function tryAutoInstallFromRedirect() {
   const url = new URL(location.href);
@@ -2667,11 +2647,8 @@ function tryAutoInstallFromRedirect() {
   };
   setTimeout(attempt, 600);
 }
-function apkDownloadUrl() {
-  return "/static/tomuda/downloads/TOMUDA.apk";
-}
 function androidApkInstallSteps() {
-  return `<a href="${apkDownloadUrl()}" download="TOMUDA.apk" class="block w-full py-3 mb-4 bg-primary text-primary-foreground rounded font-semibold text-center no-underline">📥 TOMUDA.apk татах (Play Store шаардлаггүй)</a><ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Дээрх товчоор <b>APK файл</b> татна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span>Татсан файл дээр дарж <b>суулгана</b></span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>«Танихгүй эх үүсвэр» гэвэл <b>Зөвшөөрөх</b> дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">4</span><span>Нүүр дэлгэцээс <b>ТОМУДА</b> app-аар нээнэ</span></li></ol>`;
+  return `<ol class="space-y-3 text-sm leading-relaxed"><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">1</span><span>Chrome дээр баруун дээд <b>⋮</b> menu дарна</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">2</span><span><b>Install app</b> эсвэл <b>Add to Home screen</b> сонгоно</span></li><li class="flex gap-3"><span class="shrink-0 w-7 h-7 rounded-full bg-primary text-primary-foreground grid place-items-center font-bold">3</span><span>Нүүр дэлгэцээс <b>TOMUDA</b> app-аар нээнэ</span></li></ol>`;
 }
 function openInChrome() {
   const page = installUrlWithFlag();
@@ -10284,7 +10261,6 @@ Object.assign(window, {
   installPwaApp,
   dismissPwaInstall,
   installAppOnPhone,
-  downloadAndroidApk,
   dismissIosInstallCoach: dismissInstallCoach,
   dismissInstallCoach,
   showAndroidInstallCoach,
