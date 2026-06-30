@@ -1909,13 +1909,10 @@ function onAppPopState() {
   }
 }
 function tryExitApp() {
-  const App = window.Capacitor?.Plugins?.App;
-  if (App?.exitApp) {
-    App.exitApp();
-    return;
-  }
-  if (window.Capacitor?.isNativePlatform?.()) return;
-  history.back();
+  // Android gestures/back events can be triggered accidentally while working.
+  // Keep the app open instead of letting the native wrapper or browser exit.
+  showInstallToast("App хаагдахгүй. Цэснээс хэсгээ сонгоно уу.");
+  if (tombudaHistoryDepth === 0) armAppBackGuard();
 }
 function initAppBack() {
   if (window.__tomudaBackReady) return;
