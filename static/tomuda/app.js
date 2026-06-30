@@ -131,7 +131,30 @@ function mnDistrictsForProvince(province) {
     a.localeCompare(b, "mn"),
   );
 }
+const UB_DISTRICT_KHOROO_COUNTS = {
+  Багахангай: 2,
+  Багануур: 5,
+  Баянгол: 34,
+  Баянзүрх: 43,
+  Чингэлтэй: 24,
+  "Хан-Уул": 25,
+  Налайх: 8,
+  Сонгинохайрхан: 43,
+  Сүхбаатар: 20,
+};
+function mnNumberedUnits(prefix, count) {
+  if (!count || count < 1) return [];
+  return Array.from({ length: count }, (_, i) => `${i + 1}-р ${prefix}`);
+}
+function mnKhoroosForUbDistrict(district) {
+  const count = UB_DISTRICT_KHOROO_COUNTS[district];
+  return count ? mnNumberedUnits("хороо", count) : [];
+}
 function mnSubsForDistrict(province, district) {
+  if (province === "Улаанбаатар" && district) {
+    const khoroos = mnKhoroosForUbDistrict(district);
+    if (khoroos.length) return khoroos;
+  }
   if (!mnLocations || !province || !district) return [];
   return mnLocations[province]?.[district] || [];
 }
@@ -5524,7 +5547,7 @@ function countView() {
         .join(
           "",
         )}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
-  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}${countListPanel}<div class="grid grid-cols-2 gap-2"><button onclick="finishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
+  return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}${countListPanel}<div class="grid grid-cols-2 gap-2"><button onclick="confirmFinishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
   const stats = countProductStats(p),
@@ -6535,6 +6558,18 @@ function confirmCountExcel() {
   if (!state.countDone) return alert("Эхлээд тооллогоо дуусгана уу");
   if (!countExcelRows().length) return alert("Тоолсон бараа байхгүй");
   confirmDataExport("Excel татах", exportCountExcel);
+}
+function confirmFinishCount() {
+  if (!countSessionActive()) {
+    return alert("Тоолсон тоо оруулна уу");
+  }
+  if (!Object.keys(state.countQty).some((id) => countValue(id) !== null)) {
+    return alert("Тоолсон тоо оруулна уу");
+  }
+  confirmModal("Тооллого дуусгах", "Тооллогыг дуусгаж хадгалах уу?", {
+    confirmLabel: "Дуусгах",
+    onConfirm: finishCount,
+  });
 }
 function finishCount() {
   if (!countSessionActive()) {
@@ -10914,6 +10949,7 @@ Object.assign(window, {
   setPaymentTerm,
   csv,
   finishCount,
+  confirmFinishCount,
   confirmNewCount,
   confirmCountExcel,
   exportCountExcel,
