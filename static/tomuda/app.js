@@ -3898,7 +3898,7 @@ function customerDetailHtml(c, id) {
       customerCardPinIcon(),
     ),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div><footer class="customer-detail__actions"><button type="button" onclick="confirmEditCustomer('${esc(id)}')" class="btn btn--primary btn--block">Засах</button></footer></div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div><footer class="customer-detail__actions">${editIconButton({ className: "btn btn--primary btn--block btn--icon-label", attrs: `onclick="confirmEditCustomer('${esc(id)}')"`, label: "Харилцагч засах" })}</footer></div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -3908,6 +3908,27 @@ function customerSubtitle(c) {
   if (rd) parts.push(`РД: ${rd}`);
   if (company && company !== name) parts.push(company);
   return parts.join(" · ");
+}
+const ACTION_EDIT_ICON = `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5z"/></svg>`;
+const ACTION_DELETE_ICON = `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>`;
+function actionIconButton({ className, label, attrs = "", icon }) {
+  return `<button type="button" ${attrs} class="${className}" aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
+}
+function editIconButton({ className, attrs = "", label = "Засах" }) {
+  return actionIconButton({
+    className,
+    label,
+    attrs,
+    icon: ACTION_EDIT_ICON,
+  });
+}
+function deleteIconButton({ className, attrs = "", label = "Устгах" }) {
+  return actionIconButton({
+    className,
+    label,
+    attrs,
+    icon: ACTION_DELETE_ICON,
+  });
 }
 function customerRegistrationDisplay(c) {
   return String(c?.registrationNumber || "").trim();
@@ -4510,11 +4531,15 @@ function customerAddress(c) {
 }
 function customerRow(c) {
   const deleteBtn = canDelete()
-    ? `<button type="button" data-confirm-delete="customer" data-id="${esc(c.id)}" class="customer-card__btn customer-card__btn--danger">Устгах</button>`
+    ? deleteIconButton({
+        className: "customer-card__btn customer-card__btn--danger",
+        attrs: `data-confirm-delete="customer" data-id="${esc(c.id)}"`,
+        label: "Харилцагч устгах",
+      })
     : "";
   return customerListRow(
     c,
-    `<button type="button" onclick="customerDetail('${c.id}')" class="customer-card__btn customer-card__btn--ghost">Харах</button><button type="button" onclick="confirmEditCustomer('${c.id}')" class="customer-card__btn customer-card__btn--primary">Засах</button>${deleteBtn}`,
+    `<button type="button" onclick="customerDetail('${esc(c.id)}')" class="customer-card__btn customer-card__btn--ghost">Харах</button>${editIconButton({ className: "customer-card__btn customer-card__btn--primary", attrs: `onclick="confirmEditCustomer('${esc(c.id)}')"`, label: "Харилцагч засах" })}${deleteBtn}`,
   );
 }
 function workerPickCard(c) {
@@ -4599,7 +4624,7 @@ function productDetailHtml(p, id) {
     rows.push(productDetailRow("Анхааруулах үлдэгдэл", `${minStock} ${unit}`));
   }
   const editBtn = canManageProducts()
-    ? `<footer class="customer-detail__actions"><button type="button" onclick="confirmEditProduct('${esc(id)}')" class="btn btn--primary btn--block">Засах</button></footer>`
+    ? `<footer class="customer-detail__actions">${editIconButton({ className: "btn btn--primary btn--block btn--icon-label", attrs: `onclick="confirmEditProduct('${esc(id)}')"`, label: "Бараа засах" })}</footer>`
     : "";
   return `<div class="customer-detail product-detail"><header class="customer-detail__hero"><img src="${productImage(p)}" alt="${esc(p.name)}" class="customer-detail__avatar product-detail__img"><div class="customer-detail__hero-text"><p class="customer-detail__company">${esc(p.name)}</p>${p.category ? `<span class="customer-detail__badge">${esc(p.category)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows.join("")}</div>${editBtn}</div>`;
 }
@@ -4611,7 +4636,7 @@ function productDetail(id) {
 function productCard(p) {
   const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
   const adminActions = canManageProducts()
-    ? `<div class="product-card__actions" onclick="event.stopPropagation()"><button type="button" onclick="confirmEditProduct('${esc(p.id)}')" class="product-card__action-btn product-card__action-btn--edit" aria-label="Бараа засах" title="Засах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5z"/></svg></button><button type="button" data-confirm-delete="product" data-id="${esc(p.id)}" class="product-card__action-btn product-card__action-btn--delete" aria-label="Бараа устгах" title="Устгах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button></div>`
+    ? `<div class="product-card__actions" onclick="event.stopPropagation()">${editIconButton({ className: "product-card__action-btn product-card__action-btn--edit", attrs: `onclick="confirmEditProduct('${esc(p.id)}')"`, label: "Бараа засах" })}${deleteIconButton({ className: "product-card__action-btn product-card__action-btn--delete", attrs: `data-confirm-delete="product" data-id="${esc(p.id)}"`, label: "Бараа устгах" })}</div>`
     : "";
   const costLine = isAdmin()
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
@@ -6643,7 +6668,7 @@ function promotionQtyRuleCard(r, i) {
           `<img src="${productImage(p)}" class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
-  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('quantity',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
+  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -6684,10 +6709,10 @@ function promotionPaymentPanel(rows) {
   return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн хэлбэр (бэлэн эсвэл дансаар) сонгосон үед хөнгөлөлт эсвэл үнэгүй бараа олгоно.</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionPaymentRuleCard(r, i) {
-  return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('payment',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
+  return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('payment',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
 }
 function promotionPriceRuleCard(r, i) {
-  return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPriceRuleText(r)}</p></div>${canDelete() ? `<button onclick="confirmRemovePromotionRule('price',${i})" class="px-3 py-2 tone tone--danger rounded text-sm shrink-0">Устгах</button>` : ""}</div>`;
+  return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPriceRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('price',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
 }
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
@@ -7231,11 +7256,19 @@ function employeeListHead() {
 function employeeRow(e) {
   const canEdit = hasPermission("employees.edit");
   const editBtn = canEdit
-    ? `<button type="button" onclick="confirmEditEmployee('${esc(e.id)}')" class="employee-card__btn employee-card__btn--ghost">Засах</button>`
+    ? editIconButton({
+        className: "employee-card__btn employee-card__btn--ghost",
+        attrs: `onclick="confirmEditEmployee('${esc(e.id)}')"`,
+        label: "Ажилтан засах",
+      })
     : "";
   const deleteBtn =
     canEdit && canDelete()
-      ? `<button type="button" data-confirm-delete="employee" data-id="${esc(e.id)}" class="employee-card__btn employee-card__btn--danger">Устгах</button>`
+      ? deleteIconButton({
+          className: "employee-card__btn employee-card__btn--danger",
+          attrs: `data-confirm-delete="employee" data-id="${esc(e.id)}"`,
+          label: "Ажилтан устгах",
+        })
       : "";
   const pctToggle = canEdit ? employeePercentDiscountToggle(e) : "";
   const meta = `${role(e.role)} · ${e.email || "-"} · ${employeePermissionSummary(e)}`;
@@ -8745,7 +8778,11 @@ function categoryModal() {
       const action =
         count > 0
           ? `<span class="category-row__meta">${count} бараа</span>`
-          : `<button type="button" onclick="confirmDeleteCategory('${esc(cat)}')" class="category-row__delete">Устгах</button>`;
+          : deleteIconButton({
+              className: "category-row__delete",
+              attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
+              label: "Төрөл устгах",
+            });
       return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span>${action}</div>`;
     })
     .join("");

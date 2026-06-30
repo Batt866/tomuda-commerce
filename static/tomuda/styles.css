@@ -1061,6 +1061,27 @@ a.customer-card__line .customer-card__icon {
   box-shadow: none !important;
 }
 
+.customer-card__btn:has(.ui-icon),
+.employee-card__btn:has(.ui-icon) {
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+}
+
+.customer-card__btn .ui-icon,
+.employee-card__btn .ui-icon,
+.category-row__delete .ui-icon,
+.icon-action-btn .ui-icon,
+.btn--icon-label .ui-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .customer-card__btn--ghost {
   background: var(--hex-secondary);
   color: var(--hex-foreground);
@@ -1072,8 +1093,9 @@ a.customer-card__line .customer-card__icon {
 }
 
 .customer-card__btn--danger {
-  background: var(--hex-danger-soft);
-  color: var(--hex-danger-text);
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  border: 1px solid var(--hex-border);
 }
 
 .worker-pick {
@@ -1624,8 +1646,9 @@ a.customer-card__line .customer-card__icon {
 }
 
 .employee-card__btn--danger {
-  background: var(--hex-danger-soft);
-  color: var(--hex-danger-text);
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  border: 1px solid var(--hex-border);
 }
 
 .employee-card__actions .employee-pct-toggle {
@@ -1840,8 +1863,9 @@ a.customer-card__line .customer-card__icon {
 }
 
 .product-card__action-btn--delete {
-  background: var(--hex-danger);
-  color: #fff;
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  border: 1px solid var(--hex-border);
 }
 
 @media (min-width: 1024px) {
@@ -2360,18 +2384,45 @@ a.customer-card__line .customer-card__icon {
 
 .category-row__delete {
   flex-shrink: 0;
-  padding: 6px 12px;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--hex-border);
   border-radius: 8px;
-  font-size: 0.8rem;
+  font-size: 0;
   font-weight: 600;
-  color: #fff;
-  background: #dc2626;
+  color: var(--hex-foreground);
+  background: var(--hex-card);
   cursor: pointer;
 }
 
 .category-row__delete:active {
   opacity: 0.85;
+}
+
+.icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: 1px solid var(--hex-border);
+  border-radius: 8px;
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none !important;
+}
+
+.icon-action-btn--neutral {
+  background: var(--hex-card);
+  color: var(--hex-foreground);
 }
 
 @media (min-width: 640px) {
