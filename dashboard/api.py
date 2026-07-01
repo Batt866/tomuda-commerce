@@ -26,6 +26,7 @@ from dashboard.permissions import (
     _order_within_retention,
 )
 from dashboard.seed_data import default_state
+from dashboard.state_sanitize import sanitize_app_state
 
 api = NinjaAPI(title="Tomuda API")
 
@@ -56,7 +57,11 @@ def get_state(request):
         key="main",
         defaults={"data": default_state()},
     )
-    return {"ok": True, "state": row.data, "updatedAt": row.updated_at.isoformat()}
+    data, changed = sanitize_app_state(row.data or default_state())
+    if changed:
+        row.data = data
+        row.save(update_fields=["data", "updated_at"])
+    return {"ok": True, "state": data, "updatedAt": row.updated_at.isoformat()}
 
 
 def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
@@ -71,6 +76,7 @@ def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
 @api.post("/state")
 def save_state(request, payload: dict[str, Any] = Body(...)):
     data = _retained_orders_state(payload.get("state", payload))
+    data, _ = sanitize_app_state(data)
     actor = payload.get("actor")
     row, _ = AppState.objects.get_or_create(
         key="main",

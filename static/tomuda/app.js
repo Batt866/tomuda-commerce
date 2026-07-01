@@ -265,10 +265,16 @@ let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
 const BACKEND_POLL_MS = 4000;
-const BOOT_WAKE_MAX = 18;
-const BOOT_WAKE_BASE_MS = 5000;
-const BOOT_STATE_MAX = 6;
-const BOOT_STATE_BASE_MS = 3000;
+const BOOT_WAKE_MAX = 20;
+const BOOT_WAKE_BASE_MS = 2500;
+const BOOT_STATE_MAX = 5;
+const BOOT_STATE_BASE_MS = 2000;
+const BOOT_HEALTH_TIMEOUT_MS = 25000;
+const BOOT_STATE_TIMEOUT_MS = 90000;
+const LOCAL_BACKEND_CACHE_KEY = "tomuda-backend-cache";
+const LOCAL_BACKEND_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const LOCAL_BACKEND_CACHE_MAX_BYTES = 4 * 1024 * 1024;
+const MAX_INLINE_IMAGE_CHARS = 180000;
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -283,7 +289,7 @@ function setBootStatus(title, detail) {
   }
   if (detailEl) detailEl.textContent = detail || BOOT_LOADING_TEXT;
 }
-async function fetchJsonWithTimeout(url, ms = 90000) {
+async function fetchJsonWithTimeout(url, ms = BOOT_HEALTH_TIMEOUT_MS) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
@@ -298,16 +304,30 @@ async function fetchJsonWithTimeout(url, ms = 90000) {
     clearTimeout(timer);
   }
 }
+function wakeRetryDelayMs(attempt) {
+  if (attempt < 2) return 1500;
+  if (attempt < 5) return 2500;
+  return BOOT_WAKE_BASE_MS + attempt * 400;
+}
 async function wakeBackendWithRetry() {
   for (let attempt = 0; attempt < BOOT_WAKE_MAX; attempt++) {
+    setBootStatus(
+      BOOT_TITLE_TEXT,
+      attempt === 0
+        ? "Сервер асаж байна. 1–2 минут хүлээгдэнэ..."
+        : `Дахин холбогдож байна (${attempt + 1}/${BOOT_WAKE_MAX})...`,
+    );
     try {
-      const payload = await fetchJsonWithTimeout(`${API_BASE}/health`, 90000);
+      const payload = await fetchJsonWithTimeout(
+        `${API_BASE}/health`,
+        BOOT_HEALTH_TIMEOUT_MS,
+      );
       if (payload?.ok) return true;
     } catch (error) {
       console.warn("Backend wake failed", error, attempt + 1);
     }
     if (attempt < BOOT_WAKE_MAX - 1) {
-      await sleep(BOOT_WAKE_BASE_MS + attempt * 800);
+      await sleep(wakeRetryDelayMs(attempt));
     }
   }
   return false;
@@ -315,14 +335,23 @@ async function wakeBackendWithRetry() {
 async function fetchBackendStateWithRetry() {
   if (!(await wakeBackendWithRetry())) return null;
   for (let attempt = 0; attempt < BOOT_STATE_MAX; attempt++) {
+    setBootStatus(
+      BOOT_TITLE_TEXT,
+      attempt === 0
+        ? "Мэдээлэл татаж байна..."
+        : `Мэдээлэл дахин татаж байна (${attempt + 1}/${BOOT_STATE_MAX})...`,
+    );
     try {
-      const payload = await fetchJsonWithTimeout(`${API_BASE}/state`, 90000);
+      const payload = await fetchJsonWithTimeout(
+        `${API_BASE}/state`,
+        BOOT_STATE_TIMEOUT_MS,
+      );
       if (payload?.state) return payload;
     } catch (error) {
       console.warn("Backend state load failed", error, attempt + 1);
     }
     if (attempt < BOOT_STATE_MAX - 1) {
-      await sleep(BOOT_STATE_BASE_MS + attempt * 1000);
+      await sleep(BOOT_STATE_BASE_MS + attempt * 800);
     }
   }
   return null;
@@ -1617,6 +1646,41 @@ function persistentState() {
 }
 const LOCAL_PENDING_STATE_KEY = "tomuda-pending-state";
 const LOCAL_ORDERS_BACKUP_KEY = "tomuda-orders-backup";
+function readLocalBackendCache() {
+  try {
+    const raw = localStorage.getItem(LOCAL_BACKEND_CACHE_KEY);
+    if (!raw || raw.length > LOCAL_BACKEND_CACHE_MAX_BYTES) return null;
+    const parsed = JSON.parse(raw);
+    const savedAt = Date.parse(parsed?.savedAt || "");
+    if (!parsed?.state || typeof parsed.state !== "object") return null;
+    if (!Number.isFinite(savedAt)) return null;
+    if (Date.now() - savedAt > LOCAL_BACKEND_CACHE_MAX_AGE_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function saveLocalBackendCache(payload) {
+  if (!payload?.state) return;
+  try {
+    const snapshot = {
+      state: payload.state,
+      updatedAt: payload.updatedAt || "",
+      savedAt: new Date().toISOString(),
+    };
+    const raw = JSON.stringify(snapshot);
+    if (raw.length > LOCAL_BACKEND_CACHE_MAX_BYTES) return;
+    localStorage.setItem(LOCAL_BACKEND_CACHE_KEY, raw);
+  } catch (error) {
+    console.warn("Backend cache save failed", error);
+  }
+}
+function mergeBootState(serverState) {
+  const pendingState = readLocalPendingState();
+  const ordersBackup = readLocalOrdersBackup();
+  if (!pendingState && !ordersBackup.length) return serverState;
+  return mergeBootPersistentState(serverState, pendingState, ordersBackup);
+}
 function saveLocalPendingState() {
   try {
     localStorage.setItem(
@@ -2065,6 +2129,7 @@ function applyRemoteState(payload) {
   normalizeOrderTotals();
   syncBackendSaveMarker();
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+  saveLocalBackendCache({ state: merged, updatedAt: payload.updatedAt || "" });
   render();
   if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
@@ -2118,64 +2183,70 @@ function showBootRetry() {
   document.querySelector(".boot-screen")?.classList.add("boot-screen--error");
   document.getElementById("boot-retry")?.classList.remove("hidden");
 }
+function completeBootUiInit() {
+  backendReady = true;
+  ensureEmployeeEmails();
+  ensureSettings();
+  ensureEmployeePercentDiscount();
+  ensureDeliverySelection();
+  normalizeOrderReceiptNumbers();
+  normalizeOrderPayments();
+  normalizeOrderDeliveryDates();
+  normalizeOrderTotals();
+  state.workerQty = {};
+  restoreAuthSession();
+  initNoZoom();
+  initNestedScrollChain();
+  initPickerModalActions();
+  initEmployeeModalActions();
+  initQtyStepperButtons();
+  initCountInputHandlers();
+  initStockInInputHandlers();
+  initExcelImportHandlers();
+  initConfirmCard();
+  initConfirmDeleteActions();
+  initImageLightbox();
+  initPageUnloadPersist();
+  initAppBack();
+  window.__tomudaBooted = true;
+  render();
+  initPwa();
+  startBackendPoll();
+}
 async function boot() {
   try {
     app.innerHTML = bootScreenHtml();
+    let bootUiReady = false;
+    const cached = readLocalBackendCache();
+    if (cached?.state) {
+      syncBackendMarkers(cached, mergeBootState(cached.state));
+      completeBootUiInit();
+      bootUiReady = true;
+      setBootStatus("Шинэчилж байна", "Серверийн мэдээлэл шалгаж байна...");
+    }
+
     const payload = await fetchBackendStateWithRetry();
     if (payload?.state) {
-      syncBackendMarkers(payload, payload.state);
-      const pendingState = readLocalPendingState();
-      const ordersBackup = readLocalOrdersBackup();
-      if (pendingState || ordersBackup.length) {
-        try {
-          applyPersistentState(
-            mergeBootPersistentState(
-              persistentState(),
-              pendingState,
-              ordersBackup,
-            ),
-          );
-        } catch (error) {
-          console.warn("Pending state restore failed", error);
-          clearOrderPersistenceCache();
-        }
+      syncBackendMarkers(payload, mergeBootState(payload.state));
+      saveLocalBackendCache(payload);
+      if (!bootUiReady) {
+        completeBootUiInit();
+      } else {
+        render();
       }
-    } else {
-      setBootStatus(
-        "Холбогдож чадсангүй",
-        "Сервер асаж дуусаагүй байж болно. 2 минут хүлээгээд «Дахин оролдох» дарна уу.",
-      );
-      showBootRetry();
       return;
     }
-    backendReady = true;
-    ensureEmployeeEmails();
-    ensureSettings();
-    ensureEmployeePercentDiscount();
-    ensureDeliverySelection();
-    normalizeOrderReceiptNumbers();
-    normalizeOrderPayments();
-    normalizeOrderDeliveryDates();
-    normalizeOrderTotals();
-    state.workerQty = {};
-    restoreAuthSession();
-    initNoZoom();
-    initNestedScrollChain();
-    initPickerModalActions();
-    initEmployeeModalActions();
-    initQtyStepperButtons();
-    initCountInputHandlers();
-    initStockInInputHandlers();
-    initExcelImportHandlers();
-    initConfirmCard();
-    initConfirmDeleteActions();
-    initImageLightbox();
-    initPageUnloadPersist();
-    initAppBack();
-    window.__tomudaBooted = true;
-    render();
-    initPwa();
-    startBackendPoll();
+
+    if (bootUiReady) {
+      console.warn("Fresh backend state unavailable; using cached copy.");
+      return;
+    }
+
+    setBootStatus(
+      "Холбогдож чадсангүй",
+      "Сервер асаж дуусаагүй байж болно. 1–2 минут хүлээгээд «Дахин оролдох» дарна уу.",
+    );
+    showBootRetry();
   } catch (err) {
     console.error("Boot failed", err);
     setBootStatus(
@@ -4388,28 +4459,73 @@ function initCustomerImageField(c) {
   if (value) value.value = c.image || "";
   if (preview) preview.src = c.image || customerStoreImage(c);
 }
+function compressImageFile(
+  file,
+  { maxSize = 960, quality = 0.82, maxBytes = MAX_INLINE_IMAGE_CHARS } = {},
+) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("image decode failed"));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const scale = Math.min(1, maxSize / Math.max(width, height, 1));
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("canvas unavailable"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        let q = quality;
+        let dataUrl = canvas.toDataURL("image/jpeg", q);
+        while (dataUrl.length > maxBytes && q > 0.45) {
+          q -= 0.08;
+          dataUrl = canvas.toDataURL("image/jpeg", q);
+        }
+        if (dataUrl.length > maxBytes) {
+          reject(new Error("image too large"));
+          return;
+        }
+        resolve(dataUrl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 function handleCustomerImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const value = document.getElementById("customerImageValue"),
-      preview = document.getElementById("customerImagePreview");
-    if (value) value.value = reader.result;
-    if (preview) preview.src = reader.result;
-    const removeBtn = input
-      .closest(".customer-image-upload__actions")
-      ?.querySelector('[onclick="clearCustomerImage()"]');
-    if (!removeBtn) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn btn--secondary btn--sm";
-      btn.textContent = "Зураг арилгах";
-      btn.onclick = clearCustomerImage;
-      input.closest(".customer-image-upload__actions")?.appendChild(btn);
-    }
-  };
-  reader.readAsDataURL(file);
+  compressImageFile(file)
+    .then((dataUrl) => {
+      const value = document.getElementById("customerImageValue"),
+        preview = document.getElementById("customerImagePreview");
+      if (value) value.value = dataUrl;
+      if (preview) preview.src = dataUrl;
+      const removeBtn = input
+        .closest(".customer-image-upload__actions")
+        ?.querySelector('[onclick="clearCustomerImage()"]');
+      if (!removeBtn) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn--secondary btn--sm";
+        btn.textContent = "Зураг арилгах";
+        btn.onclick = clearCustomerImage;
+        input.closest(".customer-image-upload__actions")?.appendChild(btn);
+      }
+    })
+    .catch((error) => {
+      console.warn("Customer image compress failed", error);
+      alert("Зураг уншиж чадсангүй");
+    });
 }
 function clearCustomerImage() {
   const value = document.getElementById("customerImageValue"),
@@ -8334,25 +8450,28 @@ function initEmployeeImageField(e = {}) {
 function handleEmployeeImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const value = document.getElementById("employeeImageValue"),
-      preview = document.getElementById("employeeImagePreview");
-    if (value) value.value = reader.result;
-    if (preview) preview.src = reader.result;
-    const removeBtn = input
-      .closest(".customer-image-upload__actions")
-      ?.querySelector('[onclick="clearEmployeeImage()"]');
-    if (!removeBtn) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "btn btn--secondary btn--sm";
-      btn.textContent = "Зураг арилгах";
-      btn.onclick = clearEmployeeImage;
-      input.closest(".customer-image-upload__actions")?.appendChild(btn);
-    }
-  };
-  reader.readAsDataURL(file);
+  compressImageFile(file)
+    .then((dataUrl) => {
+      const value = document.getElementById("employeeImageValue"),
+        preview = document.getElementById("employeeImagePreview");
+      if (value) value.value = dataUrl;
+      if (preview) preview.src = dataUrl;
+      const removeBtn = input
+        .closest(".customer-image-upload__actions")
+        ?.querySelector('[onclick="clearEmployeeImage()"]');
+      if (!removeBtn) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn--secondary btn--sm";
+        btn.textContent = "Зураг арилгах";
+        btn.onclick = clearEmployeeImage;
+        input.closest(".customer-image-upload__actions")?.appendChild(btn);
+      }
+    })
+    .catch((error) => {
+      console.warn("Employee image compress failed", error);
+      alert("Зураг уншиж чадсангүй");
+    });
 }
 function clearEmployeeImage() {
   const value = document.getElementById("employeeImageValue"),
@@ -9789,14 +9908,17 @@ function productModal(id) {
 function handleProductImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const value = document.getElementById("productImageValue"),
-      preview = document.getElementById("productImagePreview");
-    if (value) value.value = reader.result;
-    if (preview) preview.src = reader.result;
-  };
-  reader.readAsDataURL(file);
+  compressImageFile(file)
+    .then((dataUrl) => {
+      const value = document.getElementById("productImageValue"),
+        preview = document.getElementById("productImagePreview");
+      if (value) value.value = dataUrl;
+      if (preview) preview.src = dataUrl;
+    })
+    .catch((error) => {
+      console.warn("Product image compress failed", error);
+      alert("Зураг хэт том байна. Жижиг зураг сонгоно уу.");
+    });
 }
 let productBarcodeLookupId = 0;
 let lesRegistryIndex = null;
