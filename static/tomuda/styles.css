@@ -4754,6 +4754,21 @@ input::placeholder, textarea::placeholder {
   box-sizing: border-box;
 }
 
+.stock-in-entry-row__img {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  display: block;
+  border-radius: 0;
+  object-fit: contain;
+  object-position: center;
+  padding: 6px;
+  box-sizing: border-box;
+  border: none;
+  box-shadow: none;
+  background: var(--hex-secondary);
+}
+
 .stock-in-entry-row__inputs {
   display: flex;
   flex-direction: column;
@@ -4786,6 +4801,26 @@ input::placeholder, textarea::placeholder {
   font-variant-numeric: tabular-nums;
 }
 
+.stock-in-entry-row__cost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--field-h);
+  padding: 8px 6px;
+  border-radius: var(--btn-radius);
+  background: color-mix(in srgb, var(--hex-secondary) 70%, var(--hex-card));
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  text-align: center;
+}
+
+.stock-in-entry-row__cost--empty {
+  color: var(--hex-muted-foreground);
+  font-weight: 600;
+}
+
 .stock-in-entry-cat {
   padding: 10px 16px;
   border-bottom: 1px solid var(--hex-border);
@@ -4802,7 +4837,7 @@ input::placeholder, textarea::placeholder {
 
 @media (max-width: 639px) {
   .stock-in-entry-row {
-    grid-template-columns: 64px minmax(0, 1fr) 88px;
+    grid-template-columns: 80px minmax(0, 1fr) 88px;
     gap: 8px 10px;
     padding: 10px;
   }
@@ -4811,14 +4846,10 @@ input::placeholder, textarea::placeholder {
     width: 88px;
   }
 
-  .stock-in-entry-row__input {
+  .stock-in-entry-row__input,
+  .stock-in-entry-row__cost {
     padding: 7px 4px;
     font-size: 13px;
-  }
-
-  .inventory-stock-row__thumb {
-    width: 64px;
-    height: 64px;
   }
 }
 

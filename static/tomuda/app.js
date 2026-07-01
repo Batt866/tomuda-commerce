@@ -5468,9 +5468,6 @@ function stockInLineQty(p) {
   return pieces;
 }
 function stockInLineCost(p) {
-  const d = state.stockInDraft[p.id] || {};
-  const custom = Number(d.costPrice);
-  if (Number.isFinite(custom) && custom > 0) return custom;
   return productCostPrice(p) || 0;
 }
 function stockInHasEntries() {
@@ -5577,7 +5574,7 @@ function finishStockIn() {
     const qty = stockInLineQty(p);
     if (qty <= 0) continue;
     if (!stockInLineCost(p)) {
-      alert(`${p.name}: Өртөг үнэ оруулна уу`);
+      alert(`${p.name}: Барааны өртөг үнэ тохируулаагүй байна. Бараа цэснээс өртөг үнэ оруулна уу.`);
       return;
     }
   }
@@ -5627,16 +5624,12 @@ function stockInEntryRow(p) {
   const packSize = productPackSize(p);
   const packsVal = d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
   const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
-  const costVal =
-    d.costPrice != null && d.costPrice !== ""
-      ? esc(String(d.costPrice))
-      : productCostPrice(p)
-        ? esc(String(productCostPrice(p)))
-        : "";
+  const cost = stockInLineCost(p);
+  const costText = cost ? fmt(cost) : "—";
   const packField = packSize
     ? `<label class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Багц</span><input data-stock-in-pack data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="stock-in-entry-row__input app-input" aria-label="${esc(p.name)} багц"></label>`
     : "";
-  return `<div class="stock-in-entry-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="inventory-stock-row__thumb" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div><div class="stock-in-entry-row__inputs">${packField}<label class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Тоо</span><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-entry-row__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label><label class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Өртөг</span><input data-stock-in-cost data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${costVal}" placeholder="0" class="stock-in-entry-row__input app-input" aria-label="${esc(p.name)} өртөг үнэ"></label></div></div>`;
+  return `<div class="stock-in-entry-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div><div class="stock-in-entry-row__inputs">${packField}<label class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Тоо</span><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-entry-row__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label><div class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Өртөг</span><span class="stock-in-entry-row__cost${cost ? "" : " stock-in-entry-row__cost--empty"}">${costText}</span></div></div></div>`;
 }
 function stockInReceiptRow(line) {
   return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
@@ -5656,7 +5649,7 @@ function stockInEntryList(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа сонгоод баруун талд тоо, өртөг оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа сонгоод баруун талд тоо оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -5779,15 +5772,6 @@ function initStockInInputHandlers() {
           qty.getAttribute("data-product-id") || "",
           "qty",
           qty.value,
-        );
-        return;
-      }
-      const cost = e.target.closest?.("[data-stock-in-cost]");
-      if (cost) {
-        stockInDraftInput(
-          cost.getAttribute("data-product-id") || "",
-          "costPrice",
-          cost.value,
         );
       }
     },
