@@ -11025,69 +11025,35 @@ body.image-lightbox-open {
 
 /* ── Excel import ── */
 .excel-import-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  gap: 10px;
-  padding: 0 16px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 16px 12px;
 }
 
 .excel-import-toolbar__btn {
-  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 5px;
 }
 
-.excel-import-dropzone {
-  flex: 1 1 260px;
-  min-height: 72px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1.5px dashed var(--hex-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--hex-secondary) 35%, var(--hex-card));
-  color: var(--hex-muted-foreground);
-  text-align: center;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.15s ease;
+.excel-import-toolbar__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.excel-import-dropzone.is-dragover,
-.excel-import-dropzone:focus-visible {
-  border-color: var(--hex-primary);
-  background: color-mix(in srgb, var(--hex-primary) 8%, var(--hex-card));
-  outline: none;
-}
-
-.excel-import-dropzone__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--hex-primary) 12%, var(--hex-card));
-  color: var(--hex-primary);
-}
-
-.excel-import-dropzone__svg {
-  width: 20px;
-  height: 20px;
-}
-
-.excel-import-dropzone__text {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--hex-foreground);
-}
-
-.excel-import-dropzone__hint {
-  font-size: 11px;
+.excel-import-toolbar.is-dragover {
+  border-radius: 12px;
+  outline: 2px dashed var(--hex-primary);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--hex-primary) 6%, transparent);
 }
 
 .import-loading-overlay {
@@ -11221,13 +11187,9 @@ body.image-lightbox-open {
 }
 
 @media (max-width: 639px) {
-  .excel-import-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .excel-import-toolbar__btn {
-    width: 100%;
+    font-size: 11px;
+    padding: 0 8px;
   }
 
   .import-report__stats {
