@@ -4805,15 +4805,20 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: var(--field-h);
-  padding: 8px 6px;
-  border-radius: var(--btn-radius);
+  min-height: 0;
+  padding: 4px 5px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--hex-secondary) 70%, var(--hex-card));
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: var(--hex-foreground);
   text-align: center;
+}
+
+.stock-in-entry-row__field:has(.stock-in-entry-row__cost) {
+  gap: 2px;
 }
 
 .stock-in-entry-row__cost--empty {
@@ -4846,10 +4851,14 @@ input::placeholder, textarea::placeholder {
     width: 88px;
   }
 
-  .stock-in-entry-row__input,
-  .stock-in-entry-row__cost {
+  .stock-in-entry-row__input {
     padding: 7px 4px;
     font-size: 13px;
+  }
+
+  .stock-in-entry-row__cost {
+    padding: 3px 4px;
+    font-size: 10px;
   }
 }
 
