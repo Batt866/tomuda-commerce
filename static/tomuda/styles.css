@@ -4746,29 +4746,27 @@ input::placeholder, textarea::placeholder {
 
 .stock-in-entry-row {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) auto;
+  grid-template-columns: 80px minmax(0, 1fr) 96px;
   gap: 10px 12px;
   padding: 12px;
   align-items: center;
-}
-
-.stock-in-entry-row__thumb {
-  width: 80px;
-  height: 80px;
-  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .stock-in-entry-row__inputs {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 92px;
+  width: 96px;
+  flex-shrink: 0;
 }
 
 .stock-in-entry-row__field {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .stock-in-entry-row__label {
@@ -4781,8 +4779,8 @@ input::placeholder, textarea::placeholder {
 
 .stock-in-entry-row__input {
   width: 100%;
-  min-width: 84px;
-  padding: 8px 10px;
+  min-width: 0;
+  padding: 8px 6px;
   font-size: 14px;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -4798,21 +4796,29 @@ input::placeholder, textarea::placeholder {
   color: var(--hex-foreground);
 }
 
+.inventory-stock-panel .inventory-stock-row__name {
+  margin: 0;
+}
+
 @media (max-width: 639px) {
   .stock-in-entry-row {
-    grid-template-columns: 72px minmax(0, 1fr);
-    align-items: start;
+    grid-template-columns: 64px minmax(0, 1fr) 88px;
+    gap: 8px 10px;
+    padding: 10px;
   }
 
   .stock-in-entry-row__inputs {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    flex-wrap: wrap;
-    min-width: 0;
+    width: 88px;
   }
 
-  .stock-in-entry-row__field {
-    flex: 1 1 88px;
+  .stock-in-entry-row__input {
+    padding: 7px 4px;
+    font-size: 13px;
+  }
+
+  .inventory-stock-row__thumb {
+    width: 64px;
+    height: 64px;
   }
 }
 
@@ -10965,7 +10971,6 @@ body.image-lightbox-open {
 
 @media (max-width: 639px) {
   .stock-in-view {
-    overflow-x: hidden;
     max-width: 100%;
   }
 
