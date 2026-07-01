@@ -194,22 +194,51 @@ def _row_dict(row: list[str], mapping: dict[str, int]) -> dict[str, str]:
     return out
 
 
+def _excel_col_width(*values: Any, minimum: float = 12) -> float:
+    best = minimum
+    for value in values:
+        text = _cell_text(value)
+        if not text:
+            continue
+        units = 0.0
+        for ch in text:
+            units += 1.5 if ord(ch) > 127 else 1.0
+        best = max(best, units + 5)
+    return min(best, 80)
+
+
 def _format_import_worksheet(
     ws,
     headers: list[str],
     example_row: list[Any],
-    col_widths: list[float],
     *,
     text_columns: set[int] | None = None,
+    min_col_widths: list[float] | None = None,
 ) -> None:
     text_columns = text_columns or set()
+    mins = min_col_widths or [12] * len(headers)
+    col_widths = [
+        _excel_col_width(
+            headers[i],
+            example_row[i] if i < len(example_row) else "",
+            minimum=mins[i] if i < len(mins) else 12,
+        )
+        for i in range(len(headers))
+    ]
     header_font = Font(bold=True, size=11, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="16899A")
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    body_align = Alignment(vertical="center", wrap_text=True)
+    body_align = Alignment(vertical="center", wrap_text=True, horizontal="left")
 
-    ws.row_dimensions[1].height = 42
-    ws.row_dimensions[2].height = 28
+    longest_header_lines = 1
+    for col_idx, width in enumerate(col_widths, start=1):
+        header_text = headers[col_idx - 1]
+        units = sum(1.4 if ord(ch) > 127 else 1.0 for ch in header_text)
+        lines = max(1, int(units // max(width - 2, 8)) + (1 if units > width else 0))
+        longest_header_lines = max(longest_header_lines, lines)
+
+    ws.row_dimensions[1].height = max(36, 18 * longest_header_lines + 8)
+    ws.row_dimensions[2].height = 30
     ws.freeze_panes = "A2"
 
     for col_idx, width in enumerate(col_widths, start=1):
@@ -245,8 +274,8 @@ def build_customer_template_bytes() -> bytes:
         ws,
         CUSTOMER_HEADERS,
         example,
-        [22, 14, 14, 14, 18, 16, 10, 32],
         text_columns={2, 3, 4},
+        min_col_widths=[18, 14, 14, 14, 20, 16, 12, 34],
     )
     buf = io.BytesIO()
     wb.save(buf)
@@ -262,8 +291,8 @@ def build_product_template_bytes() -> bytes:
         ws,
         PRODUCT_HEADERS,
         example,
-        [20, 28, 16, 18, 18],
         text_columns={1},
+        min_col_widths=[18, 26, 20, 30, 30],
     )
     for col_idx in (4, 5):
         ws.cell(row=2, column=col_idx).number_format = "#,##0"
