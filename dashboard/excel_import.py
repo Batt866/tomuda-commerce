@@ -29,6 +29,7 @@ PRODUCT_HEADERS = [
     "Хэмжих нэгж",
     "Борлуулалтын үнэ",
     "Үйлдвэрлэсэн үнэ",
+    "Үйлдвэрлэсэн улс",
 ]
 
 CUSTOMER_HEADER_ALIASES: dict[str, str] = {
@@ -75,6 +76,9 @@ PRODUCT_HEADER_ALIASES: dict[str, str] = {
     "costprice": "costPrice",
     "cost price": "costPrice",
     "үйлдвэрлэсэн үнэ": "costPrice",
+    "үйлдвэрлэсэн улс": "country",
+    "улс": "country",
+    "country": "country",
 }
 
 UNIT_ALIASES: dict[str, str] = {
@@ -225,8 +229,8 @@ def _format_import_worksheet(
         )
         for i in range(len(headers))
     ]
-    header_font = Font(bold=True, size=11, color="FFFFFF")
-    header_fill = PatternFill("solid", fgColor="16899A")
+    header_font = Font(bold=True, size=11, color="000000")
+    header_fill = PatternFill("solid", fgColor="FFFFFF")
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     body_align = Alignment(vertical="center", wrap_text=True, horizontal="left")
 
@@ -286,13 +290,13 @@ def build_product_template_bytes() -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Бараа"
-    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, 10000]
+    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, 10000, "Монгол"]
     _format_import_worksheet(
         ws,
         PRODUCT_HEADERS,
         example,
         text_columns={1},
-        min_col_widths=[18, 26, 20, 30, 30],
+        min_col_widths=[18, 26, 20, 30, 30, 22],
     )
     for col_idx in (4, 5):
         ws.cell(row=2, column=col_idx).number_format = "#,##0"
@@ -457,6 +461,8 @@ def import_products_into_state(
             errors.append({"row": offset, "message": "Хэмжих нэгж буруу байна."})
             continue
 
+        country = _cell_text(data.get("country")) or "Монгол"
+
         now += 1
         products.append(
             {
@@ -470,7 +476,7 @@ def import_products_into_state(
                 "costPrice": int(cost or 0),
                 "stock": 0,
                 "minStock": 0,
-                "country": "Монгол",
+                "country": country,
                 "image": "",
             }
         )
