@@ -2255,7 +2255,6 @@ function completeBootUiInit() {
   initEmployeeModalActions();
   initQtyStepperButtons();
   initCountInputHandlers();
-  initStockInInputHandlers();
   initExcelImportHandlers();
   initConfirmCard();
   initConfirmDeleteActions();
@@ -5544,6 +5543,9 @@ function stockInLineQty(p) {
   return pieces;
 }
 function stockInLineCost(p) {
+  const d = state.stockInDraft[p.id] || {};
+  const draftCost = Number(d.costPrice);
+  if (Number.isFinite(draftCost) && draftCost > 0) return draftCost;
   return productCostPrice(p) || 0;
 }
 function stockInHasEntries() {
@@ -5696,16 +5698,72 @@ function stockInEmployeeField() {
   return `<label class="stock-in-employee"><span class="stock-in-employee__label">Ажилтан</span><select class="field-input app-input" onchange="setStockInEmployee(this.value)">${options}</select></label>`;
 }
 function stockInEntryRow(p) {
+  const qty = stockInLineQty(p);
+  const cost = stockInLineCost(p);
+  const hasEntry = qty > 0;
+  const entryMeta = hasEntry
+    ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">${fmt(cost)}</span>` : ""}</span>`
+    : `<span class="stock-in-entry-row__hint">Тоо, өртөг оруулах</span>`;
+  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}"><img src="${productImage(p)}" alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div>${entryMeta}</button>`;
+}
+function stockInEntryModal(id) {
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
+  ensureStockInSession();
   const d = state.stockInDraft[p.id] || {};
   const packSize = productPackSize(p);
   const packsVal = d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
   const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
-  const cost = stockInLineCost(p);
-  const costText = cost ? fmt(cost) : "—";
-  const packField = packSize
-    ? `<label class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Багц</span><input data-stock-in-pack data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="stock-in-entry-row__input app-input" aria-label="${esc(p.name)} багц"></label>`
-    : "";
-  return `<div class="stock-in-entry-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div><div class="stock-in-entry-row__inputs">${packField}<label class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Тоо</span><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-entry-row__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label><div class="stock-in-entry-row__field"><span class="stock-in-entry-row__label">Өртөг</span><span class="stock-in-entry-row__cost${cost ? "" : " stock-in-entry-row__cost--empty"}">${costText}</span></div></div></div>`;
+  const costVal =
+    d.costPrice != null && d.costPrice !== ""
+      ? esc(String(d.costPrice))
+      : esc(String(productCostPrice(p) || ""));
+  const qtyFields = packSize
+    ? `<div class="grid grid-cols-2 gap-2"><label class="block"><span class="field-label">Багц</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} багц"></label><label class="block"><span class="field-label">Ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} ширхэг"></label></div>`
+    : `<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label>`;
+  box(
+    "Орлого оруулах",
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImage(p)}" alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ</span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" step="1" value="${costVal}" required class="field-input app-input" aria-label="Өртөг үнэ"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
+    "max-w-md",
+  );
+}
+function applyStockInEntryModal(e, id) {
+  e.preventDefault();
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
+  const formData = new FormData(e.target);
+  const packSize = productPackSize(p);
+  const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
+  const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
+  const qty = packSize ? packs * packSize + pieces : pieces;
+  if (qty <= 0) {
+    delete state.stockInDraft[id];
+    state.stockInDone = false;
+    state.stockInReceipt = null;
+    closeModal();
+    render();
+    return;
+  }
+  const costPrice = Number(formData.get("costPrice") || 0);
+  if (!Number.isFinite(costPrice) || costPrice <= 0) {
+    alert("Өртөг үнэ оруулна уу");
+    return;
+  }
+  const entry = stockInDraftEntry(id);
+  if (packSize) {
+    if (packs > 0) entry.packs = String(packs);
+    else delete entry.packs;
+    if (pieces > 0) entry.qty = String(pieces);
+    else delete entry.qty;
+  } else {
+    entry.qty = String(pieces);
+    delete entry.packs;
+  }
+  entry.costPrice = String(Math.floor(costPrice));
+  state.stockInDone = false;
+  state.stockInReceipt = null;
+  closeModal();
+  render();
 }
 function stockInReceiptRow(line) {
   return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
@@ -5725,7 +5783,7 @@ function stockInEntryList(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа сонгоод баруун талд тоо оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа дээр дарж тоо, өртөг үнэ оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -5819,42 +5877,6 @@ ${bodyRows}
   a.download = `orlogo-avah-${stamp}.xls`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
-function stockInDraftInput(id, field, raw) {
-  ensureStockInSession();
-  state.stockInDone = false;
-  state.stockInReceipt = null;
-  const entry = stockInDraftEntry(id);
-  const text = String(raw ?? "").trim();
-  if (!text) delete entry[field];
-  else entry[field] = text.replace(/[^\d]/g, "");
-}
-function initStockInInputHandlers() {
-  if (document.documentElement.dataset.stockInInputBound) return;
-  document.documentElement.dataset.stockInInputBound = "1";
-  document.addEventListener(
-    "input",
-    (e) => {
-      const pack = e.target.closest?.("[data-stock-in-pack]");
-      if (pack) {
-        stockInDraftInput(
-          pack.getAttribute("data-product-id") || "",
-          "packs",
-          pack.value,
-        );
-        return;
-      }
-      const qty = e.target.closest?.("[data-stock-in-qty]");
-      if (qty) {
-        stockInDraftInput(
-          qty.getAttribute("data-product-id") || "",
-          "qty",
-          qty.value,
-        );
-      }
-    },
-    true,
-  );
 }
 function stockActionRow(p, tab) {
   return `<button type="button" onclick="inventoryStockModal('${esc(p.id)}','${tab}')" class="inventory-stock-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-card__img inventory-stock-row__thumb" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></span></div></button>`;
@@ -11790,6 +11812,8 @@ Object.assign(window, {
   confirmNewStockIn,
   confirmStockInExcel,
   setStockInEmployee,
+  stockInEntryModal,
+  applyStockInEntryModal,
   confirmReportExport,
   confirmEmployeeExcel,
   confirmOrderReceiptsExcel,
