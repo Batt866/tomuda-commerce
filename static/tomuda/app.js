@@ -5825,7 +5825,12 @@ function confirmStockInExcel() {
 }
 function exportStockInExcelFallback(receipt) {
   const stamp = new Date().toISOString().slice(0, 10);
-  const date = stockInReceiptDateParts(receipt.createdAt);
+  const receivedDateValue = warehouseSheetDateValue(
+    receipt.createdAt
+      ? new Date(receipt.createdAt).toISOString().slice(0, 10)
+      : todayIso(),
+  );
+  const printedDateValue = warehouseSheetDateValue(todayIso());
   const h = (value) => xlsxXmlEsc(value ?? "");
   const bodyRows = stockInReceiptGroupedLines(receipt.lines)
     .map((item) => {
@@ -5849,6 +5854,8 @@ table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; 
 .stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
+.date-label { text-align: right; white-space: nowrap; }
+.date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
@@ -5858,13 +5865,13 @@ table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; 
 </style></head><body><table class="stock-in">
 <colgroup><col><col><col><col><col><col><col></colgroup>
 <tr><td colspan="7" class="title">Орлого авах баримт</td></tr>
-<tr class="meta"><td colspan="7">Ажилтан: ${h(receipt.employeeName)} · ${receipt.lines.length} бараа</td></tr>
+<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${receipt.lines.length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
 <tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount)}</td></tr>
 <tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________ (гарын үсэг)</td></tr>
 <tr class="sign"><td colspan="7">Хүлээн авсан: ________________________ (гарын үсэг)</td></tr>
-<tr class="sign"><td colspan="7">Баримтын огноо: ${date.day} / ${date.month} / ${date.year}</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const a = document.createElement("a");
@@ -6889,11 +6896,20 @@ function buildStockInSheetXml(receipt) {
     strIndex.set(key, idx);
     return idx;
   };
-  const date = stockInReceiptDateParts(receipt.createdAt);
-  const dateValue = ` ${date.year}/${String(date.month).padStart(2, "0")}/${String(date.day).padStart(2, "0")}`;
+  const receivedDateValue = warehouseSheetDateValue(
+    receipt.createdAt
+      ? new Date(receipt.createdAt).toISOString().slice(0, 10)
+      : todayIso(),
+  );
+  const printedDateValue = warehouseSheetDateValue(todayIso());
   const groups = stockInReceiptGroupedLines(receipt.lines);
   const rows = [];
-  const merges = [`A1:${STOCK_IN_LAST_COL}1`, `A2:${STOCK_IN_LAST_COL}2`];
+  const merges = [
+    `A1:${STOCK_IN_LAST_COL}1`,
+    `A2:B2`,
+    `C2:E2`,
+    `C3:E3`,
+  ];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
@@ -6926,7 +6942,21 @@ function buildStockInSheetXml(receipt) {
       ),
       "s",
     ),
-    ...emptyCells(2, "B", STOCK_IN_LAST_COL, 4),
+    xlsxCellXml("B2", 4, null, "empty"),
+    xlsxCellXml("C2", 14, si("Орлого авсан огноо:"), "s"),
+    xlsxCellXml("D2", 14, null, "empty"),
+    xlsxCellXml("E2", 14, null, "empty"),
+    xlsxCellXml("F2", 14, si(receivedDateValue), "s"),
+    xlsxCellXml("G2", 14, null, "empty"),
+  ]);
+  pushRow(20.25, [
+    xlsxCellXml("A3", 6, null, "empty"),
+    xlsxCellXml("B3", 6, null, "empty"),
+    xlsxCellXml("C3", 14, si("Хэвлэсэн огноо:"), "s"),
+    xlsxCellXml("D3", 14, null, "empty"),
+    xlsxCellXml("E3", 14, null, "empty"),
+    xlsxCellXml("F3", 14, si(printedDateValue), "s"),
+    xlsxCellXml("G3", 14, null, "empty"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
   const headerRow = rowNum;
@@ -7022,11 +7052,6 @@ function buildStockInSheetXml(receipt) {
       "s",
     ),
     ...emptyCells(sign4, "D", STOCK_IN_LAST_COL, 18),
-  ]);
-  pushRow(16.5, [
-    xlsxCellXml(`A${rowNum}`, 4, si("Баримтын огноо:"), "s"),
-    xlsxCellXml(`B${rowNum}`, 4, si(dateValue.trim()), "s"),
-    ...emptyCells(rowNum, "C", STOCK_IN_LAST_COL, 4),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
