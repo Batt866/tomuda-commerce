@@ -1,13 +1,29 @@
+from __future__ import annotations
+
 from typing import Any
 
-from ninja import Body, NinjaAPI
+from django.db import transaction
+from django.http import HttpResponse
+from ninja import Body, File, Form, NinjaAPI
 from ninja.errors import HttpError
+from ninja.files import UploadedFile
 
+from dashboard.excel_import import (
+    _append_import_log,
+    build_customer_template_bytes,
+    build_product_template_bytes,
+    import_customers_into_state,
+    import_products_into_state,
+    load_sheet_rows,
+    parse_actor,
+)
 from dashboard.models import AppState
 from dashboard.permissions import (
     PERMISSION_CATALOG,
-    _order_within_retention,
+    find_employee,
+    has_permission,
     validate_state_mutation,
+    _order_within_retention,
 )
 from dashboard.seed_data import default_state
 
@@ -66,3 +82,111 @@ def save_state(request, payload: dict[str, Any] = Body(...)):
     row.data = data
     row.save(update_fields=["data", "updated_at"])
     return {"ok": True, "updatedAt": row.updated_at.isoformat()}
+
+
+def _require_import_permission(state: dict[str, Any], actor: dict[str, Any] | None, perm: str) -> None:
+    if not actor:
+        raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
+    employee = find_employee(state, actor)
+    if not employee:
+        raise HttpError(403, "Нэвтэрсэн ажилтан олдсонгүй")
+    if not has_permission(employee, perm):
+        raise HttpError(403, "Импорт хийх эрхгүй")
+
+
+@api.get("/import/customers/template")
+def customer_import_template(request):
+    content = build_customer_template_bytes()
+    response = HttpResponse(
+        content,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="hariltsagch-format.xlsx"'
+    return response
+
+
+@api.get("/import/products/template")
+def product_import_template(request):
+    content = build_product_template_bytes()
+    response = HttpResponse(
+        content,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="baraa-format.xlsx"'
+    return response
+
+
+@api.post("/import/customers")
+def import_customers(request, file: UploadedFile = File(...), actor: str = Form("")):
+    actor_data = parse_actor(actor)
+    data = file.read()
+    filename = file.name or "upload.xlsx"
+    try:
+        rows = load_sheet_rows(data, filename)
+    except ValueError as exc:
+        raise HttpError(400, str(exc)) from exc
+
+    with transaction.atomic():
+        row, _ = AppState.objects.get_or_create(
+            key="main",
+            defaults={"data": default_state()},
+        )
+        row = AppState.objects.select_for_update().get(pk=row.pk)
+        current = dict(row.data or default_state())
+        _require_import_permission(current, actor_data, "customers.create")
+        try:
+            next_state, report = import_customers_into_state(current, rows)
+        except ValueError as exc:
+            raise HttpError(400, str(exc)) from exc
+        ok, message = validate_state_mutation(current, next_state, actor_data)
+        if not ok:
+            raise HttpError(403, message or "Эрх хүрэлцэхгүй")
+        _append_import_log(next_state, kind="customers", actor=actor_data, report=report)
+        row.data = next_state
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {
+        "ok": True,
+        "report": report,
+        "customers": next_state.get("customers") or [],
+        "updatedAt": updated_at,
+    }
+
+
+@api.post("/import/products")
+def import_products(request, file: UploadedFile = File(...), actor: str = Form("")):
+    actor_data = parse_actor(actor)
+    data = file.read()
+    filename = file.name or "upload.xlsx"
+    try:
+        rows = load_sheet_rows(data, filename)
+    except ValueError as exc:
+        raise HttpError(400, str(exc)) from exc
+
+    with transaction.atomic():
+        row, _ = AppState.objects.get_or_create(
+            key="main",
+            defaults={"data": default_state()},
+        )
+        row = AppState.objects.select_for_update().get(pk=row.pk)
+        current = dict(row.data or default_state())
+        _require_import_permission(current, actor_data, "products.create")
+        try:
+            next_state, report = import_products_into_state(current, rows)
+        except ValueError as exc:
+            raise HttpError(400, str(exc)) from exc
+        ok, message = validate_state_mutation(current, next_state, actor_data)
+        if not ok:
+            raise HttpError(403, message or "Эрх хүрэлцэхгүй")
+        _append_import_log(next_state, kind="products", actor=actor_data, report=report)
+        row.data = next_state
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {
+        "ok": True,
+        "report": report,
+        "products": next_state.get("products") or [],
+        "updatedAt": updated_at,
+    }

@@ -7,6 +7,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -32,6 +33,9 @@ def main() -> None:
         name = str(row[1]).strip() if row[1] is not None else ""
         if reg and name:
             index[reg] = name
+            digits = re.sub(r"\D", "", reg)
+            if digits and digits != reg:
+                index.setdefault(digits, name)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", encoding="utf-8") as f:

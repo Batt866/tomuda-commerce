@@ -819,6 +819,199 @@ function excelDownloadBtn(onclick, opts = {}) {
   } = opts;
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-excel ${extraClass}"${disabled ? " disabled" : ""} aria-label="${esc(label)}">${excelIconHtml()}<span class="btn--toolbar__label btn--toolbar__label--full">${esc(label)}</span><span class="btn--toolbar__label btn--toolbar__label--short">${esc(shortLabel)}</span></button>`;
 }
+function excelImportToolbar(kind) {
+  const perm =
+    kind === "customers" ? "customers.create" : "products.create";
+  if (!hasPermission(perm)) return "";
+  const label = kind === "customers" ? "Харилцагч" : "Бараа";
+  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}"><button type="button" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn">📥 Формат татах</button><button type="button" onclick="triggerImportUpload('${kind}')" class="btn btn--toolbar btn--toolbar-primary excel-import-toolbar__btn">📤 Upload</button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"><div class="excel-import-dropzone" data-import-dropzone="${esc(kind)}" tabindex="0" role="button" aria-label="${esc(label)} Excel файл чирж оруулах"><span class="excel-import-dropzone__icon" aria-hidden="true">📄</span><span class="excel-import-dropzone__text">Excel файлаа энд чирж оруулна уу</span><span class="excel-import-dropzone__hint">.xlsx, .xls</span></div></div>`;
+}
+let importLoading = false;
+function setImportLoading(active, message = "Excel импорт хийж байна...") {
+  importLoading = !!active;
+  let overlay = document.getElementById("importLoadingOverlay");
+  if (!active) {
+    overlay?.remove();
+    return;
+  }
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "importLoadingOverlay";
+    overlay.className = "import-loading-overlay";
+    overlay.innerHTML = `<div class="import-loading-overlay__card" role="status" aria-live="polite"><span class="import-loading-overlay__spinner" aria-hidden="true"></span><p class="import-loading-overlay__text"></p></div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.querySelector(".import-loading-overlay__text").textContent = message;
+}
+function showAppToast(message, type = "success") {
+  document.querySelector(".app-toast")?.remove();
+  const el = document.createElement("div");
+  el.className = `app-toast app-toast--${type}`;
+  el.setAttribute("role", "status");
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("app-toast--visible"));
+  setTimeout(() => {
+    el.classList.remove("app-toast--visible");
+    setTimeout(() => el.remove(), 220);
+  }, 3200);
+}
+function importActorPayload() {
+  return state.currentEmployee
+    ? JSON.stringify({
+        id: state.currentEmployee.id,
+        email: state.currentEmployee.email,
+      })
+    : "";
+}
+async function downloadImportTemplate(kind) {
+  const perm =
+    kind === "customers" ? "customers.create" : "products.create";
+  if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
+  const path =
+    kind === "customers"
+      ? "/import/customers/template"
+      : "/import/products/template";
+  const filename =
+    kind === "customers" ? "hariltsagch-format.xlsx" : "baraa-format.xlsx";
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("template failed");
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (error) {
+    alertModal("Алдаа", "Формат файл татахад алдаа гарлаа.");
+  }
+}
+function triggerImportUpload(kind) {
+  const input = document.querySelector(`[data-import-file="${kind}"]`);
+  if (!input) return;
+  input.value = "";
+  input.click();
+}
+function showImportReportModal(report, kind) {
+  const label = kind === "customers" ? "Харилцагч" : "Бараа";
+  const errors = (report.errors || [])
+    .map(
+      (item) =>
+        `<li><b>Row ${item.row}</b> → ${esc(item.message || "Алдаа")}</li>`,
+    )
+    .join("");
+  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p></div>${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Алдааны дэлгэрэнгүй</p><ul>${errors}</ul></div>` : `<p class="import-report__ok">Бүх мөр амжилттай импортлогдлоо.</p>`}</div>`;
+  confirmModal(`${label} импортын тайлан`, body, {
+    confirmLabel: "Хаах",
+    cancelLabel: "",
+    closable: true,
+    onConfirm: () => closeConfirmCard(),
+  });
+}
+async function handleImportFile(kind, file) {
+  const perm =
+    kind === "customers" ? "customers.create" : "products.create";
+  if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
+  if (!file) return;
+  const name = String(file.name || "").toLowerCase();
+  if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+    return alertModal("Алдаа", "Зөвхөн .xlsx эсвэл .xls файл зөвшөөрнө.");
+  }
+  if (importLoading) return;
+  const path =
+    kind === "customers" ? "/import/customers" : "/import/products";
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("actor", importActorPayload());
+  setImportLoading(true);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      body: fd,
+      cache: "no-store",
+    });
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+    if (!res.ok) {
+      const msg = payload?.detail || payload?.message || "Импорт амжилтгүй";
+      showAppToast(String(msg), "error");
+      alertModal("Импорт амжилтгүй", esc(String(msg)));
+      return;
+    }
+    const report = payload.report || {};
+    if (kind === "customers" && Array.isArray(payload.customers)) {
+      state.customers = payload.customers;
+    }
+    if (kind === "products" && Array.isArray(payload.products)) {
+      state.products = payload.products;
+    }
+    if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+    syncBackendSaveMarker();
+    render();
+    if ((report.success || 0) > 0 && !(report.failed || 0)) {
+      showAppToast(`${report.success} мөр амжилттай импортлогдлоо`, "success");
+    } else if ((report.success || 0) > 0) {
+      showAppToast(
+        `${report.success} амжилттай, ${report.failed || 0} алдаатай`,
+        "error",
+      );
+    } else {
+      showAppToast("Импорт амжилтгүй", "error");
+    }
+    showImportReportModal(report, kind);
+  } catch (error) {
+    console.warn("Import failed", error);
+    showAppToast("Импорт хийхэд алдаа гарлаа", "error");
+    alertModal("Алдаа", "Импорт хийхэд алдаа гарлаа.");
+  } finally {
+    setImportLoading(false);
+  }
+}
+function initExcelImportHandlers() {
+  if (document.documentElement.dataset.importBound) return;
+  document.documentElement.dataset.importBound = "1";
+  document.addEventListener("change", (e) => {
+    const input = e.target.closest?.("[data-import-file]");
+    if (!input?.files?.[0]) return;
+    const kind = input.getAttribute("data-import-file") || "";
+    handleImportFile(kind, input.files[0]);
+  });
+  document.addEventListener("dragover", (e) => {
+    const zone = e.target.closest?.("[data-import-dropzone]");
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.add("is-dragover");
+  });
+  document.addEventListener("dragleave", (e) => {
+    const zone = e.target.closest?.("[data-import-dropzone]");
+    if (!zone) return;
+    zone.classList.remove("is-dragover");
+  });
+  document.addEventListener("drop", (e) => {
+    const zone = e.target.closest?.("[data-import-dropzone]");
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.remove("is-dragover");
+    const kind = zone.getAttribute("data-import-dropzone") || "";
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleImportFile(kind, file);
+  });
+  document.addEventListener("keydown", (e) => {
+    const zone = e.target.closest?.("[data-import-dropzone]");
+    if (!zone || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    const kind = zone.getAttribute("data-import-dropzone") || "";
+    triggerImportUpload(kind);
+  });
+}
 function pageToolbarSearch({
   focusKey,
   value = "",
@@ -1973,6 +2166,7 @@ async function boot() {
     initQtyStepperButtons();
     initCountInputHandlers();
     initStockInInputHandlers();
+    initExcelImportHandlers();
     initConfirmCard();
     initConfirmDeleteActions();
     initImageLightbox();
@@ -4317,32 +4511,82 @@ function customerRegistrationDisplay(c) {
   return String(c?.registrationNumber || "").trim();
 }
 function customerRegistrationDigits(c) {
-  return customerRegistrationDisplay(c).replace(/\D/g, "");
+  return parseRegistrationNumber(c?.registrationNumber).digits;
+}
+const REGISTRATION_LABEL_RE =
+  /^(?:р\.?\s*д\.?|rd|РД|Р\s*Д)\s*:?\s*/iu;
+function parseRegistrationNumber(value) {
+  const raw = String(value || "").trim();
+  let cleaned = raw.replace(/\s+/g, "");
+  cleaned = cleaned.replace(REGISTRATION_LABEL_RE, "");
+  const match = cleaned.match(/^([A-Za-zА-ЯӨҮЁа-яөүё]{2})(\d{5,10})$/u);
+  const prefix = match ? match[1].toUpperCase() : "";
+  const digits = match
+    ? match[2]
+    : (cleaned.match(/(\d{5,10})/)?.[1] || cleaned.replace(/\D/g, ""));
+  const full = prefix && digits ? `${prefix}${digits}` : digits || cleaned;
+  const lookupKeys = [];
+  if (digits) {
+    lookupKeys.push(digits);
+    const trimmed = digits.replace(/^0+/, "");
+    if (trimmed && trimmed !== digits) lookupKeys.push(trimmed);
+    const asNumber = String(Number(digits));
+    if (asNumber && asNumber !== digits && asNumber !== "NaN")
+      lookupKeys.push(asNumber);
+  }
+  if (prefix && digits) {
+    lookupKeys.push(`${prefix}${digits}`, `${prefix.toLowerCase()}${digits}`);
+  }
+  if (cleaned && !lookupKeys.includes(cleaned)) lookupKeys.push(cleaned);
+  return {
+    raw,
+    cleaned,
+    prefix,
+    digits,
+    full,
+    searchKey: full.toLowerCase(),
+    lookupKeys: [...new Set(lookupKeys.filter(Boolean))],
+  };
+}
+function normalizeRegistrationNumber(value) {
+  return parseRegistrationNumber(value).digits;
 }
 function registrationSearchKey(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "");
+  return parseRegistrationNumber(value).searchKey;
+}
+function lookupLesRegistryCompany(index, value) {
+  const parsed = parseRegistrationNumber(value);
+  if (!parsed.digits) return "";
+  for (const key of parsed.lookupKeys) {
+    const hit = index[key];
+    if (hit) return hit;
+  }
+  return "";
 }
 function findCustomerByRegistrationNumber(registrationNumber, excludeId = "") {
-  const queryKey = registrationSearchKey(registrationNumber);
-  const queryDigits = normalizeRegistrationNumber(registrationNumber);
-  if (!queryKey && !queryDigits) return null;
+  const query = parseRegistrationNumber(registrationNumber);
+  if (!query.digits && !query.searchKey) return null;
   return (
     state.customers.find((c) => {
       if (c.id === excludeId) return false;
-      const storedKey = registrationSearchKey(c.registrationNumber);
-      const storedDigits = normalizeRegistrationNumber(c.registrationNumber);
-      if (queryKey && storedKey && queryKey === storedKey) return true;
-      if (queryDigits && storedDigits && queryDigits === storedDigits)
+      const stored = parseRegistrationNumber(c.registrationNumber);
+      if (query.digits && stored.digits && query.digits === stored.digits)
+        return true;
+      if (
+        query.full &&
+        stored.full &&
+        query.full.toLowerCase() === stored.full.toLowerCase()
+      )
+        return true;
+      if (query.searchKey && stored.searchKey && query.searchKey === stored.searchKey)
         return true;
       return false;
     }) || null
   );
 }
 function customerMatchesQuery(c, q) {
-  const needle = registrationSearchKey(q);
+  const parsedQ = parseRegistrationNumber(q);
+  const needle = parsedQ.searchKey || registrationSearchKey(q);
   if (!needle) return true;
   const nameMatch = String(c.name || "")
     .toLowerCase()
@@ -4350,13 +4594,26 @@ function customerMatchesQuery(c, q) {
   const companyMatch = String(c.companyName || "")
     .toLowerCase()
     .includes(needle);
-  const rdKey = registrationSearchKey(c.registrationNumber);
-  const rdMatch = !!rdKey && rdKey.includes(needle);
-  const rdDigitsNeedle = needle.replace(/\D/g, "");
-  const rdDigits = rdKey.replace(/\D/g, "");
+  const stored = parseRegistrationNumber(c.registrationNumber);
+  const rdMatch =
+    !!stored.searchKey &&
+    (stored.searchKey.includes(needle) || needle.includes(stored.searchKey));
   const rdDigitsMatch =
-    !!rdDigitsNeedle && !!rdDigits && rdDigits.includes(rdDigitsNeedle);
-  return nameMatch || companyMatch || rdMatch || rdDigitsMatch;
+    !!parsedQ.digits &&
+    !!stored.digits &&
+    stored.digits.includes(parsedQ.digits);
+  const rdPrefixMatch =
+    !!parsedQ.prefix &&
+    !parsedQ.digits &&
+    !!stored.prefix &&
+    stored.prefix.toLowerCase() === parsedQ.prefix.toLowerCase();
+  return (
+    nameMatch ||
+    companyMatch ||
+    rdMatch ||
+    rdDigitsMatch ||
+    rdPrefixMatch
+  );
 }
 function sortCustomersByName(customers) {
   return [...(customers || [])].sort((a, b) =>
@@ -4404,7 +4661,7 @@ function customersView() {
     ]
       .filter(Boolean)
       .join("");
-  return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), actions: toolbarActions })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), actions: toolbarActions })}${excelImportToolbar("customers")}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Excel файл татах уу?") {
   confirmModal(title, message, {
@@ -4963,7 +5220,7 @@ function productsView() {
     .filter(Boolean)
     .join("");
   const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${isAdmin() ? " product-list--show-cost" : ""}`;
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = canManageProducts(),
@@ -5257,33 +5514,19 @@ function stockInEntryRow(p) {
       : productCostPrice(p)
         ? esc(String(productCostPrice(p)))
         : "";
-  const qty = stockInLineQty(p);
-  const cost = stockInLineCost(p);
-  const unitText = qty > 0 && cost ? fmt(cost) : "-";
-  const totalText = qty > 0 && cost ? fmt(qty * cost) : "-";
   const packCell = packSize
     ? `<input data-stock-in-pack data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} багц">`
     : `<span class="stock-in-table__muted">-</span>`;
-  return `<div class="stock-in-table__row" data-stock-in-row="${esc(p.id)}"><span class="stock-in-table__name">${esc(p.name)}</span><span class="stock-in-table__barcode">${esc(p.barcode || "-")}</span><span class="stock-in-table__pack">${packCell}</span><span class="stock-in-table__qty"><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></span><span class="stock-in-table__cost"><input data-stock-in-cost data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${costVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} өртөг үнэ"></span><span class="stock-in-table__money" data-stock-in-unit>${unitText}</span><span class="stock-in-table__money stock-in-table__money--total" data-stock-in-total>${totalText}</span></div>`;
+  return `<div class="stock-in-table__row stock-in-table__row--entry"><span class="stock-in-table__name">${esc(p.name)}</span><span class="stock-in-table__barcode">${esc(p.barcode || "-")}</span><span class="stock-in-table__pack">${packCell}</span><span class="stock-in-table__qty"><input data-stock-in-qty data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} тоо ширхэг"></span><span class="stock-in-table__cost"><input data-stock-in-cost data-product-id="${esc(p.id)}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${costVal}" placeholder="0" class="stock-in-table__input app-input" aria-label="${esc(p.name)} өртөг үнэ"></span></div>`;
 }
 function stockInReceiptRow(line) {
-  return `<div class="stock-in-table__row stock-in-table__row--readonly"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
 }
-function stockInTableHead() {
+function stockInTableHead(mode = "entry") {
+  if (mode === "entry") {
+    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Багц</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
+  }
   return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Багц</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
-}
-function stockInDraftTotal() {
-  return state.products.reduce((sum, p) => {
-    const qty = stockInLineQty(p);
-    if (qty <= 0) return sum;
-    return sum + qty * stockInLineCost(p);
-  }, 0);
-}
-function stockInTableFoot(total) {
-  return `<div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total" data-stock-in-foot-total>${fmt(total)}</span></div>`;
-}
-function stockInTableSignatures(date) {
-  return `<footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________ (гарын үсэг)</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________ (гарын үсэг)</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer>`;
 }
 function stockInEntryTable(list) {
   const groups = stockInProductsGrouped(list);
@@ -5294,8 +5537,7 @@ function stockInEntryTable(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  const date = stockInReceiptDateParts(state.stockInSessionStartedAt);
-  return `<section class="stock-in-receipt-panel"><div class="stock-in-table stock-in-table--full"><div class="stock-in-table__scroll">${stockInTableHead()}<div class="stock-in-table__body">${rows || `<p class="stock-in-table__empty">Бараа олдсонгүй</p>`}</div>${stockInTableFoot(stockInDraftTotal())}</div></div>${stockInTableSignatures(date)}</section>`;
+  return `<div class="stock-in-table"><div class="stock-in-table__scroll">${stockInTableHead("entry")}<div class="stock-in-table__body">${rows || `<p class="stock-in-table__empty">Бараа олдсонгүй</p>`}</div></div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -5318,7 +5560,7 @@ function stockInReceiptPanel(receipt) {
     )
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--full"><div class="stock-in-table__scroll">${stockInTableHead()}<div class="stock-in-table__body">${rows}</div>${stockInTableFoot(receipt.totalAmount)}</div></div>${stockInTableSignatures(date)}<footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________ (гарын үсэг)</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________ (гарын үсэг)</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -5396,23 +5638,6 @@ function stockInDraftInput(id, field, raw) {
   const text = String(raw ?? "").trim();
   if (!text) delete entry[field];
   else entry[field] = text.replace(/[^\d]/g, "");
-  syncStockInRowTotals(id);
-}
-function syncStockInRowTotals(productId) {
-  const p = state.products.find((x) => x.id === productId);
-  if (!p) return;
-  const row = document.querySelector(`[data-stock-in-row="${productId}"]`);
-  if (!row) return;
-  const qty = stockInLineQty(p);
-  const cost = stockInLineCost(p);
-  const unitEl = row.querySelector("[data-stock-in-unit]");
-  const totalEl = row.querySelector("[data-stock-in-total]");
-  const unitText = qty > 0 && cost ? fmt(cost) : "-";
-  const totalText = qty > 0 && cost ? fmt(qty * cost) : "-";
-  if (unitEl) unitEl.textContent = unitText;
-  if (totalEl) totalEl.textContent = totalText;
-  const footEl = document.querySelector("[data-stock-in-foot-total]");
-  if (footEl) footEl.textContent = fmt(stockInDraftTotal());
 }
 function initStockInInputHandlers() {
   if (document.documentElement.dataset.stockInInputBound) return;
@@ -5451,7 +5676,7 @@ function initStockInInputHandlers() {
   );
 }
 function stockActionRow(p, tab) {
-  return `<button type="button" onclick="inventoryStockModal('${esc(p.id)}','${tab}')" class="inventory-stock-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-thumb inventory-stock-row__thumb"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></span></div></button>`;
+  return `<button type="button" onclick="inventoryStockModal('${esc(p.id)}','${tab}')" class="inventory-stock-row"><img src="${productImage(p)}" alt="${esc(p.name)}" class="product-card__img inventory-stock-row__thumb" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></span></div></button>`;
 }
 function inventoryStockModal(id, tab) {
   const p = state.products.find((x) => x.id === id);
@@ -9579,10 +9804,6 @@ let lesRegistryLoadPromise = null;
 let customerRegistryLookupId = 0;
 let customerRegistryLookupTimer = null;
 
-function normalizeRegistrationNumber(value) {
-  return String(value || "").replace(/\D/g, "");
-}
-
 async function loadLesRegistryIndex() {
   if (lesRegistryIndex) return lesRegistryIndex;
   if (!lesRegistryLoadPromise) {
@@ -9619,7 +9840,8 @@ async function fillCustomerFromRegistration(code) {
   const input = document.getElementById("customerRegistrationInput"),
     form = input?.closest("form"),
     status = document.getElementById("customerRegistryLookupStatus"),
-    reg = normalizeRegistrationNumber(code),
+    parsed = parseRegistrationNumber(code),
+    reg = parsed.digits,
     lookupId = ++customerRegistryLookupId;
   if (!form) return;
   if (!reg) {
@@ -9631,7 +9853,7 @@ async function fillCustomerFromRegistration(code) {
     return;
   }
   const excludeId = form.dataset.customerId || "";
-  const existing = findCustomerByRegistrationNumber(reg, excludeId);
+  const existing = findCustomerByRegistrationNumber(code, excludeId);
   if (existing) {
     const name = existing.name || existing.companyName || "Харилцагч";
     if (status)
@@ -9642,11 +9864,7 @@ async function fillCustomerFromRegistration(code) {
   try {
     const index = await loadLesRegistryIndex();
     if (lookupId !== customerRegistryLookupId) return;
-    const companyName =
-      index[reg] ||
-      index[String(Number(reg))] ||
-      index[reg.replace(/^0+/, "")] ||
-      "";
+    const companyName = lookupLesRegistryCompany(index, code);
     if (!companyName) {
       if (status) status.textContent = "Энэ регистрээр олдсонгүй";
       return;
@@ -9656,6 +9874,8 @@ async function fillCustomerFromRegistration(code) {
     if (companyEl) companyEl.value = companyName;
     if (nameEl && !String(nameEl.value || "").trim())
       nameEl.value = companyName;
+    if (input && parsed.prefix && parsed.digits)
+      input.value = `${parsed.prefix}${parsed.digits}`;
     if (status) status.textContent = "";
   } catch (error) {
     console.warn("Registry lookup failed", error);
@@ -11190,6 +11410,8 @@ Object.assign(window, {
   onCustomerDistrictChange,
   initCustomerAddressFields,
   confirmCustomerExcel,
+  downloadImportTemplate,
+  triggerImportUpload,
   confirmProductsExport,
   confirmInventoryExport,
   confirmFinishStockIn,
