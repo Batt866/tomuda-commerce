@@ -10910,17 +10910,17 @@ body.image-lightbox-open {
 .excel-import-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
   padding: 0 16px 14px;
 }
 
 .excel-import-toolbar__btn {
-  min-width: 140px;
+  flex: 0 0 auto;
 }
 
 .excel-import-dropzone {
-  flex: 1 1 220px;
+  flex: 1 1 260px;
   min-height: 72px;
   display: flex;
   flex-direction: column;
@@ -10948,8 +10948,19 @@ body.image-lightbox-open {
 }
 
 .excel-import-dropzone__icon {
-  font-size: 20px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-primary) 12%, var(--hex-card));
+  color: var(--hex-primary);
+}
+
+.excel-import-dropzone__svg {
+  width: 20px;
+  height: 20px;
 }
 
 .excel-import-dropzone__text {

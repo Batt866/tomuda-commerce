@@ -9,6 +9,8 @@ import time
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 CUSTOMER_HEADERS = [
     "Нэр",
@@ -192,22 +194,59 @@ def _row_dict(row: list[str], mapping: dict[str, int]) -> dict[str, str]:
     return out
 
 
+def _format_import_worksheet(
+    ws,
+    headers: list[str],
+    example_row: list[Any],
+    col_widths: list[float],
+    *,
+    text_columns: set[int] | None = None,
+) -> None:
+    text_columns = text_columns or set()
+    header_font = Font(bold=True, size=11, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="16899A")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    body_align = Alignment(vertical="center", wrap_text=True)
+
+    ws.row_dimensions[1].height = 42
+    ws.row_dimensions[2].height = 28
+    ws.freeze_panes = "A2"
+
+    for col_idx, width in enumerate(col_widths, start=1):
+        letter = get_column_letter(col_idx)
+        ws.column_dimensions[letter].width = width
+        header_cell = ws.cell(row=1, column=col_idx, value=headers[col_idx - 1])
+        header_cell.font = header_font
+        header_cell.fill = header_fill
+        header_cell.alignment = header_align
+
+        value = example_row[col_idx - 1] if col_idx - 1 < len(example_row) else ""
+        body_cell = ws.cell(row=2, column=col_idx, value=value)
+        body_cell.alignment = body_align
+        if col_idx in text_columns:
+            body_cell.number_format = "@"
+
+
 def build_customer_template_bytes() -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Харилцагч"
-    ws.append(CUSTOMER_HEADERS)
-    ws.append(
-        [
-            "Жишээ ХХК",
-            "1234567",
-            "99112233",
-            "",
-            "Улаанбаатар",
-            "Баянзүрх",
-            "1",
-            "1-р хороо, 10-р байр",
-        ]
+    example = [
+        "Жишээ ХХК",
+        "1234567",
+        "99112233",
+        "",
+        "Улаанбаатар",
+        "Баянзүрх",
+        "1",
+        "1-р хороо, 10-р байр",
+    ]
+    _format_import_worksheet(
+        ws,
+        CUSTOMER_HEADERS,
+        example,
+        [22, 14, 14, 14, 18, 16, 10, 32],
+        text_columns={2, 3, 4},
     )
     buf = io.BytesIO()
     wb.save(buf)
@@ -218,8 +257,16 @@ def build_product_template_bytes() -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Бараа"
-    ws.append(PRODUCT_HEADERS)
-    ws.append(["6977236071316", "Жишээ бараа", "ширхэг", "15000", "10000"])
+    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, 10000]
+    _format_import_worksheet(
+        ws,
+        PRODUCT_HEADERS,
+        example,
+        [20, 28, 16, 18, 18],
+        text_columns={1},
+    )
+    for col_idx in (4, 5):
+        ws.cell(row=2, column=col_idx).number_format = "#,##0"
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

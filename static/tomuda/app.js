@@ -839,6 +839,9 @@ const EXCEL_FILE_DOWNLOAD = "Excel файл татах";
 function excelIconHtml() {
   return `<svg class="ui-icon page-toolbar__excel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`;
 }
+function importDropzoneIconHtml() {
+  return `<svg class="ui-icon excel-import-dropzone__svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 19h16a2 2 0 0 0 2-2v-1H2v1a2 2 0 0 0 2 2z"/></svg>`;
+}
 function excelDownloadBtn(onclick, opts = {}) {
   const {
     label = EXCEL_FILE_DOWNLOAD,
@@ -853,7 +856,7 @@ function excelImportToolbar(kind) {
     kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return "";
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
-  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}"><button type="button" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn">📥 Формат татах</button><button type="button" onclick="triggerImportUpload('${kind}')" class="btn btn--toolbar btn--toolbar-primary excel-import-toolbar__btn">📤 Upload</button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"><div class="excel-import-dropzone" data-import-dropzone="${esc(kind)}" tabindex="0" role="button" aria-label="${esc(label)} Excel файл чирж оруулах"><span class="excel-import-dropzone__icon" aria-hidden="true">📄</span><span class="excel-import-dropzone__text">Excel файлаа энд чирж оруулна уу</span><span class="excel-import-dropzone__hint">.xlsx, .xls</span></div></div>`;
+  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}"><button type="button" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="btn--toolbar__label btn--toolbar__label--full">Формат татах</span></button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"><div class="excel-import-dropzone" data-import-dropzone="${esc(kind)}" tabindex="0" role="button" aria-label="${esc(label)} Excel файл чирж оруулах"><span class="excel-import-dropzone__icon" aria-hidden="true">${importDropzoneIconHtml()}</span><span class="excel-import-dropzone__text">Excel файлаа энд чирж оруулна уу</span><span class="excel-import-dropzone__hint">.xlsx, .xls · дарж сонгох</span></div></div>`;
 }
 let importLoading = false;
 function setImportLoading(active, message = "Excel импорт хийж байна...") {
