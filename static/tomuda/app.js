@@ -3921,7 +3921,10 @@ function createReceiptStringContext() {
   return { strings, si };
 }
 function receiptXlsxStylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="m/d/yy"/></numFmts><fonts count="6"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="19"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="m/d/yy"/></numFmts><fonts count="6"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="21"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+}
+function warehousePrepareStylesXml() {
+  return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="tomuda-logo.png"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
@@ -3973,6 +3976,7 @@ function buildReceiptSheetXml(
   const receiptNo = formatReceiptNumber(o);
   const items = (o.items || []).filter((i) => !i.isPromoFree);
   const promoItems = (o.items || []).filter((i) => i.isPromoFree);
+  const gross = orderGrossTotal(o);
   const discount = orderDiscountAmount(o);
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
@@ -4081,12 +4085,19 @@ function buildReceiptSheetXml(
   merges.push(`D${bankTitleRow}:E${bankTitleRow}`);
   const bankAcctRow = rowNum;
   pushRow(14.25, [
-    xlsxCellXml(`B${bankAcctRow}`, 3, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`D${bankAcctRow}`, 4, si("51333333307"), "s"),
+    xlsxCellXml(`B${bankAcctRow}`, 3, si("Дансны дугаар:                     IBAN:      "), "s"),
+    xlsxCellXml(`D${bankAcctRow}`, 4, si("60000500"), "s"),
     ...emptyCells(bankAcctRow, "A", "A"),
     ...emptyCells(bankAcctRow, "E", RECEIPT_XLSX_LAST_COL),
   ]);
   merges.push(`D${bankAcctRow}:E${bankAcctRow}`);
+  const bankAcctRow2 = rowNum;
+  pushRow(14.25, [
+    xlsxCellXml(`D${bankAcctRow2}`, 4, si("5133333307"), "s"),
+    ...emptyCells(bankAcctRow2, "A", "C"),
+    ...emptyCells(bankAcctRow2, "E", RECEIPT_XLSX_LAST_COL),
+  ]);
+  merges.push(`D${bankAcctRow2}:E${bankAcctRow2}`);
   pushRow(14.25, emptyCells(rowNum));
   const headerRow = rowNum;
   pushRow(14.25, [
@@ -4138,19 +4149,20 @@ function buildReceiptSheetXml(
     ]);
   });
   pushRow(14.25, emptyCells(rowNum));
-  const noteRow = rowNum;
+  const grossRow = rowNum;
+  merges.push(`B${grossRow}:J${grossRow}`);
   pushRow(14.25, [
-    xlsxCellXml(`B${noteRow}`, 8, si("Буцаалтын тэмдэглэгээ:"), "s"),
-    ...emptyCells(noteRow, "A", "A"),
-    ...emptyCells(noteRow, "C", RECEIPT_XLSX_LAST_COL),
+    xlsxCellXml(
+      `B${grossRow}`,
+      19,
+      si("Хувь хасагдаагүй нийт үнийн дүн"),
+      "s",
+    ),
+    xlsxCellXml(`K${grossRow}`, 20, gross, "n"),
+    ...emptyCells(grossRow, "A", "A", 19),
+    ...emptyCells(grossRow, "C", "J", 19),
   ]);
-  const settleRow = rowNum;
-  merges.push(`B${settleRow}:K${settleRow}`);
-  pushRow(14.25, [
-    xlsxCellXml(`B${settleRow}`, 8, si(settlement || grossNotice || ""), "s"),
-    ...emptyCells(settleRow, "A", "A"),
-    ...emptyCells(settleRow, "C", RECEIPT_XLSX_LAST_COL),
-  ]);
+  pushRow(14.25, emptyCells(rowNum));
   const promoSlots = Math.max(2, promoItems.length);
   Array.from({ length: promoSlots }).forEach((_, idx) => {
     const item = promoItems[idx],
@@ -4167,78 +4179,83 @@ function buildReceiptSheetXml(
       item
         ? xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n")
         : xlsxCellXml(`H${r}`, 10, null, "empty"),
-      xlsxCellXml(`J${r}`, 10, item ? 0 : null, item ? "n" : "empty"),
-      xlsxCellXml(`K${r}`, 10, item ? 0 : null, item ? "n" : "empty"),
+      item
+        ? xlsxCellXml(`J${r}`, 10, Number(item.price) || 0, "n")
+        : xlsxCellXml(`J${r}`, 10, null, "empty"),
+      item
+        ? xlsxCellXml(`K${r}`, 10, 0, "n")
+        : xlsxCellXml(`K${r}`, 10, null, "empty"),
       ...emptyCells(r, "A", "B"),
       ...emptyCells(r, "D", "D"),
       ...emptyCells(r, "F", "G"),
       ...emptyCells(r, "I", "I"),
     ]);
   });
-  const discountRow = rowNum;
-  merges.push(
-    `B${discountRow}:D${discountRow}`,
-    `E${discountRow}:K${discountRow}`,
-  );
-  pushRow(14.25, [
-    xlsxCellXml(
-      `B${discountRow}`,
-      8,
-      si(discount ? `Хөнгөлөлт (${pct}%)` : ""),
-      "s",
-    ),
-    xlsxCellXml(`E${discountRow}`, 12, discount ? -discount : 0, "n"),
-    ...emptyCells(discountRow, "A", "A"),
-    ...emptyCells(discountRow, "F", RECEIPT_XLSX_LAST_COL),
-  ]);
+  pushRow(14.25, emptyCells(rowNum));
   const totalRows = [
     ["Бараа ажил үйлчилгээний дүн", sub],
     ["НӨАТ", vat],
   ];
-  if (discount) totalRows.push([`Хөнгөлөлт (${pct}%)`, -discount]);
-  totalRows.push([
-    pct
-      ? `Таны нийт төлөх дүн (Бэлэн төлөлтийн ${pct}% хасагдав)`
-      : "Таны нийт төлөх дүн",
-    payable,
-  ]);
-  totalRows.forEach(([label, amount], idx) => {
+  totalRows.forEach(([label, amount]) => {
     const r = rowNum;
-    const labelStyle = idx === totalRows.length - 1 ? 10 : 8;
-    const amountStyle = idx === totalRows.length - 1 ? 10 : 12;
     merges.push(`B${r}:D${r}`, `E${r}:K${r}`);
     pushRow(14.25, [
-      xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
-      xlsxCellXml(`E${r}`, amountStyle, Number(amount) || 0, "n"),
+      xlsxCellXml(`B${r}`, 8, si(label), "s"),
+      xlsxCellXml(`E${r}`, 12, Number(amount) || 0, "n"),
       ...emptyCells(r, "A", "A"),
       ...emptyCells(r, "F", RECEIPT_XLSX_LAST_COL),
     ]);
   });
-  pushRow(14.25, emptyCells(rowNum));
+  const grandRow = rowNum;
+  merges.push(`B${grandRow}:D${grandRow}`, `E${grandRow}:J${grandRow}`);
+  pushRow(14.25, [
+    xlsxCellXml(`B${grandRow}`, 10, si("Таны нийт төлөх дүн"), "s"),
+    xlsxCellXml(
+      `E${grandRow}`,
+      8,
+      si(
+        pct
+          ? `(Бэлэн төлөлтийн ${pct}% хасагдав)`
+          : discount
+            ? `(Хөнгөлөлт ${pct || percentDiscountRate()}%)`
+            : "",
+      ),
+      "s",
+    ),
+    xlsxCellXml(`K${grandRow}`, 10, payable, "n"),
+    ...emptyCells(grandRow, "A", "A"),
+    ...emptyCells(grandRow, "F", "I"),
+  ]);
+  const settleText =
+    settlement ||
+    grossNotice ||
+    "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!";
+  const settleRow = rowNum;
+  merges.push(`B${settleRow}:K${settleRow}`);
+  pushRow(14.25, [
+    xlsxCellXml(`B${settleRow}`, 16, si(settleText), "s"),
+    ...emptyCells(settleRow, "A", "A"),
+    ...emptyCells(settleRow, "C", RECEIPT_XLSX_LAST_COL, 16),
+  ]);
   const payRow = rowNum;
+  const payTerm = paid
+    ? "Шууд төлөлт"
+    : bank
+      ? "Зээлээр"
+      : o.paymentTerm === "credit"
+        ? "Зээлээр"
+        : "Шууд төлөлт";
   pushRow(14.25, [
     xlsxCellXml(`B${payRow}`, 8, si("Төлбөрийн нөхцөл"), "s"),
-    xlsxCellXml(
-      `E${payRow}`,
-      paid ? 10 : 8,
-      si(paid ? "☑ Бэлэн" : "Бэлэн"),
-      "s",
-    ),
-    xlsxCellXml(
-      `H${payRow}`,
-      bank ? 10 : 8,
-      si(bank ? "☑ Зээлээр" : "Зээлээр"),
-      "s",
-    ),
+    xlsxCellXml(`H${payRow}`, 10, si(payTerm), "s"),
     ...emptyCells(payRow, "A", "A"),
-    ...emptyCells(payRow, "C", "D"),
-    ...emptyCells(payRow, "F", "G"),
+    ...emptyCells(payRow, "C", "G"),
     ...emptyCells(payRow, "I", RECEIPT_XLSX_LAST_COL),
   ]);
   [
     "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
     "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай. ",
-    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно",
+    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
     "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
   ].forEach((text, index) => {
     const r = rowNum;
@@ -5743,7 +5760,9 @@ function stockInPanel(list) {
 function exportStockInExcel() {
   const receipt = state.stockInReceipt;
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
-  exportStockInExcelFallback(receipt);
+  exportStockInExcelXlsx(receipt).catch(() =>
+    exportStockInExcelFallback(receipt),
+  );
 }
 function confirmStockInExcel() {
   if (!state.stockInDone || !state.stockInReceipt?.lines?.length) {
@@ -6840,6 +6859,186 @@ async function exportCountExcelXlsx() {
 const WAREHOUSE_PREPARE_LAST_COL = "F";
 const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
+const STOCK_IN_LAST_COL = "G";
+const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
+function buildStockInSheetXml(receipt) {
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const date = stockInReceiptDateParts(receipt.createdAt);
+  const dateValue = ` ${date.year}/${String(date.month).padStart(2, "0")}/${String(date.day).padStart(2, "0")}`;
+  const groups = stockInReceiptGroupedLines(receipt.lines);
+  const rows = [];
+  const merges = [`A1:${STOCK_IN_LAST_COL}1`, `C2:E2`];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
+    rowNum += 1;
+  };
+  const emptyCells = (
+    row,
+    from = "A",
+    to = STOCK_IN_LAST_COL,
+    style = 1,
+  ) => {
+    const cols = "ABCDEFG".slice(
+      "ABCDEFG".indexOf(from),
+      "ABCDEFG".indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
+  pushRow(43.5, [
+    xlsxCellXml("A1", 13, si("Орлого авах баримт"), "s"),
+    ...emptyCells(1, "B", STOCK_IN_LAST_COL, 13),
+  ]);
+  pushRow(28.5, [
+    xlsxCellXml("A2", 3, si("Ажилтан:"), "s"),
+    xlsxCellXml("B2", 4, si(receipt.employeeName || "-"), "s"),
+    xlsxCellXml("C2", 14, si("Огноо:"), "s"),
+    xlsxCellXml("D2", 14, null, "empty"),
+    xlsxCellXml("E2", 14, null, "empty"),
+    xlsxCellXml("F2", 14, si(dateValue), "s"),
+    xlsxCellXml("G2", 14, null, "empty"),
+  ]);
+  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
+  const headerRow = rowNum;
+  pushRow(30.75, [
+    xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, si("Багц"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Тоо ширхэг"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Нэгж үнэ"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Нийт үнэ"), "s"),
+  ]);
+  for (const item of groups) {
+    if (item.type === "cat") {
+      const r = rowNum;
+      merges.push(`A${r}:${STOCK_IN_LAST_COL}${r}`);
+      pushRow(24, [
+        xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
+        ...emptyCells(r, "B", STOCK_IN_LAST_COL, 15),
+      ]);
+      continue;
+    }
+    const line = item.line;
+    const r = rowNum;
+    pushRow(15, [
+      xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
+      xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
+      xlsxOptionalNum(`C${r}`, 10, line.packs),
+      xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
+      xlsxCellXml(`E${r}`, 10, Number(line.costPrice) || 0, "n"),
+      xlsxCellXml(`F${r}`, 10, Number(line.unitPrice) || 0, "n"),
+      xlsxCellXml(`G${r}`, 10, Number(line.totalPrice) || 0, "n"),
+    ]);
+  }
+  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
+  const totalRow = rowNum;
+  merges.push(`A${totalRow}:F${totalRow}`);
+  pushRow(16.5, [
+    xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
+    ...emptyCells(totalRow, "B", "F", 10),
+    xlsxCellXml(`G${totalRow}`, 10, Number(receipt.totalAmount) || 0, "n"),
+  ]);
+  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
+  const sign1 = rowNum;
+  merges.push(`C${sign1}:G${sign1}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн:"), "s"),
+    xlsxCellXml(`B${sign1}`, 18, si("Нэр"), "s"),
+    xlsxCellXml(
+      `C${sign1}`,
+      18,
+      si("...................................................."),
+      "s",
+    ),
+    ...emptyCells(sign1, "D", STOCK_IN_LAST_COL, 18),
+  ]);
+  const sign2 = rowNum;
+  merges.push(`C${sign2}:G${sign2}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign2}`, 12, null, "empty"),
+    xlsxCellXml(`B${sign2}`, 16, si("Гарын үсэг"), "s"),
+    xlsxCellXml(
+      `C${sign2}`,
+      18,
+      si("...................................................."),
+      "s",
+    ),
+    ...emptyCells(sign2, "D", STOCK_IN_LAST_COL, 18),
+  ]);
+  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
+  const sign3 = rowNum;
+  merges.push(`C${sign3}:G${sign3}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан:"), "s"),
+    xlsxCellXml(`B${sign3}`, 18, si("Нэр"), "s"),
+    xlsxCellXml(
+      `C${sign3}`,
+      18,
+      si("...................................................."),
+      "s",
+    ),
+    ...emptyCells(sign3, "D", STOCK_IN_LAST_COL, 18),
+  ]);
+  const sign4 = rowNum;
+  merges.push(`C${sign4}:G${sign4}`);
+  pushRow(null, [
+    xlsxCellXml(`A${sign4}`, 12, null, "empty"),
+    xlsxCellXml(`B${sign4}`, 16, si("Гарын үсэг"), "s"),
+    xlsxCellXml(
+      `C${sign4}`,
+      18,
+      si("...................................................."),
+      "s",
+    ),
+    ...emptyCells(sign4, "D", STOCK_IN_LAST_COL, 18),
+  ]);
+  pushRow(16.5, [
+    xlsxCellXml(`A${rowNum}`, 4, si("Баримтын огноо:"), "s"),
+    xlsxCellXml(`B${rowNum}`, 4, si(dateValue.trim()), "s"),
+    ...emptyCells(rowNum, "C", STOCK_IN_LAST_COL, 4),
+  ]);
+  const lastRow = rowNum;
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="8" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="12" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="14" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+}
+async function exportStockInExcelXlsx(receipt) {
+  if (typeof JSZip === "undefined") {
+    throw new Error("JSZip missing");
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  const { sharedStringsXml, sheetXml } = buildStockInSheetXml(receipt);
+  const tpl = await fetch(STOCK_IN_XLSX_TEMPLATE).then((r) => {
+    if (!r.ok) throw new Error("template missing");
+    return r.arrayBuffer();
+  });
+  const zip = await JSZip.loadAsync(tpl);
+  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  zip.file("xl/styles.xml", warehousePrepareStylesXml());
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `orlogo-avah-${stamp}.xls`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
 function warehouseDateLabel(prefix, raw = todayIso()) {
   const parts = String(raw).split("-");
   if (parts.length === 3) {
@@ -6849,6 +7048,18 @@ function warehouseDateLabel(prefix, raw = todayIso()) {
     if (y && m && d) return `${prefix}: ${y}/${m}/${d}`;
   }
   return `${prefix}: ${raw}`;
+}
+function warehouseSheetDateValue(raw = todayIso()) {
+  const parts = String(raw).split("-");
+  if (parts.length === 3) {
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (y && m && d) {
+      return ` ${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+    }
+  }
+  return ` ${raw}`;
 }
 function warehouseSheetDateLabel() {
   return warehouseDateLabel("Огноо", state.filters.warehouseDate || todayIso());
@@ -6969,27 +7180,31 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     return idx;
   };
   const warehouseEmp = state.currentEmployee?.name || "-";
-  const orderDateLabel = warehouseOrderDateLabel();
-  const printedDateLabel = warehousePrintedDateLabel();
+  const orderDateLabel = "Захиалгын огноо:";
+  const orderDateValue = warehouseSheetDateValue(
+    state.filters.warehouseDate || todayIso(),
+  );
+  const printedDateLabel = "Хэвлэсэн огноо:";
+  const printedDateValue = warehouseSheetDateValue(todayIso());
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
   const sections = warehouseOrderPrepareSections(orders);
   const rows = [];
-  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `C2:F2`, `C3:F3`];
+  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `C2:E2`, `C3:E3`];
   let rowNum = 1;
   let catIndex = 0;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells, WAREHOUSE_PREPARE_LAST_COL));
     rowNum += 1;
   };
-  const warehousePrepareMetaRow = (row, label, value) => [
+  const warehousePrepareMetaRow = (row, label, value, dateLabel, dateValue) => [
     xlsxCellXml(`A${row}`, 3, si(label), "s"),
     xlsxCellXml(`B${row}`, 4, si(value), "s"),
-    xlsxCellXml(`C${row}`, 5, null, "empty"),
-    xlsxCellXml(`D${row}`, 6, null, "empty"),
-    xlsxCellXml(`E${row}`, 5, null, "empty"),
-    xlsxCellXml(`F${row}`, 6, null, "empty"),
+    xlsxCellXml(`C${row}`, 14, si(dateLabel), "s"),
+    xlsxCellXml(`D${row}`, 14, null, "empty"),
+    xlsxCellXml(`E${row}`, 14, null, "empty"),
+    xlsxCellXml(`F${row}`, 14, si(dateValue), "s"),
   ];
   const warehousePrepareWorkerExtraRow = (row, name) => [
     xlsxCellXml(`A${row}`, 6, null, "empty"),
@@ -7025,37 +7240,14 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml("A1", 13, si("Бараа бэлдэх хуудас"), "s"),
     ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
   ]);
-  pushRow(28.5, [
-    xlsxCellXml("A2", 3, si("Агуулахын ажилтан:"), "s"),
-    xlsxCellXml("B2", 4, si(warehouseEmp), "s"),
-    xlsxCellXml("C2", 14, si(orderDateLabel), "s"),
-    xlsxCellXml("D2", 14, null, "empty"),
-    xlsxCellXml("E2", 14, null, "empty"),
-    xlsxCellXml("F2", 14, null, "empty"),
-  ]);
+  pushRow(28.5, warehousePrepareMetaRow(2, "Агуулахын ажилтан:", warehouseEmp, "Захиалгын огноо:", orderDateValue));
   if (workerNames.length) {
-    const firstWorkerRow = rowNum;
-    pushRow(20.25, [
-      xlsxCellXml(`A${firstWorkerRow}`, 3, si("Захиалга авсан ажилтан:"), "s"),
-      xlsxCellXml(`B${firstWorkerRow}`, 4, si(workerNames[0]), "s"),
-      xlsxCellXml(`C${firstWorkerRow}`, 14, si(printedDateLabel), "s"),
-      xlsxCellXml(`D${firstWorkerRow}`, 14, null, "empty"),
-      xlsxCellXml(`E${firstWorkerRow}`, 14, null, "empty"),
-      xlsxCellXml(`F${firstWorkerRow}`, 14, null, "empty"),
-    ]);
+    pushRow(20.25, warehousePrepareMetaRow(3, "Захиалга авсан ажилтан:", workerNames[0], "Хэвлэсэн огноо:", printedDateValue));
     for (let i = 1; i < workerNames.length; i += 1) {
       pushRow(16.5, warehousePrepareWorkerExtraRow(rowNum, workerNames[i]));
     }
   } else {
-    const firstWorkerRow = rowNum;
-    pushRow(20.25, [
-      xlsxCellXml(`A${firstWorkerRow}`, 3, si("Захиалга авсан ажилтан:"), "s"),
-      xlsxCellXml(`B${firstWorkerRow}`, 4, si("-"), "s"),
-      xlsxCellXml(`C${firstWorkerRow}`, 14, si(printedDateLabel), "s"),
-      xlsxCellXml(`D${firstWorkerRow}`, 14, null, "empty"),
-      xlsxCellXml(`E${firstWorkerRow}`, 14, null, "empty"),
-      xlsxCellXml(`F${firstWorkerRow}`, 14, null, "empty"),
-    ]);
+    pushRow(20.25, warehousePrepareMetaRow(3, "Захиалга авсан ажилтан:", "-", "Хэвлэсэн огноо:", printedDateValue));
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
@@ -7101,22 +7293,22 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     const promoHeadRow = rowNum;
     merges.push(`A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`);
     pushRow(27.75, [
-      xlsxCellXml(`A${promoHeadRow}`, 15, si("Урамшуулалтай бараа"), "s"),
+      xlsxCellXml(`A${promoHeadRow}`, 15, si("Урамшууллын бараа"), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
     ]);
     pushPrepareGroups(sections.promo);
   }
   pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-  pushRow(47.25, []);
+  pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const sign1 = rowNum;
-  merges.push(`A${sign1}:B${sign1}`, `C${sign1}:E${sign1}`);
+  merges.push(`C${sign1}:F${sign1}`);
   pushRow(null, [
     xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтан:"), "s"),
-    xlsxCellXml(`B${sign1}`, 17, null, "empty"),
+    xlsxCellXml(`B${sign1}`, 18, si("Нэр"), "s"),
     xlsxCellXml(
       `C${sign1}`,
       18,
-      si("/...................................................../"),
+      si("...................................................."),
       "s",
     ),
     xlsxCellXml(`D${sign1}`, 18, null, "empty"),
@@ -7124,24 +7316,30 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`F${sign1}`, 18, null, "empty"),
   ]);
   const sign2 = rowNum;
-  merges.push(`C${sign2}:E${sign2}`);
+  merges.push(`C${sign2}:F${sign2}`);
   pushRow(null, [
     xlsxCellXml(`A${sign2}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign2}`, 12, null, "empty"),
-    xlsxCellXml(`C${sign2}`, 16, si("гарын үсэг"), "s"),
-    xlsxCellXml(`D${sign2}`, 16, null, "empty"),
-    xlsxCellXml(`E${sign2}`, 16, null, "empty"),
-    xlsxCellXml(`F${sign2}`, 16, null, "empty"),
+    xlsxCellXml(`B${sign2}`, 16, si("Гарын үсэг"), "s"),
+    xlsxCellXml(
+      `C${sign2}`,
+      18,
+      si("...................................................."),
+      "s",
+    ),
+    xlsxCellXml(`D${sign2}`, 18, null, "empty"),
+    xlsxCellXml(`E${sign2}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign2}`, 18, null, "empty"),
   ]);
+  pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const sign3 = rowNum;
-  merges.push(`A${sign3}:B${sign3}`, `C${sign3}:E${sign3}`);
+  merges.push(`C${sign3}:F${sign3}`);
   pushRow(null, [
     xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан ажилтан:"), "s"),
-    xlsxCellXml(`B${sign3}`, 17, null, "empty"),
+    xlsxCellXml(`B${sign3}`, 18, si("Нэр"), "s"),
     xlsxCellXml(
       `C${sign3}`,
       18,
-      si("/...................................................../"),
+      si("...................................................."),
       "s",
     ),
     xlsxCellXml(`D${sign3}`, 18, null, "empty"),
@@ -7149,18 +7347,23 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`F${sign3}`, 18, null, "empty"),
   ]);
   const sign4 = rowNum;
-  merges.push(`C${sign4}:E${sign4}`);
+  merges.push(`C${sign4}:F${sign4}`);
   pushRow(null, [
     xlsxCellXml(`A${sign4}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign4}`, 12, null, "empty"),
-    xlsxCellXml(`C${sign4}`, 16, si("гарын үсэг"), "s"),
-    xlsxCellXml(`D${sign4}`, 16, null, "empty"),
-    xlsxCellXml(`E${sign4}`, 16, null, "empty"),
-    xlsxCellXml(`F${sign4}`, 16, null, "empty"),
+    xlsxCellXml(`B${sign4}`, 16, si("Гарын үсэг"), "s"),
+    xlsxCellXml(
+      `C${sign4}`,
+      18,
+      si("...................................................."),
+      "s",
+    ),
+    xlsxCellXml(`D${sign4}`, 18, null, "empty"),
+    xlsxCellXml(`E${sign4}`, 18, null, "empty"),
+    xlsxCellXml(`F${sign4}`, 18, null, "empty"),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="34" customWidth="1"/><col min="2" max="2" width="12.5" customWidth="1"/><col min="3" max="3" width="20" customWidth="1"/><col min="4" max="4" width="7" customWidth="1"/><col min="5" max="5" width="8" customWidth="1"/><col min="6" max="6" width="12.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.125" customWidth="1"/><col min="2" max="2" width="12.75" customWidth="1"/><col min="3" max="3" width="13.75" customWidth="1"/><col min="4" max="4" width="7.375" customWidth="1"/><col min="5" max="5" width="8.125" customWidth="1"/><col min="6" max="6" width="14.625" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
@@ -7179,6 +7382,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   const zip = await JSZip.loadAsync(tpl);
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  zip.file("xl/styles.xml", warehousePrepareStylesXml());
   const blob = await zip.generateAsync({
     type: "blob",
     mimeType:
@@ -7193,8 +7397,8 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const stamp = new Date().toISOString().slice(0, 10);
   const warehouseEmp = state.currentEmployee?.name || "-";
-  const orderDateLabel = warehouseOrderDateLabel();
-  const printedDateLabel = warehousePrintedDateLabel();
+  const orderDateText = `Захиалгын огноо:${warehouseSheetDateValue(state.filters.warehouseDate || todayIso())}`;
+  const printedDateText = `Хэвлэсэн огноо:${warehouseSheetDateValue(todayIso())}`;
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
@@ -7204,10 +7408,10 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? workerNames
         .map(
           (name, idx) =>
-            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td colspan="4" class="date">${h(printedDateLabel)}</td>` : "<td></td><td></td><td></td><td></td>"}</tr>`,
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td colspan="4" class="date">${h(printedDateText)}</td>` : "<td></td><td></td><td></td><td></td>"}</tr>`,
         )
         .join("")
-    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td colspan="4" class="date">${h(printedDateLabel)}</td></tr>`;
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td colspan="4" class="date">${h(printedDateText)}</td></tr>`;
   const renderGroupRows = (groups) =>
     groups
       .map((item) => {
@@ -7220,7 +7424,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
       })
       .join("");
   const promoRows = sections.promo.length
-    ? `<tr><td colspan="6" class="cat promo-head">Урамшуулалтай бараа</td></tr>${renderGroupRows(sections.promo)}`
+    ? `<tr><td colspan="6" class="cat promo-head">Урамшууллын бараа</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
@@ -7250,16 +7454,16 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
 <tr><td colspan="6" class="title">Бараа бэлдэх хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td colspan="4" class="date">${h(orderDateLabel)}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td colspan="4" class="date">${h(orderDateText)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td colspan="2" class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="3" class="sign-line">/...................................................../</td><td></td></tr>
-<tr><td colspan="2"></td><td colspan="3" class="sign-hint">гарын үсэг</td><td></td></tr>
-<tr><td colspan="2" class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="3" class="sign-line">/...................................................../</td><td></td></tr>
-<tr><td colspan="2"></td><td colspan="3" class="sign-hint">гарын үсэг</td><td></td></tr>
+<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line">....................................................</td></tr>
+<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line">....................................................</td></tr>
+<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line">....................................................</td></tr>
+<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line">....................................................</td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }

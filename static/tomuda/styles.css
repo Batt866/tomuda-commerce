@@ -4746,7 +4746,7 @@ input::placeholder, textarea::placeholder {
 
 .stock-in-entry-row {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 96px;
+  grid-template-columns: 80px minmax(0, 1fr) 72px;
   gap: 10px 12px;
   padding: 12px;
   align-items: center;
@@ -4772,20 +4772,20 @@ input::placeholder, textarea::placeholder {
 .stock-in-entry-row__inputs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 96px;
+  gap: 6px;
+  width: 72px;
   flex-shrink: 0;
 }
 
 .stock-in-entry-row__field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
 .stock-in-entry-row__label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4795,8 +4795,10 @@ input::placeholder, textarea::placeholder {
 .stock-in-entry-row__input {
   width: 100%;
   min-width: 0;
-  padding: 8px 6px;
-  font-size: 14px;
+  min-height: 34px !important;
+  height: 34px;
+  padding: 4px 4px;
+  font-size: 13px !important;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -4806,10 +4808,10 @@ input::placeholder, textarea::placeholder {
   align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: 4px 5px;
-  border-radius: 8px;
+  padding: 3px 4px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--hex-secondary) 70%, var(--hex-card));
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
@@ -4842,23 +4844,25 @@ input::placeholder, textarea::placeholder {
 
 @media (max-width: 639px) {
   .stock-in-entry-row {
-    grid-template-columns: 80px minmax(0, 1fr) 88px;
+    grid-template-columns: 80px minmax(0, 1fr) 68px;
     gap: 8px 10px;
     padding: 10px;
   }
 
   .stock-in-entry-row__inputs {
-    width: 88px;
+    width: 68px;
   }
 
   .stock-in-entry-row__input {
-    padding: 7px 4px;
-    font-size: 13px;
+    min-height: 32px !important;
+    height: 32px;
+    padding: 3px 3px;
+    font-size: 12px !important;
   }
 
   .stock-in-entry-row__cost {
-    padding: 3px 4px;
-    font-size: 10px;
+    padding: 2px 3px;
+    font-size: 9px;
   }
 }
 
