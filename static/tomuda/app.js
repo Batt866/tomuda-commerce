@@ -357,6 +357,8 @@ async function fetchBackendStateWithRetry() {
   return null;
 }
 const fmt = (n) => "₮" + Number(n || 0).toLocaleString();
+const fmtExcelMoney = (n) =>
+  `${Number(n || 0).toLocaleString("en-US")}₮`;
 const RECEIPT_PERCENT_DISCOUNT = 3;
 const RECEIPT_FONT = '"Roboto", Arial, sans-serif';
 const RECEIPT_FONT_LINK =
@@ -5503,7 +5505,7 @@ function inventoryView() {
     )
     .join(
       "",
-    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" ? (state.stockInDone ? excelDownloadBtn("confirmStockInExcel()") : "") : excelDownloadBtn("confirmInventoryExport()") })}<div class="inventory-categories flex flex-wrap gap-2"><button type="button" onclick="setInventoryCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
+    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" ? "" : excelDownloadBtn("confirmInventoryExport()") })}<div class="inventory-categories flex flex-wrap gap-2"><button type="button" onclick="setInventoryCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
     .map(
       (c) =>
         `<button type="button" onclick="setInventoryCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${c}</button>`,
@@ -5644,7 +5646,7 @@ function applyStockInReceipt(receipt) {
   }
   scheduleBackendSave();
 }
-function finishStockIn() {
+function confirmFinishStockIn() {
   ensureStockInSession();
   if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
   if (!stockInHasEntries()) return alert("Орлого оруулна уу");
@@ -5656,23 +5658,23 @@ function finishStockIn() {
       return;
     }
   }
-  const receipt = buildStockInReceiptSnapshot();
-  applyStockInReceipt(receipt);
-  state.stockInReceipt = receipt;
-  state.stockInDone = true;
-  render();
+  confirmStockInReceiptExport(buildStockInReceiptSnapshot());
 }
-function confirmFinishStockIn() {
-  ensureStockInSession();
-  if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
-  if (!stockInHasEntries()) return alert("Орлого оруулна уу");
-  confirmModal("Орлого дуусгах", "Орлого бүртгэж баримт үүсгэх үү?", {
-    confirmLabel: "Дуусгах",
-    onConfirm: finishStockIn,
+function confirmStockInReceiptExport(receipt) {
+  if (!receipt?.lines?.length) return;
+  const summary = `<p>Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(receipt.employeeName)}</b> · ${receipt.lines.length} бараа · ${fmtExcelMoney(receipt.totalAmount)}</p>`;
+  confirmModal("Орлогын баримт", summary, {
+    confirmLabel: "Татах",
+    onConfirm: () => {
+      applyStockInReceipt(receipt);
+      startStockInSession();
+      render();
+      exportStockInExcel(receipt);
+    },
   });
 }
 function confirmNewStockIn() {
-  const hasData = stockInHasEntries() || state.stockInDone;
+  const hasData = stockInHasEntries();
   if (!hasData) {
     resetStockInSession();
     return;
@@ -5810,23 +5812,16 @@ function stockInReceiptPanel(receipt) {
 }
 function stockInPanel(list) {
   ensureStockInSession();
-  if (state.stockInDone && state.stockInReceipt) {
-    return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInReceiptPanel(state.stockInReceipt)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
-  }
   return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
-function exportStockInExcel() {
-  const receipt = state.stockInReceipt;
+function exportStockInExcel(receipt) {
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
   exportStockInExcelXlsx(receipt).catch(() =>
     exportStockInExcelFallback(receipt),
   );
 }
 function confirmStockInExcel() {
-  if (!state.stockInDone || !state.stockInReceipt?.lines?.length) {
-    return alert("Эхлээд орлогоо дуусгана уу");
-  }
-  confirmDataExport("Excel татах", exportStockInExcel);
+  return alert("Эхлээд орлогоо дуусгана уу");
 }
 function exportStockInExcelFallback(receipt) {
   const stamp = new Date().toISOString().slice(0, 10);
@@ -5838,7 +5833,7 @@ function exportStockInExcelFallback(receipt) {
         return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
       }
       const line = item.line;
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${line.costPrice}</td><td class="num">${line.unitPrice}</td><td class="num">${line.totalPrice}</td></tr>`;
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(line.costPrice)}</td><td class="num">${fmtExcelMoney(line.unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice)}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -5863,10 +5858,10 @@ table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; 
 </style></head><body><table class="stock-in">
 <colgroup><col><col><col><col><col><col><col></colgroup>
 <tr><td colspan="7" class="title">Орлого авах баримт</td></tr>
-<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)}</td><td colspan="3">Огноо: ${date.day} / ${date.month} / ${date.year}</td></tr>
+<tr class="meta"><td colspan="7">Ажилтан: ${h(receipt.employeeName)} · ${receipt.lines.length} бараа</td></tr>
 <tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${receipt.totalAmount}</td></tr>
+<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount)}</td></tr>
 <tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________ (гарын үсэг)</td></tr>
 <tr class="sign"><td colspan="7">Хүлээн авсан: ________________________ (гарын үсэг)</td></tr>
 <tr class="sign"><td colspan="7">Баримтын огноо: ${date.day} / ${date.month} / ${date.year}</td></tr>
@@ -6898,7 +6893,7 @@ function buildStockInSheetXml(receipt) {
   const dateValue = ` ${date.year}/${String(date.month).padStart(2, "0")}/${String(date.day).padStart(2, "0")}`;
   const groups = stockInReceiptGroupedLines(receipt.lines);
   const rows = [];
-  const merges = [`A1:${STOCK_IN_LAST_COL}1`, `C2:E2`];
+  const merges = [`A1:${STOCK_IN_LAST_COL}1`, `A2:${STOCK_IN_LAST_COL}2`];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
@@ -6922,14 +6917,16 @@ function buildStockInSheetXml(receipt) {
     xlsxCellXml("A1", 13, si("Орлого авах баримт"), "s"),
     ...emptyCells(1, "B", STOCK_IN_LAST_COL, 13),
   ]);
-  pushRow(28.5, [
-    xlsxCellXml("A2", 3, si("Ажилтан:"), "s"),
-    xlsxCellXml("B2", 4, si(receipt.employeeName || "-"), "s"),
-    xlsxCellXml("C2", 14, si("Огноо:"), "s"),
-    xlsxCellXml("D2", 14, null, "empty"),
-    xlsxCellXml("E2", 14, null, "empty"),
-    xlsxCellXml("F2", 14, si(dateValue), "s"),
-    xlsxCellXml("G2", 14, null, "empty"),
+  pushRow(20.25, [
+    xlsxCellXml(
+      "A2",
+      4,
+      si(
+        `Ажилтан: ${receipt.employeeName || "-"} · ${receipt.lines.length} бараа`,
+      ),
+      "s",
+    ),
+    ...emptyCells(2, "B", STOCK_IN_LAST_COL, 4),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
   const headerRow = rowNum;
@@ -6959,9 +6956,9 @@ function buildStockInSheetXml(receipt) {
       xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
       xlsxOptionalNum(`C${r}`, 10, line.packs),
       xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
-      xlsxCellXml(`E${r}`, 10, Number(line.costPrice) || 0, "n"),
-      xlsxCellXml(`F${r}`, 10, Number(line.unitPrice) || 0, "n"),
-      xlsxCellXml(`G${r}`, 10, Number(line.totalPrice) || 0, "n"),
+      xlsxCellXml(`E${r}`, 8, si(fmtExcelMoney(line.costPrice)), "s"),
+      xlsxCellXml(`F${r}`, 8, si(fmtExcelMoney(line.unitPrice)), "s"),
+      xlsxCellXml(`G${r}`, 8, si(fmtExcelMoney(line.totalPrice)), "s"),
     ]);
   }
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
@@ -6970,7 +6967,7 @@ function buildStockInSheetXml(receipt) {
   pushRow(16.5, [
     xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
     ...emptyCells(totalRow, "B", "F", 10),
-    xlsxCellXml(`G${totalRow}`, 10, Number(receipt.totalAmount) || 0, "n"),
+    xlsxCellXml(`G${totalRow}`, 10, si(fmtExcelMoney(receipt.totalAmount)), "s"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
   const sign1 = rowNum;
