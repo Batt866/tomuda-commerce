@@ -35,22 +35,33 @@ PRODUCT_HEADERS = [
 CUSTOMER_HEADER_ALIASES: dict[str, str] = {
     "нэр": "name",
     "name": "name",
+    "байгууллагын нэр": "name",
+    "company": "name",
+    "company name": "name",
+    "компани": "name",
     "регистр": "registrationNumber",
     "registration": "registrationNumber",
     "рд": "registrationNumber",
     "rd": "registrationNumber",
+    "рдад": "registrationNumber",
     "утас 1": "phone1",
     "утас1": "phone1",
+    "утас": "phone1",
+    "гар утас": "phone1",
     "phone1": "phone1",
+    "phone": "phone1",
+    "mobile": "phone1",
     "утас 2": "phone2",
     "утас2": "phone2",
     "phone2": "phone2",
     "аймаг / хот": "province",
     "аймаг/хот": "province",
     "аймаг": "province",
+    "хот": "province",
     "province": "province",
     "дүүрэг": "district",
     "дүүрэг/сум": "district",
+    "сум": "district",
     "district": "district",
     "хороо": "khoroo",
     "khoroo": "khoroo",
@@ -114,7 +125,7 @@ def _valid_phone(value: str) -> bool:
     if not value:
         return True
     digits = re.sub(r"\D", "", value)
-    return len(digits) >= 7
+    return len(digits) >= 6
 
 
 def _parse_number(value: Any, *, allow_empty: bool = False) -> tuple[float | None, str | None]:
@@ -148,14 +159,97 @@ def _row_is_empty(cells: list[str]) -> bool:
     return not any(cells)
 
 
+def _is_template_example_customer(name: str, reg_raw: str) -> bool:
+    normalized = _normalize_header(name)
+    if normalized in {"жишээ ххк", "жишээ", "example", "sample"}:
+        return True
+    reg_digits = _registration_digits(reg_raw)
+    return normalized == "жишээ ххк" or reg_digits == "1234567"
+
+
 def _load_rows_xlsx(data: bytes) -> list[list[str]]:
-    wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    wb = load_workbook(io.BytesIO(data), read_only=False, data_only=True)
     try:
-        ws = wb.active
         rows: list[list[str]] = []
-        for row in ws.iter_rows(values_only=True):
+        for row in wb.active.iter_rows(
+            min_row=1,
+            max_row=wb.active.max_row,
+            max_col=wb.active.max_column,
+            values_only=True,
+        ):
             rows.append([_cell_text(v) for v in row])
+        while rows and _row_is_empty(rows[-1]):
+            rows.pop()
         return rows
+    finally:
+        wb.close()
+
+
+def _load_workbook_rows(data: bytes, filename: str) -> list[list[str]]:
+    name = (filename or "").lower()
+    if name.endswith(".xlsx"):
+        return _load_rows_xlsx(data)
+    if name.endswith(".xls"):
+        return _load_rows_xls(data)
+    raise ValueError("Зөвхөн .xlsx эсвэл .xls файл зөвшөөрнө")
+
+
+def _best_sheet_rows(data: bytes, filename: str) -> list[list[str]]:
+    name = (filename or "").lower()
+    if not name.endswith(".xlsx"):
+        return _load_workbook_rows(data, filename)
+
+    wb = load_workbook(io.BytesIO(data), read_only=False, data_only=True)
+    try:
+        best_rows: list[list[str]] = []
+        best_score = -1
+        for ws in wb.worksheets:
+            rows: list[list[str]] = []
+            for row in ws.iter_rows(
+                min_row=1,
+                max_row=ws.max_row,
+                max_col=ws.max_column,
+                values_only=True,
+            ):
+                rows.append([_cell_text(v) for v in row])
+            while rows and _row_is_empty(rows[-1]):
+                rows.pop()
+            if not rows:
+                continue
+            header_idx, header_map = _find_header_row(rows, CUSTOMER_HEADER_ALIASES, ("name",))
+            product_header_idx, product_header_map = _find_header_row(
+                rows,
+                PRODUCT_HEADER_ALIASES,
+                ("barcode", "name"),
+            )
+            data_count = 0
+            if header_idx >= 0:
+                for row in rows[header_idx + 1 :]:
+                    if _row_is_empty(row):
+                        continue
+                    data_count += 1
+            score = data_count
+            if header_idx >= 0:
+                score += 10
+            if product_header_idx >= 0:
+                score += 5
+            if score > best_score:
+                best_score = score
+                best_rows = rows
+        if not best_rows:
+            ws = wb.active
+            rows = []
+            for row in ws.iter_rows(
+                min_row=1,
+                max_row=ws.max_row,
+                max_col=ws.max_column,
+                values_only=True,
+            ):
+                rows.append([_cell_text(v) for v in row])
+            while rows and _row_is_empty(rows[-1]):
+                rows.pop()
+            best_rows = rows
+        return best_rows
     finally:
         wb.close()
 
@@ -174,12 +268,7 @@ def _load_rows_xls(data: bytes) -> list[list[str]]:
 
 
 def load_sheet_rows(data: bytes, filename: str) -> list[list[str]]:
-    name = (filename or "").lower()
-    if name.endswith(".xlsx"):
-        return _load_rows_xlsx(data)
-    if name.endswith(".xls"):
-        return _load_rows_xls(data)
-    raise ValueError("Зөвхөн .xlsx эсвэл .xls файл зөвшөөрнө")
+    return _best_sheet_rows(data, filename)
 
 
 def _map_headers(header_row: list[str], aliases: dict[str, str]) -> dict[str, int]:
@@ -189,6 +278,20 @@ def _map_headers(header_row: list[str], aliases: dict[str, str]) -> dict[str, in
         if key and key not in mapping:
             mapping[key] = idx
     return mapping
+
+
+def _find_header_row(
+    rows: list[list[str]],
+    aliases: dict[str, str],
+    required: tuple[str, ...],
+    *,
+    scan_limit: int = 20,
+) -> tuple[int, dict[str, int]]:
+    for idx, row in enumerate(rows[:scan_limit]):
+        mapping = _map_headers(row, aliases)
+        if all(key in mapping for key in required):
+            return idx, mapping
+    return -1, {}
 
 
 def _row_dict(row: list[str], mapping: dict[str, int]) -> dict[str, str]:
@@ -333,12 +436,18 @@ def import_customers_into_state(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not rows:
         raise ValueError("Excel хоосон байна")
-    header_map = _map_headers(rows[0], CUSTOMER_HEADER_ALIASES)
-    if "name" not in header_map:
-        raise ValueError("Excel-д «Нэр» багана олдсонгүй")
+    header_idx, header_map = _find_header_row(rows, CUSTOMER_HEADER_ALIASES, ("name",))
+    if header_idx < 0:
+        raise ValueError("Excel-д «Нэр» багана олдсонгүй (эхний мөрөнд багана нэр байх ёстой)")
+    data_rows = rows[header_idx + 1 :]
 
     existing_regs = {
         _registration_digits(str(c.get("registrationNumber") or ""))
+        for c in state.get("customers") or []
+        if _registration_digits(str(c.get("registrationNumber") or ""))
+    }
+    existing_by_reg = {
+        _registration_digits(str(c.get("registrationNumber") or "")): c
         for c in state.get("customers") or []
         if _registration_digits(str(c.get("registrationNumber") or ""))
     }
@@ -349,10 +458,9 @@ def import_customers_into_state(
     total = 0
     now = int(time.time() * 1000)
 
-    for offset, row in enumerate(rows[1:], start=2):
+    for offset, row in enumerate(data_rows, start=header_idx + 2):
         if _row_is_empty(row):
             continue
-        total += 1
         data = _row_dict(row, header_map)
         name = _cell_text(data.get("name"))
         reg_raw = _cell_text(data.get("registrationNumber"))
@@ -360,13 +468,20 @@ def import_customers_into_state(
         phone1 = _cell_text(data.get("phone1"))
         phone2 = _cell_text(data.get("phone2"))
 
+        if _is_template_example_customer(name, reg_raw):
+            continue
+        total += 1
         if not name:
             errors.append({"row": offset, "message": "Нэр хоосон байна."})
             continue
         if reg_digits:
-            if reg_digits in existing_regs or reg_digits in batch_regs:
+            if reg_digits in batch_regs:
                 errors.append({"row": offset, "message": "Регистр давхардаж байна."})
                 continue
+            if reg_digits in existing_by_reg:
+                errors.append({"row": offset, "message": "Регистр системд бүртгэлтэй байна."})
+                continue
+            batch_regs.add(reg_digits)
         if phone1 and not _valid_phone(phone1):
             errors.append({"row": offset, "message": "Утасны формат буруу байна."})
             continue
@@ -393,9 +508,14 @@ def import_customers_into_state(
         }
         customers.append(customer)
         if reg_digits:
-            batch_regs.add(reg_digits)
             existing_regs.add(reg_digits)
+            existing_by_reg[reg_digits] = customer
         success += 1
+
+    if total <= 0:
+        raise ValueError(
+            "Excel-д өгөгдөлтэй мөр олдсонгүй. «Формат татах» товчоор татсан файлд мэдээллээ оруулна уу."
+        )
 
     next_state = dict(state)
     next_state["customers"] = customers
@@ -414,9 +534,14 @@ def import_products_into_state(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not rows:
         raise ValueError("Excel хоосон байна")
-    header_map = _map_headers(rows[0], PRODUCT_HEADER_ALIASES)
-    if "barcode" not in header_map or "name" not in header_map:
+    header_idx, header_map = _find_header_row(
+        rows,
+        PRODUCT_HEADER_ALIASES,
+        ("barcode", "name"),
+    )
+    if header_idx < 0:
         raise ValueError("Excel-д «Barcode» болон «Барааны нэр» багана шаардлагатай")
+    data_rows = rows[header_idx + 1 :]
 
     existing_barcodes = {
         re.sub(r"\D", "", str(p.get("barcode") or ""))
@@ -430,7 +555,7 @@ def import_products_into_state(
     total = 0
     now = int(time.time() * 1000)
 
-    for offset, row in enumerate(rows[1:], start=2):
+    for offset, row in enumerate(data_rows, start=header_idx + 2):
         if _row_is_empty(row):
             continue
         total += 1

@@ -923,26 +923,73 @@ async function downloadImportTemplate(kind) {
   }
 }
 function triggerImportUpload(kind) {
-  const input = document.querySelector(`[data-import-file="${kind}"]`);
+  const zone = document.querySelector(`[data-import-dropzone="${kind}"]`);
+  const input =
+    zone?.querySelector(`[data-import-file="${kind}"]`) ||
+    document.querySelector(`[data-import-file="${kind}"]`);
   if (!input) return;
   input.value = "";
   input.click();
+}
+function importApiDetail(payload, fallback = "Импорт амжилтгүй") {
+  const detail = payload?.detail ?? payload?.message;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length) {
+    const first = detail[0];
+    if (typeof first === "string") return first;
+    if (first?.msg) return String(first.msg);
+  }
+  return fallback;
+}
+function importReportHint(report = {}) {
+  if ((report.total || 0) <= 0) {
+    return " — Excel-д өгөгдөлтэй мөр олдсонгүй";
+  }
+  const first = (report.errors || [])[0];
+  if (!first?.message) return "";
+  return ` (${first.message}, мөр ${first.row || "?"})`;
+}
+async function waitForBackendSaveIdle() {
+  while (backendSaving) await sleep(50);
 }
 function showImportReportModal(report, kind) {
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
   const errors = (report.errors || [])
     .map(
       (item) =>
-        `<li><b>Row ${item.row}</b> → ${esc(item.message || "Алдаа")}</li>`,
+        `<li><b>Мөр ${item.row}</b> → ${esc(item.message || "Алдаа")}</li>`,
     )
     .join("");
-  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p></div>${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Алдааны дэлгэрэнгүй</p><ul>${errors}</ul></div>` : `<p class="import-report__ok">Бүх мөр амжилттай импортлогдлоо.</p>`}</div>`;
+  let summary = "";
+  if ((report.total || 0) <= 0) {
+    summary = `<p class="import-report__empty">Excel-д өгөгдөлтэй мөр олдсонгүй. «Формат татах» товчоор татсан файл ашиглаж, 2-р мөрөөс мэдээлэл оруулна уу.</p>`;
+  } else if ((report.success || 0) <= 0) {
+    summary = `<p class="import-report__empty">Нэг ч мөр импортлогдсонгүй. Доорх алдааг шалгана уу.</p>`;
+  } else if (!errors) {
+    summary = `<p class="import-report__ok">Бүх мөр амжилттай импортлогдлоо.</p>`;
+  }
+  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p></div>${summary}${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Алдааны дэлгэрэнгүй</p><ul>${errors}</ul></div>` : ""}</div>`;
   confirmModal(`${label} импортын тайлан`, body, {
     confirmLabel: "Хаах",
     cancelLabel: "",
     closable: true,
     onConfirm: () => closeConfirmCard(),
   });
+}
+function applyImportPayload(kind, payload) {
+  if (!payload) return false;
+  const report = payload.report || {};
+  if (kind === "customers" && Array.isArray(payload.customers)) {
+    state.customers = payload.customers;
+    if ((report.success || 0) > 0) state.searches.customers = "";
+    return true;
+  }
+  if (kind === "products" && Array.isArray(payload.products)) {
+    state.products = payload.products;
+    if ((report.success || 0) > 0) state.searches.products = "";
+    return true;
+  }
+  return false;
 }
 async function handleImportFile(kind, file) {
   const perm =
@@ -954,13 +1001,24 @@ async function handleImportFile(kind, file) {
     return alertModal("Алдаа", "Зөвхөн .xlsx эсвэл .xls файл зөвшөөрнө.");
   }
   if (importLoading) return;
+  syncCurrentEmployeeFromState();
+  if (!state.currentEmployee?.id) {
+    return alertModal(
+      "Нэвтрээгүй",
+      "Excel импорт хийхийн тулд дахин нэвтэрнэ үү.",
+    );
+  }
   const path =
     kind === "customers" ? "/import/customers" : "/import/products";
   const fd = new FormData();
   fd.append("file", file);
   fd.append("actor", importActorPayload());
+  clearTimeout(backendSaveTimer);
+  backendSaveTimer = null;
   setImportLoading(true);
   try {
+    await waitForBackendSaveIdle();
+    backendSaving = true;
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       body: fd,
@@ -973,20 +1031,18 @@ async function handleImportFile(kind, file) {
       payload = null;
     }
     if (!res.ok) {
-      const msg = payload?.detail || payload?.message || "Импорт амжилтгүй";
+      const msg = importApiDetail(payload);
       showAppToast(String(msg), "error");
       alertModal("Импорт амжилтгүй", esc(String(msg)));
       return;
     }
     const report = payload.report || {};
-    if (kind === "customers" && Array.isArray(payload.customers)) {
-      state.customers = payload.customers;
-    }
-    if (kind === "products" && Array.isArray(payload.products)) {
-      state.products = payload.products;
-    }
-    if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
-    syncBackendSaveMarker();
+    applyImportPayload(kind, payload);
+    syncBackendMarkers(payload);
+    saveLocalBackendCache({
+      state: persistentState(),
+      updatedAt: payload.updatedAt || serverUpdatedAt || "",
+    });
     render();
     if ((report.success || 0) > 0 && !(report.failed || 0)) {
       showAppToast(`${report.success} мөр амжилттай импортлогдлоо`, "success");
@@ -996,7 +1052,7 @@ async function handleImportFile(kind, file) {
         "error",
       );
     } else {
-      showAppToast("Импорт амжилтгүй", "error");
+      showAppToast(`Импорт амжилтгүй${importReportHint(report)}`, "error");
     }
     showImportReportModal(report, kind);
   } catch (error) {
@@ -1004,6 +1060,7 @@ async function handleImportFile(kind, file) {
     showAppToast("Импорт хийхэд алдаа гарлаа", "error");
     alertModal("Алдаа", "Импорт хийхэд алдаа гарлаа.");
   } finally {
+    backendSaving = false;
     setImportLoading(false);
   }
 }
@@ -2142,7 +2199,8 @@ async function fetchBackendPayload() {
   return res.json();
 }
 async function pollBackendState() {
-  if (!backendReady || backendSaving || backendSaveTimer) return;
+  if (!backendReady || backendSaving || backendSaveTimer || importLoading)
+    return;
   if (shouldDeferBackendSync()) return;
   try {
     const payload = await fetchBackendPayload();
@@ -3233,6 +3291,10 @@ async function flushBackendSave() {
 }
 async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
+  if (importLoading) {
+    scheduleBackendSave();
+    return;
+  }
   const protectedData = protectAccidentalDeletions(persistentState());
   if (protectedData.orders) {
     protectedData.orders = retainedOrders(protectedData.orders);
@@ -3270,6 +3332,10 @@ async function saveBackendState(retry = 0) {
   });
   if (body === backendLastSaved) {
     clearOrderPersistenceCache();
+    return;
+  }
+  if (importLoading) {
+    scheduleBackendSave();
     return;
   }
   backendSaving = true;

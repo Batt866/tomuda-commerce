@@ -11186,6 +11186,14 @@ body.image-lightbox-open {
   font-weight: 700;
 }
 
+.import-report__empty {
+  margin: 0;
+  font-size: 14px;
+  color: #b45309;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 @media (max-width: 639px) {
   .excel-import-toolbar__btn {
     font-size: 11px;
