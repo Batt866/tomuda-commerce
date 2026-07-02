@@ -467,10 +467,15 @@ function productForReceiptLine(i) {
   }
   const name = String(i.productName || "").trim();
   if (name) {
-    const hit = state.products.find(
+    const exact = state.products.find(
       (x) => String(x.name || "").trim() === name,
     );
-    if (hit) return hit;
+    if (exact) return exact;
+    const loose = state.products.find((x) => {
+      const pn = String(x.name || "").trim();
+      return pn && (pn.includes(name) || name.includes(pn));
+    });
+    if (loose) return loose;
   }
   return {};
 }
@@ -480,6 +485,8 @@ function receiptPromoCatalogPrice(i) {
 }
 function receiptPromoDisplayPrice(i) {
   if (!i) return 0;
+  const stored = Number(i.catalogPrice);
+  if (Number.isFinite(stored) && stored > 0) return stored;
   const catalog = receiptPromoCatalogPrice(i);
   if (catalog) return catalog;
   const price = Number(i.price);
@@ -494,8 +501,14 @@ function receiptPromoSettleNote(o) {
   if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
   return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлнэ`;
 }
+function enrichPromoLineForReceipt(line) {
+  if (!line?.isPromoFree) return line;
+  const catalog = receiptPromoCatalogPrice(line);
+  if (!catalog) return line;
+  return { ...line, catalogPrice: line.catalogPrice ?? catalog };
+}
 function receiptPromoRowsHtml(o) {
-  const promoItems = receiptPromoItems(o);
+  const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   const settleNote = receiptPromoSettleNote(o);
   const slots = Math.max(2, promoItems.length);
   const head = settleNote
@@ -529,6 +542,9 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm) {
       const valueClass = grand
         ? "receipt-grid__summary-value receipt-grid__summary-value--grand"
         : "receipt-grid__summary-value";
+      if (grand) {
+        return `<tr class="${rowClass}"><td></td><td colspan="9" class="receipt-grid__summary-label">${esc(label)}</td><td class="${valueClass}">${value}</td></tr>`;
+      }
       return `<tr class="${rowClass}"><td></td><td colspan="3" class="receipt-grid__summary-label">${esc(label)}</td><td colspan="6"></td><td class="${valueClass}">${value}</td></tr>`;
     })
     .join("");
@@ -551,7 +567,7 @@ function receiptGrandNote(o) {
   return "";
 }
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p class="receipt-grid__warn-line">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
 }
 function receiptNoticeBoxHtml() {
   return receiptWarningRowsHtml();
@@ -4124,7 +4140,7 @@ function buildOrderReceiptExcelRows(o) {
 function orderReceiptSnapshot(o) {
   return {
     ...o,
-    items: orderItemsWithPromos(o),
+    items: orderItemsWithPromos(o).map(enrichPromoLineForReceipt),
   };
 }
 function receiptExcelPage(o, logoSrc) {
@@ -4156,7 +4172,7 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid--sheet .receipt-grid__summary td { border-top: 1px dotted #808080; }
 .receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #808080; border-bottom: 1px dotted #808080; }
 .receipt-grid--sheet .receipt-grid__promo-title { border-left: 1px dashed #808080; }
-.receipt-grid__promo-settle { text-align: center; font-size: 9pt; white-space: normal; line-height: 1.25; }
+.receipt-grid__promo-settle { text-align: center; font-size: 9pt; white-space: normal; line-height: 1.25; background: #fff2cc; font-weight: 700; }
 .receipt-grid__logo-cell { vertical-align: top; padding: 0; }
 .receipt-logo { width: 48px; height: 48px; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
@@ -4181,19 +4197,21 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__gross .receipt-grid__money { font-size: 11pt; text-align: right; padding-right: 4px; }
 .receipt-grid__summary-label { background: #d9d9d9; font-weight: 400; font-size: 11pt; padding-left: 4px; text-align: left; }
 .receipt-grid__summary-value { text-align: right; font-size: 11pt; padding-right: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-grid__summary--grand td { background: #d9d9d9; }
 .receipt-grid__summary--grand .receipt-grid__summary-label,
 .receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; }
 .receipt-grid__summary-value--grand { font-size: 12pt; }
 .receipt-grid__summary--pay .receipt-grid__summary-value { font-weight: 700; }
 .receipt-grid__footnote td { border: none; padding: 0; }
-.receipt-grid__footnote-text { text-align: center; font-size: 9pt; line-height: 1.35; padding: 4px 6px; }
+.receipt-grid__footnote-text { text-align: center; font-size: 9pt; line-height: 1.35; padding: 6px 4px 2px; }
 .receipt-grid__warn td { border: none; padding: 0; }
-.receipt-grid__warn-box { background: #d9d9d9; text-align: center; padding: 8px 10px; border: 1px solid #808080 !important; }
+.receipt-grid__warn-box { background: transparent; text-align: center; padding: 8px 4px 4px; border: none !important; }
 .receipt-grid__warn-line { margin: 0 0 4px; font-size: 9pt; line-height: 1.35; }
-.receipt-grid__warn-line:last-child { margin-bottom: 0; }
-.receipt-grid__warn-line--bold { font-weight: 700; }
-.receipt-grid__sign-label { font-size: 9pt; padding: 4px 2px 2px; vertical-align: bottom; }
-.receipt-grid__sign-line { border-bottom: 1px dotted #808080; min-height: 18px; vertical-align: bottom; }
+.receipt-grid__warn-line:last-child,
+.receipt-grid__warn-line--last { margin-bottom: 0; }
+.receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
+.receipt-grid__sign-label { font-size: 9pt; padding: 8px 2px 2px; vertical-align: bottom; white-space: nowrap; }
+.receipt-grid__sign-line { border-bottom: 1px dotted #808080 !important; min-height: 20px; vertical-align: bottom; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 `;
 let receiptExcelLogoDataUri = "";
@@ -8916,6 +8934,8 @@ function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
         productName: product.name,
         quantity: grant,
         price: 0,
+        catalogPrice:
+          Number(product.price ?? product.sellPrice ?? 0) || 0,
         total: 0,
         isPromoFree: true,
         ...extra,
