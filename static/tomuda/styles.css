@@ -10996,6 +10996,12 @@ body.image-lightbox-open {
   font-weight: 800;
 }
 
+.stock-in-table__foot--cat {
+  border-top: 1px dashed var(--hex-border);
+  background: color-mix(in srgb, var(--hex-secondary) 45%, var(--hex-card));
+  font-weight: 700;
+}
+
 .stock-in-table__foot-label {
   grid-column: 1 / 7;
   text-align: right;
