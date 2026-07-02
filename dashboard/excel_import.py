@@ -30,6 +30,7 @@ PRODUCT_HEADERS = [
     "Борлуулалтын үнэ",
     "Үйлдвэрлэсэн үнэ",
     "Үйлдвэрлэсэн улс",
+    "Зураг URL",
 ]
 
 CUSTOMER_HEADER_ALIASES: dict[str, str] = {
@@ -90,6 +91,14 @@ PRODUCT_HEADER_ALIASES: dict[str, str] = {
     "үйлдвэрлэсэн улс": "country",
     "улс": "country",
     "country": "country",
+    "зураг": "image",
+    "зураг url": "image",
+    "зургийн холбоос": "image",
+    "image": "image",
+    "image url": "image",
+    "image_url": "image",
+    "photo": "image",
+    "picture": "image",
 }
 
 UNIT_ALIASES: dict[str, str] = {
@@ -104,6 +113,11 @@ UNIT_ALIASES: dict[str, str] = {
     "м": "метр",
 }
 
+EXCEL_IMPORT_FORMAT_HINT = (
+    "Файлын формат .xlsx байх ёстой. «Формат татах» товчоор татсан .xlsx "
+    "загвар ашиглана уу. Хуучин .xls файл мөн дэмжигдэнэ."
+)
+
 
 def _cell_text(value: Any) -> str:
     if value is None:
@@ -115,6 +129,11 @@ def _cell_text(value: Any) -> str:
 
 def _normalize_header(value: Any) -> str:
     return re.sub(r"\s+", " ", _cell_text(value).lower())
+
+
+def _image_url_text(value: Any) -> str:
+    text = _cell_text(value)
+    return "" if text.lower() in {"", "nan", "none", "null"} else text
 
 
 def _registration_digits(value: str) -> str:
@@ -159,6 +178,12 @@ def _row_is_empty(cells: list[str]) -> bool:
     return not any(cells)
 
 
+def _trim_empty_tail(rows: list[list[str]]) -> list[list[str]]:
+    while rows and _row_is_empty(rows[-1]):
+        rows.pop()
+    return rows
+
+
 def _is_template_example_customer(name: str, reg_raw: str) -> bool:
     normalized = _normalize_header(name)
     if normalized in {"жишээ ххк", "жишээ", "example", "sample"}:
@@ -178,9 +203,65 @@ def _load_rows_xlsx(data: bytes) -> list[list[str]]:
             values_only=True,
         ):
             rows.append([_cell_text(v) for v in row])
-        while rows and _row_is_empty(rows[-1]):
-            rows.pop()
-        return rows
+        return _trim_empty_tail(rows)
+    finally:
+        wb.close()
+
+
+def _openpyxl_sheet_rows(ws: Any) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for row in ws.iter_rows(
+        min_row=1,
+        max_row=ws.max_row,
+        max_col=ws.max_column,
+        values_only=True,
+    ):
+        rows.append([_cell_text(v) for v in row])
+    return _trim_empty_tail(rows)
+
+
+def _sheet_import_score(rows: list[list[str]]) -> int:
+    if not rows:
+        return -1
+
+    score = 0
+    header_idx, _ = _find_header_row(rows, CUSTOMER_HEADER_ALIASES, ("name",))
+    product_header_idx, _ = _find_header_row(
+        rows,
+        PRODUCT_HEADER_ALIASES,
+        ("barcode", "name"),
+    )
+    if header_idx >= 0:
+        score += 10
+        score += sum(1 for row in rows[header_idx + 1 :] if not _row_is_empty(row))
+    if product_header_idx >= 0:
+        score += 10
+        score += sum(
+            1 for row in rows[product_header_idx + 1 :] if not _row_is_empty(row)
+        )
+    if score:
+        return score
+    return 1 if any(not _row_is_empty(row) for row in rows) else -1
+
+
+def _best_rows_from_sheets(sheet_rows: list[list[list[str]]]) -> list[list[str]]:
+    best_rows: list[list[str]] = []
+    best_score = -1
+    for rows in sheet_rows:
+        score = _sheet_import_score(rows)
+        if score > best_score:
+            best_score = score
+            best_rows = rows
+    return best_rows
+
+
+def _best_rows_xlsx(data: bytes) -> list[list[str]]:
+    wb = load_workbook(io.BytesIO(data), read_only=False, data_only=True)
+    try:
+        best_rows = _best_rows_from_sheets(
+            [_openpyxl_sheet_rows(ws) for ws in wb.worksheets]
+        )
+        return best_rows or _openpyxl_sheet_rows(wb.active)
     finally:
         wb.close()
 
@@ -188,10 +269,10 @@ def _load_rows_xlsx(data: bytes) -> list[list[str]]:
 def _load_workbook_rows(data: bytes, filename: str) -> list[list[str]]:
     name = (filename or "").lower()
     if name.endswith(".xlsx"):
-        return _load_rows_xlsx(data)
+        return _best_rows_xlsx(data)
     if name.endswith(".xls"):
         return _load_rows_xls(data)
-    raise ValueError("Зөвхөн .xlsx эсвэл .xls файл зөвшөөрнө")
+    raise ValueError(EXCEL_IMPORT_FORMAT_HINT)
 
 
 def _best_sheet_rows(data: bytes, filename: str) -> list[list[str]]:
@@ -199,72 +280,33 @@ def _best_sheet_rows(data: bytes, filename: str) -> list[list[str]]:
     if not name.endswith(".xlsx"):
         return _load_workbook_rows(data, filename)
 
-    wb = load_workbook(io.BytesIO(data), read_only=False, data_only=True)
-    try:
-        best_rows: list[list[str]] = []
-        best_score = -1
-        for ws in wb.worksheets:
-            rows: list[list[str]] = []
-            for row in ws.iter_rows(
-                min_row=1,
-                max_row=ws.max_row,
-                max_col=ws.max_column,
-                values_only=True,
-            ):
-                rows.append([_cell_text(v) for v in row])
-            while rows and _row_is_empty(rows[-1]):
-                rows.pop()
-            if not rows:
-                continue
-            header_idx, header_map = _find_header_row(rows, CUSTOMER_HEADER_ALIASES, ("name",))
-            product_header_idx, product_header_map = _find_header_row(
-                rows,
-                PRODUCT_HEADER_ALIASES,
-                ("barcode", "name"),
-            )
-            data_count = 0
-            if header_idx >= 0:
-                for row in rows[header_idx + 1 :]:
-                    if _row_is_empty(row):
-                        continue
-                    data_count += 1
-            score = data_count
-            if header_idx >= 0:
-                score += 10
-            if product_header_idx >= 0:
-                score += 5
-            if score > best_score:
-                best_score = score
-                best_rows = rows
-        if not best_rows:
-            ws = wb.active
-            rows = []
-            for row in ws.iter_rows(
-                min_row=1,
-                max_row=ws.max_row,
-                max_col=ws.max_column,
-                values_only=True,
-            ):
-                rows.append([_cell_text(v) for v in row])
-            while rows and _row_is_empty(rows[-1]):
-                rows.pop()
-            best_rows = rows
-        return best_rows
-    finally:
-        wb.close()
+    return _best_rows_xlsx(data)
 
 
 def _load_rows_xls(data: bytes) -> list[list[str]]:
+    if data.startswith(b"PK"):
+        return _best_rows_xlsx(data)
     try:
         import xlrd
     except ImportError as exc:
-        raise ValueError("XLS унших xlrd суулгаагүй байна") from exc
-    book = xlrd.open_workbook(file_contents=data)
-    sheet = book.sheet_by_index(0)
-    rows: list[list[str]] = []
-    for r in range(sheet.nrows):
-        rows.append([_cell_text(sheet.cell_value(r, c)) for c in range(sheet.ncols)])
-    return rows
+        raise ValueError(
+            f"XLS унших xlrd суулгаагүй байна. {EXCEL_IMPORT_FORMAT_HINT}"
+        ) from exc
+    try:
+        book = xlrd.open_workbook(file_contents=data)
+    except Exception as exc:
+        raise ValueError(
+            f"XLS файл уншиж чадсангүй. {EXCEL_IMPORT_FORMAT_HINT}"
+        ) from exc
+
+    sheets: list[list[list[str]]] = []
+    for sheet_idx in range(book.nsheets):
+        sheet = book.sheet_by_index(sheet_idx)
+        rows: list[list[str]] = []
+        for r in range(sheet.nrows):
+            rows.append([_cell_text(sheet.cell_value(r, c)) for c in range(sheet.ncols)])
+        sheets.append(_trim_empty_tail(rows))
+    return _best_rows_from_sheets(sheets)
 
 
 def load_sheet_rows(data: bytes, filename: str) -> list[list[str]]:
@@ -393,13 +435,13 @@ def build_product_template_bytes() -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Бараа"
-    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, 10000, "Монгол"]
+    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, 10000, "Монгол", ""]
     _format_import_worksheet(
         ws,
         PRODUCT_HEADERS,
         example,
-        text_columns={1},
-        min_col_widths=[18, 26, 20, 30, 30, 22],
+        text_columns={1, 7},
+        min_col_widths=[18, 26, 20, 30, 30, 22, 42],
     )
     for col_idx in (4, 5):
         ws.cell(row=2, column=col_idx).number_format = "#,##0"
@@ -435,10 +477,13 @@ def import_customers_into_state(
     rows: list[list[str]],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not rows:
-        raise ValueError("Excel хоосон байна")
+        raise ValueError(f"Excel хоосон байна. {EXCEL_IMPORT_FORMAT_HINT}")
     header_idx, header_map = _find_header_row(rows, CUSTOMER_HEADER_ALIASES, ("name",))
     if header_idx < 0:
-        raise ValueError("Excel-д «Нэр» багана олдсонгүй (эхний мөрөнд багана нэр байх ёстой)")
+        raise ValueError(
+            "Excel-д «Нэр» багана олдсонгүй. "
+            f"{EXCEL_IMPORT_FORMAT_HINT}"
+        )
     data_rows = rows[header_idx + 1 :]
 
     existing_by_reg = {
@@ -522,7 +567,8 @@ def import_customers_into_state(
 
     if total <= 0:
         raise ValueError(
-            "Excel-д өгөгдөлтэй мөр олдсонгүй. «Формат татах» товчоор татсан файлд мэдээллээ оруулна уу."
+            "Excel-д өгөгдөлтэй мөр олдсонгүй. "
+            f"{EXCEL_IMPORT_FORMAT_HINT}"
         )
 
     next_state = dict(state)
@@ -543,24 +589,30 @@ def import_products_into_state(
     rows: list[list[str]],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not rows:
-        raise ValueError("Excel хоосон байна")
+        raise ValueError(f"Excel хоосон байна. {EXCEL_IMPORT_FORMAT_HINT}")
     header_idx, header_map = _find_header_row(
         rows,
         PRODUCT_HEADER_ALIASES,
         ("barcode", "name"),
     )
     if header_idx < 0:
-        raise ValueError("Excel-д «Barcode» болон «Барааны нэр» багана шаардлагатай")
+        raise ValueError(
+            "Excel-д «Barcode» болон «Барааны нэр» багана шаардлагатай. "
+            f"{EXCEL_IMPORT_FORMAT_HINT}"
+        )
     data_rows = rows[header_idx + 1 :]
 
+    batch_barcodes: set[str] = set()
+    products = [
+        dict(p) if isinstance(p, dict) else p for p in state.get("products") or []
+    ]
     existing_by_barcode = {
         re.sub(r"\D", "", str(p.get("barcode") or "")): p
-        for p in state.get("products") or []
-        if re.sub(r"\D", "", str(p.get("barcode") or ""))
+        for p in products
+        if isinstance(p, dict) and re.sub(r"\D", "", str(p.get("barcode") or ""))
     }
-    batch_barcodes: set[str] = set()
-    products = list(state.get("products") or [])
     errors: list[dict[str, Any]] = []
+    touched_product_ids: list[str] = []
     success = 0
     updated = 0
     created = 0
@@ -598,38 +650,38 @@ def import_products_into_state(
             errors.append({"row": offset, "message": "Хэмжих нэгж буруу байна."})
             continue
 
-        country = _cell_text(data.get("country")) or "Монгол"
+        if barcode in existing_by_barcode:
+            errors.append(
+                {
+                    "row": offset,
+                    "message": "Али хэдийн бүртгэгдсэн product байна.",
+                }
+            )
+            continue
 
-        existing = existing_by_barcode.get(barcode)
-        if existing:
-            # Давтан импорт хийхэд байгаа барааг шинэчилнэ (үлдэгдэл/зураг хэвээр).
-            existing["name"] = name
-            existing["unit"] = unit or "ширхэг"
-            existing["price"] = int(price or 0)
-            existing["costPrice"] = int(cost or 0)
-            existing["country"] = country
-            if not existing.get("category"):
-                existing["category"] = "Бусад"
-            updated += 1
-        else:
-            now += 1
-            product = {
-                "id": str(now),
-                "barcode": barcode,
-                "name": name,
-                "category": "Бусад",
-                "unit": unit or "ширхэг",
-                "boxQuantity": 1,
-                "price": int(price or 0),
-                "costPrice": int(cost or 0),
-                "stock": 0,
-                "minStock": 0,
-                "country": country,
-                "image": "",
-            }
-            products.append(product)
-            existing_by_barcode[barcode] = product
-            created += 1
+        country = _cell_text(data.get("country")) or "Монгол"
+        image_source = _image_url_text(data.get("image"))
+
+        now += 1
+        pid = str(now)
+        product = {
+            "id": pid,
+            "barcode": barcode,
+            "name": name,
+            "category": "Бусад",
+            "unit": unit or "ширхэг",
+            "boxQuantity": 1,
+            "price": int(price or 0),
+            "costPrice": int(cost or 0),
+            "stock": 0,
+            "minStock": 0,
+            "country": country,
+            "image": image_source,
+        }
+        products.append(product)
+        existing_by_barcode[barcode] = product
+        created += 1
+        touched_product_ids.append(pid)
         batch_barcodes.add(barcode)
         success += 1
 
@@ -642,6 +694,7 @@ def import_products_into_state(
         "updated": updated,
         "failed": len(errors),
         "errors": errors,
+        "_productIds": touched_product_ids,
     }
     return next_state, report
 

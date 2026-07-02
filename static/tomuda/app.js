@@ -1119,6 +1119,10 @@ const ORDER_PICKER_TITLE = "Захиалгад бараа сонгох";
 const PRODUCT_NEW_TITLE = "Бараа нэмэх";
 const PRODUCT_EDIT_TITLE = "Бараа засах";
 const EXCEL_FILE_DOWNLOAD = "Excel файл татах";
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const IMPORT_FILE_FORMAT_HINT =
+  "Файлын формат .xlsx байх ёстой. «Формат татах» товчоор татсан .xlsx загвар ашиглана уу. Хуучин .xls файл мөн дэмжигдэнэ.";
 function excelIconHtml() {
   return `<svg class="ui-icon page-toolbar__excel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`;
 }
@@ -1196,8 +1200,11 @@ async function downloadImportTemplate(kind) {
     });
     if (!res.ok) throw new Error("template failed");
     const blob = await res.blob();
+    const fileBlob = new Blob([blob], {
+      type: XLSX_MIME,
+    });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = URL.createObjectURL(fileBlob);
     a.download = filename;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -1239,6 +1246,7 @@ function showImportReportModal(report, kind) {
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
   const created = Number(report.created || 0);
   const updated = Number(report.updated || 0);
+  const imageSuccess = Number(report.imageSuccess || 0);
   const errors = (report.errors || [])
     .map(
       (item) =>
@@ -1247,18 +1255,25 @@ function showImportReportModal(report, kind) {
     .join("");
   let summary = "";
   if ((report.total || 0) <= 0) {
-    summary = `<p class="import-report__empty">Excel-д өгөгдөлтэй мөр олдсонгүй. «Формат татах» товчоор татсан файл ашиглаж, 2-р мөрөөс мэдээлэл оруулна уу.</p>`;
+    summary = `<p class="import-report__empty">Excel-д өгөгдөлтэй мөр олдсонгүй. ${esc(IMPORT_FILE_FORMAT_HINT)} 2-р мөрөөс мэдээлэл оруулна уу.</p>`;
   } else if ((report.success || 0) <= 0) {
     summary = `<p class="import-report__empty">Нэг ч мөр импортлогдсонгүй. Доорх алдааг шалгана уу.</p>`;
+  } else if ((report.failed || 0) > 0) {
+    summary = `<p class="import-report__empty">${report.success || 0} мөр хадгалагдлаа. ${report.failed || 0} мөрийг боловсруулж чадсангүй.</p>`;
   } else if (!errors) {
     summary = `<p class="import-report__ok">Бүх мөр амжилттай импортлогдлоо.</p>`;
   }
-  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Шинэ</span><b>${created}</b></p><p><span>Шинэчлэгдсэн</span><b>${updated}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p></div>${summary}${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Алдааны дэлгэрэнгүй</p><ul>${errors}</ul></div>` : ""}</div>`;
+  const imageStat =
+    kind === "products" && imageSuccess
+      ? `<p><span>Зураг</span><b class="text-tone-success">${imageSuccess}</b></p>`
+      : "";
+  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Шинэ</span><b>${created}</b></p><p><span>Шинэчлэгдсэн</span><b>${updated}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p>${imageStat}</div>${summary}${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Боловсруулж чадсангүй</p><ul>${errors}</ul></div>` : ""}</div>`;
   confirmModal(`${label} импортын тайлан`, body, {
     confirmLabel: "Хаах",
-    cancelLabel: "",
+    cancelLabel: "Нэмэх",
     closable: true,
     onConfirm: () => closeConfirmCard(),
+    onCancel: () => closeConfirmCard(),
   });
 }
 function applyImportPayload(kind, payload) {
@@ -1283,7 +1298,7 @@ async function handleImportFile(kind, file) {
   if (!file) return;
   const name = String(file.name || "").toLowerCase();
   if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
-    return alertModal("Алдаа", "Зөвхөн .xlsx эсвэл .xls файл зөвшөөрнө.");
+    return alertModal("Алдаа", IMPORT_FILE_FORMAT_HINT);
   }
   if (importLoading) return;
   syncCurrentEmployeeFromState();
@@ -1329,7 +1344,10 @@ async function handleImportFile(kind, file) {
       updatedAt: payload.updatedAt || serverUpdatedAt || "",
     });
     render();
-    if ((report.success || 0) > 0 && !(report.failed || 0)) {
+    if (
+      (report.success || 0) > 0 &&
+      !(report.failed || 0)
+    ) {
       showAppToast(`${report.success} мөр амжилттай импортлогдлоо`, "success");
     } else if ((report.success || 0) > 0) {
       showAppToast(
@@ -1343,7 +1361,7 @@ async function handleImportFile(kind, file) {
   } catch (error) {
     console.warn("Import failed", error);
     showAppToast("Импорт хийхэд алдаа гарлаа", "error");
-    alertModal("Алдаа", "Импорт хийхэд алдаа гарлаа.");
+    alertModal("Алдаа", `Импорт хийхэд алдаа гарлаа. ${IMPORT_FILE_FORMAT_HINT}`);
   } finally {
     backendSaving = false;
     setImportLoading(false);
@@ -4625,9 +4643,12 @@ function buildReceiptExcelDocument(orders, logoSrc) {
 function receiptExcelFileName(orders) {
   const stamp = new Date().toISOString().slice(0, 10);
   if (orders.length === 1) {
-    return `zarlagyn-barimt-${formatReceiptNumber(orders[0])}.xls`;
+    return `zarlagyn-barimt-${formatReceiptNumber(orders[0])}.xlsx`;
   }
-  return `zarlagyn-barimt-${stamp}.xls`;
+  return `zarlagyn-barimt-${stamp}.xlsx`;
+}
+function legacyExcelFileName(name) {
+  return String(name || "excel.xlsx").replace(/\.(xlsx|xls|csv)$/i, ".xls");
 }
 function downloadReceiptExcelBlob(name, html) {
   const blob = new Blob(["\uFEFF" + html], {
@@ -4656,7 +4677,7 @@ function exportOrderReceiptsExcelCsv(orders) {
     if (idx > 0) sheetRows.push([], ["--------------------"], []);
     sheetRows.push(...buildOrderReceiptExcelRows(o));
   });
-  excel(`zahialgiin-barimt-${stamp}.csv`, sheetRows);
+  excel(`zahialgiin-barimt-${stamp}.xlsx`, sheetRows);
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
@@ -5155,7 +5176,7 @@ async function exportOrderReceiptsExcel(orders) {
     try {
       const logoSrc = await getReceiptExcelLogoDataUri();
       const html = buildReceiptExcelDocument(orders, logoSrc);
-      downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
+      downloadReceiptExcelBlob(legacyExcelFileName(receiptExcelFileName(orders)), html);
     } catch {
       exportOrderReceiptsExcelCsv(orders);
     }
@@ -6060,7 +6081,7 @@ function exportProductsExcelFallback() {
   const products = productsExportList();
   if (!products.length) return alert("Бараа байхгүй");
   const stamp = new Date().toISOString().slice(0, 10);
-  excel(`baraa-${stamp}.csv`, [
+  excel(`baraa-${stamp}.xlsx`, [
     ["Барааны жагсаалт"],
     [`${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
     [],
@@ -6070,8 +6091,8 @@ function exportProductsExcelFallback() {
 }
 function confirmInventoryExport() {
   confirmDataExport("Excel татах", () => {
-    csv(
-      "inventory.csv",
+    excel(
+      "inventory.xlsx",
       state.inventoryLogs.map((l) => [
         dte(l.date),
         l.productName,
@@ -6089,7 +6110,7 @@ function confirmReportExport() {
       paid = orders
         .filter((o) => orderIsPaid(o))
         .reduce((s, o) => s + orderAmount(o), 0);
-    csv("report.csv", [[total, paid]]);
+    excel("report.xlsx", [["Нийт", "Төлсөн"], [total, paid]]);
   });
 }
 function confirmEmployeeExcel() {
@@ -6134,7 +6155,7 @@ function customerExcel() {
         ];
       }),
   ];
-  excel("hariltsagch.xls", rows);
+  excel("hariltsagch.xlsx", rows);
 }
 function customerAddress(c) {
   return (
@@ -6448,7 +6469,7 @@ function finalizeStockInReceipt(receipt) {
 }
 function stockInReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `orlogo-avah-${no}.xls` : `orlogo-avah-${todayIso()}.xls`;
+  return no ? `orlogo-avah-${no}.xlsx` : `orlogo-avah-${todayIso()}.xlsx`;
 }
 function stockInReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -6775,7 +6796,7 @@ ${bodyRows}
   const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = stockInReceiptFileName(receipt);
+  a.download = legacyExcelFileName(stockInReceiptFileName(receipt));
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
@@ -7583,7 +7604,7 @@ async function exportProductsExcelXlsx() {
   });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `baraa-${stamp}.xls`;
+  a.download = `baraa-${stamp}.xlsx`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
@@ -7815,7 +7836,7 @@ async function exportCountExcelXlsx() {
   });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `toollogo-${stamp}.xls`;
+  a.download = `toollogo-${stamp}.xlsx`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
@@ -8384,7 +8405,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `aguulah-beldeh-${stamp}.xls`;
+  a.download = `aguulah-beldeh-${stamp}.xlsx`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
@@ -8473,7 +8494,7 @@ function exportCountExcelFallback() {
   const products = countExportProducts();
   const totals = countMetricsTotals(products);
   const mismatchCount = countMismatchesForList(products).length;
-  excel(`toollogo-${stamp}.csv`, [
+  excel(`toollogo-${stamp}.xlsx`, [
     ["Тооллогын тайлан"],
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
@@ -12667,8 +12688,8 @@ function showConfirmCard({
     yesBtn.className = `confirm-card__btn ${danger ? "confirm-card__btn--danger" : "confirm-card__btn--confirm"}`;
   }
   if (noBtn) {
-    noBtn.hidden = !!single;
-    noBtn.textContent = cancelLabel;
+    noBtn.hidden = !!single || cancelLabel === "";
+    noBtn.textContent = cancelLabel || "Үгүй";
   }
   if (closeBtn) closeBtn.hidden = !closable;
   actions?.classList.toggle("confirm-card__actions--single", !!single);
@@ -12874,15 +12895,99 @@ function csv(name, rows) {
   a.download = name;
   a.click();
 }
-function excel(name, rows) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(
-    new Blob(["\uFEFF" + rows.map(csvRow).join("\r\n")], {
-      type: "text/csv;charset=utf-8",
-    }),
+function xlsxFileName(name) {
+  const base = String(name || "excel.xlsx")
+    .trim()
+    .replace(/\.(xlsx|xls|csv)$/i, "");
+  return `${base || "excel"}.xlsx`;
+}
+function xlsxSheetTitle(name = "Sheet1") {
+  const title = String(name || "Sheet1")
+    .replace(/[:\\/?*\[\]]/g, " ")
+    .trim();
+  return (title || "Sheet1").slice(0, 31);
+}
+function simpleWorkbookXml(sheetName) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xlsxXmlEsc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+}
+function simpleWorkbookRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>`;
+}
+function simpleRootRelsXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+}
+function simpleContentTypesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>`;
+}
+function simpleSheetXml(rows, si) {
+  const normalizedRows = (rows || []).map((row) =>
+    Array.isArray(row) ? row : [row],
   );
-  a.download = name;
+  const rowCount = Math.max(normalizedRows.length, 1);
+  const colCount = Math.max(1, ...normalizedRows.map((row) => row.length));
+  const lastRef = `${xlsxColName(colCount)}${rowCount}`;
+  const sheetRows = normalizedRows
+    .map((row, rowIdx) => {
+      const rowNum = rowIdx + 1;
+      const cells = [];
+      for (let colIdx = 0; colIdx < colCount; colIdx += 1) {
+        const ref = `${xlsxColName(colIdx + 1)}${rowNum}`;
+        const value = row[colIdx];
+        if (value === null || value === undefined || value === "") {
+          cells.push(`<c r="${ref}"/>`);
+          continue;
+        }
+        const numberValue = typeof value === "number" ? value : Number(value);
+        if (
+          typeof value === "number" &&
+          Number.isFinite(numberValue)
+        ) {
+          cells.push(`<c r="${ref}"><v>${numberValue}</v></c>`);
+        } else {
+          cells.push(`<c r="${ref}" t="s"><v>${si(value)}</v></c>`);
+        }
+      }
+      return `<row r="${rowNum}" spans="1:${colCount}">${cells.join("")}</row>`;
+    })
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetData>${sheetRows}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+}
+async function downloadRowsXlsx(name, rows, sheetName = "Sheet1") {
+  if (typeof JSZip === "undefined") {
+    throw new Error("JSZip missing");
+  }
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const safeSheetName = xlsxSheetTitle(sheetName);
+  const zip = new JSZip();
+  zip.file("[Content_Types].xml", simpleContentTypesXml());
+  zip.file("_rels/.rels", simpleRootRelsXml());
+  zip.file("xl/workbook.xml", simpleWorkbookXml(safeSheetName));
+  zip.file("xl/_rels/workbook.xml.rels", simpleWorkbookRelsXml());
+  zip.file("xl/worksheets/sheet1.xml", simpleSheetXml(rows, si));
+  zip.file("xl/sharedStrings.xml", xlsxSharedStringsXml(strings));
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType: XLSX_MIME,
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = xlsxFileName(name);
   a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function excel(name, rows) {
+  downloadRowsXlsx(name, rows).catch(() =>
+    csv(String(name || "excel.xlsx").replace(/\.(xlsx|xls)$/i, ".csv"), rows),
+  );
 }
 Object.assign(window, {
   state,

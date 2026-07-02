@@ -8,7 +8,7 @@ import re
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 from django.conf import settings
@@ -158,6 +158,74 @@ def find_stored_product_image_url(product_id: str) -> str:
             version = int(path.stat().st_mtime)
             return f"{settings.MEDIA_URL}products/{pid}.{ext}?v={version}"
     return ""
+
+
+def product_media_path_from_url(url: str) -> str:
+    raw = str(url or "").strip()
+    if not raw:
+        return ""
+    media_url = str(settings.MEDIA_URL or "/media/")
+    if not media_url.startswith("/"):
+        media_url = f"/{media_url}"
+    if raw.startswith(media_url):
+        return raw
+    if raw.startswith(media_url.lstrip("/")):
+        return f"/{raw}"
+    if raw.startswith(("http://", "https://")):
+        parsed = urlparse(raw)
+        if parsed.path.startswith(media_url):
+            return f"{parsed.path}{('?' + parsed.query) if parsed.query else ''}"
+    return ""
+
+
+def persist_imported_product_images(
+    state: dict,
+    *,
+    previous_state: dict | None = None,
+    product_ids: list[str] | set[str] | tuple[str, ...] | None = None,
+) -> dict:
+    ids = {str(pid) for pid in product_ids or [] if str(pid or "").strip()}
+    previous_images = {
+        str(p.get("id")): str(p.get("image") or "").strip()
+        for p in (previous_state or {}).get("products") or []
+        if isinstance(p, dict) and p.get("id") is not None
+    }
+    image_success = 0
+    image_skipped = 0
+
+    for product in state.get("products") or []:
+        if not isinstance(product, dict):
+            continue
+        pid = str(product.get("id") or "").strip()
+        if not pid or (ids and pid not in ids):
+            continue
+        source = str(product.get("image") or "").strip()
+        if not source:
+            continue
+
+        local_url = product_media_path_from_url(source)
+        if local_url:
+            product["image"] = local_url
+            continue
+
+        normalized_source = f"https:{source}" if source.startswith("//") else source
+        previous = previous_images.get(pid, "")
+        try:
+            if not normalized_source.startswith(("http://", "https://")):
+                raise ValueError("Зурагны холбоос буруу байна")
+            url = mirror_product_image(pid, normalized_source)
+        except Exception:
+            product["image"] = previous
+            image_skipped += 1
+            continue
+
+        product["image"] = url
+        image_success += 1
+
+    return {
+        "imageSuccess": image_success,
+        "imageSkipped": image_skipped,
+    }
 
 
 def hydrate_product_images(state: dict) -> tuple[dict, bool]:
