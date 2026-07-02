@@ -1651,22 +1651,6 @@ a.customer-card__line .customer-card__icon {
   border: 1px solid var(--hex-border);
 }
 
-.employee-card__actions .employee-pct-toggle {
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: center;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
-  background: var(--hex-secondary);
-}
-
-.employee-pct-toggle__text {
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .product-list__head {
   display: none;
 }
@@ -2173,12 +2157,6 @@ a.customer-card__line .customer-card__icon {
     min-width: 64px;
   }
 
-  .employee-card__actions .employee-pct-toggle {
-    flex: 0 0 auto;
-    min-width: auto;
-    padding: 0;
-    background: transparent;
-  }
 }
 
 .product-detail__img {
@@ -10602,6 +10580,38 @@ input::placeholder, textarea::placeholder {
 
 .perm-grant-employees .wh-receipt-picker {
   width: 100%;
+}
+
+.perm-grant-pct {
+  padding: 12px 14px;
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  background: var(--hex-card);
+}
+
+.perm-grant-pct__label {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+}
+
+.perm-grant-pct__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.perm-grant-pct__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--hex-foreground);
 }
 
 .employee-form .perm-matrix-wrap {

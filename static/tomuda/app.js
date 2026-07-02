@@ -1568,6 +1568,21 @@ function mergedPermissionSelection() {
   }
   return api.mergePermissionsForEmployees(selectedPermissionEmployees());
 }
+function mergedPermissionPercentDiscount(selected = selectedPermissionEmployees()) {
+  const sales = selected.filter((e) => e.role === "sales");
+  if (!sales.length) return null;
+  if (sales.every((e) => e.allowPercentDiscount !== false)) return true;
+  if (sales.every((e) => e.allowPercentDiscount === false)) return false;
+  return null;
+}
+function permissionPercentDiscountFieldHtml(selectedEmployees = []) {
+  const sales = selectedEmployees.filter((e) => e.role === "sales");
+  if (!sales.length) return "";
+  const merged = mergedPermissionPercentDiscount(sales);
+  const checked = merged === true;
+  const mixed = merged === null;
+  return `<section class="perm-grant-pct"><p class="perm-grant-pct__label">Хувь тооцох</p><label class="perm-grant-pct__row"><span class="perm-grant-pct__text">Захиалга дээр ${percentDiscountRate()}% хөнгөлөлт тооцох зөвшөөрөл${mixed ? " (сонгогдсон ажилтнууд өөр өөр)" : ""}</span><span class="perm-toggle perm-toggle--sm"><input type="checkbox" name="allowPercentDiscount"${checked ? " checked" : ""}${mixed ? ' data-pct-mixed="1"' : ""} aria-label="Хувь тооцох зөвшөөрөл"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></span></label></section>`;
+}
 function saveGrantedPermissions() {
   if (!canManageEmployeePermissions()) {
     return alertModal("Эрхгүй", "Эрх олгох эрхгүй.");
@@ -1577,9 +1592,17 @@ function saveGrantedPermissions() {
   const root = document.querySelector("[data-permissions-form]");
   const permissions = permApi()?.permissionsFromForm(root || document) || [];
   if (!permissions.length) return alert("Дор хаяж нэг эрх сонгоно уу");
+  const pctInput = document.querySelector('input[name="allowPercentDiscount"]');
+  const allowPct = !!pctInput?.checked;
   ids.forEach((id) => {
     const emp = state.employees.find((e) => e.id === id);
-    if (emp) emp.permissions = [...permissions];
+    if (!emp) return;
+    emp.permissions = [...permissions];
+    if (emp.role === "sales" && pctInput) emp.allowPercentDiscount = allowPct;
+    if (state.currentEmployee?.id === id) {
+      state.currentEmployee = emp;
+      if (!allowPct) state.applyPercentDiscount = false;
+    }
   });
   scheduleBackendSave();
   showInstallToast("Эрх хадгалагдлаа");
@@ -1602,7 +1625,8 @@ function employeePermissionsView() {
     { hideRoleReset: !selectedEmployees.length },
   );
   const saveBtn = `<button type="button" onclick="saveGrantedPermissions()" class="btn btn--primary btn--sm shrink-0">Хадгалах</button>`;
-  return `<div class="space-y-4 perm-grant-page">${pageHead("Эрх үүсгэх", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p>${permissionEmployeePickerHtml()}${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${permHtml}</div>`;
+  const pctHtml = permissionPercentDiscountFieldHtml(selectedEmployees);
+  return `<div class="space-y-4 perm-grant-page">${pageHead("Эрх үүсгэх", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p>${permissionEmployeePickerHtml()}${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${pctHtml}${permHtml}</div>`;
 }
 const EMPLOYEE_EMAIL_DEFAULTS = {
   admin: "admin@tomuda.mn",
@@ -3980,7 +4004,7 @@ function percentDiscountSettingsModal() {
   const rate = percentDiscountRate();
   box(
     "Хувь тооцох тохиргоо",
-    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалга дээр «Хувь тооцох» сонголтын хувь. Ажилтан бүрт зөвшөөрөл нь Ажилтан цэснээс тохируулна.</p><label class="block text-sm font-medium">Хөнгөлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалга дээр «Хувь тооцох» сонголтын хувь. Ажилтан бүрт зөвшөөрөл нь Админ → Эрх үүсгэх хэсэгт тохируулна.</p><label class="block text-sm font-medium">Хөнгөлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -9248,23 +9272,6 @@ function removePromotionRuleNow(type, index) {
   removePromotionRule(type, index);
   closeModal();
 }
-function employeePercentDiscountToggle(e) {
-  if (e.role !== "sales") return "";
-  const on = !!e.allowPercentDiscount;
-  return `<div class="employee-pct-toggle shrink-0 flex items-center gap-1.5 text-xs" title="Хувь тооцох зөвшөөрөл"><span class="employee-pct-toggle__text ${on ? "text-tone-success" : "text-muted-foreground"}">Хувь</span><label class="perm-toggle perm-toggle--sm"><input type="checkbox"${on ? " checked" : ""} onchange="toggleEmployeePercentDiscount('${e.id}',this.checked)" aria-label="Хувь тооцох зөвшөөрөл"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label></div>`;
-}
-function toggleEmployeePercentDiscount(id, allowed) {
-  if (!hasPermission("employees.edit")) return;
-  const emp = state.employees.find((e) => e.id === id);
-  if (!emp || emp.role !== "sales") return;
-  emp.allowPercentDiscount = !!allowed;
-  if (state.currentEmployee?.id === id) {
-    state.currentEmployee.allowPercentDiscount = !!allowed;
-    if (!allowed) state.applyPercentDiscount = false;
-  }
-  scheduleBackendSave();
-  render();
-}
 function employeePlaceholderImage(e = {}) {
   if (e?.image) return e.image;
   const initial = deliveryInitial(e.name);
@@ -9353,9 +9360,8 @@ function employeeRow(e) {
           label: "Ажилтан устгах",
         })
       : "";
-  const pctToggle = canEdit ? employeePercentDiscountToggle(e) : "";
   const meta = `${role(e.role)} · ${e.email || "-"} · ${employeePermissionSummary(e)}`;
-  return `<article class="employee-card"><header class="employee-card__head">${employeeAvatarHtml(e)}<div class="employee-card__identity"><h3 class="employee-card__name">${esc(e.name)}</h3><p class="employee-card__sub">${esc(meta)}</p></div></header><p class="employee-card__meta">${esc(meta)}</p><footer class="employee-card__actions">${editBtn}${pctToggle}${deleteBtn}</footer></article>`;
+  return `<article class="employee-card"><header class="employee-card__head">${employeeAvatarHtml(e)}<div class="employee-card__identity"><h3 class="employee-card__name">${esc(e.name)}</h3><p class="employee-card__sub">${esc(meta)}</p></div></header><p class="employee-card__meta">${esc(meta)}</p><footer class="employee-card__actions">${editBtn}${deleteBtn}</footer></article>`;
 }
 function employeesView() {
   const addBtn = hasPermission("employees.create")
@@ -9413,12 +9419,6 @@ function authSessionPayload() {
     deliveryStoreId: state.deliveryStoreId || "",
     deliveryStoreReady: !!state.deliveryStoreReady,
   };
-}
-function syncEmployeePctField() {
-  const roleEl = document.getElementById("employeeRoleSelect");
-  const field = document.getElementById("employeePctField");
-  if (!roleEl || !field) return;
-  field.classList.toggle("hidden", roleEl.value !== "sales");
 }
 function applyLoginRoleDefaults(emp) {
   if (!emp) return;
@@ -11167,20 +11167,15 @@ function employeeModal(id) {
         `<option value="${r}" ${selectedRole === r ? "selected" : ""}>${role(r)}</option>`,
     )
     .join("");
-  const pctChecked =
-    isEdit && e?.role === "sales" ? e.allowPercentDiscount !== false : !isEdit;
   const passwordAttrs = isEdit
     ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" onchange="syncEmployeePctField()" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><label id="employeePctField" class="flex items-center gap-2 text-sm cursor-pointer"><input name="allowPercentDiscount" type="checkbox" class="w-4 h-4 rounded"${pctChecked ? " checked" : ""}><span>Хувь тооцох зөвшөөрөх (${percentDiscountRate()}%)</span></label><p class="text-xs text-muted-foreground">Эрхийг Админ → Эрх үүсгэх хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрх үүсгэх хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-lg",
   );
-  setTimeout(() => {
-    syncEmployeePctField();
-    initEmployeeImageField(e || {});
-  }, 0);
+  setTimeout(() => initEmployeeImageField(e || {}), 0);
 }
 function buildEmployeeDataFromForm(form, editId = "") {
   const f = Object.fromEntries(new FormData(form));
@@ -11218,7 +11213,11 @@ function buildEmployeeDataFromForm(form, editId = "") {
       role: roleValue,
       image: String(f.image || ""),
       allowPercentDiscount:
-        roleValue === "sales" && f.allowPercentDiscount === "on",
+        roleValue === "sales"
+          ? existing?.role === "sales"
+            ? existing.allowPercentDiscount !== false
+            : true
+          : false,
       permissions,
     },
   };
@@ -12643,8 +12642,6 @@ Object.assign(window, {
   stockAlertModal,
   percentDiscountSettingsModal,
   savePercentDiscountSettings,
-  toggleEmployeePercentDiscount,
-  syncEmployeePctField,
   syncEmployeePermissionsFromRole,
   openEmployeePermissionsPage,
   togglePermissionEmployee,
