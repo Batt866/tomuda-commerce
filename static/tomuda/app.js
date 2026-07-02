@@ -467,41 +467,78 @@ function receiptPromoLineTotal(i) {
 }
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o);
-  if (!promoItems.length) {
-    return `<tr class="receipt-grid__promo"><td></td><td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td><td colspan="7"></td></tr>`;
-  }
-  return promoItems
-    .map(
-      (i, idx) =>
-        `<tr class="receipt-grid__promo"><td></td>${idx === 0 ? `<td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td>` : `<td colspan="3"></td>`}<td colspan="3" class="receipt-grid__name">${esc(i.productName)}</td><td colspan="2" class="receipt-grid__qty">${i.quantity}</td><td class="receipt-grid__money">${receiptMoney(i.price)}</td><td class="receipt-grid__money">${receiptMoney(receiptPromoLineTotal(i))}</td></tr>`,
-    )
-    .join("");
+  const slots = Math.max(2, promoItems.length);
+  return Array.from({ length: slots }, (_, idx) => {
+    const i = promoItems[idx];
+    return `<tr class="receipt-grid__promo"><td></td>${idx === 0 ? `<td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td>` : `<td colspan="3"></td>`}<td colspan="3" class="receipt-grid__name">${i ? esc(i.productName) : ""}</td><td colspan="2" class="receipt-grid__qty">${i ? i.quantity : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(i.price) : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoLineTotal(i)) : ""}</td></tr>`;
+  }).join("");
 }
 function receiptPaymentTermText(f, o) {
   if (f.bank || o.paymentTerm === "credit") return "Зээлээр";
-  return "Бэлэн";
+  return "Шууд төлөлт";
+}
+function receiptShouldShowGross(o) {
+  return true;
+}
+function receiptGrandNote(o) {
+  const discount = orderDiscountAmount(o);
+  const pct =
+    o.applyPercentDiscount && isCashPayment(o.paymentTerm)
+      ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
+      : 0;
+  if (pct) return `(Бэлэн төлөлтийн ${pct}% хасагдав)`;
+  if (discount) return `(Хөнгөлөлт ${percentDiscountRate()}%)`;
+  return "";
+}
+function receiptWarningRowsHtml() {
+  const lines = [
+    [
+      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
+      false,
+    ],
+    ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.", true],
+    [
+      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно",
+      false,
+    ],
+    [
+      "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
+      false,
+    ],
+  ];
+  return lines
+    .map(
+      ([text, bold], index) =>
+        `<tr class="receipt-grid__warn${index === 0 ? " receipt-grid__warn--first" : ""}${index === lines.length - 1 ? " receipt-grid__warn--last" : ""}"><td></td><td colspan="10" class="receipt-grid__warn-text${bold ? " receipt-grid__warn-text--bold" : ""}">${esc(text)}</td></tr>`,
+    )
+    .join("");
 }
 function receiptNoticeBoxHtml() {
-  return `<tr class="receipt-grid__notice"><td></td><td colspan="10" class="receipt-grid__notice-box"><p class="receipt-grid__notice-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__notice-line receipt-grid__notice-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__notice-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p class="receipt-grid__notice-line">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return receiptWarningRowsHtml();
 }
 function receiptFooterRows(o) {
   const f = receiptPartyFields(o);
-  const payable = orderPayableTotal(o),
-    sub = payable / 1.1,
-    vat = payable - sub,
-    settlement = settlementNoteText(o),
-    grossNotice =
-      !o.applyPercentDiscount &&
-      isCashPayment(o.paymentTerm) &&
-      !orderInWarehouseLiveSession(o)
-        ? `Тооцоог өдөртөө хийгээгүй тохиолдолд (${percentDiscountRate()}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
-        : "",
-    settleText =
-      settlement ||
-      grossNotice ||
-      "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!",
-    payTerm = receiptPaymentTermText(f, o);
-  return `<tr class="receipt-grid__return"><td></td><td colspan="2" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr><tr class="receipt-grid__settle"><td></td><td colspan="10" class="receipt-grid__settle-text">${esc(settleText)}</td></tr>${receiptPromoRowsHtml(o)}<tr class="receipt-grid__total"><td></td><td colspan="3" class="receipt-grid__label">Бараа ажил үйлчилгээний дүн</td><td colspan="7" class="receipt-grid__money">${receiptMoneyDetailed(sub)}</td></tr><tr class="receipt-grid__total"><td></td><td colspan="3" class="receipt-grid__label">НӨАТ</td><td colspan="7" class="receipt-grid__money">${receiptMoneyDetailed(vat)}</td></tr><tr class="receipt-grid__grand"><td></td><td colspan="3" class="receipt-grid__label">Таны нийт төлөх дүн</td><td colspan="7" class="receipt-grid__money receipt-grid__money--grand">${receiptMoney(payable)}</td></tr><tr class="receipt-grid__pay"><td></td><td colspan="3" class="receipt-grid__label">Төлбөрийн нөхцөл</td><td colspan="7" class="receipt-grid__pay-value">${esc(payTerm)}</td></tr>${receiptNoticeBoxHtml()}<tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
+  const gross = orderGrossTotal(o);
+  const payable = orderPayableTotal(o);
+  const sub = payable / 1.1;
+  const vat = payable - sub;
+  const settlement = settlementNoteText(o);
+  const grossNotice =
+    !o.applyPercentDiscount &&
+    isCashPayment(o.paymentTerm) &&
+    !orderInWarehouseLiveSession(o)
+      ? `Тооцоог өдөртөө хийгээгүй тохиолдолд (${percentDiscountRate()}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
+      : "";
+  const settleText =
+    settlement ||
+    grossNotice ||
+    "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!";
+  const payTerm = receiptPaymentTermText(f, o);
+  const grandNote = receiptGrandNote(o);
+  const grossRow = receiptShouldShowGross(o)
+    ? `<tr class="receipt-grid__gross"><td></td><td colspan="9" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`
+    : "";
+  return `<tr class="receipt-grid__return"><td></td><td colspan="2" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr><tr class="receipt-grid__spacer"><td colspan="11"></td></tr>${grossRow}<tr class="receipt-grid__spacer"><td colspan="11"></td></tr>${receiptPromoRowsHtml(o)}<tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__total"><td></td><td colspan="3" class="receipt-grid__label">Бараа ажил үйлчилгээний дүн</td><td colspan="7" class="receipt-grid__money">${receiptMoneyDetailed(sub)}</td></tr><tr class="receipt-grid__total"><td></td><td colspan="3" class="receipt-grid__label">НӨАТ</td><td colspan="7" class="receipt-grid__money">${receiptMoneyDetailed(vat)}</td></tr><tr class="receipt-grid__grand"><td></td><td colspan="3" class="receipt-grid__label">Таны нийт төлөх дүн</td><td colspan="6" class="receipt-grid__grand-note">${esc(grandNote)}</td><td class="receipt-grid__money receipt-grid__money--grand">${receiptMoney(payable)}</td></tr><tr class="receipt-grid__settle"><td></td><td colspan="10" class="receipt-grid__settle-text">${esc(settleText)}</td></tr><tr class="receipt-grid__pay"><td></td><td class="receipt-grid__label">Төлбөрийн нөхцөл</td><td colspan="5"></td><td colspan="4" class="receipt-grid__pay-value">${esc(payTerm)}</td></tr>${receiptWarningRowsHtml()}<tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
 }
 function receiptTotalsBlockHtml(o) {
   return receiptFooterRows(o);
@@ -3965,16 +4002,21 @@ const RECEIPT_EXCEL_STYLES = `
 body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet { display: block; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
-.receipt-page { width: 720px; max-width: 100%; margin: 0 auto; padding: 4px 2px 8px; font-size: 9pt; line-height: 1.2; font-family: ${RECEIPT_FONT}; }
+.receipt-page { width: 100%; max-width: 194mm; margin: 0 auto; padding: 2mm 1mm 4mm; font-size: 9pt; line-height: 1.2; font-family: ${RECEIPT_FONT}; box-sizing: border-box; }
 .receipt-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
-.receipt-grid__a { width: 3.59%; } .receipt-grid__b { width: 7.49%; } .receipt-grid__c { width: 20.81%; } .receipt-grid__d { width: 4.64%; } .receipt-grid__e { width: 12.43%; }
-.receipt-grid__f { width: 11.53%; } .receipt-grid__g { width: 6.74%; } .receipt-grid__h { width: 5.84%; } .receipt-grid__i { width: 4.49%; } .receipt-grid__j { width: 11.08%; } .receipt-grid__k { width: 11.38%; }
+.receipt-grid__a { width: 3.59%; } .receipt-grid__b { width: 7.48%; } .receipt-grid__c { width: 20.81%; } .receipt-grid__d { width: 4.65%; } .receipt-grid__e { width: 12.43%; }
+.receipt-grid__f { width: 11.52%; } .receipt-grid__g { width: 6.73%; } .receipt-grid__h { width: 5.84%; } .receipt-grid__i { width: 4.49%; } .receipt-grid__j { width: 11.08%; } .receipt-grid__k { width: 11.38%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__return td,
 .receipt-grid--sheet .receipt-grid__sign td,
-.receipt-grid--sheet .receipt-grid__notice td,
-.receipt-grid--sheet .receipt-grid__spacer td { border: none; padding: 1px 2px; vertical-align: middle; }
+.receipt-grid--sheet .receipt-grid__warn td,
+.receipt-grid--sheet .receipt-grid__spacer td,
+.receipt-grid--sheet .receipt-grid__gross td,
+.receipt-grid--sheet .receipt-grid__total td,
+.receipt-grid--sheet .receipt-grid__grand td,
+.receipt-grid--sheet .receipt-grid__pay td,
+.receipt-grid--sheet .receipt-grid__settle td { border: none; padding: 1px 2px; vertical-align: middle; }
 .receipt-grid__logo-cell { vertical-align: top; padding: 0; }
 .receipt-logo { width: 48px; height: 48px; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
@@ -3988,33 +4030,35 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__spacer td { height: 4px; padding: 0; }
 .receipt-grid--sheet .receipt-grid__items-head td,
 .receipt-grid--sheet .receipt-grid__item td,
-.receipt-grid--sheet .receipt-grid__promo td,
-.receipt-grid--sheet .receipt-grid__total td,
-.receipt-grid--sheet .receipt-grid__grand td,
-.receipt-grid--sheet .receipt-grid__pay td { border: 1px solid #808080; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__promo td { border: 1px solid #808080; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
 .receipt-grid--sheet .receipt-grid__item td,
 .receipt-grid--sheet .receipt-grid__promo td { border-top: 1px dotted #808080; }
+.receipt-grid--sheet .receipt-grid__promo-title { border-left: 1px dashed #808080; }
 .receipt-grid__head { font-weight: 700; text-align: center; background: #f3f3f3; font-size: 9pt; }
 .receipt-grid__num { text-align: center; }
 .receipt-grid__name { text-align: left; }
 .receipt-grid__unit, .receipt-grid__barcode, .receipt-grid__qty { text-align: center; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.receipt-grid__money--strong { font-weight: 700; font-size: 11pt; }
 .receipt-grid__money--grand { font-weight: 700; font-size: 12pt; }
 .receipt-grid__promo-title { font-weight: 700; text-align: center; }
+.receipt-grid__gross td { background: #e8ebee; font-weight: 700; border-bottom: 1px dotted #808080 !important; }
+.receipt-grid__gross-label { text-align: left; font-size: 11pt; }
+.receipt-grid__gross .receipt-grid__money { font-size: 11pt; text-align: right; }
 .receipt-grid__total .receipt-grid__label { font-weight: 400; font-size: 11pt; border-bottom: 1px dotted #808080; }
 .receipt-grid__total .receipt-grid__money { border-bottom: 1px dotted #808080; font-size: 11pt; }
-.receipt-grid__grand td { background: #d9d9d9; }
-.receipt-grid__grand .receipt-grid__label { font-weight: 700; font-size: 11pt; border-bottom: 1px dotted #808080; }
-.receipt-grid__grand .receipt-grid__money { font-weight: 700; font-size: 12pt; border-bottom: 1px dotted #808080; }
+.receipt-grid__grand td { background: #d9d9d9; border-bottom: 1px dotted #808080 !important; }
+.receipt-grid__grand .receipt-grid__label { font-weight: 700; font-size: 11pt; }
+.receipt-grid__grand-note { font-weight: 700; font-size: 9pt; text-align: left; white-space: normal; line-height: 1.25; }
+.receipt-grid__grand .receipt-grid__money { font-weight: 700; font-size: 12pt; }
 .receipt-grid__settle td { border: none; padding: 0; }
 .receipt-grid__settle-text { background: #fff2cc; text-align: center; font-weight: 400; font-size: 9pt; line-height: 1.35; padding: 3px 4px; border: 1px solid #808080 !important; }
-.receipt-grid__pay .receipt-grid__label { font-size: 11pt; border-bottom: 1px dotted #808080; }
+.receipt-grid__pay .receipt-grid__label { font-size: 11pt; border-bottom: 1px dotted #808080; white-space: nowrap; }
 .receipt-grid__pay-value { font-size: 11pt; font-weight: 700; text-align: left; border-bottom: 1px dotted #808080; }
-.receipt-grid__notice td { border: none; padding: 0; }
-.receipt-grid__notice-box { background: #d9d9d9; text-align: center; padding: 8px 10px; border: 1px solid #808080 !important; }
-.receipt-grid__notice-line { margin: 0 0 4px; font-size: 9pt; line-height: 1.35; }
-.receipt-grid__notice-line:last-child { margin-bottom: 0; }
-.receipt-grid__notice-line--bold { font-weight: 700; }
+.receipt-grid__warn-text { background: #d9d9d9; text-align: center; font-size: 9pt; line-height: 1.35; padding: 4px 6px; border-left: 1px solid #808080; border-right: 1px solid #808080; }
+.receipt-grid__warn--first .receipt-grid__warn-text { border-top: 1px solid #808080; }
+.receipt-grid__warn--last .receipt-grid__warn-text { border-bottom: 1px solid #808080; }
+.receipt-grid__warn-text--bold { font-weight: 700; }
 .receipt-grid__sign-label { font-size: 9pt; padding: 4px 2px 2px; vertical-align: bottom; }
 .receipt-grid__sign-line { border-bottom: 1px dotted #808080; min-height: 18px; vertical-align: bottom; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
@@ -11324,7 +11368,7 @@ function printOrderReceiptsNow(ids) {
   root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
-  .receipt-page { width: 190mm; padding: 1mm 0.5mm 3mm; font-size: 9pt; }
+  .receipt-page { width: 100%; max-width: none; padding: 0; font-size: 9pt; }
   .receipt-logo { width: 12mm; height: 12mm; }
   .receipt-grid__brand { font-size: 11pt; }
   .receipt-title { font-size: 14pt; }
