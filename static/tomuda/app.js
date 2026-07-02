@@ -2001,10 +2001,66 @@ const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 function productImagePlaceholder(p = {}) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
 }
+function appBackendOrigin() {
+  const base = String(API_BASE || "").trim();
+  if (base.startsWith("http://") || base.startsWith("https://")) {
+    try {
+      return new URL(base).origin;
+    } catch {
+      return window.location.origin;
+    }
+  }
+  return window.location.origin;
+}
+function productMediaPathFromUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("/media/")) return raw;
+  if (raw.startsWith("media/")) return `/${raw}`;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    try {
+      const parsed = new URL(raw);
+      if (parsed.pathname.startsWith("/media/")) {
+        return `${parsed.pathname}${parsed.search || ""}`;
+      }
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+function resolveBackendAssetUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  const mediaPath = productMediaPathFromUrl(raw);
+  if (mediaPath) return new URL(mediaPath, appBackendOrigin()).href;
+  if (
+    raw.startsWith("data:") ||
+    raw.startsWith("blob:") ||
+    raw.startsWith("http://") ||
+    raw.startsWith("https://")
+  ) {
+    return raw;
+  }
+  const origin = appBackendOrigin();
+  if (raw.startsWith("//")) return `${window.location.protocol}${raw}`;
+  if (raw.startsWith("/media/") || raw.startsWith("/static/")) {
+    return new URL(raw, origin).href;
+  }
+  if (raw.startsWith("media/") || raw.startsWith("static/")) {
+    return new URL(`/${raw}`, origin).href;
+  }
+  return raw;
+}
+function pushUniqueProductImage(list, url) {
+  const resolved = resolveBackendAssetUrl(url);
+  if (!resolved) return;
+  if (!list.includes(resolved)) list.push(resolved);
+}
 function productImageMediaUrl(productId, ext = "jpg") {
   const id = String(productId || "").trim();
   if (!id) return "";
-  return `/media/products/${encodeURIComponent(id)}.${ext}`;
+  return resolveBackendAssetUrl(`/media/products/${encodeURIComponent(id)}.${ext}`);
 }
 function storedProductImage(p) {
   const raw = String(p?.image || "").trim();
@@ -2013,20 +2069,19 @@ function storedProductImage(p) {
 }
 function isLocalProductImage(url) {
   const raw = String(url || "").trim();
-  return raw.startsWith("/media/") || raw.startsWith("data:image/");
+  return !!productMediaPathFromUrl(raw) || raw.startsWith("data:image/");
 }
 function productImageFallbackList(p = {}) {
   const list = [];
   const id = String(p?.id || "").trim();
   const stored = storedProductImage(p);
-  if (stored && isLocalProductImage(stored)) list.push(stored);
+  pushUniqueProductImage(list, stored);
   if (id) {
     PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
       const url = productImageMediaUrl(id, ext);
-      if (!list.includes(url)) list.push(url);
+      pushUniqueProductImage(list, url);
     });
   }
-  if (stored && !isLocalProductImage(stored)) list.push(stored);
   list.push(productImagePlaceholder(p));
   return list;
 }
@@ -2052,9 +2107,15 @@ function findProductForImage(img) {
   const src = String(img?.getAttribute("src") || "");
   const match = src.match(/\/media\/products\/([^/?#.]+)/);
   if (match) {
-    const fromMedia = state.products.find((x) => String(x.id) === match[1]);
+    let mediaId = match[1];
+    try {
+      mediaId = decodeURIComponent(mediaId);
+    } catch {
+      /* keep raw id */
+    }
+    const fromMedia = state.products.find((x) => String(x.id) === mediaId);
     if (fromMedia) return fromMedia;
-    return { id: match[1], name: alt || "", category: "" };
+    return { id: mediaId, name: alt || "", category: "" };
   }
   return { name: alt || "", category: "" };
 }
@@ -2117,8 +2178,7 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     const id = String(item.id);
     const prev = map.get(id);
     const merged = prev ? { ...prev, ...item } : { ...item };
-    const image =
-      String(item.image || "").trim() || String(prev?.image || "").trim();
+    const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
     map.set(id, merged);
@@ -2130,6 +2190,18 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     }
   }
   return Array.from(map.values());
+}
+function preferredEntityImage(localImage, remoteImage) {
+  const local = String(localImage || "").trim();
+  const remote = String(remoteImage || "").trim();
+  if (local.startsWith("data:image/") && !local.startsWith("data:image/svg")) {
+    return local;
+  }
+  const localMedia = productMediaPathFromUrl(local);
+  if (localMedia) return localMedia;
+  const remoteMedia = productMediaPathFromUrl(remote);
+  if (remoteMedia) return remoteMedia;
+  return local || remote;
 }
 
 function persistentState() {
@@ -2173,7 +2245,7 @@ function readProductImageFromForm(form) {
   }
   return image;
 }
-async function uploadProductImage(productId, dataUrl) {
+async function saveProductImagePayload(productId, payload) {
   const res = await fetch(
     `${API_BASE}/products/${encodeURIComponent(productId)}/image`,
     {
@@ -2183,7 +2255,7 @@ async function uploadProductImage(productId, dataUrl) {
         Accept: "application/json",
       },
       body: JSON.stringify({
-        image: dataUrl,
+        ...payload,
         actor: state.currentEmployee
           ? {
               id: state.currentEmployee.id,
@@ -2204,9 +2276,15 @@ async function uploadProductImage(productId, dataUrl) {
     }
     throw new Error(msg);
   }
-  const payload = await res.json();
-  if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
-  return payload.url || "";
+  const result = await res.json();
+  if (result.updatedAt) serverUpdatedAt = result.updatedAt;
+  return result.url || "";
+}
+async function uploadProductImage(productId, dataUrl) {
+  return saveProductImagePayload(productId, { image: dataUrl });
+}
+async function mirrorProductImage(productId, sourceUrl) {
+  return saveProductImagePayload(productId, { sourceUrl });
 }
 async function fetchImageAsDataUrl(url) {
   const source = String(url || "").trim();
@@ -11301,6 +11379,8 @@ async function applyProductSave(data, id) {
   if (incomingImage.startsWith("data:image/")) {
     imageDataUrl = incomingImage;
     delete data.image;
+  } else if (productMediaPathFromUrl(incomingImage)) {
+    data.image = productMediaPathFromUrl(incomingImage);
   } else if (
     incomingImage.startsWith("http://") ||
     incomingImage.startsWith("https://")
@@ -11335,9 +11415,17 @@ async function applyProductSave(data, id) {
   }
   if (productId && !imageDataUrl && imageRemoteUrl) {
     try {
-      imageDataUrl = await fetchImageAsDataUrl(imageRemoteUrl);
+      const url = await mirrorProductImage(productId, imageRemoteUrl);
+      const product = state.products.find((p) => p.id === productId);
+      if (product) product.image = url;
+      imageRemoteUrl = "";
     } catch (error) {
       console.warn("Product image mirror failed", error);
+      try {
+        imageDataUrl = await fetchImageAsDataUrl(imageRemoteUrl);
+      } catch (fallbackError) {
+        console.warn("Product image browser fetch failed", fallbackError);
+      }
     }
   }
   if (productId) {

@@ -28,6 +28,7 @@ from dashboard.permissions import (
 )
 from dashboard.product_images import (
     hydrate_product_images,
+    mirror_product_image,
     save_product_image,
     update_product_image_in_state,
 )
@@ -139,6 +140,7 @@ def upload_product_image(
     request, product_id: str, payload: dict[str, Any] = Body(...)
 ):
     data_url = payload.get("image") or payload.get("dataUrl") or ""
+    source_url = payload.get("sourceUrl") or payload.get("source_url") or ""
     actor = payload.get("actor")
 
     row, _ = AppState.objects.get_or_create(
@@ -162,7 +164,12 @@ def upload_product_image(
         raise HttpError(403, "Бараа нэмэх эрхгүй")
 
     try:
-        url = save_product_image(product_id, data_url)
+        if data_url:
+            url = save_product_image(product_id, data_url)
+        elif source_url:
+            url = mirror_product_image(product_id, source_url)
+        else:
+            raise ValueError("Зураг оруулна уу")
     except ValueError as exc:
         raise HttpError(400, str(exc)) from exc
 
