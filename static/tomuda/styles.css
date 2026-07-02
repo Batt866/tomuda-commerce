@@ -5287,6 +5287,14 @@ input::placeholder, textarea::placeholder {
   font-size: 13px !important;
 }
 
+.worker-order-opt__field--date {
+  flex: 1 1 100%;
+}
+
+.worker-order-opt__field--date .app-input {
+  width: 100%;
+}
+
 .worker-order-discount-preview {
   display: flex;
   flex-wrap: wrap;
@@ -9274,7 +9282,6 @@ input::placeholder, textarea::placeholder {
     gap: 2mm;
     align-items: center;
     padding: 1mm 0;
-    border-bottom: 1px dotted #999;
   }
   .receipt-promo-head {
     font-weight: 800;
@@ -9292,7 +9299,6 @@ input::placeholder, textarea::placeholder {
     align-items: baseline;
     gap: 4mm;
     padding: 1.2mm 0;
-    border-bottom: 1px dotted #999;
     font-size: 12px;
   }
   .receipt-total-line strong { font-weight: 800; white-space: nowrap; }
@@ -9324,7 +9330,7 @@ input::placeholder, textarea::placeholder {
   .receipt-warning p { margin: 1mm 0; }
   .receipt-sign { display: grid; grid-template-columns: 1fr; gap: 4mm; margin-top: 5mm; font-size: 12px; }
   .receipt-sign p { display: grid; grid-template-columns: 62mm 1fr; gap: 3mm; margin: 0; }
-  .receipt-sign b { border-bottom: 1px dotted #111; min-height: 6mm; display: block; }
+  .receipt-sign b { min-height: 6mm; display: block; }
   .employee-report-page { width: 190mm; min-height: 277mm; margin: 0 auto; padding: 12mm 10mm; font-family: Arial, sans-serif; color: #111827; background: #fff; font-size: 11px; }
   .employee-report-header { display: grid; grid-template-columns: 1fr 32mm; align-items: start; gap: 8mm; border-bottom: 2px solid #111827; padding-bottom: 5mm; margin-bottom: 5mm; }
   .employee-report-brand { margin: 0 0 2mm; color: #16899a; font-weight: 800; font-size: 12px; }

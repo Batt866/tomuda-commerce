@@ -498,8 +498,9 @@ function receiptPromoDisplayTotal(i) {
   return qty * receiptPromoDisplayPrice(i);
 }
 function receiptPromoSettleNote(o) {
-  if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
-  return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлнэ`;
+  const parts = settlementPartsFromSource(o);
+  if (!parts) return "";
+  return settlementNoteFromParts(parts, "тооцоо нийлнэ");
 }
 function enrichPromoLineForReceipt(line) {
   if (!line?.isPromoFree) return line;
@@ -892,8 +893,9 @@ function retainedOrders(orders = [], now = Date.now()) {
   return (orders || []).filter((o) => orderWithinRetention(o, now));
 }
 function settlementNoteText(o) {
-  if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
-  return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлэхээр тохиролцов`;
+  const parts = settlementPartsFromSource(o);
+  if (!parts) return "";
+  return settlementNoteFromParts(parts, "тооцоо нийлэхээр тохиролцов");
 }
 function receiptGrossPercentNoticeHtml(o) {
   if (!o || o.applyPercentDiscount || !isCashPayment(o.paymentTerm)) return "";
@@ -901,19 +903,78 @@ function receiptGrossPercentNoticeHtml(o) {
   const rate = percentDiscountRate();
   return `<div class="receipt-gross-note">Тооцоог өдөртөө хийгээгүй тохиолдолд (${rate}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.</div>`;
 }
-function settlementMonthOptions(selected) {
-  const cur = selected || String(new Date().getMonth() + 1);
-  return Array.from({ length: 12 }, (_, i) => {
-    const m = String(i + 1);
-    return `<option value="${m}" ${cur === m ? "selected" : ""}>${m} сар</option>`;
-  }).join("");
+function daysInSettlementMonth(month, year = new Date().getFullYear()) {
+  const m = Math.floor(Number(month) || 0);
+  if (m < 1 || m > 12) return 31;
+  return new Date(year, m, 0).getDate();
 }
-function settlementDayOptions(selected) {
-  const cur = selected || String(new Date().getDate());
-  return Array.from({ length: 31 }, (_, i) => {
-    const d = String(i + 1);
-    return `<option value="${d}" ${cur === d ? "selected" : ""}>${d}</option>`;
-  }).join("");
+function parseSettlementMonth(raw) {
+  const n = Math.floor(Number(String(raw ?? "").trim()) || 0);
+  return n >= 1 && n <= 12 ? n : 0;
+}
+function parseSettlementDay(raw, month) {
+  const m = parseSettlementMonth(month);
+  if (!m) return 0;
+  const max = daysInSettlementMonth(m);
+  const n = Math.floor(Number(String(raw ?? "").trim()) || 0);
+  return n >= 1 && n <= max ? n : 0;
+}
+function settlementPartsFromSource(source) {
+  if (!source?.settlementAgreed) return null;
+  const month = parseSettlementMonth(source.settlementMonth);
+  const day = parseSettlementDay(source.settlementDay, month);
+  if (!month || !day) return null;
+  return { month, day };
+}
+function settlementNoteFromParts(parts, suffix = "тооцоо нийлэхээр тохиролцов") {
+  if (!parts) return "";
+  return `${parts.month} сарын ${parts.day}-ны дотор ${suffix}`;
+}
+function settlementDateIsoFromParts(parts, year = new Date().getFullYear()) {
+  if (!parts) return "";
+  return `${year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+function settlementPartsFromIso(iso) {
+  const text = String(iso || "").trim();
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const month = parseSettlementMonth(Number(m[2]));
+  const day = parseSettlementDay(Number(m[3]), month);
+  if (!month || !day) return null;
+  return { month, day };
+}
+function normalizeSettlementDraft() {
+  if (!state.settlementAgreed) {
+    state.settlementMonth = "";
+    state.settlementDay = "";
+    return;
+  }
+  const parts = settlementPartsFromSource(state);
+  if (!parts) {
+    const now = new Date();
+    state.settlementMonth = String(now.getMonth() + 1);
+    state.settlementDay = String(now.getDate());
+    return;
+  }
+  state.settlementMonth = String(parts.month);
+  state.settlementDay = String(parts.day);
+}
+function applySettlementDateInput(iso) {
+  const parts = settlementPartsFromIso(iso);
+  if (!parts) return;
+  state.settlementAgreed = true;
+  state.settlementMonth = String(parts.month);
+  state.settlementDay = String(parts.day);
+  render();
+}
+function settlementDateInputValue() {
+  const parts =
+    settlementPartsFromSource(state) ||
+    (() => {
+      const now = new Date();
+      return { month: now.getMonth() + 1, day: now.getDate() };
+    })();
+  return settlementDateIsoFromParts(parts);
 }
 function nextReceiptSeq(month) {
   let max = 0;
@@ -4260,10 +4321,13 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid--sheet .receipt-grid__promo td,
 .receipt-grid--sheet .receipt-grid__promo-note td,
 .receipt-grid--sheet .receipt-grid__gross td,
-.receipt-grid--sheet .receipt-grid__summary td { border: none; border-top: 1px dotted #808080; padding: 2px 4px; vertical-align: middle; font-size: 9pt; }
-.receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #808080; border-bottom: 1px dotted #808080; background: #e8ebee; }
-.receipt-grid--sheet .receipt-grid__summary--grand td { border-top: 1px solid #808080; border-bottom: none; background: #e8ebee; }
-.receipt-grid--sheet .receipt-grid__summary--pay td { border-bottom: 1px solid #808080; }
+.receipt-grid--sheet .receipt-grid__summary td { border: none; padding: 2px 4px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__return td { padding: 4px 4px 6px; }
+.receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #c8c8c8; background: #e8ebee; padding: 4px; }
+.receipt-grid--sheet .receipt-grid__promo td,
+.receipt-grid--sheet .receipt-grid__promo-note td { background: #fafafa; }
+.receipt-grid--sheet .receipt-grid__summary--grand td { border-top: 1px solid #c8c8c8; background: #e8ebee; padding: 4px; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { padding-top: 6px; }
 .receipt-grid__promo-title { border-left: none !important; font-weight: 700; text-align: center; vertical-align: middle; }
 .receipt-grid__promo-settle { text-align: center; font-size: 9pt; white-space: normal; line-height: 1.25; background: #fff2cc; font-weight: 700; }
 .receipt-grid__logo-cell { vertical-align: top; padding: 0; }
@@ -4303,7 +4367,7 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__warn-line--last { margin-bottom: 0; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
 .receipt-grid__sign-label { font-size: 9pt; padding: 8px 2px 2px; vertical-align: bottom; white-space: nowrap; }
-.receipt-grid__sign-line { border-bottom: 1px dotted #808080 !important; min-height: 20px; vertical-align: bottom; }
+.receipt-grid__sign-line { border-bottom: none !important; min-height: 22px; vertical-align: bottom; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 `;
 let receiptExcelLogoDataUri = "";
@@ -9579,6 +9643,7 @@ function restoreAuthSession() {
     state.settlementAgreed = !!data.settlementAgreed;
     state.settlementMonth = data.settlementMonth || "";
     state.settlementDay = data.settlementDay || "";
+    if (state.settlementAgreed) normalizeSettlementDraft();
     state.applyPercentDiscount = !!data.applyPercentDiscount;
     state.orderEmployee = data.orderEmployee || emp.id;
     state.deliveryDate = data.deliveryDate || "";
@@ -10179,13 +10244,13 @@ function paymentTermPicker() {
   return `<div class="seg-tabs worker-payment-tabs"><button type="button" onclick="setPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">${paymentTermLabel("cash")}</button><button type="button" onclick="setPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">${paymentTermLabel("credit")}</button></div>`;
 }
 function workerOrderOptionsHtml(cart) {
-  const sm = state.settlementMonth || String(new Date().getMonth() + 1),
-    sd = state.settlementDay || String(new Date().getDate()),
-    pct = percentDiscountRate(),
+  const pct = percentDiscountRate(),
     pctAllowed = canApplyPercentDiscount(),
     cashOnly = isCashPayment(),
+    settlementDate = settlementDateInputValue(),
+    settlementMin = todayIso(),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Сар</span><select class="app-input" aria-label="Сар" onchange="state.settlementMonth=this.value;render()">${settlementMonthOptions(state.settlementMonth || sm)}</select></label><label class="worker-order-opt__field"><span class="worker-order-opt__field-label">Өдөр</span><select class="app-input" aria-label="Өдөр" onchange="state.settlementDay=this.value;render()">${settlementDayOptions(state.settlementDay || sd)}</select></label></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field worker-order-opt__field--date"><span class="worker-order-opt__field-label">Огноо</span><input type="date" class="app-input" aria-label="Тооцоо нийлэх огноо" value="${settlementDate}" min="${settlementMin}" onchange="applySettlementDateInput(this.value)"></label></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -10193,7 +10258,7 @@ function workerOrderOptionsHtml(cart) {
     pctRow = pctAllowed
       ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
-  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked&&!state.settlementMonth){state.settlementMonth='${sm}';state.settlementDay='${sd}'}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
+  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked){normalizeSettlementDraft()}else{state.settlementMonth='';state.settlementDay=''}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
@@ -12198,6 +12263,14 @@ async function saveWorker() {
     state.applyPercentDiscount = false;
   const items = cart.all,
     percentDiscount = workerPercentDiscountActive() ? percentDiscountRate() : 0;
+  let settlementMonth = "",
+    settlementDay = "";
+  if (state.settlementAgreed) {
+    const parts = settlementPartsFromSource(state);
+    if (!parts) return alert("Тооцоо нийлэх өдрийг зөв сонгоно уу");
+    settlementMonth = String(parts.month);
+    settlementDay = String(parts.day);
+  }
   const order = buildNewOrder({
     customerId: c.id,
     customerName: c.name,
@@ -12207,9 +12280,9 @@ async function saveWorker() {
     percentDiscount,
     discountAmount: cart.discount,
     total: cart.total,
-    settlementAgreed: !!state.settlementAgreed,
-    settlementMonth: state.settlementAgreed ? state.settlementMonth : "",
-    settlementDay: state.settlementAgreed ? state.settlementDay : "",
+    settlementAgreed: !!settlementMonth && !!settlementDay,
+    settlementMonth,
+    settlementDay,
     status: "pending",
     employeeId: e.id,
     employeeName: e.name,
