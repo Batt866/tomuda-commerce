@@ -90,12 +90,18 @@ def hydrate_product_images(state: dict) -> tuple[dict, bool]:
         if not pid:
             continue
         current = str(product.get("image") or "").strip()
+        url = find_stored_product_image_url(pid)
+        if url:
+            if url != current:
+                product["image"] = url
+                changed = True
+            continue
         if current.startswith("data:image/") and not current.startswith(
             "data:image/svg"
         ):
             continue
-        url = find_stored_product_image_url(pid)
-        if url and url != current:
-            product["image"] = url
-            changed = True
+        if current.startswith("http") and not current.startswith(
+            str(settings.MEDIA_URL)
+        ):
+            continue
     return state, changed

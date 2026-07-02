@@ -1886,19 +1886,27 @@ function storedProductImage(p) {
   if (!raw || raw.startsWith("data:image/svg")) return "";
   return raw;
 }
+function isLocalProductImage(url) {
+  const raw = String(url || "").trim();
+  return raw.startsWith("/media/") || raw.startsWith("data:image/");
+}
 function productImageFallbackList(p = {}) {
   const list = [];
-  const stored = storedProductImage(p);
-  if (stored) list.push(stored);
   const id = String(p?.id || "").trim();
+  const stored = storedProductImage(p);
+  if (stored && isLocalProductImage(stored)) list.push(stored);
   if (id) {
     PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
       const url = productImageMediaUrl(id, ext);
       if (!list.includes(url)) list.push(url);
     });
   }
+  if (stored && !isLocalProductImage(stored)) list.push(stored);
   list.push(productImagePlaceholder(p));
   return list;
+}
+function productImgDataAttrs(p) {
+  return `data-product-img data-product-id="${esc(p.id)}" alt="${esc(p.name)}"`;
 }
 function productImageSrc(p) {
   return productImageFallbackList(p)[0];
@@ -1909,31 +1917,59 @@ function findProductForImage(img) {
     const hit = state.products.find((x) => String(x.id) === id);
     if (hit) return hit;
   }
+  const alt = String(img?.getAttribute("alt") || "").trim();
+  if (alt) {
+    const byName = state.products.find(
+      (x) => String(x.name || "").trim() === alt,
+    );
+    if (byName) return byName;
+  }
   const src = String(img?.getAttribute("src") || "");
   const match = src.match(/\/media\/products\/([^/?#.]+)/);
   if (match) {
     const fromMedia = state.products.find((x) => String(x.id) === match[1]);
     if (fromMedia) return fromMedia;
-    return { id: match[1], name: img.getAttribute("alt") || "", category: "" };
+    return { id: match[1], name: alt || "", category: "" };
   }
-  return { name: img?.getAttribute("alt") || "", category: "" };
+  return { name: alt || "", category: "" };
+}
+function applyProductImageFallback(img, product) {
+  const candidates = productImageFallbackList(product);
+  if (!candidates.length) return;
+  let index = Number(img.dataset.imgFallbackIdx || "0");
+  const current = String(img.getAttribute("src") || "");
+  if (!img.dataset.imgFallbackIdx) {
+    const found = candidates.findIndex((url) => url === current);
+    index = found >= 0 ? found : 0;
+  }
+  img.onerror = () => {
+    index += 1;
+    if (index < candidates.length) {
+      img.dataset.imgFallbackIdx = String(index);
+      img.src = candidates[index];
+    } else {
+      img.onerror = null;
+    }
+  };
+  img.dataset.imgFallbackReady = "1";
+  if (
+    !current ||
+    current === PRODUCT_IMAGE_FALLBACK ||
+    current.startsWith("data:image/svg") ||
+    (img.complete && img.naturalWidth === 0)
+  ) {
+    index = 0;
+    img.dataset.imgFallbackIdx = "0";
+    img.src = candidates[0];
+  }
 }
 function bindProductImages(root = document) {
   root.querySelectorAll("img[data-product-img]").forEach((img) => {
     const product = findProductForImage(img);
-    const candidates = productImageFallbackList(product);
-    let index = Math.max(
-      0,
-      candidates.findIndex((url) => url === String(img.getAttribute("src") || "")),
-    );
-    img.onerror = () => {
-      index += 1;
-      if (index < candidates.length) img.src = candidates[index];
-      else img.onerror = null;
-    };
-    if (!img.getAttribute("src") || img.getAttribute("src") === PRODUCT_IMAGE_FALLBACK) {
-      img.src = candidates[0];
+    if (product?.id && !img.dataset.productId) {
+      img.dataset.productId = String(product.id);
     }
+    applyProductImageFallback(img, product);
   });
 }
 const productImage = (p) => productImageSrc(p);
@@ -5881,7 +5917,7 @@ function productCard(p) {
   const costLine = isAdmin()
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
     : "";
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img data-product-id="${esc(p.id)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -10154,6 +10190,7 @@ function render() {
   app.innerHTML = shell(view());
   lastRenderedView = state.currentView;
   restoreRenderScroll(scrollSnap);
+  bindProductImages(app);
   if (localStateDirty()) scheduleBackendSave();
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
@@ -10240,9 +10277,13 @@ function initProductImageFallback() {
     (e) => {
       const img = e.target;
       if (img?.tagName !== "IMG" || !img.dataset.productImg) return;
-      if (img.dataset.imgFallback) return;
-      img.dataset.imgFallback = "1";
-      img.src = PRODUCT_IMAGE_FALLBACK;
+      if (img.dataset.imgFallbackReady === "1") return;
+      const candidates = productImageFallbackList(findProductForImage(img));
+      const next = Number(img.dataset.imgFallbackIdx || "0") + 1;
+      if (next < candidates.length) {
+        img.dataset.imgFallbackIdx = String(next);
+        img.src = candidates[next];
+      }
     },
     true,
   );
@@ -11939,7 +11980,7 @@ function pickerRow(p) {
     qtyBadge = inCart
       ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
       : "";
-  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="picker-row__thumb" alt=""><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span></span></div>${qtyBadge}</button>`;
+  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="picker-row__thumb" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span></span></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
