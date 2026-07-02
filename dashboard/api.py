@@ -29,6 +29,7 @@ from dashboard.permissions import (
 from dashboard.product_images import (
     hydrate_product_images,
     mirror_product_image,
+    persist_imported_product_images,
     save_product_image,
     update_product_image_in_state,
 )
@@ -244,6 +245,13 @@ def import_products(request, file: UploadedFile = File(...), actor: str = Form("
             next_state, report = import_products_into_state(current, rows)
         except ValueError as exc:
             raise HttpError(400, str(exc)) from exc
+        product_ids = report.pop("_productIds", [])
+        image_report = persist_imported_product_images(
+            next_state,
+            previous_state=current,
+            product_ids=product_ids,
+        )
+        report.update(image_report)
         ok, message = validate_state_mutation(current, next_state, actor_data)
         if not ok:
             raise HttpError(403, message or "Эрх хүрэлцэхгүй")
