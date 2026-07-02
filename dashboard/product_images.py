@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import base64
+import json
 import re
 import time
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 
@@ -14,6 +18,14 @@ DATA_URL_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 MAX_IMAGE_BYTES = 300_000
+OPENFOODFACTS_FIELDS = "image_url"
+IMAGE_MIME_TO_EXT = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
 
 
 def product_image_dir() -> Path:
@@ -44,19 +56,86 @@ def decode_data_url(data_url: str) -> tuple[bytes, str]:
     return raw, ext
 
 
-def save_product_image(product_id: str, data_url: str) -> str:
+def save_product_image_bytes(product_id: str, raw: bytes, ext: str) -> str:
     pid = safe_product_id(product_id)
-    raw, ext = decode_data_url(data_url)
+    clean_ext = str(ext or "").lower()
+    if clean_ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
+        raise ValueError("Зурагны формат буруу байна")
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise ValueError("Зураг хэт том байна")
+    if len(raw) < 32:
+        raise ValueError("Зураг хоосон байна")
     directory = product_image_dir()
     for old in directory.glob(f"{pid}.*"):
         try:
             old.unlink()
         except OSError:
             pass
-    filename = f"{pid}.{ext}"
+    final_ext = "jpg" if clean_ext in {"jpg", "jpeg"} else clean_ext
+    filename = f"{pid}.{final_ext}"
     (directory / filename).write_bytes(raw)
     version = int(time.time())
     return f"{settings.MEDIA_URL}products/{filename}?v={version}"
+
+
+def save_product_image(product_id: str, data_url: str) -> str:
+    raw, ext = decode_data_url(data_url)
+    return save_product_image_bytes(product_id, raw, ext)
+
+
+def fetch_image_bytes(url: str) -> tuple[bytes, str]:
+    source = str(url or "").strip()
+    if not source.startswith(("http://", "https://")):
+        raise ValueError("Зурагны холбоос буруу байна")
+    req = Request(
+        source,
+        headers={
+            "Accept": "image/webp,image/jpeg,image/png,image/gif,*/*;q=0.8",
+            "User-Agent": "tomuda-image-sync/1.0",
+        },
+    )
+    try:
+        with urlopen(req, timeout=20) as response:
+            content_type = str(response.headers.get("Content-Type") or "")
+            mime = content_type.split(";", 1)[0].strip().lower()
+            ext = IMAGE_MIME_TO_EXT.get(mime, "")
+            if not ext:
+                raise ValueError("Зурагны формат буруу байна")
+            raw = response.read(MAX_IMAGE_BYTES + 1)
+    except (HTTPError, URLError):
+        raise ValueError("Зураг татаж чадсангүй")
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise ValueError("Зураг хэт том байна")
+    if len(raw) < 32:
+        raise ValueError("Зураг хоосон байна")
+    return raw, ext
+
+
+def mirror_product_image(product_id: str, source_url: str) -> str:
+    raw, ext = fetch_image_bytes(source_url)
+    return save_product_image_bytes(product_id, raw, ext)
+
+
+def lookup_openfoodfacts_image(barcode: str) -> str:
+    digits = re.sub(r"\D", "", str(barcode or ""))
+    if not digits:
+        return ""
+    endpoint = (
+        "https://world.openfoodfacts.org/api/v2/product/"
+        f"{quote(digits)}.json?fields={OPENFOODFACTS_FIELDS}"
+    )
+    req = Request(
+        endpoint,
+        headers={"Accept": "application/json", "User-Agent": "tomuda-image-sync/1.0"},
+    )
+    try:
+        with urlopen(req, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, json.JSONDecodeError):
+        return ""
+    product = payload.get("product") if isinstance(payload, dict) else {}
+    image_url = str((product or {}).get("image_url") or "").strip()
+    return image_url if image_url.startswith(("http://", "https://")) else ""
 
 
 def update_product_image_in_state(state: dict, product_id: str, url: str) -> bool:

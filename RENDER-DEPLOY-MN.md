@@ -46,6 +46,10 @@ python manage.py seed_tomuda
 **Ажиллах үед:**
 
 ```bash
+python manage.py migrate --noinput
+python manage.py sanitize_state --apply
+python manage.py seed_tomuda --only-if-empty
+python manage.py sync_product_images || true
 gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT
 ```
 
@@ -228,6 +232,17 @@ Production-д нууц үгээ заавал солино (апп дотор а�
 | `CSRF_TRUSTED_ORIGINS` | `https://tomuda-commerce.onrender.com` |
 | `DATABASE_URL`         | PostgreSQL-ээс автоматаар              |
 | `PYTHON_VERSION`       | `3.11`                                 |
+| `MEDIA_ROOT`           | `/var/data/media`                      |
+| `SERVE_MEDIA`          | `1`                                    |
+
+### Persistent Disk (зураг алдагдахгүй)
+
+`render.yaml`-д web service дээр `media-disk` нэмсэн:
+
+- `mountPath`: `/var/data`
+- `MEDIA_ROOT`: `/var/data/media`
+
+Ингэснээр барааны зураг `media/products` дотор deploy/restart дараа хадгалагдана.
 
 ### URL өөр гарсан бол (чухал)
 

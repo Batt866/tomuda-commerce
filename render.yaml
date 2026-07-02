@@ -7,11 +7,15 @@ databases:
 services:
   - type: web
     name: tomuda-commerce
-    env: python
+    runtime: python
     plan: free
     healthCheckPath: /api/health
     buildCommand: pip install -r requirements.txt && curl -fsSL https://cdn.tailwindcss.com -o static/tomuda/vendor/tailwindcdn.js && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && python manage.py sanitize_state --apply && python manage.py seed_tomuda --only-if-empty && gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 4 --preload
+    startCommand: python manage.py migrate --noinput && python manage.py sanitize_state --apply && python manage.py seed_tomuda --only-if-empty && (python manage.py sync_product_images || true) && gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 4 --preload
+    disk:
+      name: media-disk
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: DEBUG
         value: "0"
@@ -27,3 +31,7 @@ services:
           property: connectionString
       - key: PYTHON_VERSION
         value: "3.11"
+      - key: MEDIA_ROOT
+        value: "/var/data/media"
+      - key: SERVE_MEDIA
+        value: "1"

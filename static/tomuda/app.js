@@ -2114,6 +2114,27 @@ async function uploadProductImage(productId, dataUrl) {
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   return payload.url || "";
 }
+async function fetchImageAsDataUrl(url) {
+  const source = String(url || "").trim();
+  if (!source.startsWith("http://") && !source.startsWith("https://")) {
+    throw new Error("Зурагны холбоос буруу байна");
+  }
+  const res = await fetch(source, { cache: "no-store" });
+  if (!res.ok) throw new Error("Зураг татаж чадсангүй");
+  const blob = await res.blob();
+  if (!String(blob.type || "").startsWith("image/")) {
+    throw new Error("Зурагны формат буруу байна");
+  }
+  if (blob.size > PRODUCT_IMAGE_UPLOAD_MAX_BYTES) {
+    throw new Error("Зураг хэт том байна. Жижиг зураг сонгоно уу.");
+  }
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Зураг уншиж чадсангүй"));
+    reader.readAsDataURL(blob);
+  });
+}
 const LOCAL_PENDING_STATE_KEY = "tomuda-pending-state";
 const LOCAL_ORDERS_BACKUP_KEY = "tomuda-orders-backup";
 function readLocalBackendCache() {
@@ -2599,7 +2620,9 @@ function flushPendingCountRender() {
 function applyRemoteState(payload) {
   if (!payload?.state) return false;
   if (shouldDeferBackendSync()) return false;
-  const merged = mergePersistentStates(payload.state, persistentState());
+  const merged = protectAccidentalDeletions(
+    mergePersistentStates(payload.state, persistentState()),
+  );
   if (JSON.stringify(merged) === JSON.stringify(persistentState())) {
     if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
     return false;
@@ -2676,7 +2699,8 @@ function showBootRetry() {
   document.querySelector(".boot-screen")?.classList.add("boot-screen--error");
   document.getElementById("boot-retry")?.classList.remove("hidden");
 }
-function completeBootUiInit() {
+function completeBootUiInit(options = {}) {
+  const startPoll = options.startPoll !== false;
   backendReady = true;
   ensureEmployeeEmails();
   ensureSettings();
@@ -2704,7 +2728,7 @@ function completeBootUiInit() {
   window.__tomudaBooted = true;
   render();
   initPwa();
-  startBackendPoll();
+  if (startPoll) startBackendPoll();
 }
 async function boot() {
   try {
@@ -2713,7 +2737,7 @@ async function boot() {
     const cached = readLocalBackendCache();
     if (cached?.state) {
       syncBackendMarkers(cached, mergeBootState(cached.state));
-      completeBootUiInit();
+      completeBootUiInit({ startPoll: false });
       bootUiReady = true;
       setBootStatus("Шинэчилж байна", "Серверийн мэдээлэл шалгаж байна...");
     }
@@ -2726,12 +2750,14 @@ async function boot() {
         completeBootUiInit();
       } else {
         render();
+        startBackendPoll();
       }
       return;
     }
 
     if (bootUiReady) {
       console.warn("Fresh backend state unavailable; using cached copy.");
+      startBackendPoll();
       return;
     }
 
@@ -4125,16 +4151,16 @@ function orderReceiptRowsFiltered(
   const q = (state.searches[searchKey] || "").toLowerCase();
   const workerIds = idList(opts.workerIds || employeeIds),
     deliveryIds = idList(opts.deliveryIds);
-  const rows = filterWarehouseOrders(
-    state.orders.filter(
-      (o) =>
-        (!workerIds.length || workerIds.includes(o.employeeId)) &&
-        (!deliveryIds.length ||
-          deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
-        orderReceiptMatchesQuery(o, q) &&
-        (state.filters.order === "all" || o.status === state.filters.order),
-    ),
+  const skipWarehouseDate = opts.skipWarehouseDate || searchKey === "orders";
+  let rows = state.orders.filter(
+    (o) =>
+      (!workerIds.length || workerIds.includes(o.employeeId)) &&
+      (!deliveryIds.length ||
+        deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
+      orderReceiptMatchesQuery(o, q) &&
+      (state.filters.order === "all" || o.status === state.filters.order),
   );
+  if (!skipWarehouseDate) rows = filterWarehouseOrders(rows);
   return sortOrdersBySelectedPeople(rows, workerIds, deliveryIds);
 }
 function buildOrderReceiptExcelRows(o) {
@@ -6015,6 +6041,34 @@ function stockInLineCost(p) {
   if (Number.isFinite(draftCost) && draftCost > 0) return draftCost;
   return productCostPrice(p) || 0;
 }
+function stockInReceiptLineUnitPrice(line) {
+  const unitPrice = Number(line?.unitPrice ?? line?.costPrice);
+  return Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0;
+}
+function stockInReceiptLineTotal(line) {
+  const quantity = Number(line?.quantity) || 0;
+  const unitPrice = stockInReceiptLineUnitPrice(line);
+  if (quantity > 0 && unitPrice > 0) return quantity * unitPrice;
+  const storedTotal = Number(line?.totalPrice);
+  return Number.isFinite(storedTotal) ? storedTotal : 0;
+}
+function normalizeStockInReceiptTotals(receipt) {
+  const lines = (receipt?.lines || []).map((line) => {
+    const unitPrice = stockInReceiptLineUnitPrice(line);
+    const totalPrice = stockInReceiptLineTotal(line);
+    return {
+      ...line,
+      costPrice: unitPrice || Number(line.costPrice) || 0,
+      unitPrice: unitPrice || Number(line.unitPrice) || 0,
+      totalPrice,
+    };
+  });
+  return {
+    ...receipt,
+    lines,
+    totalAmount: lines.reduce((sum, line) => sum + stockInReceiptLineTotal(line), 0),
+  };
+}
 function stockInHasEntries() {
   return state.products.some((p) => stockInLineQty(p) > 0);
 }
@@ -6135,18 +6189,17 @@ function buildStockInReceiptSnapshot() {
       totalPrice: qty * cost,
     };
   });
-  return {
+  return normalizeStockInReceiptTotals({
     id: String(Date.now()),
     createdAt: new Date().toISOString(),
     employeeId: state.stockInEmployeeId,
     employeeName: stockInEmployeeName(),
     lines,
-    totalAmount: lines.reduce((s, l) => s + l.totalPrice, 0),
-  };
+  });
 }
 function applyStockInReceipt(receipt) {
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
-  const saved = finalizeStockInReceipt(receipt);
+  const saved = finalizeStockInReceipt(normalizeStockInReceiptTotals(receipt));
   if (!state.stockInReceipts.some((r) => r.id === saved.id)) {
     state.stockInReceipts.push({
       id: saved.id,
@@ -6304,7 +6357,9 @@ function applyStockInEntryModal(e, id) {
   render();
 }
 function stockInReceiptRow(line) {
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.costPrice)}</span><span class="stock-in-table__money">${fmt(line.unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice)}</span></div>`;
+  const unitPrice = stockInReceiptLineUnitPrice(line);
+  const totalPrice = stockInReceiptLineTotal(line);
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(totalPrice)}</span></div>`;
 }
 function stockInTableHead(mode = "entry") {
   if (mode === "entry") {
@@ -6335,7 +6390,7 @@ function stockInReceiptGroupedLines(lines) {
     .flatMap((cat) => {
       const catLines = byCat[cat];
       const catTotal = catLines.reduce(
-        (sum, line) => sum + (Number(line.totalPrice) || 0),
+        (sum, line) => sum + stockInReceiptLineTotal(line),
         0,
       );
       return [
@@ -6349,6 +6404,7 @@ function stockInCategoryTotalRow(name, amount) {
   return `<div class="stock-in-table__foot stock-in-table__foot--cat"><span class="stock-in-table__foot-label">${esc(name)} нийт</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(amount)}</span></div>`;
 }
 function stockInReceiptPanel(receipt) {
+  receipt = normalizeStockInReceiptTotals(receipt);
   const groups = stockInReceiptGroupedLines(receipt.lines);
   const rows = groups
     .map((item) => {
@@ -6369,6 +6425,7 @@ function stockInPanel(list) {
   return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
 function exportStockInExcel(receipt) {
+  receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
   exportStockInExcelXlsx(receipt).catch(() =>
     exportStockInExcelFallback(receipt),
@@ -6378,6 +6435,7 @@ function confirmStockInExcel() {
   return alert("Эхлээд орлогоо дуусгана уу");
 }
 function exportStockInExcelFallback(receipt) {
+  receipt = normalizeStockInReceiptTotals(receipt);
   const receivedDateValue = warehouseSheetDateValue(
     receipt.createdAt
       ? new Date(receipt.createdAt).toISOString().slice(0, 10)
@@ -6394,7 +6452,8 @@ function exportStockInExcelFallback(receipt) {
         return `<tr class="cat-total"><td colspan="6" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
       }
       const line = item.line;
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(line.costPrice)}</td><td class="num">${fmtExcelMoney(line.unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice)}</td></tr>`;
+      const unitPrice = stockInReceiptLineUnitPrice(line);
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -7483,6 +7542,7 @@ const WAREHOUSE_PREPARE_TEMPLATE =
 const STOCK_IN_LAST_COL = "G";
 const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
 function buildStockInSheetXml(receipt) {
+  receipt = normalizeStockInReceiptTotals(receipt);
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -7582,25 +7642,21 @@ function buildStockInSheetXml(receipt) {
       pushRow(16.5, [
         xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
         ...emptyCells(r, "B", "F", 3),
-        xlsxCellXml(
-          `G${r}`,
-          11,
-          si(fmtExcelMoney(item.amount)),
-          "s",
-        ),
+        xlsxCellXml(`G${r}`, 10, item.amount, "n"),
       ]);
       continue;
     }
     const line = item.line;
     const r = rowNum;
+    const unitPrice = stockInReceiptLineUnitPrice(line);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
       xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
       xlsxOptionalNum(`C${r}`, 10, line.packs),
       xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
-      xlsxCellXml(`E${r}`, 8, si(fmtExcelMoney(line.costPrice)), "s"),
-      xlsxCellXml(`F${r}`, 8, si(fmtExcelMoney(line.unitPrice)), "s"),
-      xlsxCellXml(`G${r}`, 8, si(fmtExcelMoney(line.totalPrice)), "s"),
+      xlsxCellXml(`E${r}`, 10, unitPrice, "n"),
+      xlsxCellXml(`F${r}`, 10, unitPrice, "n"),
+      xlsxCellXml(`G${r}`, 10, stockInReceiptLineTotal(line), "n"),
     ]);
   }
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
@@ -7609,7 +7665,7 @@ function buildStockInSheetXml(receipt) {
   pushRow(16.5, [
     xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
     ...emptyCells(totalRow, "B", "F", 10),
-    xlsxCellXml(`G${totalRow}`, 10, si(fmtExcelMoney(receipt.totalAmount)), "s"),
+    xlsxCellXml(`G${totalRow}`, 10, receipt.totalAmount, "n"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
   const sign1 = rowNum;
@@ -11032,8 +11088,16 @@ function buildProductDataFromForm(form) {
 }
 async function applyProductSave(data, id) {
   let imageDataUrl = null;
-  if (String(data.image || "").startsWith("data:image/")) {
-    imageDataUrl = data.image;
+  let imageRemoteUrl = "";
+  const incomingImage = String(data.image || "").trim();
+  if (incomingImage.startsWith("data:image/")) {
+    imageDataUrl = incomingImage;
+    delete data.image;
+  } else if (
+    incomingImage.startsWith("http://") ||
+    incomingImage.startsWith("https://")
+  ) {
+    imageRemoteUrl = incomingImage;
     delete data.image;
   }
   let productId = id;
@@ -11042,7 +11106,12 @@ async function applyProductSave(data, id) {
     if (existing) {
       const prevImage = storedProductImage(existing);
       Object.assign(existing, data);
-      if (!imageDataUrl && !storedProductImage(existing) && prevImage) {
+      if (
+        !imageDataUrl &&
+        !imageRemoteUrl &&
+        !storedProductImage(existing) &&
+        prevImage
+      ) {
         existing.image = prevImage;
       }
     }
@@ -11056,19 +11125,33 @@ async function applyProductSave(data, id) {
       costPrice: 0,
     });
   }
-  if (imageDataUrl && productId) {
+  if (productId && !imageDataUrl && imageRemoteUrl) {
     try {
-      const url = await uploadProductImage(productId, imageDataUrl);
-      const product = state.products.find((p) => p.id === productId);
-      if (product) product.image = url;
+      imageDataUrl = await fetchImageAsDataUrl(imageRemoteUrl);
     } catch (error) {
-      console.warn("Product image upload failed", error);
-      alert(error.message || "Зураг хадгалж чадсангүй");
+      console.warn("Product image mirror failed", error);
+    }
+  }
+  if (productId) {
+    if (imageDataUrl) {
+      try {
+        const url = await uploadProductImage(productId, imageDataUrl);
+        const product = state.products.find((p) => p.id === productId);
+        if (product) product.image = url;
+      } catch (error) {
+        console.warn("Product image upload failed", error);
+        alert(error.message || "Зураг хадгалж чадсангүй");
+      }
+    } else if (imageRemoteUrl) {
+      const product = state.products.find((p) => p.id === productId);
+      if (product) product.image = imageRemoteUrl;
     }
   }
   closeModal();
   render();
-  scheduleBackendSave();
+  flushBackendSave().catch((error) =>
+    console.warn("Product backend save failed", error),
+  );
 }
 async function saveProduct(e, id) {
   if (
@@ -11354,9 +11437,12 @@ function saveOrder(e) {
     }),
   );
   items.forEach((i) => stock(i.productId, i.quantity, "out"));
+  persistOrderSnapshot();
   closeModal();
-  scheduleBackendSave();
   render();
+  flushBackendSave().catch((error) =>
+    console.warn("Order backend save failed", error),
+  );
 }
 function clearReceiptEdit() {
   state.receiptEditOrderId = "";
