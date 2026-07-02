@@ -25,6 +25,7 @@ from dashboard.permissions import (
     validate_state_mutation,
     _order_within_retention,
 )
+from dashboard.product_images import save_product_image, update_product_image_in_state
 from dashboard.seed_data import default_state
 from dashboard.state_sanitize import sanitize_app_state
 
@@ -120,6 +121,49 @@ def product_import_template(request):
     )
     response["Content-Disposition"] = 'attachment; filename="baraa-format.xlsx"'
     return response
+
+
+@api.post("/products/{product_id}/image")
+def upload_product_image(
+    request, product_id: str, payload: dict[str, Any] = Body(...)
+):
+    data_url = payload.get("image") or payload.get("dataUrl") or ""
+    actor = payload.get("actor")
+
+    row, _ = AppState.objects.get_or_create(
+        key="main",
+        defaults={"data": default_state()},
+    )
+    current = dict(row.data or default_state())
+    employee = find_employee(current, actor)
+    if not employee:
+        raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
+
+    product_exists = any(
+        str(p.get("id")) == str(product_id)
+        for p in current.get("products") or []
+        if isinstance(p, dict)
+    )
+    if product_exists:
+        if not has_permission(employee, "products.edit"):
+            raise HttpError(403, "Бараа засах эрхгүй")
+    elif not has_permission(employee, "products.create"):
+        raise HttpError(403, "Бараа нэмэх эрхгүй")
+
+    try:
+        url = save_product_image(product_id, data_url)
+    except ValueError as exc:
+        raise HttpError(400, str(exc)) from exc
+
+    with transaction.atomic():
+        row = AppState.objects.select_for_update().get(key="main")
+        current = dict(row.data or default_state())
+        update_product_image_in_state(current, product_id, url)
+        row.data = current
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {"ok": True, "url": url, "updatedAt": updated_at}
 
 
 @api.post("/import/customers")
