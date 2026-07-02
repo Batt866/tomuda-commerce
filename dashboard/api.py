@@ -101,7 +101,7 @@ def save_state(request, payload: dict[str, Any] = Body(...)):
         raise HttpError(403, message or "Эрх хүрэлцэхгүй")
     row.data = data
     row.save(update_fields=["data", "updated_at"])
-    return {"ok": True, "updatedAt": row.updated_at.isoformat()}
+    return {"ok": True, "state": data, "updatedAt": row.updated_at.isoformat()}
 
 
 def _require_import_permission(state: dict[str, Any], actor: dict[str, Any] | None, perm: str) -> None:

@@ -13,6 +13,8 @@ from urllib.request import Request, urlopen
 
 from django.conf import settings
 
+from dashboard.models import ProductImage
+
 DATA_URL_RE = re.compile(
     r"^data:image/(?P<fmt>jpeg|jpg|png|webp|gif);base64,(?P<data>.+)$",
     re.IGNORECASE | re.DOTALL,
@@ -25,6 +27,13 @@ IMAGE_MIME_TO_EXT = {
     "image/png": "png",
     "image/webp": "webp",
     "image/gif": "gif",
+}
+IMAGE_EXT_TO_MIME = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "gif": "image/gif",
 }
 
 
@@ -65,16 +74,40 @@ def save_product_image_bytes(product_id: str, raw: bytes, ext: str) -> str:
         raise ValueError("Зураг хэт том байна")
     if len(raw) < 32:
         raise ValueError("Зураг хоосон байна")
-    directory = product_image_dir()
-    for old in directory.glob(f"{pid}.*"):
-        try:
-            old.unlink()
-        except OSError:
-            pass
     final_ext = "jpg" if clean_ext in {"jpg", "jpeg"} else clean_ext
+    content_type = IMAGE_EXT_TO_MIME[final_ext]
+
+    image, _ = ProductImage.objects.update_or_create(
+        product_id=pid,
+        defaults={
+            "image": raw,
+            "content_type": content_type,
+            "ext": final_ext,
+        },
+    )
+
+    try:
+        directory = product_image_dir()
+        for old in directory.glob(f"{pid}.*"):
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        filename = f"{pid}.{final_ext}"
+        (directory / filename).write_bytes(raw)
+    except OSError:
+        # The DB copy is the durable source; media files are only a fast path.
+        pass
+
+    version = int(image.updated_at.timestamp()) if image.updated_at else int(time.time())
+    return product_image_url(pid, final_ext, version)
+
+
+def product_image_url(product_id: str, ext: str, version: int | None = None) -> str:
+    pid = safe_product_id(product_id)
+    final_ext = "jpg" if str(ext or "").lower() in {"jpg", "jpeg"} else str(ext or "").lower()
     filename = f"{pid}.{final_ext}"
-    (directory / filename).write_bytes(raw)
-    version = int(time.time())
+    version = int(version or time.time())
     return f"{settings.MEDIA_URL}products/{filename}?v={version}"
 
 
@@ -151,13 +184,59 @@ def find_stored_product_image_url(product_id: str) -> str:
         pid = safe_product_id(product_id)
     except ValueError:
         return ""
-    directory = product_image_dir()
-    for ext in ("jpg", "jpeg", "png", "webp", "gif"):
-        path = directory / f"{pid}.{ext}"
-        if path.is_file() and path.stat().st_size > 32:
-            version = int(path.stat().st_mtime)
-            return f"{settings.MEDIA_URL}products/{pid}.{ext}?v={version}"
+    try:
+        directory = product_image_dir()
+    except OSError:
+        directory = None
+    if directory:
+        for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+            path = directory / f"{pid}.{ext}"
+            try:
+                if path.is_file() and path.stat().st_size > 32:
+                    version = int(path.stat().st_mtime)
+                    backfill_product_image_from_file(pid, path, ext)
+                    return product_image_url(pid, ext, version)
+            except OSError:
+                continue
+    image = ProductImage.objects.filter(product_id=pid).first()
+    if image and image.image and len(image.image) > 32:
+        version = int(image.updated_at.timestamp()) if image.updated_at else int(time.time())
+        return product_image_url(pid, image.ext or "jpg", version)
     return ""
+
+
+def backfill_product_image_from_file(product_id: str, path: Path, ext: str) -> None:
+    if ProductImage.objects.filter(product_id=product_id).exists():
+        return
+    clean_ext = "jpg" if str(ext or "").lower() in {"jpg", "jpeg"} else str(ext or "").lower()
+    content_type = IMAGE_EXT_TO_MIME.get(clean_ext)
+    if not content_type:
+        return
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return
+    if len(raw) < 32 or len(raw) > MAX_IMAGE_BYTES:
+        return
+    ProductImage.objects.update_or_create(
+        product_id=product_id,
+        defaults={
+            "image": raw,
+            "content_type": content_type,
+            "ext": clean_ext,
+        },
+    )
+
+
+def get_stored_product_image(product_id: str) -> ProductImage | None:
+    try:
+        pid = safe_product_id(product_id)
+    except ValueError:
+        return None
+    image = ProductImage.objects.filter(product_id=pid).first()
+    if image and image.image and len(image.image) > 32:
+        return image
+    return None
 
 
 def product_media_path_from_url(url: str) -> str:
@@ -205,11 +284,16 @@ def persist_imported_product_images(
 
         local_url = product_media_path_from_url(source)
         if local_url:
-            product["image"] = local_url
+            stored_url = find_stored_product_image_url(pid)
+            product["image"] = stored_url
+            if not stored_url:
+                image_skipped += 1
             continue
 
         normalized_source = f"https:{source}" if source.startswith("//") else source
         previous = previous_images.get(pid, "")
+        if product_media_path_from_url(previous) and not find_stored_product_image_url(pid):
+            previous = ""
         try:
             if not normalized_source.startswith(("http://", "https://")):
                 raise ValueError("Зурагны холбоос буруу байна")
@@ -241,6 +325,11 @@ def hydrate_product_images(state: dict) -> tuple[dict, bool]:
         if url:
             if url != current:
                 product["image"] = url
+                changed = True
+            continue
+        if product_media_path_from_url(current):
+            if current:
+                product["image"] = ""
                 changed = True
             continue
         if current.startswith("data:image/") and not current.startswith(
