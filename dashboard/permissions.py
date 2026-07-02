@@ -175,7 +175,20 @@ def _iso_day(value: Any) -> str:
     return ""
 
 
-def _order_within_retention(order: dict[str, Any], now: datetime | None = None) -> bool:
+def _order_retention_days(state: dict[str, Any] | None = None) -> int:
+    settings = (state or {}).get("settings") or {}
+    try:
+        days = int(settings.get("orderRetentionDays") or 31)
+    except (TypeError, ValueError):
+        days = 31
+    return max(7, min(days, 365))
+
+
+def _order_within_retention(
+    order: dict[str, Any],
+    now: datetime | None = None,
+    retention_days: int | None = None,
+) -> bool:
     day = _iso_day(order.get("createdAt") or order.get("deliveryDate"))
     if not day:
         return True
@@ -183,7 +196,8 @@ def _order_within_retention(order: dict[str, Any], now: datetime | None = None) 
         created = datetime.fromisoformat(day)
     except ValueError:
         return True
-    return created + timedelta(days=31) >= (now or datetime.utcnow())
+    days = retention_days if retention_days is not None else 31
+    return created + timedelta(days=days) >= (now or datetime.utcnow())
 
 
 def _created_order_stock_usage(
@@ -310,10 +324,11 @@ def validate_state_mutation(
             return False, f"{key} засах эрхгүй"
 
     deleted_orders = set(old_orders) - set(new_orders)
+    retention_days = _order_retention_days(new_state)
     protected_deleted_orders = [
         order_id
         for order_id in deleted_orders
-        if _order_within_retention(old_orders[order_id])
+        if _order_within_retention(old_orders[order_id], retention_days=retention_days)
     ]
     if protected_deleted_orders:
         return False, "1 сарын доторх захиалга устгах боломжгүй"

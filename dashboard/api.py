@@ -23,6 +23,7 @@ from dashboard.permissions import (
     find_employee,
     has_permission,
     validate_state_mutation,
+    _order_retention_days,
     _order_within_retention,
 )
 from dashboard.product_images import (
@@ -74,8 +75,11 @@ def get_state(request):
 def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
     next_state = dict(data or {})
     orders = next_state.get("orders") or []
+    retention_days = _order_retention_days(next_state)
     next_state["orders"] = [
-        order for order in orders if _order_within_retention(order)
+        order
+        for order in orders
+        if _order_within_retention(order, retention_days=retention_days)
     ]
     return next_state
 

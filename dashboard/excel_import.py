@@ -441,11 +441,6 @@ def import_customers_into_state(
         raise ValueError("Excel-д «Нэр» багана олдсонгүй (эхний мөрөнд багана нэр байх ёстой)")
     data_rows = rows[header_idx + 1 :]
 
-    existing_regs = {
-        _registration_digits(str(c.get("registrationNumber") or ""))
-        for c in state.get("customers") or []
-        if _registration_digits(str(c.get("registrationNumber") or ""))
-    }
     existing_by_reg = {
         _registration_digits(str(c.get("registrationNumber") or "")): c
         for c in state.get("customers") or []
@@ -455,6 +450,8 @@ def import_customers_into_state(
     customers = list(state.get("customers") or [])
     errors: list[dict[str, Any]] = []
     success = 0
+    updated = 0
+    created = 0
     total = 0
     now = int(time.time() * 1000)
 
@@ -474,14 +471,9 @@ def import_customers_into_state(
         if not name:
             errors.append({"row": offset, "message": "Нэр хоосон байна."})
             continue
-        if reg_digits:
-            if reg_digits in batch_regs:
-                errors.append({"row": offset, "message": "Регистр давхардаж байна."})
-                continue
-            if reg_digits in existing_by_reg:
-                errors.append({"row": offset, "message": "Регистр системд бүртгэлтэй байна."})
-                continue
-            batch_regs.add(reg_digits)
+        if reg_digits and reg_digits in batch_regs:
+            errors.append({"row": offset, "message": "Регистр давхардаж байна."})
+            continue
         if phone1 and not _valid_phone(phone1):
             errors.append({"row": offset, "message": "Утасны формат буруу байна."})
             continue
@@ -489,27 +481,43 @@ def import_customers_into_state(
             errors.append({"row": offset, "message": "Утас 2 формат буруу байна."})
             continue
 
-        now += 1
-        customer = {
-            "id": str(now),
-            "name": name,
-            "registrationNumber": reg_raw,
-            "companyName": name,
-            "phone1": phone1,
-            "phone2": phone2,
-            "province": _cell_text(data.get("province")) or "Улаанбаатар",
-            "district": _cell_text(data.get("district")),
-            "khoroo": _cell_text(data.get("khoroo")),
-            "address": _cell_text(data.get("address")),
-            "latitude": "",
-            "longitude": "",
-            "locationText": "",
-            "image": "",
-        }
-        customers.append(customer)
+        existing = existing_by_reg.get(reg_digits) if reg_digits else None
+        if existing:
+            # Excel-ээр давтан оруулахад давхар бичлэг үүсгэхгүй, байгаа харилцагчийг шинэчилнэ.
+            existing["name"] = name
+            existing["companyName"] = name
+            existing["registrationNumber"] = reg_raw
+            existing["phone1"] = phone1
+            existing["phone2"] = phone2
+            existing["province"] = _cell_text(data.get("province")) or "Улаанбаатар"
+            existing["district"] = _cell_text(data.get("district"))
+            existing["khoroo"] = _cell_text(data.get("khoroo"))
+            existing["address"] = _cell_text(data.get("address"))
+            updated += 1
+        else:
+            now += 1
+            customer = {
+                "id": str(now),
+                "name": name,
+                "registrationNumber": reg_raw,
+                "companyName": name,
+                "phone1": phone1,
+                "phone2": phone2,
+                "province": _cell_text(data.get("province")) or "Улаанбаатар",
+                "district": _cell_text(data.get("district")),
+                "khoroo": _cell_text(data.get("khoroo")),
+                "address": _cell_text(data.get("address")),
+                "latitude": "",
+                "longitude": "",
+                "locationText": "",
+                "image": "",
+            }
+            customers.append(customer)
+            created += 1
+            if reg_digits:
+                existing_by_reg[reg_digits] = customer
         if reg_digits:
-            existing_regs.add(reg_digits)
-            existing_by_reg[reg_digits] = customer
+            batch_regs.add(reg_digits)
         success += 1
 
     if total <= 0:
@@ -522,6 +530,8 @@ def import_customers_into_state(
     report = {
         "total": total,
         "success": success,
+        "created": created,
+        "updated": updated,
         "failed": len(errors),
         "errors": errors,
     }
@@ -543,8 +553,8 @@ def import_products_into_state(
         raise ValueError("Excel-д «Barcode» болон «Барааны нэр» багана шаардлагатай")
     data_rows = rows[header_idx + 1 :]
 
-    existing_barcodes = {
-        re.sub(r"\D", "", str(p.get("barcode") or ""))
+    existing_by_barcode = {
+        re.sub(r"\D", "", str(p.get("barcode") or "")): p
         for p in state.get("products") or []
         if re.sub(r"\D", "", str(p.get("barcode") or ""))
     }
@@ -552,6 +562,8 @@ def import_products_into_state(
     products = list(state.get("products") or [])
     errors: list[dict[str, Any]] = []
     success = 0
+    updated = 0
+    created = 0
     total = 0
     now = int(time.time() * 1000)
 
@@ -572,7 +584,7 @@ def import_products_into_state(
         if not name:
             errors.append({"row": offset, "message": "Барааны нэр хоосон байна."})
             continue
-        if barcode in existing_barcodes or barcode in batch_barcodes:
+        if barcode in batch_barcodes:
             errors.append({"row": offset, "message": "Barcode давхардаж байна."})
             continue
         if price_err:
@@ -588,9 +600,20 @@ def import_products_into_state(
 
         country = _cell_text(data.get("country")) or "Монгол"
 
-        now += 1
-        products.append(
-            {
+        existing = existing_by_barcode.get(barcode)
+        if existing:
+            # Давтан импорт хийхэд байгаа барааг шинэчилнэ (үлдэгдэл/зураг хэвээр).
+            existing["name"] = name
+            existing["unit"] = unit or "ширхэг"
+            existing["price"] = int(price or 0)
+            existing["costPrice"] = int(cost or 0)
+            existing["country"] = country
+            if not existing.get("category"):
+                existing["category"] = "Бусад"
+            updated += 1
+        else:
+            now += 1
+            product = {
                 "id": str(now),
                 "barcode": barcode,
                 "name": name,
@@ -604,9 +627,10 @@ def import_products_into_state(
                 "country": country,
                 "image": "",
             }
-        )
+            products.append(product)
+            existing_by_barcode[barcode] = product
+            created += 1
         batch_barcodes.add(barcode)
-        existing_barcodes.add(barcode)
         success += 1
 
     next_state = dict(state)
@@ -614,6 +638,8 @@ def import_products_into_state(
     report = {
         "total": total,
         "success": success,
+        "created": created,
+        "updated": updated,
         "failed": len(errors),
         "errors": errors,
     }

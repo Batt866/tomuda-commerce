@@ -38,6 +38,7 @@ const state = {
   paymentTerm: "cash",
   isPaid: false,
   settlementAgreed: false,
+  settlementText: "",
   settlementMonth: "",
   settlementDay: "",
   applyPercentDiscount: false,
@@ -79,6 +80,7 @@ const state = {
     stockAlertEnabled: true,
     stockAlertMin: 10,
     percentDiscountRate: 3,
+    orderRetentionDays: 31,
   },
 };
 const API_BASE = window.TOMUDA_API_BASE || "/api";
@@ -244,6 +246,7 @@ const persistKeys = [
   "workerCustomer",
   "orderEmployee",
   "paymentTerm",
+  "settlementText",
   "promotionRules",
   "deliveryDate",
   "selectedDeliveryId",
@@ -251,6 +254,7 @@ const persistKeys = [
   "deliveryPhone",
   "settings",
 ];
+let backendSaveFailedMessage = "";
 let backendReady = false;
 let backendSaveTimer = null;
 let backendLastSaved = "";
@@ -498,6 +502,8 @@ function receiptPromoDisplayTotal(i) {
   return qty * receiptPromoDisplayPrice(i);
 }
 function receiptPromoSettleNote(o) {
+  const custom = String(o?.settlementText || "").trim();
+  if (custom) return custom;
   const parts = settlementPartsFromSource(o);
   if (!parts) return "";
   return settlementNoteFromParts(parts, "тооцоо нийлнэ");
@@ -668,6 +674,8 @@ function ensureSettings() {
   if (state.settings.stockAlertMin == null) state.settings.stockAlertMin = 10;
   if (state.settings.percentDiscountRate == null)
     state.settings.percentDiscountRate = RECEIPT_PERCENT_DISCOUNT;
+  if (state.settings.orderRetentionDays == null)
+    state.settings.orderRetentionDays = 31;
 }
 function percentDiscountRate() {
   ensureSettings();
@@ -877,12 +885,17 @@ function orderCreatedDay(o) {
   if (created) return created;
   return orderDeliveryDay(o);
 }
+function orderRetentionDays() {
+  ensureSettings();
+  const n = Number(state.settings.orderRetentionDays);
+  return Number.isFinite(n) && n >= 7 ? Math.min(Math.floor(n), 365) : 31;
+}
 function orderRetentionExpiresAt(o) {
   const day = orderCreatedDay(o);
   if (!day) return 0;
   const expires = new Date(`${day}T23:59:59`);
   if (Number.isNaN(expires.getTime())) return 0;
-  expires.setMonth(expires.getMonth() + 1);
+  expires.setDate(expires.getDate() + orderRetentionDays());
   return expires.getTime();
 }
 function orderWithinRetention(o, now = Date.now()) {
@@ -893,9 +906,27 @@ function retainedOrders(orders = [], now = Date.now()) {
   return (orders || []).filter((o) => orderWithinRetention(o, now));
 }
 function settlementNoteText(o) {
+  const custom = String(o?.settlementText || "").trim();
+  if (custom) return custom;
   const parts = settlementPartsFromSource(o);
   if (!parts) return "";
   return settlementNoteFromParts(parts, "тооцоо нийлэхээр тохиролцов");
+}
+function settlementTextInputValue(source = state) {
+  return String(source?.settlementText || "").trim();
+}
+function normalizeSettlementTextDraft() {
+  if (!state.settlementAgreed) {
+    state.settlementText = "";
+    return;
+  }
+  if (settlementTextInputValue(state)) return;
+  state.settlementText = todayIso().replace(/-/g, ".");
+}
+function applySettlementTextInput(value) {
+  state.settlementAgreed = true;
+  state.settlementText = String(value || "");
+  render();
 }
 function receiptGrossPercentNoticeHtml(o) {
   if (!o || o.applyPercentDiscount || !isCashPayment(o.paymentTerm)) return "";
@@ -1206,6 +1237,8 @@ async function waitForBackendSaveIdle() {
 }
 function showImportReportModal(report, kind) {
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
+  const created = Number(report.created || 0);
+  const updated = Number(report.updated || 0);
   const errors = (report.errors || [])
     .map(
       (item) =>
@@ -1220,7 +1253,7 @@ function showImportReportModal(report, kind) {
   } else if (!errors) {
     summary = `<p class="import-report__ok">Бүх мөр амжилттай импортлогдлоо.</p>`;
   }
-  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p></div>${summary}${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Алдааны дэлгэрэнгүй</p><ul>${errors}</ul></div>` : ""}</div>`;
+  const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Шинэ</span><b>${created}</b></p><p><span>Шинэчлэгдсэн</span><b>${updated}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p></div>${summary}${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Алдааны дэлгэрэнгүй</p><ul>${errors}</ul></div>` : ""}</div>`;
   confirmModal(`${label} импортын тайлан`, body, {
     confirmLabel: "Хаах",
     cancelLabel: "",
@@ -3815,6 +3848,46 @@ async function flushBackendSave() {
   await saveBackendState();
   return !localStateDirty();
 }
+function markBackendSaveFailed(message = "") {
+  backendSaveFailedMessage = String(message || "Серверт хадгалагдаагүй өгөгдөл байна").trim();
+}
+function clearBackendSaveFailed() {
+  backendSaveFailedMessage = "";
+}
+function hasUnsavedLocalData() {
+  return localStateDirty() || !!readLocalPendingState();
+}
+function criticalBackendSave() {
+  persistOrderSnapshot();
+  if (!backendReady) return Promise.resolve(false);
+  return flushBackendSave().catch((error) => {
+    console.warn("Backend save failed", error);
+    markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
+    return false;
+  });
+}
+async function retryPendingBackendSave() {
+  const ok = await flushBackendSave();
+  if (ok) clearBackendSaveFailed();
+  render();
+}
+function dataSaveBannerHtml() {
+  if (!state.isLoggedIn || !hasUnsavedLocalData()) return "";
+  const detail = backendSaveFailedMessage
+    ? esc(backendSaveFailedMessage)
+    : "Шинэ өгөгдөл серверт бүрэн хадгалагдаагүй байж болно.";
+  return `<div class="data-save-banner" role="alert"><div class="data-save-banner__copy"><strong>Хадгалагдаагүй өгөгдөл</strong><p>${detail}</p></div><button type="button" class="btn btn--sm btn--secondary" onclick="retryPendingBackendSave()">Дахин хадгалах</button></div>`;
+}
+function warehouseDateFilterActive() {
+  return !state.filters.warehouseDate;
+}
+function warehouseLiveFilterBannerHtml() {
+  if (!warehouseDateFilterActive()) return "";
+  const total = (state.orders || []).length;
+  const visible = filterWarehouseOrders(state.orders || []).length;
+  const hidden = Math.max(0, total - visible);
+  return `<div class="wh-date-banner" role="status"><strong>Зөвхөн өнөөдрийн захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Бүх захиалгыг Админ → Захиалга хэсгээс үзнэ үү.</span></div>`;
+}
 async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
   if (importLoading) {
@@ -3879,6 +3952,7 @@ async function saveBackendState(retry = 0) {
       const payload = await res.json();
       syncBackendSaveMarker();
       clearOrderPersistenceCache();
+      clearBackendSaveFailed();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
     } else if (res.status === 403) {
       let msg = "Эрх хүрэлцэхгүй";
@@ -3889,9 +3963,11 @@ async function saveBackendState(retry = 0) {
         /* ignore */
       }
       persistOrderSnapshot();
+      markBackendSaveFailed(msg);
       alertModal("Хадгалах амжилтгүй", msg);
     } else {
       persistOrderSnapshot();
+      markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
       if (retry >= 2) {
         alertModal(
           "Хадгалах амжилтгүй",
@@ -3906,6 +3982,7 @@ async function saveBackendState(retry = 0) {
   } catch (error) {
     console.warn("Backend state save failed", error);
     persistOrderSnapshot();
+    markBackendSaveFailed("Интернет холболт эсвэл серверийн алдаа");
     if (retry >= 2) {
       alertModal(
         "Хадгалах амжилтгүй",
@@ -4021,7 +4098,7 @@ function shell(content) {
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
   const svg =
@@ -4053,6 +4130,12 @@ function adminHubHtml() {
       `Хувь тооцох (${percentDiscountRate()}%)`,
       "employees",
     ],
+    [
+      "orderRetentionSettingsModal()",
+      `Захиалга хадгалах (${orderRetentionDays()} хоног)`,
+      "reports",
+    ],
+    ["deletionLogModal()", "Устгасан бүртгэл", "inventory"],
   ];
   const settingsHtml = hasPermission("settings.view")
     ? `<h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div>`
@@ -4113,9 +4196,67 @@ function savePercentDiscountSettings(e) {
   );
   if (!canApplyPercentDiscount()) state.applyPercentDiscount = false;
   closeModal();
-  scheduleBackendSave();
   render();
   showInstallToast("Хувь тооцох тохиргоо хадгалагдлаа");
+  criticalBackendSave();
+}
+function orderRetentionSettingsModal() {
+  if (!isAdmin()) return;
+  ensureSettings();
+  const days = orderRetentionDays();
+  box(
+    "Захиалга хадгалах хугацаа",
+    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Энэ хоногоос хуучин захиалга системээс автоматаар цэвэрлэгдэнэ. Агуулахын «Одоогийн» filter-ээс өөр — энэ нь жинхэнэ устгал.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    "max-w-md",
+  );
+}
+function saveOrderRetentionSettings(e) {
+  if (!isAdmin()) return;
+  e.preventDefault();
+  ensureSettings();
+  const raw = Number(new FormData(e.target).get("orderRetentionDays"));
+  state.settings.orderRetentionDays = Math.min(
+    365,
+    Math.max(7, Number.isFinite(raw) ? Math.floor(raw) : 31),
+  );
+  closeModal();
+  render();
+  showInstallToast("Захиалга хадгалах хугацаа шинэчлэгдлээ");
+  criticalBackendSave();
+}
+function deletionLogLabel(entry) {
+  if (!entry) return { type: "-", actor: "-" };
+  const type =
+    entry.type === "product"
+      ? "Бараа"
+      : entry.type === "customer"
+        ? "Харилцагч"
+        : String(entry.type || "-");
+  const actor =
+    state.employees.find((e) => e.id === entry.actorId)?.name ||
+    entry.actorId ||
+    "-";
+  return { type, actor };
+}
+function deletionLogModal() {
+  if (!isAdmin()) return;
+  const log = [...normalizeDeletionLog(state.deletionLog || [])]
+    .reverse()
+    .slice(0, 100);
+  const rows = log.length
+    ? log
+        .map((entry) => {
+          const meta = deletionLogLabel(entry);
+          const when = entry.deletedAt ? dteAt(entry.deletedAt) : "-";
+          return `<tr><td class="px-3 py-2 text-sm">${esc(meta.type)}</td><td class="px-3 py-2 text-sm font-mono">${esc(String(entry.id || "-"))}</td><td class="px-3 py-2 text-sm">${esc(meta.actor)}</td><td class="px-3 py-2 text-sm text-muted-foreground">${esc(when)}</td></tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="4" class="px-3 py-6 text-center text-sm text-muted-foreground">Устгасан бүртгэл байхгүй</td></tr>`;
+  box(
+    "Устгасан бүртгэл",
+    `<div class="p-4 space-y-3"><p class="text-sm text-muted-foreground">Бараа эсвэл харилцагч устгагдсаны дараа ID энд бүртгэгдэнэ. Бусад төхөөрөмж sync хийхэд эдгээр ID дахин гарч ирэхгүй.</p><div class="overflow-x-auto rounded border border-border"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-3 py-2 text-left text-xs font-semibold">Төрөл</th><th class="px-3 py-2 text-left text-xs font-semibold">ID</th><th class="px-3 py-2 text-left text-xs font-semibold">Ажилтан</th><th class="px-3 py-2 text-left text-xs font-semibold">Огноо</th></tr></thead><tbody class="divide-y divide-border">${rows}</tbody></table></div><button type="button" onclick="closeModal()" class="w-full py-2.5 bg-secondary rounded font-medium text-sm">Хаах</button></div>`,
+    "max-w-2xl",
+  );
 }
 function stockAlertModal() {
   if (!isAdmin()) return;
@@ -4200,9 +4341,9 @@ function applyStockAlertSettings(data) {
     p.minStock = Math.max(0, Number(raw) || 0);
   });
   closeModal();
-  scheduleBackendSave();
   render();
   showInstallToast("Үлдэгдэл сануулах хадгалагдлаа");
+  criticalBackendSave();
 }
 function orderReceiptRowsFiltered(
   searchKey = "warehouseOrders",
@@ -5051,7 +5192,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
           `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
       )
       .join("")}</select>`;
-  return `<section class="wh-receipts"><header class="wh-receipts__head"><div class="wh-receipts__head-main">${canPageBack() ? pageBackBtnHtml() : ""}<h2 class="wh-receipts__title">${title}</h2></div><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header><div class="wh-receipts__filters">${pageToolbarHtml({ filters: toolbarFilters, actions: exportBtn })}</div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><div class="wh-receipts__head-main">${canPageBack() ? pageBackBtnHtml() : ""}<h2 class="wh-receipts__title">${title}</h2></div><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header>${warehouseLiveFilterBannerHtml()}<div class="wh-receipts__filters">${pageToolbarHtml({ filters: toolbarFilters, actions: exportBtn })}</div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
 }
 function warehouseOrderDetail(o) {
   const actions = warehouseOrderStatusActions(o),
@@ -6296,7 +6437,7 @@ function applyStockInReceipt(receipt) {
       receiptNumber: saved.receiptNumber,
     });
   }
-  scheduleBackendSave();
+  criticalBackendSave();
   return saved;
 }
 function confirmFinishStockIn() {
@@ -8340,8 +8481,8 @@ function finishCount() {
     return alert("Тоолсон тоо оруулна уу");
   }
   state.countDone = true;
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
   window.setTimeout(() => {
     if (state.currentView === "count" && state.countDone) pollBackendState();
   }, 600);
@@ -9118,8 +9259,8 @@ function savePromotionQty(e) {
   state.searches.promo_buyProductIds_category = "all";
   state.searches.promo_freeProductIds_category = "all";
   closeModal();
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function matchingPricePromotionRule(gross) {
   let best = null;
@@ -9367,8 +9508,8 @@ function savePromotionPrice(e) {
   state.searches.promo_priceFreeProductIds = "";
   state.searches.promo_priceFreeProductIds_category = "all";
   closeModal();
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function savePromotionPayment(e) {
   e.preventDefault();
@@ -9404,16 +9545,16 @@ function savePromotionPayment(e) {
   state.searches.promo_paymentFreeProductIds = "";
   state.searches.promo_paymentFreeProductIds_category = "all";
   closeModal();
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function removePromotionRule(type, index) {
   if (!requireAdminDelete()) return;
   if (!Array.isArray(state.promotionRules[type]))
     state.promotionRules[type] = [];
   state.promotionRules[type].splice(index, 1);
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function confirmRemovePromotionRule(type, index) {
   if (!canDelete()) {
@@ -9566,6 +9707,7 @@ function authSessionPayload() {
     paymentTerm: state.paymentTerm || "cash",
     isPaid: !!state.isPaid,
     settlementAgreed: !!state.settlementAgreed,
+    settlementText: state.settlementText || "",
     settlementMonth: state.settlementMonth || "",
     settlementDay: state.settlementDay || "",
     applyPercentDiscount: !!state.applyPercentDiscount,
@@ -9641,9 +9783,10 @@ function restoreAuthSession() {
         ? data.isPaid
         : paidFromPaymentTerm(state.paymentTerm);
     state.settlementAgreed = !!data.settlementAgreed;
+    state.settlementText = data.settlementText || "";
     state.settlementMonth = data.settlementMonth || "";
     state.settlementDay = data.settlementDay || "";
-    if (state.settlementAgreed) normalizeSettlementDraft();
+    if (state.settlementAgreed) normalizeSettlementTextDraft();
     state.applyPercentDiscount = !!data.applyPercentDiscount;
     state.orderEmployee = data.orderEmployee || emp.id;
     state.deliveryDate = data.deliveryDate || "";
@@ -10051,7 +10194,7 @@ function workerChooser(orders) {
     emptyText = hasSelection
       ? "Сонгосон ХТ дээр захиалга алга"
       : "Өнөөдрийн захиалга алга";
-  return `<section class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button><div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
+  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button><div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -10224,6 +10367,7 @@ function clearWorkerStore() {
   state.deliveryDate = "";
   state.searches.workerStore = "";
   state.settlementAgreed = false;
+  state.settlementText = "";
   state.settlementMonth = "";
   state.settlementDay = "";
   state.applyPercentDiscount = false;
@@ -10247,10 +10391,9 @@ function workerOrderOptionsHtml(cart) {
   const pct = percentDiscountRate(),
     pctAllowed = canApplyPercentDiscount(),
     cashOnly = isCashPayment(),
-    settlementDate = settlementDateInputValue(),
-    settlementMin = todayIso(),
+    settlementText = settlementTextInputValue(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field worker-order-opt__field--date"><span class="worker-order-opt__field-label">Огноо</span><input type="date" class="app-input" aria-label="Тооцоо нийлэх огноо" value="${settlementDate}" min="${settlementMin}" onchange="applySettlementDateInput(this.value)"></label></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field worker-order-opt__field--date"><span class="worker-order-opt__field-label">Тайлбар</span><input type="text" class="app-input" aria-label="Тооцоо нийлэх тайлбар" value="${esc(settlementText)}" placeholder="Ж: 2026.07.02 эсвэл Даваа гараг" oninput="applySettlementTextInput(this.value)"></label></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -10258,7 +10401,7 @@ function workerOrderOptionsHtml(cart) {
     pctRow = pctAllowed
       ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
-  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked){normalizeSettlementDraft()}else{state.settlementMonth='';state.settlementDay=''}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
+  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked){normalizeSettlementTextDraft()}else{state.settlementText='';state.settlementMonth='';state.settlementDay=''}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
@@ -10868,7 +11011,7 @@ function applyCustomerSave(data, id) {
   }
   closeModal();
   render();
-  scheduleBackendSave();
+  criticalBackendSave();
 }
 function saveCustomer(e, id) {
   e.preventDefault();
@@ -11289,11 +11432,10 @@ function addCategory(e) {
   if (cats().includes(name))
     return alert("Энэ төрөл аль хэдийн бүртгэгдсэн байна");
   state.extraCategories.push(name);
-  scheduleBackendSave();
   closeModal();
   render();
-  scheduleBackendSave();
   showInstallToast("Төрөл нэмэгдлээ");
+  criticalBackendSave();
 }
 function confirmDeleteCategory(name) {
   if (!hasPermission("products.edit")) return;
@@ -11334,10 +11476,10 @@ function deleteCategoryNow(name) {
     state.filters.inventoryCategory = "all";
   if (state.filters.countCategory === name) state.filters.countCategory = "all";
   if (state.filters.workerCategory === name) state.filters.workerCategory = "";
-  scheduleBackendSave();
   closeModal();
   render();
   showInstallToast("Төрөл устгагдлаа");
+  criticalBackendSave();
 }
 function employeeModal(id) {
   const editId = id ? String(id) : "";
@@ -11448,8 +11590,8 @@ function applyEmployeeSave(data, editId = "") {
     showInstallToast("Ажилтан нэмэгдлээ");
   }
   closeModal();
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function orderModal() {
   box(
@@ -11644,7 +11786,7 @@ function applyReceiptEditToOrder() {
   adjustReceiptEditStock(orig, state.receiptEditItems);
   o.items = state.receiptEditItems.map((i) => ({ ...i }));
   recalcOrderTotals(o);
-  scheduleBackendSave();
+  criticalBackendSave();
   return true;
 }
 function orderReceiptModal(id, keepDraft = false) {
@@ -11845,8 +11987,8 @@ function applyStock(id, type, qty, costPrice) {
     date: new Date().toISOString(),
     employeeName: state.currentEmployee?.name || "",
   });
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
   return true;
 }
 function pickerProductsInView() {
@@ -12263,11 +12405,14 @@ async function saveWorker() {
     state.applyPercentDiscount = false;
   const items = cart.all,
     percentDiscount = workerPercentDiscountActive() ? percentDiscountRate() : 0;
+  const settlementText = state.settlementAgreed
+    ? settlementTextInputValue(state)
+    : "";
   let settlementMonth = "",
     settlementDay = "";
-  if (state.settlementAgreed) {
+  if (state.settlementAgreed && !settlementText) {
     const parts = settlementPartsFromSource(state);
-    if (!parts) return alert("Тооцоо нийлэх өдрийг зөв сонгоно уу");
+    if (!parts) return alert("Тооцоо нийлэх тайлбар оруулна уу");
     settlementMonth = String(parts.month);
     settlementDay = String(parts.day);
   }
@@ -12280,7 +12425,9 @@ async function saveWorker() {
     percentDiscount,
     discountAmount: cart.discount,
     total: cart.total,
-    settlementAgreed: !!settlementMonth && !!settlementDay,
+    settlementAgreed:
+      !!settlementText || (!!settlementMonth && !!settlementDay),
+    settlementText,
     settlementMonth,
     settlementDay,
     status: "pending",
@@ -12300,6 +12447,7 @@ async function saveWorker() {
   state.workerCustomer = "";
   state.deliveryDate = "";
   state.settlementAgreed = false;
+  state.settlementText = "";
   state.settlementMonth = "";
   state.settlementDay = "";
   state.applyPercentDiscount = false;
@@ -12594,8 +12742,8 @@ function deleteNow(type, id) {
     }
   }
   closeModal();
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function delEmployee(id) {
   confirmDelete("employee", id);
@@ -12613,15 +12761,15 @@ function setOrder(id, s) {
     });
   }
   o.status = s;
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function setPaid(id, isPaid) {
   const o = state.orders.find((order) => order.id === id);
   if (!o) return;
   o.isPaid = isPaid;
-  scheduleBackendSave();
   render();
+  criticalBackendSave();
 }
 function csvRow(cells) {
   return cells
@@ -12844,6 +12992,10 @@ Object.assign(window, {
   stockAlertModal,
   percentDiscountSettingsModal,
   savePercentDiscountSettings,
+  orderRetentionSettingsModal,
+  saveOrderRetentionSettings,
+  deletionLogModal,
+  retryPendingBackendSave,
   syncEmployeePermissionsFromRole,
   openEmployeePermissionsPage,
   togglePermissionEmployee,

@@ -8237,6 +8237,51 @@ input::placeholder, textarea::placeholder {
   line-height: 1.35;
 }
 
+.wh-date-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-primary) 10%, var(--hex-card));
+  border: 1px solid color-mix(in srgb, var(--hex-primary) 24%, var(--hex-border));
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--hex-foreground);
+}
+
+.wh-date-banner strong {
+  font-weight: 700;
+}
+
+.data-save-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fff4e5;
+  border: 1px solid #f0c36d;
+  color: #7a4d00;
+}
+
+.data-save-banner__copy strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.data-save-banner__copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .wh-date-modal__desc {
   margin: 0;
   font-size: 13px;
