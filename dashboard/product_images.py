@@ -65,3 +65,37 @@ def update_product_image_in_state(state: dict, product_id: str, url: str) -> boo
             product["image"] = url
             return True
     return False
+
+
+def find_stored_product_image_url(product_id: str) -> str:
+    try:
+        pid = safe_product_id(product_id)
+    except ValueError:
+        return ""
+    directory = product_image_dir()
+    for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+        path = directory / f"{pid}.{ext}"
+        if path.is_file() and path.stat().st_size > 32:
+            version = int(path.stat().st_mtime)
+            return f"{settings.MEDIA_URL}products/{pid}.{ext}?v={version}"
+    return ""
+
+
+def hydrate_product_images(state: dict) -> tuple[dict, bool]:
+    changed = False
+    for product in state.get("products") or []:
+        if not isinstance(product, dict):
+            continue
+        pid = str(product.get("id") or "").strip()
+        if not pid:
+            continue
+        current = str(product.get("image") or "").strip()
+        if current.startswith("data:image/") and not current.startswith(
+            "data:image/svg"
+        ):
+            continue
+        url = find_stored_product_image_url(pid)
+        if url and url != current:
+            product["image"] = url
+            changed = True
+    return state, changed

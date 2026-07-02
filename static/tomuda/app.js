@@ -458,34 +458,80 @@ function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
 function receiptTableHtml(o, opts = {}) {
   return receiptTableRowsHtml(o, opts.items, opts.startIndex || 0);
 }
-function receiptPromoLineTotal(i) {
-  const qty = Number(i.quantity) || 0;
-  const price = Number(i.price) || 0;
-  const total = Number(i.total);
-  if (Number.isFinite(total) && total > 0) return total;
-  return qty * price;
+function productForReceiptLine(i) {
+  if (!i) return {};
+  const id = String(i.productId || "").trim();
+  if (id) {
+    const hit = state.products.find((x) => String(x.id) === id);
+    if (hit) return hit;
+  }
+  const name = String(i.productName || "").trim();
+  if (name) {
+    const hit = state.products.find(
+      (x) => String(x.name || "").trim() === name,
+    );
+    if (hit) return hit;
+  }
+  return {};
+}
+function receiptPromoCatalogPrice(i) {
+  const p = productForReceiptLine(i);
+  return Number(p.price ?? p.sellPrice ?? 0) || 0;
 }
 function receiptPromoDisplayPrice(i) {
   if (!i) return 0;
+  const catalog = receiptPromoCatalogPrice(i);
+  if (catalog) return catalog;
   const price = Number(i.price);
-  if (price) return price;
-  const p = state.products.find((x) => x.id === i.productId) || {};
-  return Number(p.price ?? p.sellPrice ?? 0) || 0;
+  return Number.isFinite(price) && price > 0 ? price : 0;
 }
 function receiptPromoDisplayTotal(i) {
   if (!i) return 0;
   const qty = Number(i.quantity) || 0;
-  const total = Number(i.total);
-  if (Number.isFinite(total) && total > 0) return total;
   return qty * receiptPromoDisplayPrice(i);
+}
+function receiptPromoSettleNote(o) {
+  if (!o.settlementAgreed || !o.settlementMonth || !o.settlementDay) return "";
+  return `${Number(o.settlementMonth)} сарын ${Number(o.settlementDay)}-ны дотор тооцоо нийлнэ`;
 }
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o);
+  const settleNote = receiptPromoSettleNote(o);
   const slots = Math.max(2, promoItems.length);
-  return Array.from({ length: slots }, (_, idx) => {
+  const head = settleNote
+    ? `<tr class="receipt-grid__promo-note"><td></td><td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td><td colspan="7" class="receipt-grid__promo-settle">${esc(settleNote)}</td></tr>`
+    : "";
+  const itemRows = Array.from({ length: slots }, (_, idx) => {
     const i = promoItems[idx];
-    return `<tr class="receipt-grid__promo"><td></td>${idx === 0 ? `<td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td>` : `<td colspan="3"></td>`}<td colspan="3" class="receipt-grid__name">${i ? esc(i.productName) : ""}</td><td colspan="2" class="receipt-grid__qty">${i ? i.quantity : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoDisplayPrice(i)) : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoDisplayTotal(i)) : ""}</td></tr>`;
+    const titleCell =
+      !settleNote && idx === 0
+        ? `<td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td>`
+        : `<td colspan="3"></td>`;
+    return `<tr class="receipt-grid__promo"><td></td>${titleCell}<td colspan="3" class="receipt-grid__name">${i ? esc(i.productName) : ""}</td><td colspan="2" class="receipt-grid__qty">${i ? i.quantity : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoDisplayPrice(i)) : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoDisplayTotal(i)) : ""}</td></tr>`;
   }).join("");
+  return head + itemRows;
+}
+function receiptSummaryRowsHtml(sub, vat, payable, payTerm) {
+  return [
+    { label: "Бараа ажил үйлчилгээний дүн", value: receiptMoneyDetailed(sub) },
+    { label: "НӨАТ", value: receiptMoneyDetailed(vat) },
+    { label: "Таны нийт төлөх дүн", value: receiptMoney(payable), grand: true },
+    { label: "Төлбөрийн нөхцөл", value: esc(payTerm), pay: true },
+  ]
+    .map(({ label, value, grand, pay }) => {
+      const rowClass = [
+        "receipt-grid__summary",
+        grand ? "receipt-grid__summary--grand" : "",
+        pay ? "receipt-grid__summary--pay" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const valueClass = grand
+        ? "receipt-grid__summary-value receipt-grid__summary-value--grand"
+        : "receipt-grid__summary-value";
+      return `<tr class="${rowClass}"><td></td><td colspan="3" class="receipt-grid__summary-label">${esc(label)}</td><td colspan="6"></td><td class="${valueClass}">${value}</td></tr>`;
+    })
+    .join("");
 }
 function receiptPaymentTermText(f, o) {
   if (f.bank || o.paymentTerm === "credit") return "Зээлээр";
@@ -510,32 +556,48 @@ function receiptWarningRowsHtml() {
 function receiptNoticeBoxHtml() {
   return receiptWarningRowsHtml();
 }
+function documentSignatureBlockHtml(opts = {}) {
+  const padLeft = opts.padLeft !== false;
+  const roleColspan = Number(opts.roleColspan) || 2;
+  const lineColspan = Number(opts.lineColspan) || 7;
+  const rowClass = esc(opts.rowClass || "doc-sign__row");
+  const padCell = padLeft ? "<td></td>" : "";
+  const totalCols = (padLeft ? 1 : 0) + roleColspan + 1 + lineColspan;
+  const block = (role) =>
+    `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" rowspan="2" class="doc-sign__role">${esc(role)}</td><td class="doc-sign__hint">Нэр</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr><tr class="${rowClass}">${padCell}<td class="doc-sign__hint">Гарын үсэг</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
+  return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
+}
+function receiptSignatureRowsHtml() {
+  return `<tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
+}
+function stockInSignatureRowsHtml() {
+  return documentSignatureBlockHtml({
+    padLeft: false,
+    roleColspan: 1,
+    lineColspan: 5,
+    rowClass: "doc-sign__row",
+  });
+}
 function receiptFooterRows(o) {
   const f = receiptPartyFields(o);
   const gross = orderGrossTotal(o);
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  const settlement = settlementNoteText(o);
   const grossNotice =
     !o.applyPercentDiscount &&
     isCashPayment(o.paymentTerm) &&
     !orderInWarehouseLiveSession(o)
       ? `Тооцоог өдөртөө хийгээгүй тохиолдолд (${percentDiscountRate()}%) хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
-  const settleText =
-    settlement ||
-    grossNotice ||
-    "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!";
   const payTerm = receiptPaymentTermText(f, o);
-  const grandNote = receiptGrandNote(o);
-  const grandLabelText = grandNote
-    ? `Таны нийт төлөх дүн ${grandNote}`
-    : "Таны нийт төлөх дүн";
   const grossRow = receiptShouldShowGross(o)
     ? `<tr class="receipt-grid__gross"><td></td><td colspan="9" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`
     : "";
-  return `<tr class="receipt-grid__return"><td></td><td colspan="2" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr>${grossRow}${receiptPromoRowsHtml(o)}<tr class="receipt-grid__total"><td></td><td colspan="3" class="receipt-grid__label">Бараа ажил үйлчилгээний дүн</td><td colspan="7" class="receipt-grid__money">${receiptMoneyDetailed(sub)}</td></tr><tr class="receipt-grid__total"><td></td><td colspan="3" class="receipt-grid__label">НӨАТ</td><td colspan="7" class="receipt-grid__money">${receiptMoneyDetailed(vat)}</td></tr><tr class="receipt-grid__grand"><td></td><td colspan="9" class="receipt-grid__grand-label">${esc(grandLabelText)}</td><td class="receipt-grid__money receipt-grid__money--grand">${receiptMoney(payable)}</td></tr><tr class="receipt-grid__settle"><td></td><td colspan="10" class="receipt-grid__settle-text">${esc(settleText)}</td></tr><tr class="receipt-grid__pay"><td></td><td class="receipt-grid__label">Төлбөрийн нөхцөл</td><td colspan="5"></td><td colspan="4" class="receipt-grid__pay-value">${esc(payTerm)}</td></tr>${receiptWarningRowsHtml()}<tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
+  const footnote = grossNotice
+    ? `<tr class="receipt-grid__footnote"><td></td><td colspan="10" class="receipt-grid__footnote-text">${esc(grossNotice)}</td></tr>`
+    : "";
+  return `<tr class="receipt-grid__return"><td></td><td colspan="2" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr>${grossRow}${receiptPromoRowsHtml(o)}${receiptSummaryRowsHtml(sub, vat, payable, payTerm)}${receiptWarningRowsHtml()}${footnote}${receiptSignatureRowsHtml()}`;
 }
 function receiptTotalsBlockHtml(o) {
   return receiptFooterRows(o);
@@ -1794,12 +1856,69 @@ function currentPageTitle(nav) {
   return extra[state.currentView] || "ТОМУДА";
 }
 const PRODUCT_IMAGE_FALLBACK = "/static/tomuda/icons/icon-192.png?v=20260630-logo";
+const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 function productImagePlaceholder(p = {}) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
 }
-function productImageSrc(p) {
+function productImageMediaUrl(productId, ext = "jpg") {
+  const id = String(productId || "").trim();
+  if (!id) return "";
+  return `/media/products/${encodeURIComponent(id)}.${ext}`;
+}
+function storedProductImage(p) {
   const raw = String(p?.image || "").trim();
-  return raw || productImagePlaceholder(p);
+  if (!raw || raw.startsWith("data:image/svg")) return "";
+  return raw;
+}
+function productImageFallbackList(p = {}) {
+  const list = [];
+  const stored = storedProductImage(p);
+  if (stored) list.push(stored);
+  const id = String(p?.id || "").trim();
+  if (id) {
+    PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
+      const url = productImageMediaUrl(id, ext);
+      if (!list.includes(url)) list.push(url);
+    });
+  }
+  list.push(productImagePlaceholder(p));
+  return list;
+}
+function productImageSrc(p) {
+  return productImageFallbackList(p)[0];
+}
+function findProductForImage(img) {
+  const id = String(img?.dataset?.productId || "").trim();
+  if (id) {
+    const hit = state.products.find((x) => String(x.id) === id);
+    if (hit) return hit;
+  }
+  const src = String(img?.getAttribute("src") || "");
+  const match = src.match(/\/media\/products\/([^/?#.]+)/);
+  if (match) {
+    const fromMedia = state.products.find((x) => String(x.id) === match[1]);
+    if (fromMedia) return fromMedia;
+    return { id: match[1], name: img.getAttribute("alt") || "", category: "" };
+  }
+  return { name: img?.getAttribute("alt") || "", category: "" };
+}
+function bindProductImages(root = document) {
+  root.querySelectorAll("img[data-product-img]").forEach((img) => {
+    const product = findProductForImage(img);
+    const candidates = productImageFallbackList(product);
+    let index = Math.max(
+      0,
+      candidates.findIndex((url) => url === String(img.getAttribute("src") || "")),
+    );
+    img.onerror = () => {
+      index += 1;
+      if (index < candidates.length) img.src = candidates[index];
+      else img.onerror = null;
+    };
+    if (!img.getAttribute("src") || img.getAttribute("src") === PRODUCT_IMAGE_FALLBACK) {
+      img.src = candidates[0];
+    }
+  });
 }
 const productImage = (p) => productImageSrc(p);
 function productImageSrcAttr(p) {
@@ -1867,7 +1986,13 @@ function readProductImageFromForm(form) {
   if (!image) {
     const preview = form.querySelector("#productImagePreview");
     const src = String(preview?.currentSrc || preview?.src || "").trim();
-    if (src.startsWith("data:image/")) image = src;
+    if (
+      src.startsWith("data:image/") ||
+      src.startsWith("/media/") ||
+      src.startsWith("http")
+    ) {
+      image = src;
+    }
   }
   return image;
 }
@@ -2257,10 +2382,16 @@ function applyPersistentState(data) {
   persistKeys.forEach((key) => {
     if (Object.prototype.hasOwnProperty.call(data, key)) state[key] = data[key];
   });
-  if (!state.promotionRules?.quantity)
+  if (!state.promotionRules || typeof state.promotionRules !== "object") {
     state.promotionRules = { quantity: [], price: [], payment: [] };
-  if (!Array.isArray(state.promotionRules.payment))
-    state.promotionRules.payment = [];
+  } else {
+    if (!Array.isArray(state.promotionRules.quantity))
+      state.promotionRules.quantity = [];
+    if (!Array.isArray(state.promotionRules.price))
+      state.promotionRules.price = [];
+    if (!Array.isArray(state.promotionRules.payment))
+      state.promotionRules.payment = [];
+  }
   if (!state.workerQty || typeof state.workerQty !== "object")
     state.workerQty = {};
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
@@ -2401,7 +2532,11 @@ function applyRemoteState(payload) {
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
-  syncBackendSaveMarker();
+  if (JSON.stringify(stateForBackendSave()) !== JSON.stringify(payload.state)) {
+    scheduleBackendSave();
+  } else {
+    syncBackendSaveMarker();
+  }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   saveLocalBackendCache({ state: merged, updatedAt: payload.updatedAt || "" });
   render();
@@ -4006,23 +4141,22 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__return td,
-.receipt-grid--sheet .receipt-grid__sign td,
 .receipt-grid--sheet .receipt-grid__warn td,
 .receipt-grid--sheet .receipt-grid__spacer td,
-.receipt-grid--sheet .receipt-grid__settle td,
-.receipt-grid--sheet .receipt-grid__pay td { border: none; padding: 1px 2px; vertical-align: middle; }
+.receipt-grid--sheet .receipt-grid__footnote td,
+.receipt-grid--sheet .receipt-grid__sign td { border: none; padding: 1px 2px; vertical-align: middle; }
 .receipt-grid--sheet .receipt-grid__items-head td,
 .receipt-grid--sheet .receipt-grid__item td,
 .receipt-grid--sheet .receipt-grid__promo td,
+.receipt-grid--sheet .receipt-grid__promo-note td,
 .receipt-grid--sheet .receipt-grid__gross td,
-.receipt-grid--sheet .receipt-grid__total td,
-.receipt-grid--sheet .receipt-grid__grand td { border: 1px solid #808080; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__summary td { border: 1px solid #808080; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
 .receipt-grid--sheet .receipt-grid__item td,
 .receipt-grid--sheet .receipt-grid__promo td,
-.receipt-grid--sheet .receipt-grid__total td { border-top: 1px dotted #808080; }
+.receipt-grid--sheet .receipt-grid__summary td { border-top: 1px dotted #808080; }
 .receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #808080; border-bottom: 1px dotted #808080; }
-.receipt-grid--sheet .receipt-grid__grand td { border-top: 1px solid #808080; border-bottom: 1px dotted #808080; }
 .receipt-grid--sheet .receipt-grid__promo-title { border-left: 1px dashed #808080; }
+.receipt-grid__promo-settle { text-align: center; font-size: 9pt; white-space: normal; line-height: 1.25; }
 .receipt-grid__logo-cell { vertical-align: top; padding: 0; }
 .receipt-logo { width: 48px; height: 48px; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
@@ -4045,15 +4179,14 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__gross td { background: #e8ebee; font-weight: 700; }
 .receipt-grid__gross-label { text-align: left; font-size: 11pt; padding-left: 4px; }
 .receipt-grid__gross .receipt-grid__money { font-size: 11pt; text-align: right; padding-right: 4px; }
-.receipt-grid__total .receipt-grid__label { font-weight: 400; font-size: 11pt; padding-left: 4px; }
-.receipt-grid__total .receipt-grid__money { font-size: 11pt; padding-right: 4px; }
-.receipt-grid__grand td { background: #d9d9d9; font-weight: 700; }
-.receipt-grid__grand-label { font-size: 11pt; text-align: left; padding-left: 4px; white-space: normal; line-height: 1.25; }
-.receipt-grid__grand .receipt-grid__money { font-size: 12pt; padding-right: 4px; }
-.receipt-grid__settle td { border: none; padding: 0; }
-.receipt-grid__settle-text { background: #fff2cc; text-align: center; font-weight: 400; font-size: 9pt; line-height: 1.35; padding: 4px 6px; border: none !important; }
-.receipt-grid__pay .receipt-grid__label { font-size: 11pt; white-space: nowrap; padding-left: 4px; }
-.receipt-grid__pay-value { font-size: 11pt; font-weight: 700; text-align: left; padding-left: 4px; }
+.receipt-grid__summary-label { background: #d9d9d9; font-weight: 400; font-size: 11pt; padding-left: 4px; text-align: left; }
+.receipt-grid__summary-value { text-align: right; font-size: 11pt; padding-right: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-grid__summary--grand .receipt-grid__summary-label,
+.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; }
+.receipt-grid__summary-value--grand { font-size: 12pt; }
+.receipt-grid__summary--pay .receipt-grid__summary-value { font-weight: 700; }
+.receipt-grid__footnote td { border: none; padding: 0; }
+.receipt-grid__footnote-text { text-align: center; font-size: 9pt; line-height: 1.35; padding: 4px 6px; }
 .receipt-grid__warn td { border: none; padding: 0; }
 .receipt-grid__warn-box { background: #d9d9d9; text-align: center; padding: 8px 10px; border: 1px solid #808080 !important; }
 .receipt-grid__warn-line { margin: 0 0 4px; font-size: 9pt; line-height: 1.35; }
@@ -4399,14 +4532,27 @@ function buildReceiptSheetXml(
     ...emptyCells(grossRow, "C", "J", 19),
   ]);
   pushRow(14.25, emptyCells(rowNum));
+  const promoSettleNote = receiptPromoSettleNote(o);
+  if (promoSettleNote) {
+    const r = rowNum;
+    merges.push(`C${r}:D${r}`, `E${r}:K${r}`);
+    pushRow(14.25, [
+      xlsxCellXml(`C${r}`, 15, si("Урамшуулал"), "s"),
+      xlsxCellXml(`E${r}`, 8, si(promoSettleNote), "s"),
+      ...emptyCells(r, "A", "B"),
+      ...emptyCells(r, "F", RECEIPT_XLSX_LAST_COL),
+    ]);
+  }
   const promoSlots = Math.max(2, promoItems.length);
   Array.from({ length: promoSlots }).forEach((_, idx) => {
     const item = promoItems[idx],
       r = rowNum;
     merges.push(`E${r}:G${r}`, `H${r}:I${r}`);
-    if (idx === 0) merges.push(`C${r}:D${r}`);
+    if (!promoSettleNote && idx === 0) merges.push(`C${r}:D${r}`);
+    const unitPrice = item ? receiptPromoDisplayPrice(item) : 0;
+    const lineTotal = item ? receiptPromoDisplayTotal(item) : 0;
     pushRow(14.25, [
-      idx === 0
+      !promoSettleNote && idx === 0
         ? xlsxCellXml(`C${r}`, 15, si("Урамшуулал"), "s")
         : xlsxCellXml(`C${r}`, 8, null, "empty"),
       item
@@ -4416,10 +4562,10 @@ function buildReceiptSheetXml(
         ? xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n")
         : xlsxCellXml(`H${r}`, 10, null, "empty"),
       item
-        ? xlsxCellXml(`J${r}`, 10, Number(item.price) || 0, "n")
+        ? xlsxCellXml(`J${r}`, 10, unitPrice, "n")
         : xlsxCellXml(`J${r}`, 10, null, "empty"),
       item
-        ? xlsxCellXml(`K${r}`, 10, 0, "n")
+        ? xlsxCellXml(`K${r}`, 10, lineTotal, "n")
         : xlsxCellXml(`K${r}`, 10, null, "empty"),
       ...emptyCells(r, "A", "B"),
       ...emptyCells(r, "D", "D"),
@@ -5717,7 +5863,7 @@ function productCard(p) {
   const costLine = isAdmin()
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
     : "";
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img data-product-id="${esc(p.id)}" alt="" class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -8731,6 +8877,7 @@ function savePromotionQty(e) {
   state.searches.promo_buyProductIds_category = "all";
   state.searches.promo_freeProductIds_category = "all";
   closeModal();
+  scheduleBackendSave();
   render();
 }
 function matchingPricePromotionRule(gross) {
@@ -8977,6 +9124,7 @@ function savePromotionPrice(e) {
   state.searches.promo_priceFreeProductIds = "";
   state.searches.promo_priceFreeProductIds_category = "all";
   closeModal();
+  scheduleBackendSave();
   render();
 }
 function savePromotionPayment(e) {
@@ -9013,6 +9161,7 @@ function savePromotionPayment(e) {
   state.searches.promo_paymentFreeProductIds = "";
   state.searches.promo_paymentFreeProductIds_category = "all";
   closeModal();
+  scheduleBackendSave();
   render();
 }
 function removePromotionRule(type, index) {
@@ -9020,6 +9169,7 @@ function removePromotionRule(type, index) {
   if (!Array.isArray(state.promotionRules[type]))
     state.promotionRules[type] = [];
   state.promotionRules[type].splice(index, 1);
+  scheduleBackendSave();
   render();
 }
 function confirmRemovePromotionRule(type, index) {
@@ -10001,6 +10151,7 @@ function render() {
   requestAnimationFrame(() => {
     enhanceMobileNumericInputs(document);
     permApi()?.syncAllPermissionRowDeps?.();
+    bindProductImages(document);
   });
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
@@ -10013,7 +10164,10 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
     panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "";
   const wasOpen = !!modal.innerHTML.trim();
   modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
-  requestAnimationFrame(() => enhanceMobileNumericInputs(document));
+  requestAnimationFrame(() => {
+    enhanceMobileNumericInputs(document);
+    bindProductImages(document);
+  });
   if (!wasOpen) pushAppHistory();
 }
 const IMAGE_LIGHTBOX_SKIP =
@@ -10770,7 +10924,6 @@ function buildProductDataFromForm(form) {
   data.country = String(data.country || "").trim() || "Монгол";
   const image = readProductImageFromForm(form);
   if (image) data.image = image;
-  else delete data.image;
   return { data };
 }
 async function applyProductSave(data, id) {
@@ -10783,12 +10936,11 @@ async function applyProductSave(data, id) {
   if (id) {
     const existing = state.products.find((p) => p.id === id);
     if (existing) {
-      if (!data.image && existing.image && !imageDataUrl) {
-        /* keep existing image */
-      } else if (!imageDataUrl && existing.image) {
-        data.image = existing.image;
-      }
+      const prevImage = storedProductImage(existing);
       Object.assign(existing, data);
+      if (!imageDataUrl && !storedProductImage(existing) && prevImage) {
+        existing.image = prevImage;
+      }
     }
   } else {
     productId = String(Date.now());

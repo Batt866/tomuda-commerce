@@ -25,7 +25,11 @@ from dashboard.permissions import (
     validate_state_mutation,
     _order_within_retention,
 )
-from dashboard.product_images import save_product_image, update_product_image_in_state
+from dashboard.product_images import (
+    hydrate_product_images,
+    save_product_image,
+    update_product_image_in_state,
+)
 from dashboard.seed_data import default_state
 from dashboard.state_sanitize import sanitize_app_state
 
@@ -59,6 +63,8 @@ def get_state(request):
         defaults={"data": default_state()},
     )
     data, changed = sanitize_app_state(row.data or default_state())
+    data, hydrated = hydrate_product_images(data)
+    changed = changed or hydrated
     if changed:
         row.data = data
         row.save(update_fields=["data", "updated_at"])
@@ -78,6 +84,7 @@ def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
 def save_state(request, payload: dict[str, Any] = Body(...)):
     data = _retained_orders_state(payload.get("state", payload))
     data, _ = sanitize_app_state(data)
+    data, _ = hydrate_product_images(data)
     actor = payload.get("actor")
     row, _ = AppState.objects.get_or_create(
         key="main",

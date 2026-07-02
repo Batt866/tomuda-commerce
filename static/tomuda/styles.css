@@ -1718,11 +1718,11 @@ a.customer-card__line .customer-card__icon {
   border-radius: 0;
   object-fit: contain;
   object-position: center;
-  padding: 6px;
+  padding: 3px;
   box-sizing: border-box;
   border: none;
   box-shadow: none;
-  background: var(--hex-secondary);
+  background: #fff;
 }
 
 .product-card__title {
@@ -4864,9 +4864,9 @@ input::placeholder, textarea::placeholder {
   border-radius: 0;
   object-fit: contain;
   object-position: center;
-  padding: 4px;
+  padding: 3px;
   box-sizing: border-box;
-  background: var(--hex-secondary);
+  background: #fff;
   border: none;
   box-shadow: none;
 }
@@ -5825,9 +5825,9 @@ input::placeholder, textarea::placeholder {
   border-radius: 0;
   object-fit: contain;
   object-position: center;
-  padding: 4px;
+  padding: 3px;
   box-sizing: border-box;
-  background: var(--hex-secondary);
+  background: #fff;
   border: none;
   box-shadow: none;
 }
