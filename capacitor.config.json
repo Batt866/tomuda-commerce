@@ -3,7 +3,7 @@
   "appName": "TOMUDA",
   "webDir": "static/tomuda",
   "server": {
-    "url": "https://tomuda-commerce.onrender.com",
+    "url": "https://tomuda.jobbox.mn",
     "cleartext": false
   }
 }

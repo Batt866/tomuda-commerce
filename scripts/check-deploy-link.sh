@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/.."
 LINK_FILE="DEPLOY-LINK.txt"
 PORT=8011
-RENDER_URL="https://tomuda-commerce.onrender.com"
+PRODUCTION_URL="${PRODUCTION_URL:-https://tomuda.jobbox.mn}"
 
 wait_http_ok() {
   local url="$1"
@@ -54,11 +54,11 @@ if [ -n "$TUNNEL_URL" ]; then
 fi
 
 echo ""
-echo "Render (24/7): $RENDER_URL"
-if wait_http_ok "$RENDER_URL/api/health" 6; then
-  echo "✓ Render deploy — OK"
-  curl -sS "$RENDER_URL/api/health"
+echo "Production: $PRODUCTION_URL"
+if wait_http_ok "$PRODUCTION_URL/api/health" 6; then
+  echo "✓ Production deploy — OK"
+  curl -sS "$PRODUCTION_URL/api/health"
   echo ""
 else
-  echo "✗ Render deploy — унтраалттай эсвэл сэргэж байна (1-2 минут хүлээгээд дахин шалгана уу)"
+  echo "✗ Production — хариулахгүй байна"
 fi

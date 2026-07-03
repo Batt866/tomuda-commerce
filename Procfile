@@ -1,1 +1,0 @@
-web: python manage.py migrate --noinput && python manage.py sanitize_state --apply && python manage.py seed_tomuda --only-if-empty && gunicorn tomuda.wsgi:application --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 4 --preload

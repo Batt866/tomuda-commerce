@@ -1,106 +1,89 @@
 # TOMUDA — Deploy + утсан дээр суулгах
 
-> **Render дээр бүрэн deploy заавар (Монгол):** [RENDER-DEPLOY-MN.md](./RENDER-DEPLOY-MN.md)  
-> Алхам алхмаар, алдаа засах, PWA, CSRF бүгд тэнд.
+## 1. VPS дээр deploy (production)
 
-## 1. Render дээр deploy (20 хэрэглэгчид зориулсан)
+**Одоогийн production:** https://tomuda.jobbox.mn
 
-### Алхам
-
-1. **GitHub repo** үүсгэнэ (доорх командууд).
-2. [render.com](https://render.com) → **New** → **Blueprint** → repo сонгоно.
-3. `render.yaml` автоматаар PostgreSQL + web service үүсгэнэ.
-4. Deploy дууссаны дараа URL гарна: `https://tomuda-commerce-xxxx.onrender.com`
-5. Render Dashboard → Web Service → **Environment**:
-   - `CSRF_TRUSTED_ORIGINS` = `https://tomuda-commerce-xxxx.onrender.com` (өөрийн URL)
-6. URL-аа ~20 хэрэглэгчид илгээнэ — тус бүр утсан дээр суулгана.
-
-### GitHub руу push
+### Шинэ сервер дээр суулгах
 
 ```bash
-cd mongolian-e-commerce-app
-git init
-git add .
-git commit -m "Tomuda PWA + Render deploy"
-git branch -M main
-git remote add origin https://github.com/YOUR_USER/tomuda-commerce.git
-git push -u origin main
+# Mac → серверт скрипт илгээх
+scp scripts/deploy-vps-ubuntu.sh root@SERVER_IP:/root/
+
+# Сервер дээр
+ssh root@SERVER_IP
+bash /root/deploy-vps-ubuntu.sh
+
+# Өөр домэйн:
+DOMAIN=shop.example.mn bash /root/deploy-vps-ubuntu.sh
 ```
 
-### Яагаад PostgreSQL?
+`tomuda.mn` нэмэх:
 
-Render free tier дээр SQLite файл redeploy бүрт устана. PostgreSQL (free) өгөгдөл хадгална — 20 хүн ашиглахад тохиромжтой.
+```bash
+bash scripts/setup-tomuda-mn-domain.sh
+```
+
+### Шинэчлэх
+
+```bash
+cd /var/www/tomuda && git pull
+source .venv/bin/activate && set -a && source .env && set +a
+pip install -r requirements.txt
+python manage.py migrate && python manage.py collectstatic --noinput
+systemctl restart tomuda
+```
 
 ---
 
-## 2. Утсан дээр суулгах (PWA)
-
-| Төхөөрөмж | Арга |
-|-----------|------|
-| **Android** | Chrome → URL нээх → «Суулгах» banner эсвэл цэс → App суулгах |
-| **iPhone** | Safari → URL → Хуваалцах → Нүүр дэлгэцэнд нэмэх |
-
-- App Store / Play Store **шаардлаггүй**
-- HTTPS заавал (Render автоматаар өгнө)
-- Суулгасны дараа нүүр дэлгэцийн icon-оор нээнэ
-
----
-
-## 3. Manual VPS deploy
+## 2. Локал хөгжүүлэлт
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-export DEBUG=0
-export SECRET_KEY="replace-with-long-random-secret"
-export ALLOWED_HOSTS="your-domain.com"
-export CSRF_TRUSTED_ORIGINS="https://your-domain.com"
-# PostgreSQL бол:
-# export DATABASE_URL="postgres://..."
-python manage.py collectstatic --noinput
 python manage.py migrate
 python manage.py seed_tomuda
-gunicorn tomuda.wsgi:application --bind 0.0.0.0:8000
+python manage.py runserver
 ```
 
-Nginx + Let's Encrypt SSL заавал — PWA суулгахад HTTPS хэрэгтэй.
+`http://127.0.0.1:8000/` нээнэ.
 
 ---
 
-## 4. Capacitor (Store-оор гаргах бол)
+## 3. Утсан дээр суулгах (PWA)
 
-PWA-гаар хангалттай бол Store шаардлаггүй. Хэрэв Play Store / App Store-д гаргах бол:
+| Төхөөрөмж | Арга |
+|-----------|------|
+| **Android** | Chrome → https://tomuda.jobbox.mn → «App суулгах» |
+| **iPhone** | Safari → Хуваалцах → Нүүр дэлгэцэнд нэмэх |
 
-1. Backend deploy хийсний дараа `capacitor.config.json` дотор `server.url`-ийг өөрийн URL-аар солино.
-2. `npm install && npm run cap:add:android && npm run cap:sync`
+HTTPS заавал. App Store / Play Store шаардлаггүй.
+
+---
+
+## 4. Локал түр tunnel (хөгжүүлэлт)
+
+```bash
+./scripts/start-tomuda.sh
+cat DEPLOY-LINK.txt
+```
 
 ---
 
 ## 5. Шалгах
 
-- `GET /api/health` → `{"ok":true,"app":"tomuda"}`
-- Chrome DevTools → Application → Manifest + Service Worker идэвхтэй эсэх
-- Утаснаас HTTPS URL нээж суулгах banner шалгах
-
 ```bash
 ./scripts/check-deploy-link.sh
+curl -s https://tomuda.jobbox.mn/api/health
 ```
 
 ---
 
-## 6. Deploy link ажиллахгүй бол
+## 6. Capacitor (Store — сонголттой)
 
-| Шалтгаан | Засвар |
-|----------|--------|
-| **Хуучин trycloudflare URL** | Tunnel хаагдсан үед URL устана. `./scripts/start-tomuda.sh` дахин ажиллуулж `DEPLOY-LINK.txt`-ийн шинэ линкийг ашиглана |
-| **Mac унтсан / terminal хаагдсан** | Backend + cloudflared зогсоно → дахин `./scripts/start-tomuda.sh` |
-| **Render 404 (no-server)** | [render.com](https://render.com) → Blueprint → `Batt866/tomuda-commerce` repo сонгоод deploy хийнэ |
-| **APK хуучин URL** | `start-tomuda.sh` capacitor.config.json-ийг автоматаар шинэчилнэ, дараа нь `npm run cap:sync` |
-
-**Одоо ажиллаж буй түр линк** (зөвхөн tunnel асаалттай үед):
+`capacitor.config.json` дотор `server.url`-ийг production URL-аар солино:
 
 ```bash
-./scripts/start-tomuda.sh
-cat DEPLOY-LINK.txt
+npm install && npm run cap:sync
 ```

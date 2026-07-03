@@ -178,9 +178,9 @@ def _iso_day(value: Any) -> str:
 def _order_retention_days(state: dict[str, Any] | None = None) -> int:
     settings = (state or {}).get("settings") or {}
     try:
-        days = int(settings.get("orderRetentionDays") or 31)
+        days = int(settings.get("orderRetentionDays") or 30)
     except (TypeError, ValueError):
-        days = 31
+        days = 30
     return max(7, min(days, 365))
 
 
@@ -196,8 +196,10 @@ def _order_within_retention(
         created = datetime.fromisoformat(day)
     except ValueError:
         return True
-    days = retention_days if retention_days is not None else 31
-    return created + timedelta(days=days) >= (now or datetime.utcnow())
+    days = retention_days if retention_days is not None else 30
+    expires = created + timedelta(days=days)
+    expires = expires.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return expires >= (now or datetime.utcnow())
 
 
 def _created_order_stock_usage(

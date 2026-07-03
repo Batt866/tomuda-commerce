@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.test import TestCase, override_settings
 
+from dashboard.api import _retained_orders_state
 from dashboard.models import AppState, ProductImage
 from dashboard.product_images import (
     find_stored_product_image_url,
@@ -155,3 +157,75 @@ class ProductImageStorageTests(TestCase):
                     payload["state"]["products"][0]["image"],
                     "/media/products/missing-prod.jpg?v=1",
                 )
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class OrderRetentionTests(TestCase):
+    def test_retained_orders_state_drops_orders_older_than_thirty_days(self):
+        today = date.today()
+        state = default_state()
+        state["settings"]["orderRetentionDays"] = 30
+        state["orders"] = [
+            {
+                "id": "old",
+                "createdAt": (today - timedelta(days=31)).isoformat(),
+                "status": "delivered",
+            },
+            {
+                "id": "recent",
+                "createdAt": (today - timedelta(days=10)).isoformat(),
+                "status": "delivered",
+            },
+        ]
+
+        cleaned = _retained_orders_state(state)
+
+        self.assertEqual([o["id"] for o in cleaned["orders"]], ["recent"])
+
+    def test_get_state_purges_expired_orders_from_database(self):
+        today = date.today()
+        state = default_state()
+        state["settings"]["orderRetentionDays"] = 30
+        state["orders"] = [
+            {
+                "id": "old",
+                "createdAt": (today - timedelta(days=40)).isoformat(),
+                "status": "delivered",
+            },
+            {
+                "id": "recent",
+                "createdAt": (today - timedelta(days=5)).isoformat(),
+                "status": "delivered",
+            },
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        response = self.client.get("/api/state")
+
+        self.assertEqual(response.status_code, 200)
+        order_ids = [o["id"] for o in response.json()["state"]["orders"]]
+        self.assertEqual(order_ids, ["recent"])
+
+        row = AppState.objects.get(key="main")
+        saved_ids = [o["id"] for o in row.data["orders"]]
+        self.assertEqual(saved_ids, ["recent"])
+
+    def test_health_purges_expired_orders_from_database(self):
+        today = date.today()
+        state = default_state()
+        state["settings"]["orderRetentionDays"] = 30
+        state["orders"] = [
+            {
+                "id": "old",
+                "createdAt": (today - timedelta(days=45)).isoformat(),
+                "status": "delivered",
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        response = self.client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["purgedOrders"], 1)
+        row = AppState.objects.get(key="main")
+        self.assertEqual(row.data["orders"], [])

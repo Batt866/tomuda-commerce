@@ -50,9 +50,39 @@ def _hydrate_all_images(state: dict) -> tuple[dict, bool]:
     return state, product_changed or profile_changed
 
 
+def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
+    next_state = dict(data or {})
+    orders = next_state.get("orders") or []
+    retention_days = _order_retention_days(next_state)
+    next_state["orders"] = [
+        order
+        for order in orders
+        if _order_within_retention(order, retention_days=retention_days)
+    ]
+    return next_state
+
+
+def _purge_expired_orders_from_row(row: AppState) -> int:
+    data = row.data or default_state()
+    before = len(data.get("orders") or [])
+    cleaned = _retained_orders_state(data)
+    after = len(cleaned.get("orders") or [])
+    if after < before:
+        row.data = cleaned
+        row.save(update_fields=["data", "updated_at"])
+    return before - after
+
+
 @api.get("/health")
 def health(request):
-    return {"ok": True}
+    purged = 0
+    row = AppState.objects.filter(key="main").first()
+    if row:
+        purged = _purge_expired_orders_from_row(row)
+    payload = {"ok": True}
+    if purged:
+        payload["purgedOrders"] = purged
+    return payload
 
 
 @api.get("/meta")
@@ -79,22 +109,14 @@ def get_state(request):
     data, changed = sanitize_app_state(row.data or default_state())
     data, hydrated = _hydrate_all_images(data)
     changed = changed or hydrated
+    retained = _retained_orders_state(data)
+    if len(retained.get("orders") or []) < len(data.get("orders") or []):
+        data = retained
+        changed = True
     if changed:
         row.data = data
         row.save(update_fields=["data", "updated_at"])
     return {"ok": True, "state": data, "updatedAt": row.updated_at.isoformat()}
-
-
-def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
-    next_state = dict(data or {})
-    orders = next_state.get("orders") or []
-    retention_days = _order_retention_days(next_state)
-    next_state["orders"] = [
-        order
-        for order in orders
-        if _order_within_retention(order, retention_days=retention_days)
-    ]
-    return next_state
 
 
 @api.post("/state")

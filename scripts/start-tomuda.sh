@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 PORT=8011
 LOG_DIR="$ROOT/logs"
-RENDER_URL="https://tomuda-commerce.onrender.com"
+PRODUCTION_URL="${PRODUCTION_URL:-https://tomuda.jobbox.mn}"
 mkdir -p "$LOG_DIR"
 
 if [ -d ".venv" ]; then
@@ -97,15 +97,15 @@ else
   echo "✗ Tunnel URL олдсонгүй. logs/tunnel.log шалгана уу"
 fi
 
-RENDER_OK=false
+PRODUCTION_OK=false
 LAN_URL="$(local_lan_url || true)"
 echo ""
-echo "→ Render шалгаж байна..."
-if wait_http_ok "$RENDER_URL/api/health" 8; then
-  RENDER_OK=true
-  echo "✓ Render (24/7) — OK"
+echo "→ Production шалгаж байна..."
+if wait_http_ok "$PRODUCTION_URL/api/health" 8; then
+  PRODUCTION_OK=true
+  echo "✓ Production (24/7) — OK"
 else
-  echo "⚠ Render одоогоор унтраалттай эсвэл сэргэж байна (1-2 минут)"
+  echo "⚠ Production одоогоор хариулахгүй байна"
 fi
 
 cat > "$ROOT/DEPLOY-LINK.txt" <<EOF
@@ -113,7 +113,7 @@ cat > "$ROOT/DEPLOY-LINK.txt" <<EOF
 Шинэчлэгдсэн: $(date)
 
 ✅ ҮНДСЭН (24/7, утас/APK — энийг ашиглана):
-$RENDER_URL
+$PRODUCTION_URL
 
 EOF
 
@@ -143,7 +143,7 @@ EOF
 
 echo ""
 echo "============================================"
-echo "  Render (24/7):  $RENDER_URL"
+echo "  Production:     $PRODUCTION_URL"
 if [ -n "$LAN_URL" ]; then
   echo "  Wi‑Fi (утас):   $LAN_URL"
 fi
@@ -155,7 +155,7 @@ echo "============================================"
 echo "Backend log: $LOG_DIR/backend.log"
 echo "Tunnel log:  $LOG_DIR/tunnel.log"
 
-if $RENDER_OK || $TUNNEL_OK || [ -n "$LAN_URL" ]; then
+if $PRODUCTION_OK || $TUNNEL_OK || [ -n "$LAN_URL" ]; then
   exit 0
 fi
 

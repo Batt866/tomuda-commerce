@@ -1,15 +1,9 @@
 ТОМУДА — Deploy link (HTTPS)
-Шинэчлэгдсэн: 2026-06-21
 
-✅ ҮНДСЭН (24/7, утас/APK — энийг ашиглана):
-https://tomuda-commerce.onrender.com
+✅ ҮНДСЭН (production, 24/7):
+https://tomuda.jobbox.mn
 
-🔧 MINI DEPLOY асаах:
-./scripts/mini-deploy.sh
+🔧 Локал хөгжүүлэлт:
+./scripts/start-tomuda.sh
 
-GitHub: https://github.com/Batt866/tomuda-commerce
-
-⚠️ Анхаар:
-- Render link — хамгийн найдвартай (эхний удаа 1–2 мин хүлээнэ)
-- Mini deploy tunnel — Mac асаалттай + ижил Wi‑Fi эсвэл tunnel link
-- Шалгах: ./scripts/check-deploy-link.sh
+Шалгах: ./scripts/check-deploy-link.sh

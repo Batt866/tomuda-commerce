@@ -80,7 +80,7 @@ const state = {
     stockAlertEnabled: true,
     stockAlertMin: 10,
     percentDiscountRate: 3,
-    orderRetentionDays: 31,
+    orderRetentionDays: 30,
   },
 };
 const API_BASE = window.TOMUDA_API_BASE || "/api";
@@ -680,7 +680,7 @@ function ensureSettings() {
   if (state.settings.percentDiscountRate == null)
     state.settings.percentDiscountRate = RECEIPT_PERCENT_DISCOUNT;
   if (state.settings.orderRetentionDays == null)
-    state.settings.orderRetentionDays = 31;
+    state.settings.orderRetentionDays = 30;
 }
 function percentDiscountRate() {
   ensureSettings();
@@ -893,7 +893,7 @@ function orderCreatedDay(o) {
 function orderRetentionDays() {
   ensureSettings();
   const n = Number(state.settings.orderRetentionDays);
-  return Number.isFinite(n) && n >= 7 ? Math.min(Math.floor(n), 365) : 31;
+  return Number.isFinite(n) && n >= 7 ? Math.min(Math.floor(n), 365) : 30;
 }
 function orderRetentionExpiresAt(o) {
   const day = orderCreatedDay(o);
@@ -921,12 +921,7 @@ function settlementTextInputValue(source = state) {
   return String(source?.settlementText || "").trim();
 }
 function normalizeSettlementTextDraft() {
-  if (!state.settlementAgreed) {
-    state.settlementText = "";
-    return;
-  }
-  if (settlementTextInputValue(state)) return;
-  state.settlementText = todayIso().replace(/-/g, ".");
+  if (!state.settlementAgreed) state.settlementText = "";
 }
 function applySettlementTextInput(value) {
   state.settlementAgreed = true;
@@ -8822,7 +8817,7 @@ function setInventoryTab(tab) {
 }
 function reportOrdersFiltered() {
   const day = state.filters.reportDate || "";
-  let list = state.orders.filter((o) => o.status !== "cancelled");
+  let list = retainedOrders(state.orders).filter((o) => o.status !== "cancelled");
   if (day) list = list.filter((o) => orderCreatedDay(o) === day);
   return list;
 }
@@ -10696,7 +10691,7 @@ function workerOrderOptionsHtml(cart) {
     cashOnly = isCashPayment(),
     settlementText = settlementTextInputValue(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field worker-order-opt__field--date"><span class="worker-order-opt__field-label">Тайлбар</span><textarea rows="3" class="app-input worker-order-opt__textarea" aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value)">${esc(settlementText)}</textarea></label></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><input type="text" class="app-input worker-order-opt__input" aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" value="${esc(settlementText)}" oninput="applySettlementTextInput(this.value)"></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -10704,7 +10699,7 @@ function workerOrderOptionsHtml(cart) {
     pctRow = pctAllowed
       ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
-  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(this.checked){normalizeSettlementTextDraft()}else{state.settlementText='';state.settlementMonth='';state.settlementDay=''}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
+  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;if(!this.checked){state.settlementText='';state.settlementMonth='';state.settlementDay=''}render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
@@ -12752,14 +12747,8 @@ async function saveWorker() {
   const settlementText = state.settlementAgreed
     ? settlementTextInputValue(state)
     : "";
-  let settlementMonth = "",
-    settlementDay = "";
-  if (state.settlementAgreed && !settlementText) {
-    const parts = settlementPartsFromSource(state);
-    if (!parts) return alert("Тооцоо нийлэх тайлбар оруулна уу");
-    settlementMonth = String(parts.month);
-    settlementDay = String(parts.day);
-  }
+  if (state.settlementAgreed && !settlementText)
+    return alert("Тайлбар оруулна уу");
   const order = buildNewOrder({
     customerId: c.id,
     customerName: c.name,
@@ -12769,11 +12758,10 @@ async function saveWorker() {
     percentDiscount,
     discountAmount: cart.discount,
     total: cart.total,
-    settlementAgreed:
-      !!settlementText || (!!settlementMonth && !!settlementDay),
+    settlementAgreed: !!settlementText,
     settlementText,
-    settlementMonth,
-    settlementDay,
+    settlementMonth: "",
+    settlementDay: "",
     status: "pending",
     employeeId: e.id,
     employeeName: e.name,

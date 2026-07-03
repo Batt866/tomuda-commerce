@@ -2,6 +2,8 @@
 
 HTML, Tailwind CSS, vanilla JavaScript, Django, Django Ninja хувилбар.
 
+**Production:** https://tomuda.jobbox.mn
+
 ## Ажиллуулах (локал)
 
 ```bash
@@ -15,23 +17,17 @@ python manage.py runserver
 
 Дараа нь `http://127.0.0.1:8000/` нээнэ.
 
-## Утсан дээр суулгах (App Store / Play Store шаардлаггүй)
-
-Энэ апп **PWA** (Progressive Web App) — вэб хуудсыг утасныхаа **нүүр дэлгэцэнд** суулгаж, апп шиг ашиглана.
+## Утсан дээр суулгах (PWA)
 
 ### Android (Chrome)
 
-1. Deploy хийсэн HTTPS URL-аа нээнэ (жишээ: `https://tomuda-commerce.onrender.com`)
-2. Доод талын **«Утсан дээр суулгах»** banner гарна → **Суулгах** дарна
-3. Эсвэл Chrome цэс (⋮) → **App суулгах** / **Нүүр дэлгэцэнд нэмэх**
+1. https://tomuda.jobbox.mn нээнэ
+2. **«App суулгах»** banner эсвэл Chrome цэс → App суулгах
 
 ### iPhone (Safari)
 
-1. HTTPS URL-аа Safari-аар нээнэ
-2. Доод **Хуваалцах** (□↑) → **Нүүр дэлгэцэнд нэмэх**
-3. **Нэмэх** дарна
-
-~20 хэрэглэгч бүр өөрийн утсан дээр ижил URL-аас суулгана. Store бүртгэл хэрэггүй.
+1. URL-аа Safari-аар нээнэ
+2. **Хуваалцах** → **Нүүр дэлгэцэнд нэмэх**
 
 ## API
 
@@ -42,15 +38,10 @@ python manage.py runserver
 
 ## Server deploy
 
-Production deploy:
-
-- `Procfile`
-- `render.yaml` — Render дээр автомат deploy (PostgreSQL + ~20 хэрэглэгчид)
+- `scripts/deploy-vps-ubuntu.sh` — VPS дээр автомат deploy
 - `DEPLOY.md` — дэлгэрэнгүй заавар
 
 ## Mobile (Capacitor — сонголттой)
-
-Store-оор гаргах шаардлагатай бол Capacitor ашиглаж болно:
 
 - `package.json`
 - `capacitor.config.json`
