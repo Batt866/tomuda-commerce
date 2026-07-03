@@ -1247,6 +1247,7 @@ function showImportReportModal(report, kind) {
   const created = Number(report.created || 0);
   const updated = Number(report.updated || 0);
   const imageSuccess = Number(report.imageSuccess || 0);
+  const imageSkipped = Number(report.imageSkipped || 0);
   const errors = (report.errors || [])
     .map(
       (item) =>
@@ -1260,12 +1261,14 @@ function showImportReportModal(report, kind) {
     summary = `<p class="import-report__empty">Нэг ч мөр импортлогдсонгүй. Доорх алдааг шалгана уу.</p>`;
   } else if ((report.failed || 0) > 0) {
     summary = `<p class="import-report__empty">${report.success || 0} мөр хадгалагдлаа. ${report.failed || 0} мөрийг боловсруулж чадсангүй.</p>`;
+  } else if (imageSkipped > 0) {
+    summary = `<p class="import-report__empty">Бараанууд хадгалагдлаа. ${imageSkipped} зураг татаж чадсангүй, зураггүй үлдлээ.</p>`;
   } else if (!errors) {
     summary = `<p class="import-report__ok">Бүх мөр амжилттай импортлогдлоо.</p>`;
   }
   const imageStat =
-    kind === "products" && imageSuccess
-      ? `<p><span>Зураг</span><b class="text-tone-success">${imageSuccess}</b></p>`
+    kind === "products" && (imageSuccess || imageSkipped)
+      ? `<p><span>Зураг хадгалсан</span><b class="text-tone-success">${imageSuccess}</b></p><p><span>Зураг алгассан</span><b class="${imageSkipped ? "text-tone-danger" : ""}">${imageSkipped}</b></p>`
       : "";
   const body = `<div class="import-report"><div class="import-report__stats"><p><span>Нийт мөр</span><b>${report.total || 0}</b></p><p><span>Амжилттай</span><b class="text-tone-success">${report.success || 0}</b></p><p><span>Шинэ</span><b>${created}</b></p><p><span>Шинэчлэгдсэн</span><b>${updated}</b></p><p><span>Алдаатай</span><b class="${report.failed ? "text-tone-danger" : ""}">${report.failed || 0}</b></p>${imageStat}</div>${summary}${errors ? `<div class="import-report__errors"><p class="import-report__errors-title">Боловсруулж чадсангүй</p><ul>${errors}</ul></div>` : ""}</div>`;
   confirmModal(`${label} импортын тайлан`, body, {
@@ -1325,20 +1328,31 @@ async function handleImportFile(kind, file) {
       cache: "no-store",
     });
     let payload = null;
+    let responseText = "";
     try {
-      payload = await res.json();
+      responseText = await res.text();
+      payload = responseText ? JSON.parse(responseText) : null;
     } catch {
       payload = null;
     }
     if (!res.ok) {
-      const msg = importApiDetail(payload);
+      const fallback =
+        responseText && !responseText.trim().startsWith("<")
+          ? responseText
+          : "Импорт амжилтгүй";
+      const msg = importApiDetail(payload, fallback);
       showAppToast(String(msg), "error");
       alertModal("Импорт амжилтгүй", esc(String(msg)));
       return;
     }
+    if (!payload || typeof payload !== "object") {
+      throw new Error("Импортын хариу буруу байна");
+    }
     const report = payload.report || {};
     applyImportPayload(kind, payload);
     syncBackendMarkers(payload);
+    clearOrderPersistenceCache();
+    clearBackendSaveFailed();
     saveLocalBackendCache({
       state: persistentState(),
       updatedAt: payload.updatedAt || serverUpdatedAt || "",
@@ -1360,8 +1374,9 @@ async function handleImportFile(kind, file) {
     showImportReportModal(report, kind);
   } catch (error) {
     console.warn("Import failed", error);
-    showAppToast("Импорт хийхэд алдаа гарлаа", "error");
-    alertModal("Алдаа", `Импорт хийхэд алдаа гарлаа. ${IMPORT_FILE_FORMAT_HINT}`);
+    const msg = error?.message || "Импорт хийхэд алдаа гарлаа";
+    showAppToast(msg, "error");
+    alertModal("Алдаа", `${esc(msg)}. ${IMPORT_FILE_FORMAT_HINT}`);
   } finally {
     backendSaving = false;
     setImportLoading(false);
@@ -2015,7 +2030,7 @@ function currentPageTitle(nav) {
   return extra[state.currentView] || "ТОМУДА";
 }
 const PRODUCT_IMAGE_FALLBACK = "/static/tomuda/icons/icon-192.png?v=20260630-logo";
-const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+const brokenProductImageUrls = new Set();
 function productImagePlaceholder(p = {}) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
 }
@@ -2073,12 +2088,8 @@ function resolveBackendAssetUrl(url) {
 function pushUniqueProductImage(list, url) {
   const resolved = resolveBackendAssetUrl(url);
   if (!resolved) return;
+  if (brokenProductImageUrls.has(resolved)) return;
   if (!list.includes(resolved)) list.push(resolved);
-}
-function productImageMediaUrl(productId, ext = "jpg") {
-  const id = String(productId || "").trim();
-  if (!id) return "";
-  return resolveBackendAssetUrl(`/media/products/${encodeURIComponent(id)}.${ext}`);
 }
 function storedProductImage(p) {
   const raw = String(p?.image || "").trim();
@@ -2091,15 +2102,8 @@ function isLocalProductImage(url) {
 }
 function productImageFallbackList(p = {}) {
   const list = [];
-  const id = String(p?.id || "").trim();
   const stored = storedProductImage(p);
   pushUniqueProductImage(list, stored);
-  if (id) {
-    PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
-      const url = productImageMediaUrl(id, ext);
-      pushUniqueProductImage(list, url);
-    });
-  }
   list.push(productImagePlaceholder(p));
   return list;
 }
@@ -2147,6 +2151,8 @@ function applyProductImageFallback(img, product) {
     index = found >= 0 ? found : 0;
   }
   img.onerror = () => {
+    const failed = resolveBackendAssetUrl(img.currentSrc || img.src);
+    if (failed) brokenProductImageUrls.add(failed);
     index += 1;
     if (index < candidates.length) {
       img.dataset.imgFallbackIdx = String(index);
@@ -2159,6 +2165,7 @@ function applyProductImageFallback(img, product) {
   if (
     !current ||
     current === PRODUCT_IMAGE_FALLBACK ||
+    brokenProductImageUrls.has(resolveBackendAssetUrl(current)) ||
     current.startsWith("data:image/svg") ||
     (img.complete && img.naturalWidth === 0)
   ) {
@@ -2238,14 +2245,19 @@ function stripInlineEntityImages(items = []) {
     return copy;
   });
 }
-function stateForBackendSave() {
-  const data = persistentState();
+function comparableBackendState(data = {}) {
   return {
     ...data,
     products: stripInlineEntityImages(data.products),
     customers: stripInlineEntityImages(data.customers),
     employees: stripInlineEntityImages(data.employees),
   };
+}
+function stateForBackendSave() {
+  return comparableBackendState(persistentState());
+}
+function backendStateSnapshot(data = persistentState()) {
+  return JSON.stringify({ state: comparableBackendState(data || {}) });
 }
 function readProductImageFromForm(form) {
   const hidden = form.querySelector("#productImageValue");
@@ -2363,6 +2375,10 @@ function mergeBootState(serverState) {
   return mergeBootPersistentState(serverState, pendingState, ordersBackup);
 }
 function saveLocalPendingState() {
+  if (!localStateDirty() && !backendSaveTimer && !backendSaving && !backendSaveFailedMessage) {
+    clearLocalPendingState();
+    return;
+  }
   try {
     localStorage.setItem(
       LOCAL_PENDING_STATE_KEY,
@@ -2428,8 +2444,11 @@ function clearOrderPersistenceCache() {
   clearLocalOrdersBackup();
 }
 function persistOrderSnapshot() {
+  const shouldPersist =
+    localStateDirty() || !!backendSaveTimer || backendSaving || !!backendSaveFailedMessage;
   saveLocalPendingState();
-  saveLocalOrdersBackup();
+  if (shouldPersist) saveLocalOrdersBackup();
+  else clearLocalOrdersBackup();
 }
 function mergeBootPersistentState(backendState, pendingState, ordersBackup) {
   let merged = mergePersistentStates(backendState, pendingState || {});
@@ -2703,7 +2722,7 @@ function applyPersistentState(data) {
   return true;
 }
 function localStateDirty() {
-  return JSON.stringify({ state: stateForBackendSave() }) !== backendLastSaved;
+  return backendStateSnapshot() !== backendLastSaved;
 }
 function shouldDeferBackendSync() {
   if (isEditingCountQty()) return true;
@@ -2716,8 +2735,8 @@ function shouldDeferBackendSync() {
   }
   return false;
 }
-function syncBackendSaveMarker() {
-  backendLastSaved = JSON.stringify({ state: stateForBackendSave() });
+function syncBackendSaveMarker(stateData = null) {
+  backendLastSaved = backendStateSnapshot(stateData || persistentState());
 }
 function captureSessionSnapshot() {
   return {
@@ -2750,6 +2769,15 @@ function syncBackendMarkers(payload, stateData) {
   if (stateData) applyPersistentState(stateData);
   syncBackendSaveMarker();
   if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
+}
+function applyBootBackendPayload(payload) {
+  if (!payload?.state) return false;
+  const merged = mergeBootState(payload.state);
+  applyPersistentState(merged);
+  syncBackendSaveMarker(payload.state);
+  if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+  if (!localStateDirty()) clearOrderPersistenceCache();
+  return true;
 }
 function isEditingCountQty() {
   const el = document.activeElement;
@@ -2926,7 +2954,7 @@ async function boot() {
     let bootUiReady = false;
     const cached = readLocalBackendCache();
     if (cached?.state) {
-      syncBackendMarkers(cached, mergeBootState(cached.state));
+      applyBootBackendPayload(cached);
       completeBootUiInit({ startPoll: false });
       bootUiReady = true;
       setBootStatus("Шинэчилж байна", "Серверийн мэдээлэл шалгаж байна...");
@@ -2934,7 +2962,7 @@ async function boot() {
 
     const payload = await fetchBackendStateWithRetry();
     if (payload?.state) {
-      syncBackendMarkers(payload, mergeBootState(payload.state));
+      applyBootBackendPayload(payload);
       saveLocalBackendCache(payload);
       if (!bootUiReady) {
         completeBootUiInit();
@@ -3951,7 +3979,9 @@ function clearBackendSaveFailed() {
   backendSaveFailedMessage = "";
 }
 function hasUnsavedLocalData() {
-  return localStateDirty() || !!readLocalPendingState();
+  if (localStateDirty()) return true;
+  if (readLocalPendingState()) clearOrderPersistenceCache();
+  return false;
 }
 function criticalBackendSave() {
   persistOrderSnapshot();
@@ -4016,8 +4046,10 @@ async function saveBackendState(retry = 0) {
       console.warn("Backend pre-save merge failed", error);
     }
   }
+  const payloadState = stateForBackendSave();
+  const snapshot = backendStateSnapshot(payloadState);
   const body = JSON.stringify({
-    state: stateForBackendSave(),
+    state: payloadState,
     actor: state.currentEmployee
       ? {
           id: state.currentEmployee.id,
@@ -4025,7 +4057,7 @@ async function saveBackendState(retry = 0) {
         }
       : null,
   });
-  if (body === backendLastSaved) {
+  if (snapshot === backendLastSaved) {
     clearOrderPersistenceCache();
     return;
   }
@@ -4046,10 +4078,19 @@ async function saveBackendState(retry = 0) {
     });
     if (res.ok) {
       const payload = await res.json();
-      syncBackendSaveMarker();
+      let appliedServerState = false;
+      if (payload?.state) {
+        const beforeSnapshot = backendStateSnapshot();
+        const session = captureSessionSnapshot();
+        applyPersistentState(payload.state);
+        restoreSessionSnapshot(session);
+        appliedServerState = backendStateSnapshot() !== beforeSnapshot;
+      }
+      syncBackendSaveMarker(payload?.state || null);
       clearOrderPersistenceCache();
       clearBackendSaveFailed();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+      if (appliedServerState && !shouldDeferBackendSync()) safeRender();
     } else if (res.status === 403) {
       let msg = "Эрх хүрэлцэхгүй";
       try {
@@ -10683,12 +10724,17 @@ function initProductImageFallback() {
     (e) => {
       const img = e.target;
       if (img?.tagName !== "IMG" || !img.dataset.productImg) return;
+      const failed = resolveBackendAssetUrl(img.currentSrc || img.src);
+      if (failed) brokenProductImageUrls.add(failed);
       if (img.dataset.imgFallbackReady === "1") return;
       const candidates = productImageFallbackList(findProductForImage(img));
       const next = Number(img.dataset.imgFallbackIdx || "0") + 1;
       if (next < candidates.length) {
         img.dataset.imgFallbackIdx = String(next);
         img.src = candidates[next];
+      } else if (candidates.length) {
+        img.dataset.imgFallbackIdx = "0";
+        img.src = candidates[0];
       }
     },
     true,
