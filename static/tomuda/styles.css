@@ -5291,8 +5291,18 @@ input::placeholder, textarea::placeholder {
   flex: 1 1 100%;
 }
 
-.worker-order-opt__field--date .app-input {
+.worker-order-opt__field--date .app-input,
+.worker-order-opt__field--date .worker-order-opt__textarea {
   width: 100%;
+}
+
+.worker-order-opt__textarea {
+  min-height: 72px !important;
+  height: auto;
+  resize: vertical;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  line-height: 1.4;
 }
 
 .worker-order-discount-preview {

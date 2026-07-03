@@ -36,7 +36,7 @@ class ProductImageStorageTests(TestCase):
                 self.assertEqual(response["Content-Type"], "image/png")
                 self.assertEqual(response.content, raw)
 
-    def test_hydrate_clears_broken_media_url(self):
+    def test_hydrate_keeps_media_url_when_storage_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
                 state = {
@@ -51,8 +51,11 @@ class ProductImageStorageTests(TestCase):
 
                 next_state, changed = hydrate_product_images(state)
 
-                self.assertTrue(changed)
-                self.assertEqual(next_state["products"][0]["image"], "")
+                self.assertFalse(changed)
+                self.assertEqual(
+                    next_state["products"][0]["image"],
+                    "/media/products/missing-prod.jpg?v=1",
+                )
 
     def test_existing_media_file_is_backfilled_to_db(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,4 +108,7 @@ class ProductImageStorageTests(TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 payload = response.json()
-                self.assertEqual(payload["state"]["products"][0]["image"], "")
+                self.assertEqual(
+                    payload["state"]["products"][0]["image"],
+                    "/media/products/missing-prod.jpg?v=1",
+                )

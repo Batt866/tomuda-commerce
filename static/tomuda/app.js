@@ -2030,6 +2030,7 @@ function currentPageTitle(nav) {
   return extra[state.currentView] || "ТОМУДА";
 }
 const PRODUCT_IMAGE_FALLBACK = "/static/tomuda/icons/icon-192.png?v=20260630-logo";
+const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 const brokenProductImageUrls = new Set();
 function productImagePlaceholder(p = {}) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
@@ -2062,6 +2063,18 @@ function productMediaPathFromUrl(url) {
   }
   return "";
 }
+function productImageUrlKey(url) {
+  const media = productMediaPathFromUrl(url);
+  const raw = media || String(url || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:")) return raw.slice(0, 96);
+  const path = raw.split("?")[0];
+  try {
+    return new URL(path, appBackendOrigin()).pathname;
+  } catch {
+    return path;
+  }
+}
 function resolveBackendAssetUrl(url) {
   const raw = String(url || "").trim();
   if (!raw) return "";
@@ -2088,8 +2101,16 @@ function resolveBackendAssetUrl(url) {
 function pushUniqueProductImage(list, url) {
   const resolved = resolveBackendAssetUrl(url);
   if (!resolved) return;
-  if (brokenProductImageUrls.has(resolved)) return;
-  if (!list.includes(resolved)) list.push(resolved);
+  const key = productImageUrlKey(resolved);
+  if (key && brokenProductImageUrls.has(key)) return;
+  if (!list.some((item) => productImageUrlKey(item) === key)) list.push(resolved);
+}
+function productImageMediaUrl(productId, ext = "jpg") {
+  const id = String(productId || "").trim();
+  if (!id) return "";
+  return resolveBackendAssetUrl(
+    `/media/products/${encodeURIComponent(id)}.${ext}`,
+  );
 }
 function storedProductImage(p) {
   const raw = String(p?.image || "").trim();
@@ -2102,8 +2123,14 @@ function isLocalProductImage(url) {
 }
 function productImageFallbackList(p = {}) {
   const list = [];
+  const id = String(p?.id || "").trim();
   const stored = storedProductImage(p);
   pushUniqueProductImage(list, stored);
+  if (id) {
+    PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
+      pushUniqueProductImage(list, productImageMediaUrl(id, ext));
+    });
+  }
   list.push(productImagePlaceholder(p));
   return list;
 }
@@ -2151,7 +2178,7 @@ function applyProductImageFallback(img, product) {
     index = found >= 0 ? found : 0;
   }
   img.onerror = () => {
-    const failed = resolveBackendAssetUrl(img.currentSrc || img.src);
+    const failed = productImageUrlKey(img.currentSrc || img.src);
     if (failed) brokenProductImageUrls.add(failed);
     index += 1;
     if (index < candidates.length) {
@@ -2165,7 +2192,7 @@ function applyProductImageFallback(img, product) {
   if (
     !current ||
     current === PRODUCT_IMAGE_FALLBACK ||
-    brokenProductImageUrls.has(resolveBackendAssetUrl(current)) ||
+    brokenProductImageUrls.has(productImageUrlKey(current)) ||
     current.startsWith("data:image/svg") ||
     (img.complete && img.naturalWidth === 0)
   ) {
@@ -2222,6 +2249,9 @@ function preferredEntityImage(localImage, remoteImage) {
   if (local.startsWith("data:image/") && !local.startsWith("data:image/svg")) {
     return local;
   }
+  if (remote.startsWith("data:image/") && !remote.startsWith("data:image/svg")) {
+    return remote;
+  }
   const localMedia = productMediaPathFromUrl(local);
   if (localMedia) return localMedia;
   const remoteMedia = productMediaPathFromUrl(remote);
@@ -2262,6 +2292,7 @@ function backendStateSnapshot(data = persistentState()) {
 function readProductImageFromForm(form) {
   const hidden = form.querySelector("#productImageValue");
   let image = String(hidden?.value || "").trim();
+  if (image.startsWith("data:image/svg")) image = "";
   if (!image) {
     const preview = form.querySelector("#productImagePreview");
     const src = String(preview?.currentSrc || preview?.src || "").trim();
@@ -4082,7 +4113,8 @@ async function saveBackendState(retry = 0) {
       if (payload?.state) {
         const beforeSnapshot = backendStateSnapshot();
         const session = captureSessionSnapshot();
-        applyPersistentState(payload.state);
+        const merged = mergePersistentStates(payload.state, persistentState());
+        applyPersistentState(merged);
         restoreSessionSnapshot(session);
         appliedServerState = backendStateSnapshot() !== beforeSnapshot;
       }
@@ -10533,7 +10565,7 @@ function workerOrderOptionsHtml(cart) {
     cashOnly = isCashPayment(),
     settlementText = settlementTextInputValue(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field worker-order-opt__field--date"><span class="worker-order-opt__field-label">Тайлбар</span><input type="text" class="app-input" aria-label="Тооцоо нийлэх тайлбар" value="${esc(settlementText)}" placeholder="Ж: 2026.07.02 эсвэл Даваа гараг" oninput="applySettlementTextInput(this.value)"></label></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><label class="worker-order-opt__field worker-order-opt__field--date"><span class="worker-order-opt__field-label">Тайлбар</span><textarea rows="3" class="app-input worker-order-opt__textarea" aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value)">${esc(settlementText)}</textarea></label></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -10724,7 +10756,7 @@ function initProductImageFallback() {
     (e) => {
       const img = e.target;
       if (img?.tagName !== "IMG" || !img.dataset.productImg) return;
-      const failed = resolveBackendAssetUrl(img.currentSrc || img.src);
+      const failed = productImageUrlKey(img.currentSrc || img.src);
       if (failed) brokenProductImageUrls.add(failed);
       if (img.dataset.imgFallbackReady === "1") return;
       const candidates = productImageFallbackList(findProductForImage(img));
@@ -11232,11 +11264,7 @@ function productModal(id) {
 function handleProductImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  productImageCompressTask = compressImageFile(file, {
-    maxSize: 720,
-    quality: 0.78,
-    maxBytes: PRODUCT_IMAGE_UPLOAD_MAX_BYTES,
-  })
+  productImageCompressTask = compressImageFile(file)
     .then((dataUrl) => {
       const value = document.getElementById("productImageValue"),
         preview = document.getElementById("productImagePreview");
@@ -11437,38 +11465,59 @@ function buildProductDataFromForm(form) {
   data.country = String(data.country || "").trim() || "Монгол";
   const image = readProductImageFromForm(form);
   if (image) data.image = image;
+  else delete data.image;
   return { data };
 }
-async function applyProductSave(data, id) {
-  let imageDataUrl = null;
-  let imageRemoteUrl = "";
-  const incomingImage = String(data.image || "").trim();
-  if (incomingImage.startsWith("data:image/")) {
-    imageDataUrl = incomingImage;
-    delete data.image;
-  } else if (productMediaPathFromUrl(incomingImage)) {
-    data.image = productMediaPathFromUrl(incomingImage);
-  } else if (
-    incomingImage.startsWith("http://") ||
-    incomingImage.startsWith("https://")
+async function persistProductImageToMedia(product) {
+  const productId = String(product?.id || "").trim();
+  const image = String(product?.image || "").trim();
+  if (!productId || !image) return;
+  if (image.startsWith("data:image/")) {
+    try {
+      const url = await uploadProductImage(productId, image);
+      if (url) {
+        product.image = url;
+        render();
+      }
+    } catch (error) {
+      console.warn("Product image upload failed", error);
+    }
+    return;
+  }
+  if (
+    (image.startsWith("http://") || image.startsWith("https://")) &&
+    !productMediaPathFromUrl(image)
   ) {
-    imageRemoteUrl = incomingImage;
-    delete data.image;
+    try {
+      const url = await mirrorProductImage(productId, image);
+      if (url) {
+        product.image = url;
+        render();
+      }
+    } catch (error) {
+      console.warn("Product image mirror failed", error);
+      try {
+        product.image = await fetchImageAsDataUrl(image);
+        render();
+      } catch (fallbackError) {
+        console.warn("Product image browser fetch failed", fallbackError);
+      }
+    }
+  }
+}
+async function applyProductSave(data, id) {
+  const incomingImage = String(data.image || "").trim();
+  if (productMediaPathFromUrl(incomingImage)) {
+    data.image = productMediaPathFromUrl(incomingImage);
   }
   let productId = id;
   if (id) {
     const existing = state.products.find((p) => p.id === id);
-    if (existing) {
-      const prevImage = storedProductImage(existing);
-      Object.assign(existing, data);
-      if (
-        !imageDataUrl &&
-        !imageRemoteUrl &&
-        !storedProductImage(existing) &&
-        prevImage
-      ) {
-        existing.image = prevImage;
-      }
+    if (!existing) return alert("Бараа олдсонгүй");
+    const prevImage = storedProductImage(existing);
+    Object.assign(existing, data);
+    if (!storedProductImage(existing) && prevImage) {
+      existing.image = prevImage;
     }
   } else {
     productId = String(Date.now());
@@ -11480,35 +11529,9 @@ async function applyProductSave(data, id) {
       costPrice: 0,
     });
   }
-  if (productId && !imageDataUrl && imageRemoteUrl) {
-    try {
-      const url = await mirrorProductImage(productId, imageRemoteUrl);
-      const product = state.products.find((p) => p.id === productId);
-      if (product) product.image = url;
-      imageRemoteUrl = "";
-    } catch (error) {
-      console.warn("Product image mirror failed", error);
-      try {
-        imageDataUrl = await fetchImageAsDataUrl(imageRemoteUrl);
-      } catch (fallbackError) {
-        console.warn("Product image browser fetch failed", fallbackError);
-      }
-    }
-  }
-  if (productId) {
-    if (imageDataUrl) {
-      try {
-        const url = await uploadProductImage(productId, imageDataUrl);
-        const product = state.products.find((p) => p.id === productId);
-        if (product) product.image = url;
-      } catch (error) {
-        console.warn("Product image upload failed", error);
-        alert(error.message || "Зураг хадгалж чадсангүй");
-      }
-    } else if (imageRemoteUrl) {
-      const product = state.products.find((p) => p.id === productId);
-      if (product) product.image = imageRemoteUrl;
-    }
+  const product = state.products.find((p) => p.id === productId);
+  if (product) {
+    void persistProductImageToMedia(product);
   }
   closeModal();
   render();

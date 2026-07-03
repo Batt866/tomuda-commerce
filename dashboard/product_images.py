@@ -327,10 +327,10 @@ def hydrate_product_images(state: dict) -> tuple[dict, bool]:
                 product["image"] = url
                 changed = True
             continue
+        # Keep existing media paths — files may be served from ProductImage DB
+        # even when the on-disk copy is missing, and clearing here makes images
+        # disappear after unrelated state syncs.
         if product_media_path_from_url(current):
-            if current:
-                product["image"] = ""
-                changed = True
             continue
         if current.startswith("data:image/") and not current.startswith(
             "data:image/svg"
