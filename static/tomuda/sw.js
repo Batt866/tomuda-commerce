@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v52";
+const CACHE = "tomuda-v53";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
@@ -24,7 +24,9 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+        Promise.all(
+          keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)),
+        ),
       )
       .then(() => self.clients.claim()),
   );
@@ -37,10 +39,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (request.mode === "navigate" || url.pathname === "/" || url.pathname === "/sw.js") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match(request)),
-    );
+  if (
+    request.mode === "navigate" ||
+    url.pathname === "/" ||
+    url.pathname === "/sw.js"
+  ) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)));
     return;
   }
 

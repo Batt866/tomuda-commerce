@@ -370,8 +370,7 @@ const fmtCountQty = (n) => {
   if (!Number.isFinite(num)) return "-";
   return num.toLocaleString("mn-MN");
 };
-const fmtExcelMoney = (n) =>
-  `${Number(n || 0).toLocaleString("en-US")}₮`;
+const fmtExcelMoney = (n) => `${Number(n || 0).toLocaleString("en-US")}₮`;
 const RECEIPT_PERCENT_DISCOUNT = 3;
 const RECEIPT_FONT = '"Arial", "Helvetica Neue", sans-serif';
 const RECEIPT_FONT_TITLE = '"Times New Roman", "Times", serif';
@@ -420,7 +419,12 @@ function receiptDeliveryDateValue(o) {
   }
   return String(raw).trim();
 }
-function receiptMetaRow(leftLabel, leftValue, rightLabel = "", rightValue = "") {
+function receiptMetaRow(
+  leftLabel,
+  leftValue,
+  rightLabel = "",
+  rightValue = "",
+) {
   return `<tr class="receipt-grid__meta"><td></td><td class="receipt-grid__label">${esc(leftLabel)}</td><td></td><td colspan="2" class="receipt-grid__value">${leftValue}</td><td colspan="3" class="receipt-grid__label">${esc(rightLabel)}</td><td colspan="3" class="receipt-grid__value">${rightValue}</td></tr>`;
 }
 function receiptInfoRows(o) {
@@ -956,7 +960,10 @@ function settlementPartsFromSource(source) {
   if (!month || !day) return null;
   return { month, day };
 }
-function settlementNoteFromParts(parts, suffix = "тооцоо нийлэхээр тохиролцов") {
+function settlementNoteFromParts(
+  parts,
+  suffix = "тооцоо нийлэхээр тохиролцов",
+) {
   if (!parts) return "";
   return `${parts.month} сарын ${parts.day}-ны дотор ${suffix}`;
 }
@@ -1138,8 +1145,7 @@ function excelDownloadBtn(onclick, opts = {}) {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-excel ${extraClass}"${disabled ? " disabled" : ""} aria-label="${esc(label)}">${excelIconHtml()}<span class="btn--toolbar__label btn--toolbar__label--full">${esc(label)}</span><span class="btn--toolbar__label btn--toolbar__label--short">${esc(shortLabel)}</span></button>`;
 }
 function excelImportToolbar(kind) {
-  const perm =
-    kind === "customers" ? "customers.create" : "products.create";
+  const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return "";
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
   return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><button type="button" onclick="triggerImportUpload('${kind}')" class="btn btn--toolbar btn--toolbar-primary excel-import-toolbar__btn" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"></div>`;
@@ -1183,8 +1189,7 @@ function importActorPayload() {
     : "";
 }
 async function downloadImportTemplate(kind) {
-  const perm =
-    kind === "customers" ? "customers.create" : "products.create";
+  const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
   const path =
     kind === "customers"
@@ -1294,8 +1299,7 @@ function applyImportPayload(kind, payload) {
   return false;
 }
 async function handleImportFile(kind, file) {
-  const perm =
-    kind === "customers" ? "customers.create" : "products.create";
+  const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
   if (!file) return;
   const name = String(file.name || "").toLowerCase();
@@ -1310,8 +1314,7 @@ async function handleImportFile(kind, file) {
       "Excel импорт хийхийн тулд дахин нэвтэрнэ үү.",
     );
   }
-  const path =
-    kind === "customers" ? "/import/customers" : "/import/products";
+  const path = kind === "customers" ? "/import/customers" : "/import/products";
   const fd = new FormData();
   fd.append("file", file);
   fd.append("actor", importActorPayload());
@@ -1357,10 +1360,7 @@ async function handleImportFile(kind, file) {
       updatedAt: payload.updatedAt || serverUpdatedAt || "",
     });
     render();
-    if (
-      (report.success || 0) > 0 &&
-      !(report.failed || 0)
-    ) {
+    if ((report.success || 0) > 0 && !(report.failed || 0)) {
       showAppToast(`${report.success} мөр амжилттай импортлогдлоо`, "success");
     } else if ((report.success || 0) > 0) {
       showAppToast(
@@ -1701,7 +1701,9 @@ function mergedPermissionSelection() {
   }
   return api.mergePermissionsForEmployees(selectedPermissionEmployees());
 }
-function mergedPermissionPercentDiscount(selected = selectedPermissionEmployees()) {
+function mergedPermissionPercentDiscount(
+  selected = selectedPermissionEmployees(),
+) {
   const sales = selected.filter((e) => e.role === "sales");
   if (!sales.length) return null;
   if (sales.every((e) => e.allowPercentDiscount !== false)) return true;
@@ -2028,7 +2030,8 @@ function currentPageTitle(nav) {
   };
   return extra[state.currentView] || "ТОМУДА";
 }
-const PRODUCT_IMAGE_FALLBACK = "/static/tomuda/icons/icon-192.png?v=20260630-logo";
+const PRODUCT_IMAGE_FALLBACK =
+  "/static/tomuda/icons/icon-192.png?v=20260630-logo";
 const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 const brokenProductImageUrls = new Set();
 function productImagePlaceholder(p = {}) {
@@ -2102,7 +2105,8 @@ function pushUniqueProductImage(list, url) {
   if (!resolved) return;
   const key = productImageUrlKey(resolved);
   if (key && brokenProductImageUrls.has(key)) return;
-  if (!list.some((item) => productImageUrlKey(item) === key)) list.push(resolved);
+  if (!list.some((item) => productImageUrlKey(item) === key))
+    list.push(resolved);
 }
 function productImageMediaUrl(productId, ext = "jpg") {
   const id = String(productId || "").trim();
@@ -2248,7 +2252,10 @@ function preferredEntityImage(localImage, remoteImage) {
   if (local.startsWith("data:image/") && !local.startsWith("data:image/svg")) {
     return local;
   }
-  if (remote.startsWith("data:image/") && !remote.startsWith("data:image/svg")) {
+  if (
+    remote.startsWith("data:image/") &&
+    !remote.startsWith("data:image/svg")
+  ) {
     return remote;
   }
   const localMedia = productMediaPathFromUrl(local);
@@ -2521,14 +2528,22 @@ function mergeBootState(serverState) {
   return mergeBootPersistentState(serverState, pendingState, ordersBackup);
 }
 function saveLocalPendingState() {
-  if (!localStateDirty() && !backendSaveTimer && !backendSaving && !backendSaveFailedMessage) {
+  if (
+    !localStateDirty() &&
+    !backendSaveTimer &&
+    !backendSaving &&
+    !backendSaveFailedMessage
+  ) {
     clearLocalPendingState();
     return;
   }
   try {
     localStorage.setItem(
       LOCAL_PENDING_STATE_KEY,
-      JSON.stringify({ state: persistentState(), savedAt: new Date().toISOString() }),
+      JSON.stringify({
+        state: persistentState(),
+        savedAt: new Date().toISOString(),
+      }),
     );
   } catch (error) {
     console.warn("Local pending state save failed", error);
@@ -2564,9 +2579,7 @@ function readLocalOrdersBackup() {
     const raw = localStorage.getItem(LOCAL_ORDERS_BACKUP_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return retainedOrders(
-      Array.isArray(parsed?.orders) ? parsed.orders : [],
-    );
+    return retainedOrders(Array.isArray(parsed?.orders) ? parsed.orders : []);
   } catch {
     return [];
   }
@@ -2591,7 +2604,10 @@ function clearOrderPersistenceCache() {
 }
 function persistOrderSnapshot() {
   const shouldPersist =
-    localStateDirty() || !!backendSaveTimer || backendSaving || !!backendSaveFailedMessage;
+    localStateDirty() ||
+    !!backendSaveTimer ||
+    backendSaving ||
+    !!backendSaveFailedMessage;
   saveLocalPendingState();
   if (shouldPersist) saveLocalOrdersBackup();
   else clearLocalOrdersBackup();
@@ -2599,9 +2615,7 @@ function persistOrderSnapshot() {
 function mergeBootPersistentState(backendState, pendingState, ordersBackup) {
   let merged = mergePersistentStates(backendState, pendingState || {});
   if (ordersBackup.length) {
-    merged.orders = retainedOrders(
-      mergeArrayById(merged.orders, ordersBackup),
-    );
+    merged.orders = retainedOrders(mergeArrayById(merged.orders, ordersBackup));
   }
   return merged;
 }
@@ -2779,7 +2793,9 @@ function protectAccidentalDeletions(data) {
     const currentIds = new Set(current.map((x) => x.id));
     const deletionType = deletionKeyForCollection(key);
     const restored = base.filter(
-      (x) => !currentIds.has(x.id) && !deletionLogHas(deletionLog, deletionType, x.id),
+      (x) =>
+        !currentIds.has(x.id) &&
+        !deletionLogHas(deletionLog, deletionType, x.id),
     );
     if (restored.length) protectedData[key] = [...current, ...restored];
   }
@@ -4125,7 +4141,9 @@ async function flushBackendSave() {
   return !localStateDirty();
 }
 function markBackendSaveFailed(message = "") {
-  backendSaveFailedMessage = String(message || "Серверт хадгалагдаагүй өгөгдөл байна").trim();
+  backendSaveFailedMessage = String(
+    message || "Серверт хадгалагдаагүй өгөгдөл байна",
+  ).trim();
 }
 function clearBackendSaveFailed() {
   backendSaveFailedMessage = "";
@@ -4644,9 +4662,12 @@ function orderReceiptRowsFiltered(
   const workerIds = idList(opts.workerIds || employeeIds),
     deliveryIds = idList(opts.deliveryIds);
   const skipWarehouseDate = opts.skipWarehouseDate || searchKey === "orders";
+  const requireWorkerScope = !!opts.requireWorkerScope;
   let rows = state.orders.filter(
     (o) =>
-      (!workerIds.length || workerIds.includes(o.employeeId)) &&
+      (requireWorkerScope
+        ? workerIds.length > 0 && workerIds.includes(o.employeeId)
+        : !workerIds.length || workerIds.includes(o.employeeId)) &&
       (!deliveryIds.length ||
         deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
       orderReceiptMatchesQuery(o, q) &&
@@ -5062,7 +5083,12 @@ function buildReceiptSheetXml(
   merges.push(`D${bankTitleRow}:E${bankTitleRow}`);
   const bankAcctRow = rowNum;
   pushRow(14.25, [
-    xlsxCellXml(`B${bankAcctRow}`, 3, si("Дансны дугаар:                     IBAN:      "), "s"),
+    xlsxCellXml(
+      `B${bankAcctRow}`,
+      3,
+      si("Дансны дугаар:                     IBAN:      "),
+      "s",
+    ),
     xlsxCellXml(`D${bankAcctRow}`, 4, si("60000500"), "s"),
     ...emptyCells(bankAcctRow, "A", "A"),
     ...emptyCells(bankAcctRow, "E", RECEIPT_XLSX_LAST_COL),
@@ -5129,12 +5155,7 @@ function buildReceiptSheetXml(
   const grossRow = rowNum;
   merges.push(`B${grossRow}:J${grossRow}`);
   pushRow(14.25, [
-    xlsxCellXml(
-      `B${grossRow}`,
-      19,
-      si("Хувь хасагдаагүй нийт үнийн дүн"),
-      "s",
-    ),
+    xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
     xlsxCellXml(`K${grossRow}`, 20, gross, "n"),
     ...emptyCells(grossRow, "A", "A", 19),
     ...emptyCells(grossRow, "C", "J", 19),
@@ -5370,7 +5391,10 @@ async function exportOrderReceiptsExcel(orders) {
     try {
       const logoSrc = await getReceiptExcelLogoDataUri();
       const html = buildReceiptExcelDocument(orders, logoSrc);
-      downloadReceiptExcelBlob(legacyExcelFileName(receiptExcelFileName(orders)), html);
+      downloadReceiptExcelBlob(
+        legacyExcelFileName(receiptExcelFileName(orders)),
+        html,
+      );
     } catch {
       exportOrderReceiptsExcelCsv(orders);
     }
@@ -5406,10 +5430,14 @@ function orderReceiptsPanel({
   employeeIds = [],
   showCreate = false,
   compact = false,
+  requireWorkerScope = false,
 } = {}) {
   const q = state.searches[searchKey] || "",
     filters = compact ? receiptFilterOptions() : {},
-    rows = orderReceiptRowsFiltered(searchKey, employeeIds, filters);
+    rows = orderReceiptRowsFiltered(searchKey, employeeIds, {
+      ...filters,
+      requireWorkerScope,
+    });
   if (compact)
     return warehouseReceiptsPanel(rows, { title, searchKey, employeeIds });
   const exportBtn = excelDownloadBtn(
@@ -5700,8 +5728,7 @@ function customerRegistrationDisplay(c) {
 function customerRegistrationDigits(c) {
   return parseRegistrationNumber(c?.registrationNumber).digits;
 }
-const REGISTRATION_LABEL_RE =
-  /^(?:р\.?\s*д\.?|rd|РД|Р\s*Д)\s*:?\s*/iu;
+const REGISTRATION_LABEL_RE = /^(?:р\.?\s*д\.?|rd|РД|Р\s*Д)\s*:?\s*/iu;
 function parseRegistrationNumber(value) {
   const raw = String(value || "").trim();
   let cleaned = raw.replace(/\s+/g, "");
@@ -5710,7 +5737,7 @@ function parseRegistrationNumber(value) {
   const prefix = match ? match[1].toUpperCase() : "";
   const digits = match
     ? match[2]
-    : (cleaned.match(/(\d{5,10})/)?.[1] || cleaned.replace(/\D/g, ""));
+    : cleaned.match(/(\d{5,10})/)?.[1] || cleaned.replace(/\D/g, "");
   const full = prefix && digits ? `${prefix}${digits}` : digits || cleaned;
   const lookupKeys = [];
   if (digits) {
@@ -5765,7 +5792,11 @@ function findCustomerByRegistrationNumber(registrationNumber, excludeId = "") {
         query.full.toLowerCase() === stored.full.toLowerCase()
       )
         return true;
-      if (query.searchKey && stored.searchKey && query.searchKey === stored.searchKey)
+      if (
+        query.searchKey &&
+        stored.searchKey &&
+        query.searchKey === stored.searchKey
+      )
         return true;
       return false;
     }) || null
@@ -5794,13 +5825,7 @@ function customerMatchesQuery(c, q) {
     !parsedQ.digits &&
     !!stored.prefix &&
     stored.prefix.toLowerCase() === parsedQ.prefix.toLowerCase();
-  return (
-    nameMatch ||
-    companyMatch ||
-    rdMatch ||
-    rdDigitsMatch ||
-    rdPrefixMatch
-  );
+  return nameMatch || companyMatch || rdMatch || rdDigitsMatch || rdPrefixMatch;
 }
 function sortCustomersByName(customers) {
   return [...(customers || [])].sort((a, b) =>
@@ -6130,17 +6155,28 @@ function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
     return String(a.id || "").localeCompare(String(b.id || ""), "mn");
   });
 }
+function canPickWarehouseWorkers() {
+  const role = state.currentEmployee?.role;
+  return role === "admin" || role === "warehouse";
+}
+function warehouseScopeWorkerIds() {
+  const emp = state.currentEmployee;
+  if (!emp) return [];
+  if (emp.role === "sales") return [emp.id];
+  return idList(state.selectedWorkers);
+}
 function warehouseOrdersForSelectedWorkers() {
-  const ids = new Set(state.selectedWorkers || []);
-  if (!ids.size) return [];
+  const scopeIds = warehouseScopeWorkerIds();
+  if (!scopeIds.length) return [];
+  const idSet = new Set(scopeIds);
   const orders = filterWarehouseOrders(
-    state.orders.filter((o) => ids.has(o.employeeId)),
+    state.orders.filter((o) => idSet.has(o.employeeId)),
   );
-  return sortOrdersBySelectedPeople(orders, state.selectedWorkers || []);
+  return sortOrdersBySelectedPeople(orders, scopeIds);
 }
 function warehouseActiveWorkerIds(orders) {
   const hasOrder = new Set((orders || []).map((o) => o.employeeId));
-  return (state.selectedWorkers || []).filter((id) => hasOrder.has(id));
+  return warehouseScopeWorkerIds().filter((id) => hasOrder.has(id));
 }
 function warehouseDateDisplayText(day = state.filters.warehouseDate || "") {
   const iso = day || todayIso();
@@ -6304,11 +6340,16 @@ function confirmReportExport() {
       paid = orders
         .filter((o) => orderIsPaid(o))
         .reduce((s, o) => s + orderAmount(o), 0);
-    excel("report.xlsx", [["Нийт", "Төлсөн"], [total, paid]]);
+    excel("report.xlsx", [
+      ["Нийт", "Төлсөн"],
+      [total, paid],
+    ]);
   });
 }
 function confirmEmployeeExcel() {
-  if (!state.selectedWorkers.length) return alert("Ажилтан сонгоно уу");
+  if (canPickWarehouseWorkers() && !state.selectedWorkers.length)
+    return alert("Ажилтан сонгоно уу");
+  if (!warehouseScopeWorkerIds().length) return alert("Ажилтан сонгоно уу");
   confirmDataExport("Excel татах", employeeExcel);
 }
 function customerExcel() {
@@ -6564,7 +6605,10 @@ function normalizeStockInReceiptTotals(receipt) {
   return {
     ...receipt,
     lines,
-    totalAmount: lines.reduce((sum, line) => sum + stockInReceiptLineTotal(line), 0),
+    totalAmount: lines.reduce(
+      (sum, line) => sum + stockInReceiptLineTotal(line),
+      0,
+    ),
   };
 }
 function stockInHasEntries() {
@@ -6592,7 +6636,9 @@ function setStockInEmployee(id) {
   render();
 }
 function stockInEmployeeName() {
-  return state.employees.find((e) => e.id === state.stockInEmployeeId)?.name || "-";
+  return (
+    state.employees.find((e) => e.id === state.stockInEmployeeId)?.name || "-"
+  );
 }
 function stockInProductsGrouped(products) {
   const sorted = [...products].sort((a, b) => {
@@ -6741,7 +6787,9 @@ function confirmFinishStockIn() {
     const qty = stockInLineQty(p);
     if (qty <= 0) continue;
     if (!stockInLineCost(p)) {
-      alert(`${p.name}: Барааны өртөг үнэ тохируулаагүй байна. Бараа цэснээс өртөг үнэ оруулна уу.`);
+      alert(
+        `${p.name}: Барааны өртөг үнэ тохируулаагүй байна. Бараа цэснээс өртөг үнэ оруулна уу.`,
+      );
       return;
     }
   }
@@ -6766,11 +6814,15 @@ function confirmNewStockIn() {
     resetStockInSession();
     return;
   }
-  confirmModal("Шинэ орлого", "Одоогийн орлогыг цэвэрлээд шинээр эхлүүлэх үү?", {
-    confirmLabel: "Шинээр эхлүүлэх",
-    danger: true,
-    onConfirm: resetStockInSession,
-  });
+  confirmModal(
+    "Шинэ орлого",
+    "Одоогийн орлогыг цэвэрлээд шинээр эхлүүлэх үү?",
+    {
+      confirmLabel: "Шинээр эхлүүлэх",
+      danger: true,
+      onConfirm: resetStockInSession,
+    },
+  );
 }
 function stockInEmployeeField() {
   ensureStockInSession();
@@ -6801,7 +6853,8 @@ function stockInEntryModal(id) {
   ensureStockInSession();
   const d = state.stockInDraft[p.id] || {};
   const packSize = productPackSize(p);
-  const packsVal = d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
+  const packsVal =
+    d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
   const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
   const costVal =
     d.costPrice != null && d.costPrice !== ""
@@ -6987,7 +7040,9 @@ ${bodyRows}
 <tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________ (гарын үсэг)</td></tr>
 <tr class="sign"><td colspan="7">Хүлээн авсан: ________________________ (гарын үсэг)</td></tr>
 </table></body></html>`;
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const blob = new Blob([html], {
+    type: "application/vnd.ms-excel;charset=utf-8",
+  });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = legacyExcelFileName(stockInReceiptFileName(receipt));
@@ -7242,8 +7297,7 @@ function countDiffQtyText(diff) {
   return diff > 0 ? `+${fmtCountQty(diff)}` : fmtCountQty(diff);
 }
 function countResultQtyCell(value, label) {
-  const text =
-    value === null || value === undefined ? "-" : fmtCountQty(value);
+  const text = value === null || value === undefined ? "-" : fmtCountQty(value);
   return `<span class="count-result-table__num" data-label="${esc(label)}" title="${esc(label)}: ${esc(text)}">${text}</span>`;
 }
 function countSessionActive() {
@@ -8064,23 +8118,13 @@ function buildStockInSheetXml(receipt) {
   const printedDateValue = warehouseSheetDateValue(todayIso());
   const groups = stockInReceiptGroupedLines(receipt.lines);
   const rows = [];
-  const merges = [
-    `A1:${STOCK_IN_LAST_COL}1`,
-    `A2:B2`,
-    `C2:E2`,
-    `C3:E3`,
-  ];
+  const merges = [`A1:${STOCK_IN_LAST_COL}1`, `A2:B2`, `C2:E2`, `C3:E3`];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
     rowNum += 1;
   };
-  const emptyCells = (
-    row,
-    from = "A",
-    to = STOCK_IN_LAST_COL,
-    style = 1,
-  ) => {
+  const emptyCells = (row, from = "A", to = STOCK_IN_LAST_COL, style = 1) => {
     const cols = "ABCDEFG".slice(
       "ABCDEFG".indexOf(from),
       "ABCDEFG".indexOf(to) + 1,
@@ -8454,14 +8498,41 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml("A1", 13, si("Бараа бэлдэх хуудас"), "s"),
     ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
   ]);
-  pushRow(28.5, warehousePrepareMetaRow(2, "Агуулахын ажилтан:", warehouseEmp, "Захиалгын огноо:", orderDateValue));
+  pushRow(
+    28.5,
+    warehousePrepareMetaRow(
+      2,
+      "Агуулахын ажилтан:",
+      warehouseEmp,
+      "Захиалгын огноо:",
+      orderDateValue,
+    ),
+  );
   if (workerNames.length) {
-    pushRow(20.25, warehousePrepareMetaRow(3, "Захиалга авсан ажилтан:", workerNames[0], "Хэвлэсэн огноо:", printedDateValue));
+    pushRow(
+      20.25,
+      warehousePrepareMetaRow(
+        3,
+        "Захиалга авсан ажилтан:",
+        workerNames[0],
+        "Хэвлэсэн огноо:",
+        printedDateValue,
+      ),
+    );
     for (let i = 1; i < workerNames.length; i += 1) {
       pushRow(16.5, warehousePrepareWorkerExtraRow(rowNum, workerNames[i]));
     }
   } else {
-    pushRow(20.25, warehousePrepareMetaRow(3, "Захиалга авсан ажилтан:", "-", "Хэвлэсэн огноо:", printedDateValue));
+    pushRow(
+      20.25,
+      warehousePrepareMetaRow(
+        3,
+        "Захиалга авсан ажилтан:",
+        "-",
+        "Хэвлэсэн огноо:",
+        printedDateValue,
+      ),
+    );
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
@@ -8475,37 +8546,39 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   ]);
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
-    if (item.type === "cat") {
+      if (item.type === "cat") {
+        const r = rowNum;
+        const catHeight =
+          WAREHOUSE_PREPARE_CAT_HEIGHTS[
+            Math.min(catIndex, WAREHOUSE_PREPARE_CAT_HEIGHTS.length - 1)
+          ];
+        catIndex += 1;
+        merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
+        pushRow(catHeight, [
+          xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
+          ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
+        ]);
+        continue;
+      }
+      const p = item.product;
+      const { packs, pieces } = pickerQtyToParts(item.qty, p);
       const r = rowNum;
-      const catHeight =
-        WAREHOUSE_PREPARE_CAT_HEIGHTS[
-          Math.min(catIndex, WAREHOUSE_PREPARE_CAT_HEIGHTS.length - 1)
-        ];
-      catIndex += 1;
-      merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
-      pushRow(catHeight, [
-        xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
-        ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
+      pushRow(15, [
+        xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
+        xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
+        xlsxBarcodeCell(`C${r}`, 9, p.barcode, si),
+        xlsxOptionalNum(`D${r}`, 10, packs),
+        xlsxOptionalNum(`E${r}`, 10, pieces),
+        xlsxCellXml(`F${r}`, 8, Number(p.stock) || 0, "n"),
       ]);
-      continue;
-    }
-    const p = item.product;
-    const { packs, pieces } = pickerQtyToParts(item.qty, p);
-    const r = rowNum;
-    pushRow(15, [
-      xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
-      xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
-      xlsxBarcodeCell(`C${r}`, 9, p.barcode, si),
-      xlsxOptionalNum(`D${r}`, 10, packs),
-      xlsxOptionalNum(`E${r}`, 10, pieces),
-      xlsxCellXml(`F${r}`, 8, Number(p.stock) || 0, "n"),
-    ]);
     }
   };
   pushPrepareGroups(sections.regular);
   if (sections.promo.length) {
     const promoHeadRow = rowNum;
-    merges.push(`A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`);
+    merges.push(
+      `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
+    );
     pushRow(27.75, [
       xlsxCellXml(`A${promoHeadRow}`, 15, si("Урамшууллын бараа"), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
@@ -8820,7 +8893,9 @@ function setInventoryTab(tab) {
 }
 function reportOrdersFiltered() {
   const day = state.filters.reportDate || "";
-  let list = retainedOrders(state.orders).filter((o) => o.status !== "cancelled");
+  let list = retainedOrders(state.orders).filter(
+    (o) => o.status !== "cancelled",
+  );
   if (day) list = list.filter((o) => orderCreatedDay(o) === day);
   return list;
 }
@@ -9596,8 +9671,7 @@ function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
         productName: product.name,
         quantity: grant,
         price: 0,
-        catalogPrice:
-          Number(product.price ?? product.sellPrice ?? 0) || 0,
+        catalogPrice: Number(product.price ?? product.sellPrice ?? 0) || 0,
         total: 0,
         isPromoFree: true,
         ...extra,
@@ -10028,7 +10102,13 @@ function authSessionPayload() {
 function applyLoginRoleDefaults(emp) {
   if (!emp) return;
   if (!canApplyPercentDiscount(emp)) state.applyPercentDiscount = false;
-  if (emp.role === "warehouse" || emp.role === "delivery") {
+  if (emp.role === "sales") {
+    state.selectedWorkers = [emp.id];
+    state.selectedWarehouseOrderId = "";
+  } else if (emp.role === "admin") {
+    state.selectedWorkers = [];
+    state.selectedWarehouseOrderId = "";
+  } else if (emp.role === "warehouse" || emp.role === "delivery") {
     state.selectedWorkers = [];
     state.selectedWarehouseOrderId = "";
     if (emp.role === "delivery") {
@@ -10092,6 +10172,7 @@ function restoreAuthSession() {
     state.orderEmployee = data.orderEmployee || emp.id;
     state.deliveryDate = data.deliveryDate || "";
     state.selectedWorkers = idList(data.selectedWorkers);
+    if (emp.role === "sales") state.selectedWorkers = [emp.id];
     state.selectedWarehouseOrderId = data.selectedWarehouseOrderId || "";
     state.receiptPrintWorkerIds = idList(data.receiptPrintWorkerIds);
     state.receiptPrintDeliveryId = data.receiptPrintDeliveryId || "";
@@ -10477,7 +10558,8 @@ function showDeliveryUserLocation(hasStorePin) {
   );
 }
 function warehouseReceiptsView() {
-  return `<div class="space-y-4">${orderReceiptsPanel({ compact: true, employeeIds: [] })}</div>`;
+  const employeeIds = warehouseScopeWorkerIds();
+  return `<div class="space-y-4">${orderReceiptsPanel({ compact: true, employeeIds, requireWorkerScope: true })}</div>`;
 }
 function workerChooser(orders) {
   const qty = orders
@@ -10485,18 +10567,28 @@ function workerChooser(orders) {
       .reduce((s, i) => s + i.quantity, 0),
     total = orders.reduce((s, o) => s + orderAmount(o), 0),
     activeWorkerIds = warehouseActiveWorkerIds(orders),
-    hasSelection = !!state.selectedWorkers.length,
+    canPick = canPickWarehouseWorkers(),
+    hasSelection = canPick ? !!state.selectedWorkers.length : true,
     hasOrders = !!orders.length,
     names = state.employees
       .filter((e) => activeWorkerIds.includes(e.id))
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders),
-    chooserLabel = hasSelection ? names || "Захиалга алга" : "Бүх ХТ",
-    emptyText = hasSelection
-      ? "Сонгосон ХТ дээр захиалга алга"
-      : "Худалдааны төлөөлөгч сонгоно уу";
-  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button><div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
+    chooserLabel = canPick
+      ? hasSelection
+        ? names || "Захиалга алга"
+        : "Сонгох"
+      : state.currentEmployee?.name || "-",
+    emptyText = canPick
+      ? hasSelection
+        ? "Сонгосон ХТ дээр захиалга алга"
+        : "Худалдааны төлөөлөгч сонгоно уу"
+      : "Өнөөдрийн захиалга алга",
+    pickerHtml = canPick
+      ? `<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button>`
+      : `<div class="w-full bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate">${esc(chooserLabel)}</span></div>`;
+  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -10845,7 +10937,9 @@ function imageLightboxOpen() {
 function isZoomableImage(img) {
   if (!img?.src || img.tagName !== "IMG") return false;
   if (img.closest(IMAGE_LIGHTBOX_SKIP)) return false;
-  return !!img.closest("#app, #modal, .picker-qty-sheet, [data-picker-qty-sheet]");
+  return !!img.closest(
+    "#app, #modal, .picker-qty-sheet, [data-picker-qty-sheet]",
+  );
 }
 function ensureImageLightbox() {
   if (imageLightboxEl) return imageLightboxEl;
@@ -11395,7 +11489,9 @@ function productModal(id) {
   };
   const packQtyVal =
     Number(p.boxQuantity) > 1 ? String(Math.floor(Number(p.boxQuantity))) : "";
-  const packFieldAttrs = inputAttrs(packQtyVal, "24", { treatZeroAsEmpty: true });
+  const packFieldAttrs = inputAttrs(packQtyVal, "24", {
+    treatZeroAsEmpty: true,
+  });
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
@@ -11899,7 +11995,8 @@ async function applyEmployeeSave(data, editId = "") {
     existing.phone = data.phone;
     existing.role = data.role;
     if (data.image) existing.image = data.image;
-    else if (!storedEntityImage(existing) && prevImage) existing.image = prevImage;
+    else if (!storedEntityImage(existing) && prevImage)
+      existing.image = prevImage;
     else if (!incomingImage) delete existing.image;
     existing.allowPercentDiscount = data.allowPercentDiscount;
     existing.permissions = data.permissions;
@@ -12668,6 +12765,7 @@ function setPickerCategory(cat) {
   pickerModal();
 }
 function toggleWorker(id) {
+  if (!canPickWarehouseWorkers()) return;
   state.selectedWorkers = state.selectedWorkers.includes(id)
     ? state.selectedWorkers.filter((x) => x !== id)
     : [...state.selectedWorkers, id];
@@ -12678,6 +12776,7 @@ function selectWarehouseOrder(id) {
   render();
 }
 function workerSelectModal() {
+  if (!canPickWarehouseWorkers()) return;
   const agents = salesOrderAgents();
   box(
     "Ажилтан сонгох",
@@ -12722,6 +12821,7 @@ function storePickerModal() {
   }
 }
 function toggleWorkerOnly(id) {
+  if (!canPickWarehouseWorkers()) return;
   state.selectedWorkers = state.selectedWorkers.includes(id)
     ? state.selectedWorkers.filter((x) => x !== id)
     : [...state.selectedWorkers, id];
@@ -13165,10 +13265,7 @@ function simpleSheetXml(rows, si) {
           continue;
         }
         const numberValue = typeof value === "number" ? value : Number(value);
-        if (
-          typeof value === "number" &&
-          Number.isFinite(numberValue)
-        ) {
+        if (typeof value === "number" && Number.isFinite(numberValue)) {
           cells.push(`<c r="${ref}"><v>${numberValue}</v></c>`);
         } else {
           cells.push(`<c r="${ref}" t="s"><v>${si(value)}</v></c>`);
