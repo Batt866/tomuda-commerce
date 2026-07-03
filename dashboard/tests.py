@@ -11,6 +11,11 @@ from dashboard.product_images import (
     hydrate_product_images,
     save_product_image_bytes,
 )
+from dashboard.profile_images import (
+    find_stored_profile_image_url,
+    hydrate_profile_images,
+    save_profile_image_bytes,
+)
 from dashboard.seed_data import default_state
 
 
@@ -71,6 +76,44 @@ class ProductImageStorageTests(TestCase):
                 image = ProductImage.objects.get(product_id="old-prod")
                 self.assertEqual(bytes(image.image), raw)
                 self.assertEqual(image.content_type, "image/jpeg")
+
+    def test_employee_image_serves_from_db_when_media_file_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                raw = b"employee-photo-bytes" * 3
+                url = save_profile_image_bytes("employee", "emp-1", raw, "jpg")
+
+                self.assertIn("/media/employees/emp-1.jpg", url)
+                media_file = Path(tmp) / "employees" / "emp-1.jpg"
+                media_file.unlink()
+
+                stored_url = find_stored_profile_image_url("employee", "emp-1")
+                self.assertIn("/media/employees/emp-1.jpg", stored_url)
+
+                response = self.client.get("/media/employees/emp-1.jpg")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, raw)
+
+    def test_hydrate_profile_keeps_media_url_when_storage_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                state = {
+                    "employees": [
+                        {
+                            "id": "emp-1",
+                            "name": "Test",
+                            "image": "/media/employees/emp-1.jpg?v=1",
+                        }
+                    ]
+                }
+
+                next_state, changed = hydrate_profile_images(state)
+
+                self.assertFalse(changed)
+                self.assertEqual(
+                    next_state["employees"][0]["image"],
+                    "/media/employees/emp-1.jpg?v=1",
+                )
 
     def test_save_state_returns_cleaned_state(self):
         with tempfile.TemporaryDirectory() as tmp:

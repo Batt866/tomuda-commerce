@@ -9635,25 +9635,47 @@ input::placeholder, textarea::placeholder {
   border-top: none;
 }
 
+.count-result-table__hint {
+  display: none;
+  margin: 0;
+  padding: 8px 16px 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--hex-muted-foreground);
+}
+
+@media (max-width: 1199px) and (min-width: 640px) {
+  .count-result-table__hint {
+    display: block;
+  }
+}
+
 .count-result-table__scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  padding-bottom: 2px;
+  background:
+    linear-gradient(90deg, var(--hex-card) 0%, transparent 12px) 0 0 / 24px 100%
+      no-repeat,
+    linear-gradient(270deg, var(--hex-card) 0%, transparent 12px) 100% 0 / 24px
+      100% no-repeat;
 }
 
 .count-result-table__head,
 .count-result-table__row {
+  --count-result-cols:
+    minmax(120px, 1.45fr) minmax(96px, 1fr) minmax(104px, 1.05fr)
+    minmax(96px, 1fr) minmax(112px, 1.08fr) minmax(92px, 1fr) minmax(80px, 0.9fr)
+    minmax(104px, 1.05fr);
   display: grid;
-  grid-template-columns: minmax(120px, 1.4fr) repeat(7, minmax(48px, 1fr));
-  gap: 6px;
+  grid-template-columns: var(--count-result-cols);
+  gap: 10px 12px;
   align-items: center;
-  padding: 10px 16px;
-}
-
-@media (min-width: 640px) {
-  .count-result-table__head,
-  .count-result-table__row {
-    min-width: 680px;
-  }
+  width: max(100%, 980px);
+  min-width: 980px;
+  padding: 12px 16px;
+  box-sizing: border-box;
 }
 
 .count-result-table__head {
@@ -9664,12 +9686,20 @@ input::placeholder, textarea::placeholder {
   border-bottom: 1px solid var(--hex-border);
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   color: var(--hex-muted-foreground);
 }
 
+.count-result-table__head-name,
 .count-result-table__head-num {
-  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.count-result-table__head-num {
+  text-align: right;
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
 }
 
 .count-result-table__body {
@@ -9689,14 +9719,18 @@ input::placeholder, textarea::placeholder {
   font-weight: 600;
   line-height: 1.3;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .count-result-table__num,
 .count-result-table__diff,
 .count-result-table__amount {
-  text-align: center;
+  text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .count-result-table__diff {
@@ -9710,6 +9744,26 @@ input::placeholder, textarea::placeholder {
 
 .count-result-table__row--mismatch {
   background: color-mix(in srgb, #e53935 4%, var(--hex-card));
+}
+
+@media (min-width: 1200px) {
+  .count-result-table__head,
+  .count-result-table__row {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .count-result-table__head {
+    font-size: 12px;
+  }
+
+  .count-result-table__head-num {
+    font-size: 11px;
+  }
+
+  .count-result-table__row {
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 639px) {
@@ -9844,7 +9898,7 @@ input::placeholder, textarea::placeholder {
   }
 }
 
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
   .count-result-table__head,
   .count-result-table__row {
     min-width: 0;
@@ -9855,11 +9909,9 @@ input::placeholder, textarea::placeholder {
   .count-result-table__head {
     font-size: 12px;
   }
-}
 
-@media (min-width: 640px) {
-  .count-result-row__cell {
-    text-align: center;
+  .count-result-table__row {
+    font-size: 14px;
   }
 }
 

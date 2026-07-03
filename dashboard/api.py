@@ -33,10 +33,21 @@ from dashboard.product_images import (
     save_product_image,
     update_product_image_in_state,
 )
+from dashboard.profile_images import (
+    hydrate_profile_images,
+    save_profile_image,
+    update_profile_image_in_state,
+)
 from dashboard.seed_data import default_state
 from dashboard.state_sanitize import sanitize_app_state
 
 api = NinjaAPI(title="Tomuda API")
+
+
+def _hydrate_all_images(state: dict) -> tuple[dict, bool]:
+    state, product_changed = hydrate_product_images(state)
+    state, profile_changed = hydrate_profile_images(state)
+    return state, product_changed or profile_changed
 
 
 @api.get("/health")
@@ -66,7 +77,7 @@ def get_state(request):
         defaults={"data": default_state()},
     )
     data, changed = sanitize_app_state(row.data or default_state())
-    data, hydrated = hydrate_product_images(data)
+    data, hydrated = _hydrate_all_images(data)
     changed = changed or hydrated
     if changed:
         row.data = data
@@ -90,7 +101,7 @@ def _retained_orders_state(data: dict[str, Any]) -> dict[str, Any]:
 def save_state(request, payload: dict[str, Any] = Body(...)):
     data = _retained_orders_state(payload.get("state", payload))
     data, _ = sanitize_app_state(data)
-    data, _ = hydrate_product_images(data)
+    data, _ = _hydrate_all_images(data)
     actor = payload.get("actor")
     row, _ = AppState.objects.get_or_create(
         key="main",
@@ -183,6 +194,84 @@ def upload_product_image(
         updated_at = row.updated_at.isoformat()
 
     return {"ok": True, "url": url, "updatedAt": updated_at}
+
+
+def _upload_profile_image(
+    *,
+    kind: str,
+    entity_id: str,
+    payload: dict[str, Any],
+    collection_key: str,
+    edit_perm: str,
+    create_perm: str,
+) -> dict[str, Any]:
+    data_url = payload.get("image") or payload.get("dataUrl") or ""
+    actor = payload.get("actor")
+    if not data_url:
+        raise HttpError(400, "Зураг оруулна уу")
+
+    row, _ = AppState.objects.get_or_create(
+        key="main",
+        defaults={"data": default_state()},
+    )
+    current = dict(row.data or default_state())
+    employee = find_employee(current, actor)
+    if not employee:
+        raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
+
+    entity_exists = any(
+        str(item.get("id")) == str(entity_id)
+        for item in current.get(collection_key) or []
+        if isinstance(item, dict)
+    )
+    if entity_exists:
+        if not has_permission(employee, edit_perm):
+            raise HttpError(403, "Засах эрхгүй")
+    elif not has_permission(employee, create_perm):
+        raise HttpError(403, "Нэмэх эрхгүй")
+
+    try:
+        url = save_profile_image(kind, entity_id, data_url)
+    except ValueError as exc:
+        raise HttpError(400, str(exc)) from exc
+
+    with transaction.atomic():
+        row = AppState.objects.select_for_update().get(key="main")
+        current = dict(row.data or default_state())
+        update_profile_image_in_state(current, kind, entity_id, url)
+        row.data = current
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {"ok": True, "url": url, "updatedAt": updated_at}
+
+
+@api.post("/employees/{employee_id}/image")
+def upload_employee_image(
+    request, employee_id: str, payload: dict[str, Any] = Body(...)
+):
+    return _upload_profile_image(
+        kind="employee",
+        entity_id=employee_id,
+        payload=payload,
+        collection_key="employees",
+        edit_perm="employees.edit",
+        create_perm="employees.create",
+    )
+
+
+@api.post("/customers/{customer_id}/image")
+def upload_customer_image(
+    request, customer_id: str, payload: dict[str, Any] = Body(...)
+):
+    return _upload_profile_image(
+        kind="customer",
+        entity_id=customer_id,
+        payload=payload,
+        collection_key="customers",
+        edit_perm="customers.edit",
+        create_perm="customers.create",
+    )
 
 
 @api.post("/import/customers")

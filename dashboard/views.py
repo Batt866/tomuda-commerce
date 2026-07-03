@@ -12,6 +12,11 @@ from dashboard.product_images import (
     get_stored_product_image,
     safe_product_id,
 )
+from dashboard.profile_images import (
+    PROFILE_FOLDER_TO_KIND,
+    get_stored_profile_image,
+    safe_entity_id,
+)
 
 
 def dashboard(request):
@@ -44,19 +49,15 @@ def web_manifest(request):
 
 
 @require_GET
-def product_media(request, filename: str):
+def entity_media(request, folder: str, filename: str):
+    if folder not in {"products", "employees", "customers"}:
+        raise Http404("Image not found")
     stem, dot, ext = str(filename or "").rpartition(".")
     ext = ext.lower()
     if not dot or ext not in IMAGE_EXT_TO_MIME:
-        raise Http404("Product image not found")
-    try:
-        product_id = safe_product_id(stem)
-    except ValueError as exc:
-        raise Http404("Product image not found") from exc
-    if product_id != stem:
-        raise Http404("Product image not found")
+        raise Http404("Image not found")
 
-    file_path = Path(settings.MEDIA_ROOT) / "products" / f"{product_id}.{ext}"
+    file_path = Path(settings.MEDIA_ROOT) / folder / f"{stem}.{ext}"
     try:
         if file_path.is_file() and file_path.stat().st_size > 32:
             response = FileResponse(
@@ -68,11 +69,31 @@ def product_media(request, filename: str):
     except OSError:
         pass
 
-    image = get_stored_product_image(product_id)
+    if folder == "products":
+        try:
+            product_id = safe_product_id(stem)
+        except ValueError as exc:
+            raise Http404("Image not found") from exc
+        if product_id != stem:
+            raise Http404("Image not found")
+        image = get_stored_product_image(product_id)
+    else:
+        try:
+            entity_id = safe_entity_id(stem)
+        except ValueError as exc:
+            raise Http404("Image not found") from exc
+        if entity_id != stem:
+            raise Http404("Image not found")
+        kind = PROFILE_FOLDER_TO_KIND[folder]
+        image = get_stored_profile_image(kind, entity_id)
+
     if not image:
-        raise Http404("Product image not found")
+        raise Http404("Image not found")
     raw = bytes(image.image)
     response = HttpResponse(raw, content_type=image.content_type or IMAGE_EXT_TO_MIME[ext])
     response["Content-Length"] = str(len(raw))
     response["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
+
+
+product_media = entity_media

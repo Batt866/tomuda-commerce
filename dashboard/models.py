@@ -19,3 +19,23 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return self.product_id
+
+
+class ProfileImage(models.Model):
+    kind = models.CharField(max_length=16, db_index=True)
+    entity_id = models.CharField(max_length=160, db_index=True)
+    image = models.BinaryField()
+    content_type = models.CharField(max_length=64, default="image/jpeg")
+    ext = models.CharField(max_length=8, default="jpg")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["kind", "entity_id"],
+                name="dashboard_profileimage_kind_entity_id_uniq",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.kind}:{self.entity_id}"

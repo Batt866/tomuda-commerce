@@ -365,6 +365,11 @@ async function fetchBackendStateWithRetry() {
   return null;
 }
 const fmt = (n) => "₮" + Number(n || 0).toLocaleString();
+const fmtCountQty = (n) => {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return "-";
+  return num.toLocaleString("mn-MN");
+};
 const fmtExcelMoney = (n) =>
   `${Number(n || 0).toLocaleString("en-US")}₮`;
 const RECEIPT_PERCENT_DISCOUNT = 3;
@@ -2306,6 +2311,40 @@ function readProductImageFromForm(form) {
   }
   return image;
 }
+function readEmployeeImageFromForm(form) {
+  const hidden = form.querySelector("#employeeImageValue");
+  let image = String(hidden?.value || "").trim();
+  if (image.startsWith("data:image/svg")) image = "";
+  if (!image) {
+    const preview = form.querySelector("#employeeImagePreview");
+    const src = String(preview?.currentSrc || preview?.src || "").trim();
+    if (
+      src.startsWith("data:image/") ||
+      src.startsWith("/media/") ||
+      src.startsWith("http")
+    ) {
+      image = src;
+    }
+  }
+  return image;
+}
+function readCustomerImageFromForm(form) {
+  const hidden = form.querySelector("#customerImageValue");
+  let image = String(hidden?.value || "").trim();
+  if (image.startsWith("data:image/svg")) image = "";
+  if (!image) {
+    const preview = form.querySelector("#customerImagePreview");
+    const src = String(preview?.currentSrc || preview?.src || "").trim();
+    if (
+      src.startsWith("data:image/") ||
+      src.startsWith("/media/") ||
+      src.startsWith("http")
+    ) {
+      image = src;
+    }
+  }
+  return image;
+}
 async function saveProductImagePayload(productId, payload) {
   const res = await fetch(
     `${API_BASE}/products/${encodeURIComponent(productId)}/image`,
@@ -2343,6 +2382,88 @@ async function saveProductImagePayload(productId, payload) {
 }
 async function uploadProductImage(productId, dataUrl) {
   return saveProductImagePayload(productId, { image: dataUrl });
+}
+async function saveProfileImagePayload(profileKind, entityId, dataUrl) {
+  const segment =
+    profileKind === "employee"
+      ? "employees"
+      : profileKind === "customer"
+        ? "customers"
+        : "";
+  if (!segment) throw new Error("Зурагны төрөл буруу байна");
+  const res = await fetch(
+    `${API_BASE}/${segment}/${encodeURIComponent(entityId)}/image`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        image: dataUrl,
+        actor: state.currentEmployee
+          ? {
+              id: state.currentEmployee.id,
+              email: state.currentEmployee.email,
+            }
+          : null,
+      }),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    let msg = "Зураг хадгалж чадсангүй";
+    try {
+      const err = await res.json();
+      if (err?.detail) msg = String(err.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const result = await res.json();
+  if (result.updatedAt) serverUpdatedAt = result.updatedAt;
+  return result.url || "";
+}
+async function uploadEmployeeImage(employeeId, dataUrl) {
+  return saveProfileImagePayload("employee", employeeId, dataUrl);
+}
+async function uploadCustomerImage(customerId, dataUrl) {
+  return saveProfileImagePayload("customer", customerId, dataUrl);
+}
+async function persistProfileImageToMedia(entity, profileKind) {
+  const entityId = String(entity?.id || "").trim();
+  const image = String(entity?.image || "").trim();
+  if (!entityId || !image) return;
+  if (!image.startsWith("data:image/")) return;
+  try {
+    const url =
+      profileKind === "employee"
+        ? await uploadEmployeeImage(entityId, image)
+        : profileKind === "customer"
+          ? await uploadCustomerImage(entityId, image)
+          : "";
+    if (url) {
+      entity.image = url;
+      if (state.currentEmployee?.id === entityId) {
+        state.currentEmployee.image = url;
+        saveAuthSession();
+      }
+      render();
+    }
+  } catch (error) {
+    console.warn("Profile image upload failed", error);
+  }
+}
+function storedEntityImage(item) {
+  const raw = String(item?.image || "").trim();
+  if (!raw || raw.startsWith("data:image/svg")) return "";
+  return raw;
+}
+function entityImageSrc(image) {
+  const raw = storedEntityImage({ image });
+  if (!raw) return "";
+  return resolveBackendAssetUrl(raw) || raw;
 }
 async function mirrorProductImage(productId, sourceUrl) {
   return saveProductImagePayload(productId, { sourceUrl });
@@ -5392,8 +5513,9 @@ function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
 }
 function customerAvatarHtml(c, className = "customer-card__avatar") {
-  if (c?.image) {
-    return `<img src="${esc(c.image)}" alt="" class="${className} customer-card__avatar-img">`;
+  const src = entityImageSrc(c?.image);
+  if (src) {
+    return `<img src="${esc(src)}" alt="" class="${className} customer-card__avatar-img" loading="lazy" decoding="async">`;
   }
   return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(c.name))}</span>`;
 }
@@ -5404,8 +5526,9 @@ function customerImageField(c) {
 function initCustomerImageField(c) {
   const value = document.getElementById("customerImageValue"),
     preview = document.getElementById("customerImagePreview");
-  if (value) value.value = c.image || "";
-  if (preview) preview.src = c.image || customerStoreImage(c);
+  const src = entityImageSrc(c?.image) || customerStoreImage(c);
+  if (value) value.value = c?.image || "";
+  if (preview) preview.src = src;
 }
 function compressImageFile(
   file,
@@ -7118,7 +7241,12 @@ function countDiffAmountText(diff, p) {
 }
 function countDiffQtyText(diff) {
   if (diff === null) return "-";
-  return diff > 0 ? `+${diff}` : String(diff);
+  return diff > 0 ? `+${fmtCountQty(diff)}` : fmtCountQty(diff);
+}
+function countResultQtyCell(value, label) {
+  const text =
+    value === null || value === undefined ? "-" : fmtCountQty(value);
+  return `<span class="count-result-table__num" data-label="${esc(label)}" title="${esc(label)}: ${esc(text)}">${text}</span>`;
 }
 function countSessionActive() {
   return !!state.countSessionStartedAt;
@@ -7454,7 +7582,7 @@ function countMismatchesForList(list) {
 function countResult(mismatches) {
   const list = countFilteredProducts().filter((p) => countValue(p.id) !== null);
   const mismatchCount = mismatches.length;
-  const headHtml = `<div class="count-result-table__head" aria-hidden="false"><span class="count-result-table__head-name">Бараа</span><span class="count-result-table__head-num" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num">Борлуулсан</span><span class="count-result-table__head-num">Зарлагдсан</span><span class="count-result-table__head-num">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num">Өртөг үнэ</span><span class="count-result-table__head-num">Зөрүү</span><span class="count-result-table__head-num">Зөрүү дүн</span></div>`;
+  const headHtml = `<div class="count-result-table__head" role="row"><span class="count-result-table__head-name" role="columnheader">Бараа</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд борлуулсан">Борлуулсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд зарлагдсан">Зарлагдсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллогын эцсийн үлдэгдэл">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Нэгжийн өртөг үнэ">Өртөг үнэ</span><span class="count-result-table__head-num" role="columnheader" title="Тоолсон − бүртгэл">Зөрүү</span><span class="count-result-table__head-num" role="columnheader" title="Зөрүүний дүн">Зөрүү дүн</span></div>`;
   const rowHtml = list
     .map((p) => {
       const stats = countProductStats(p),
@@ -7466,14 +7594,14 @@ function countResult(mismatches) {
             : "count-result-table__diff count-result-table__diff--bad",
         diffText = countDiffQtyText(diff),
         diffAmtText = countDiffAmountText(diff, p);
-      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}"><span class="count-result-table__name">${esc(p.name)}</span><span class="count-result-table__num" data-label="Эхний үлдэгдэл">${stats.opening}</span><span class="count-result-table__num" data-label="Борлуулсан">${stats.sold}</span><span class="count-result-table__num" data-label="Зарлагдсан">${stats.expended}</span><span class="count-result-table__num" data-label="Эцсийн үлдэгдэл">${stats.final}</span><span class="count-result-table__num" data-label="Өртөг үнэ">${cost ? fmt(cost) : "-"}</span><span class="${diffClass}" data-label="Зөрүү">${diffText}</span><span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн">${diffAmtText}</span></div>`;
+      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}" role="row"><span class="count-result-table__name" role="cell" title="${esc(p.name)}">${esc(p.name)}</span>${countResultQtyCell(stats.opening, "Эхний үлдэгдэл")}${countResultQtyCell(stats.sold, "Борлуулсан")}${countResultQtyCell(stats.expended, "Зарлагдсан")}${countResultQtyCell(stats.final, "Эцсийн үлдэгдэл")}<span class="count-result-table__num" data-label="Өртөг үнэ" title="Өртөг үнэ: ${esc(cost ? fmt(cost) : "-")}">${cost ? fmt(cost) : "-"}</span><span class="${diffClass}" data-label="Зөрүү" title="Зөрүү: ${esc(diffText)}">${diffText}</span><span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн" title="Зөрүү дүн: ${esc(diffAmtText)}">${diffAmtText}</span></div>`;
     })
     .join("");
   const badgeClass = mismatchCount
     ? "count-result-panel__badge count-result-panel__badge--warn"
     : "count-result-panel__badge count-result-panel__badge--ok";
   const badgeText = mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй";
-  return `<section class="count-result-panel"><header class="count-result-panel__head"><div class="count-result-panel__head-copy"><p class="count-result-panel__title">Тооллого хадгалагдлаа</p><p class="count-result-panel__sub">${list.length} бараа тоолсон</p></div><span class="${badgeClass}">${badgeText}</span></header>${list.length ? `<div class="count-result-table"><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="count-result-panel__empty">Тоолсон бараа байхгүй</div>`}${mismatchCount === 0 && list.length ? `<div class="count-result-panel__success">Бүх барааны тоо таарч байна</div>` : ""}<footer class="count-result-panel__foot">${excelDownloadBtn("confirmCountExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="count-result-panel"><header class="count-result-panel__head"><div class="count-result-panel__head-copy"><p class="count-result-panel__title">Тооллого хадгалагдлаа</p><p class="count-result-panel__sub">${list.length} бараа тоолсон</p></div><span class="${badgeClass}">${badgeText}</span></header>${list.length ? `<div class="count-result-table"><p class="count-result-table__hint">Хажуугаар гүйлгэж бүх баганыг харна уу</p><div class="count-result-table__scroll">${headHtml}<div class="count-result-table__body">${rowHtml}</div></div></div>` : `<div class="count-result-panel__empty">Тоолсон бараа байхгүй</div>`}${mismatchCount === 0 && list.length ? `<div class="count-result-panel__success">Бүх барааны тоо таарч байна</div>` : ""}<footer class="count-result-panel__foot">${excelDownloadBtn("confirmCountExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function countExportProducts() {
   return countFilteredProducts().filter((p) => countValue(p.id) !== null);
@@ -9759,8 +9887,9 @@ function employeePlaceholderImage(e = {}) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="88" height="88" viewBox="0 0 88 88"><rect width="88" height="88" rx="14" fill="${bg}"/><text x="44" y="54" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" font-weight="800" fill="${accent}">${initial}</text></svg>`)}`;
 }
 function employeeAvatarHtml(e, className = "employee-card__avatar") {
-  if (e?.image) {
-    return `<img src="${esc(e.image)}" alt="" class="${className} employee-card__avatar-img">`;
+  const src = entityImageSrc(e?.image);
+  if (src) {
+    return `<img src="${esc(src)}" alt="" class="${className} employee-card__avatar-img" loading="lazy" decoding="async">`;
   }
   return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(e?.name))}</span>`;
 }
@@ -9771,8 +9900,9 @@ function employeeImageField(e = {}) {
 function initEmployeeImageField(e = {}) {
   const value = document.getElementById("employeeImageValue"),
     preview = document.getElementById("employeeImagePreview");
-  if (value) value.value = e.image || "";
-  if (preview) preview.src = e.image || employeePlaceholderImage(e);
+  const src = entityImageSrc(e?.image) || employeePlaceholderImage(e);
+  if (value) value.value = e?.image || "";
+  if (preview) preview.src = src;
 }
 function handleEmployeeImage(input) {
   const file = input.files?.[0];
@@ -10133,7 +10263,8 @@ function customerHasCoords(c) {
   return Number.isFinite(lat) && Number.isFinite(lng);
 }
 function customerStoreImage(c) {
-  if (c?.image) return c.image;
+  const src = entityImageSrc(c?.image);
+  if (src) return src;
   const name = String(c?.name || "Дэлгүүр").slice(0, 16);
   const hue =
     [...String(c?.name || "Д")].reduce((s, ch) => s + ch.charCodeAt(0), 0) %
@@ -11179,12 +11310,28 @@ function initCustomerMap(lat, lng) {
   showCustomerUserLocation(has);
   scheduleCustomerMapResize();
 }
-function applyCustomerSave(data, id) {
+async function applyCustomerSave(data, id) {
+  const incomingImage = String(data.image || "").trim();
+  if (productMediaPathFromUrl(incomingImage)) {
+    data.image = productMediaPathFromUrl(incomingImage);
+  }
+  let customer = null;
   if (id) {
     const existing = state.customers.find((c) => c.id === id);
-    if (existing) Object.assign(existing, data);
+    if (!existing) return;
+    const prevImage = storedEntityImage(existing);
+    Object.assign(existing, data);
+    if (!storedEntityImage(existing) && prevImage) {
+      existing.image = prevImage;
+    }
+    customer = existing;
   } else {
-    state.customers.push({ ...data, id: String(Date.now()) });
+    customer = { ...data, id: String(Date.now()) };
+    if (!customer.image) delete customer.image;
+    state.customers.push(customer);
+  }
+  if (customer) {
+    void persistProfileImageToMedia(customer, "customer");
   }
   closeModal();
   render();
@@ -11193,6 +11340,9 @@ function applyCustomerSave(data, id) {
 function saveCustomer(e, id) {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
+  const image = readCustomerImageFromForm(e.target);
+  if (image) data.image = image;
+  else delete data.image;
   const regConflict = findCustomerByRegistrationNumber(
     data.registrationNumber,
     id || "",
@@ -11722,7 +11872,9 @@ function buildEmployeeDataFromForm(form, editId = "") {
       phone: String(f.phone || "").trim(),
       password,
       role: roleValue,
-      image: String(f.image || ""),
+      ...(readEmployeeImageFromForm(form)
+        ? { image: readEmployeeImageFromForm(form) }
+        : {}),
       allowPercentDiscount:
         roleValue === "sales"
           ? existing?.role === "sales"
@@ -11733,18 +11885,27 @@ function buildEmployeeDataFromForm(form, editId = "") {
     },
   };
 }
-function applyEmployeeSave(data, editId = "") {
+async function applyEmployeeSave(data, editId = "") {
+  const incomingImage = String(data.image || "").trim();
+  if (productMediaPathFromUrl(incomingImage)) {
+    data.image = productMediaPathFromUrl(incomingImage);
+  }
+  let employee = null;
   if (editId) {
     const existing = state.employees.find((e) => e.id === editId);
     if (!existing) return alert("Ажилтан олдсонгүй");
+    const prevImage = storedEntityImage(existing);
     existing.name = data.name;
     existing.email = data.email;
     existing.phone = data.phone;
     existing.role = data.role;
-    existing.image = data.image;
+    if (data.image) existing.image = data.image;
+    else if (!storedEntityImage(existing) && prevImage) existing.image = prevImage;
+    else if (!incomingImage) delete existing.image;
     existing.allowPercentDiscount = data.allowPercentDiscount;
     existing.permissions = data.permissions;
     if (data.password) existing.password = data.password;
+    employee = existing;
     if (state.currentEmployee?.id === editId) {
       state.currentEmployee = existing;
       applyLoginRoleDefaults(existing);
@@ -11752,20 +11913,25 @@ function applyEmployeeSave(data, editId = "") {
     }
     showInstallToast("Ажилтан шинэчлэгдлээ");
   } else {
-    state.employees.push({
+    employee = {
       id: "employee-" + Date.now(),
       name: data.name,
       email: data.email,
       phone: data.phone,
       password: data.password,
       role: data.role,
-      image: data.image,
+      image: data.image || "",
       totalSales: 0,
       commissionRate: 0,
       allowPercentDiscount: data.allowPercentDiscount,
       permissions: data.permissions,
-    });
+    };
+    if (!employee.image) delete employee.image;
+    state.employees.push(employee);
     showInstallToast("Ажилтан нэмэгдлээ");
+  }
+  if (employee) {
+    void persistProfileImageToMedia(employee, "employee");
   }
   closeModal();
   render();
