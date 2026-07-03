@@ -926,7 +926,6 @@ function normalizeSettlementTextDraft() {
 function applySettlementTextInput(value) {
   state.settlementAgreed = true;
   state.settlementText = String(value || "");
-  render();
 }
 function receiptGrossPercentNoticeHtml(o) {
   if (!o || o.applyPercentDiscount || !isCashPayment(o.paymentTerm)) return "";
@@ -2874,6 +2873,7 @@ function localStateDirty() {
 function shouldDeferBackendSync() {
   if (isEditingCountQty()) return true;
   if (isWarehouseDateEditing()) return true;
+  if (isEditingSettlementText()) return true;
   if (
     state.currentView === "count" &&
     (state.countDone || countSessionActive())
@@ -2937,6 +2937,10 @@ function isWarehouseDateEditing() {
   const el = document.activeElement;
   return el?.matches?.(".wh-date-filters__native");
 }
+function isEditingSettlementText() {
+  const el = document.activeElement;
+  return el?.matches?.(".worker-order-opt__input");
+}
 function flushPendingWarehouseDateRender() {
   if (isWarehouseDateEditing()) return;
   if (!warehouseDateRenderPending) return;
@@ -2973,6 +2977,7 @@ function safeRender() {
     warehouseDateRenderPending = true;
     return;
   }
+  if (isEditingSettlementText()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
   render();
@@ -10690,7 +10695,7 @@ function workerOrderOptionsHtml(cart) {
     cashOnly = isCashPayment(),
     settlementText = settlementTextInputValue(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><input type="text" class="app-input worker-order-opt__input" aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" value="${esc(settlementText)}" oninput="applySettlementTextInput(this.value)"></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><input type="text" class="app-input worker-order-opt__input" aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" value="${esc(settlementText)}" oninput="applySettlementTextInput(this.value)" onblur="scheduleBackendSave()"></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
