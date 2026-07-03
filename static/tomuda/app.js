@@ -6127,9 +6127,7 @@ function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
 }
 function warehouseOrdersForSelectedWorkers() {
   const ids = new Set(state.selectedWorkers || []);
-  if (!ids.size) {
-    return sortOrdersBySelectedPeople(filterWarehouseOrders(state.orders));
-  }
+  if (!ids.size) return [];
   const orders = filterWarehouseOrders(
     state.orders.filter((o) => ids.has(o.employeeId)),
   );
@@ -10491,7 +10489,7 @@ function workerChooser(orders) {
     chooserLabel = hasSelection ? names || "Захиалга алга" : "Бүх ХТ",
     emptyText = hasSelection
       ? "Сонгосон ХТ дээр захиалга алга"
-      : "Өнөөдрийн захиалга алга";
+      : "Худалдааны төлөөлөгч сонгоно уу";
   return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button><div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
@@ -12730,7 +12728,7 @@ function employeeExcel() {
     return alert(
       state.selectedWorkers.length
         ? "Сонгосон ХТ дээр захиалга алга"
-        : "Өнөөдрийн захиалга алга",
+        : "Ажилтан сонгоно уу",
     );
   exportWarehousePrepareExcel(orders, workerIds);
 }
