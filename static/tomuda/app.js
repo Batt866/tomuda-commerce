@@ -76,6 +76,7 @@ const state = {
   stockInReceipt: null,
   stockInSessionStartedAt: null,
   stockInReceipts: [],
+  stockInHighlightId: "",
   settings: {
     stockAlertEnabled: true,
     stockAlertMin: 10,
@@ -6907,6 +6908,76 @@ function stockInEmployeeField() {
     .join("");
   return `<label class="stock-in-employee"><span class="stock-in-employee__label">Ажилтан</span><select class="field-input app-input" onchange="setStockInEmployee(this.value)">${options}</select></label>`;
 }
+function barcodeScannerPanelHtml() {
+  return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
+}
+function stockInScanToolbarHtml() {
+  return `<div class="stock-in-scan"><label class="stock-in-scan__field"><span class="stock-in-scan__label">Баркод</span><div class="barcode-input-row"><input id="stockInBarcodeInput" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="field-input app-input stock-in-scan__input" placeholder="Баркод оруулах..." onkeydown="stockInBarcodeKeydown(event)" aria-label="Баркод"><button type="button" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Scan</button></div></label>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
+}
+function findProductByBarcode(code) {
+  const value = String(code || "").trim();
+  if (!value) return null;
+  return (
+    state.products.find((p) => String(p.barcode || "").trim() === value) ||
+    state.products.find((p) => String(p.barcode || "").includes(value)) ||
+    null
+  );
+}
+function applyStockInBarcode(code, { qtyDelta = 1, openModalIfNoCost = true } = {}) {
+  ensureStockInSession();
+  const product = findProductByBarcode(code);
+  if (!product) {
+    alert("Бараа олдсонгүй");
+    return false;
+  }
+  const entry = stockInDraftEntry(product.id);
+  const packSize = productPackSize(product);
+  if (packSize) {
+    const pieces = Math.max(0, Math.floor(Number(entry.qty) || 0)) + qtyDelta;
+    if (pieces > 0) entry.qty = String(pieces);
+    else delete entry.qty;
+  } else {
+    const current = Math.max(0, Math.floor(Number(entry.qty) || 0));
+    entry.qty = String(current + qtyDelta);
+  }
+  const cost = productCostPrice(product);
+  if (cost > 0) {
+    entry.costPrice = String(Math.floor(cost));
+  } else if (!Number(entry.costPrice) && openModalIfNoCost) {
+    stockInEntryModal(product.id);
+    return true;
+  }
+  state.stockInDone = false;
+  state.stockInReceipt = null;
+  state.stockInHighlightId = product.id;
+  const input = document.getElementById("stockInBarcodeInput");
+  if (input) input.value = "";
+  render();
+  showAppToast(`${product.name} · +${qtyDelta} ш`, "success");
+  requestAnimationFrame(() => {
+    document
+      .querySelector(`[data-stock-in-id="${product.id}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  setTimeout(() => {
+    if (state.stockInHighlightId === product.id) {
+      state.stockInHighlightId = "";
+      if (
+        state.currentView === "inventory" &&
+        state.filters.inventory === "in"
+      ) {
+        render();
+      }
+    }
+  }, 1600);
+  return true;
+}
+function stockInBarcodeKeydown(e) {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const input = document.getElementById("stockInBarcodeInput");
+  applyStockInBarcode(input?.value || "");
+}
 function stockInEntryRow(p) {
   const qty = stockInLineQty(p);
   const cost = stockInLineCost(p);
@@ -6914,7 +6985,7 @@ function stockInEntryRow(p) {
   const entryMeta = hasEntry
     ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">${fmt(cost)}</span>` : ""}</span>`
     : `<span class="stock-in-entry-row__hint">Тоо, өртөг оруулах</span>`;
-  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div>${entryMeta}</button>`;
+  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div>${entryMeta}</button>`;
 }
 function stockInEntryModal(id) {
   const p = state.products.find((x) => x.id === id);
@@ -6996,7 +7067,7 @@ function stockInEntryList(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа дээр дарж тоо, өртөг үнэ оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Баркод scan эсвэл бараа дээр дарж тоо, өртөг үнэ оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -7042,7 +7113,7 @@ function stockInReceiptPanel(receipt) {
 }
 function stockInPanel(list) {
   ensureStockInSession();
-  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
+  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
@@ -8956,6 +9027,7 @@ function setInventoryCategory(cat) {
   scrollAppMainToTop();
 }
 function setInventoryTab(tab) {
+  if (tab !== "in") stopBarcodeScan();
   state.filters.inventory = tab;
   render();
   scrollAppMainToTop();
@@ -12622,8 +12694,8 @@ function clearPickerFilter() {
 function handleScannedBarcode(code) {
   const value = String(code || "").trim();
   if (!value || !barcodeScanning) return;
-  barcodeScanning = false;
   if (barcodeScanTarget === "product") {
+    barcodeScanning = false;
     const input = document.getElementById("productBarcodeInput");
     if (input) {
       input.value = value;
@@ -12633,6 +12705,11 @@ function handleScannedBarcode(code) {
     stopBarcodeScan();
     return;
   }
+  if (barcodeScanTarget === "stockIn") {
+    applyStockInBarcode(value);
+    return;
+  }
+  barcodeScanning = false;
   applyPickerBarcode(value, true);
 }
 function loadZxingBrowser() {
@@ -13491,6 +13568,8 @@ Object.assign(window, {
   clearPickerCart,
   setPickerCategory,
   applyPickerBarcode,
+  applyStockInBarcode,
+  stockInBarcodeKeydown,
   clearPickerFilter,
   startBarcodeScan,
   stopBarcodeScan,
