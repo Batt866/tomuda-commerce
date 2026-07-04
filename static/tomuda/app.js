@@ -820,8 +820,7 @@ function orderInWarehouseLiveSession(o) {
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
   if (!day) return orderInWarehouseLiveSession(o);
-  if (isoDay(o.createdAt) === day) return true;
-  return orderDay(o) === day;
+  return orderCreatedDay(o) === day;
 }
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
