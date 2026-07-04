@@ -5802,6 +5802,7 @@ const REGISTRATION_LABEL_RE = /^(?:р\.?\s*д\.?|rd|РД|Р\s*Д)\s*:?\s*/iu;
 const REGISTRATION_PREFIX_RE = /^[A-Za-zА-ЯӨҮЁа-яөүё]{1,2}$/u;
 const REGISTRATION_PREFIX_BEFORE_DIGITS_RE =
   /^([A-Za-zА-ЯӨҮЁа-яөүё]{1,2})(?=\d)/u;
+const REGISTRATION_LOOKUP_MIN_DIGITS = 7;
 function normalizeRegistrationInput(value) {
   return String(value || "")
     .normalize("NFKC")
@@ -5812,6 +5813,10 @@ function parseRegistrationNumber(value) {
   const raw = normalizeRegistrationInput(value);
   let cleaned = raw.replace(/\s+/g, "").replace(/-/g, "");
   cleaned = cleaned.replace(REGISTRATION_LABEL_RE, "");
+  cleaned = cleaned.replace(
+    /^[^A-Za-zА-ЯӨҮЁа-яөүё\d]+|[^A-Za-zА-ЯӨҮЁа-яөүё\d]+$/gu,
+    "",
+  );
   const digits = cleaned.replace(/\D/g, "");
   let prefix = "";
   const prefixMatch = cleaned.match(REGISTRATION_PREFIX_BEFORE_DIGITS_RE);
@@ -5910,7 +5915,8 @@ function customerMatchesQuery(c, q) {
   const rdFullMatch =
     !!parsedQ.full &&
     !!stored.full &&
-    stored.full.toLowerCase().includes(parsedQ.full.toLowerCase());
+    (stored.full.toLowerCase().includes(parsedQ.full.toLowerCase()) ||
+      parsedQ.full.toLowerCase().includes(stored.full.toLowerCase()));
   const rdPrefixMatch =
     !!parsedQ.prefix &&
     !parsedQ.digits &&
@@ -11379,7 +11385,7 @@ function field(name, label, value = "", type = "text", placeholder = "") {
 }
 function customerRegistrationField(value = "") {
   const attrs = inputAttrs(value, "Регистрийн дугаар");
-  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="text" autocomplete="off" ${attrs} oninput="scheduleCustomerRegistryLookup(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
+  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="text" autocomplete="off" ${attrs} oninput="scheduleCustomerRegistryLookup(this.value)" onblur="fillCustomerFromRegistration(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
 }
 function customerProvinceField(value = "") {
   const selected = (value || "").trim() || "Улаанбаатар";
@@ -11708,11 +11714,12 @@ let customerRegistryLookupId = 0;
 let customerRegistryLookupTimer = null;
 
 async function loadLesRegistryIndex() {
-  if (lesRegistryIndex) return lesRegistryIndex;
+  if (lesRegistryIndex && Object.keys(lesRegistryIndex).length > 0) {
+    return lesRegistryIndex;
+  }
   if (!lesRegistryLoadPromise) {
     lesRegistryLoadPromise = fetch(
       "/static/tomuda/data/les-registry-index.json",
-      { cache: "force-cache" },
     )
       .then((res) => {
         if (!res.ok) throw new Error("registry load failed");
@@ -11720,12 +11727,16 @@ async function loadLesRegistryIndex() {
       })
       .then((data) => {
         lesRegistryIndex = data && typeof data === "object" ? data : {};
+        if (!Object.keys(lesRegistryIndex).length) {
+          throw new Error("registry index empty");
+        }
         return lesRegistryIndex;
       })
       .catch((err) => {
         console.warn("LES registry index load failed", err);
-        lesRegistryIndex = {};
-        return lesRegistryIndex;
+        lesRegistryLoadPromise = null;
+        lesRegistryIndex = null;
+        throw err;
       });
   }
   return lesRegistryLoadPromise;
@@ -11755,8 +11766,15 @@ async function fillCustomerFromRegistration(code) {
     }
     return;
   }
-  if (reg.length < 5) {
-    if (status) status.textContent = "";
+  const lookupMinDigits =
+    reg.length >= 8 ? 8 : REGISTRATION_LOOKUP_MIN_DIGITS;
+  if (reg.length < lookupMinDigits) {
+    if (status) {
+      status.textContent =
+        reg.length > 0
+          ? `Регистрийн тоог бүрэн бичнэ үү (${lookupMinDigits} орон)`
+          : "";
+    }
     return;
   }
   const excludeId = form.dataset.customerId || "";
@@ -11767,7 +11785,11 @@ async function fillCustomerFromRegistration(code) {
       status.textContent = `Энэ регистрийн дугаар аль хэдийн бүртгэлтэй: ${name}`;
     return;
   }
-  if (status) status.textContent = "Регистрээр хайж байна...";
+  if (status) {
+    status.textContent = lesRegistryIndex
+      ? "Регистрээр хайж байна..."
+      : "Регистрийн жагсаалт ачаалж байна...";
+  }
   try {
     const index = await loadLesRegistryIndex();
     if (lookupId !== customerRegistryLookupId) return;
