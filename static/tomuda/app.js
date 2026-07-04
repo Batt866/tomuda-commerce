@@ -11264,65 +11264,148 @@ function cleanupCustomerMapInstance() {
   window.customerTileLayer = null;
   window.customerTileFallback = false;
 }
-function showCustomerUserLocation(hasCustomerPin) {
+function capGeolocationPlugin() {
+  const cap = window.Capacitor;
+  if (!cap?.isNativePlatform?.()) return null;
+  return cap.Plugins?.Geolocation || null;
+}
+function geolocationErrorMessage(err) {
+  const code = err?.code;
+  const msg = String(err?.message || err?.errorMessage || "").toLowerCase();
+  if (code === 1 || msg.includes("denied") || msg.includes("permission"))
+    return "Байршил авахын тулд GPS зөвшөөрөл өгнө үү (тохиргоо)";
+  if (code === 2 || msg.includes("unavailable"))
+    return "GPS дохио олдсонгүй. Гадаа эсвэл цонхны ойрт ороорой";
+  if (code === 3 || msg.includes("timeout"))
+    return "Байршил хэт удаан. Дахин оролдоно уу";
+  return "Байршил авахад алдаа гарлаа";
+}
+async function requestDevicePosition(options = {}) {
+  const geoOpts = {
+    enableHighAccuracy: true,
+    timeout: 15000,
+    maximumAge: 60000,
+    ...options,
+  };
+  const capGeo = capGeolocationPlugin();
+  if (capGeo) {
+    const perm = await capGeo.requestPermissions();
+    const denied =
+      perm?.location === "denied" && perm?.coarseLocation === "denied";
+    if (denied) {
+      const err = new Error("denied");
+      err.code = 1;
+      throw err;
+    }
+    const pos = await capGeo.getCurrentPosition({
+      enableHighAccuracy: geoOpts.enableHighAccuracy,
+      timeout: geoOpts.timeout,
+      maximumAge: geoOpts.maximumAge,
+    });
+    return {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+    };
+  }
+  if (!navigator.geolocation) {
+    const err = new Error("unsupported");
+    err.code = 0;
+    throw err;
+  }
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+      (err) => reject(err),
+      geoOpts,
+    );
+  });
+}
+function setCustomerMapPoint(la, ln, label = "") {
+  const latInput = document.getElementById("customerLat"),
+    lngInput = document.getElementById("customerLng"),
+    status = document.getElementById("customerMapStatus");
+  if (!window.customerMap || !window.L) return;
+  const fixedLat = Number(la).toFixed(6),
+    fixedLng = Number(ln).toFixed(6);
+  if (latInput) latInput.value = fixedLat;
+  if (lngInput) lngInput.value = fixedLng;
+  if (window.customerMapMarker)
+    window.customerMapMarker.setLatLng([fixedLat, fixedLng]);
+  else
+    window.customerMapMarker = window.L.marker([fixedLat, fixedLng]).addTo(
+      window.customerMap,
+    );
+  if (status)
+    status.textContent = label || `Pin: ${fixedLat}, ${fixedLng}`;
+}
+function showCustomerUserMarker(la, ln, accuracy) {
+  if (!window.customerMap || !window.L) return;
+  if (window.customerUserMarker) window.customerUserMarker.remove();
+  window.customerUserMarker = window.L.circleMarker([la, ln], {
+    radius: 9,
+    fillColor: "#16899a",
+    color: "#ffffff",
+    weight: 3,
+    fillOpacity: 0.95,
+  })
+    .addTo(window.customerMap)
+    .bindTooltip("Таны байршил", { direction: "top" });
+  if (window.customerUserAccuracy) window.customerUserAccuracy.remove();
+  if (accuracy && accuracy < 500) {
+    window.customerUserAccuracy = window.L.circle([la, ln], {
+      radius: accuracy,
+      color: "#16899a",
+      fillColor: "#16899a",
+      fillOpacity: 0.1,
+      weight: 1,
+    }).addTo(window.customerMap);
+  }
+}
+async function showCustomerUserLocation(hasCustomerPin, { setPin = false } = {}) {
   const status = document.getElementById("customerMapStatus");
   if (!window.customerMap) return;
-  if (!navigator.geolocation) {
-    if (status && !hasCustomerPin)
+  if (!capGeolocationPlugin() && !navigator.geolocation) {
+    if (status && (!hasCustomerPin || setPin))
       status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
     return;
   }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      if (!window.customerMap) return;
-      const la = pos.coords.latitude,
-        ln = pos.coords.longitude;
-      window.customerUserCoords = [la, ln];
-      if (window.customerUserMarker) window.customerUserMarker.remove();
-      window.customerUserMarker = L.circleMarker([la, ln], {
-        radius: 9,
-        fillColor: "#16899a",
-        color: "#ffffff",
-        weight: 3,
-        fillOpacity: 0.95,
-      })
-        .addTo(window.customerMap)
-        .bindTooltip("Таны байршил", { direction: "top" });
-      if (window.customerUserAccuracy) window.customerUserAccuracy.remove();
-      const acc = pos.coords.accuracy;
-      if (acc && acc < 500) {
-        window.customerUserAccuracy = L.circle([la, ln], {
-          radius: acc,
-          color: "#16899a",
-          fillColor: "#16899a",
-          fillOpacity: 0.1,
-          weight: 1,
-        }).addTo(window.customerMap);
-      }
-      if (!hasCustomerPin) {
-        window.customerMap.setView([la, ln], 16);
-      }
-    },
-    () => {
-      if (status && !hasCustomerPin)
-        status.textContent =
-          "Байршил авахын тулд GPS зөвшөөрөл өгнө үү (тохиргоо)";
-    },
-    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
-  );
+  try {
+    const coords = await requestDevicePosition();
+    if (!window.customerMap) return;
+    const la = coords.latitude,
+      ln = coords.longitude;
+    window.customerUserCoords = [la, ln];
+    showCustomerUserMarker(la, ln, coords.accuracy);
+    if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
+    if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
+    else if (status && !hasCustomerPin) status.textContent = "";
+  } catch (err) {
+    if (status && (!hasCustomerPin || setPin))
+      status.textContent = geolocationErrorMessage(err);
+  }
 }
 function centerCustomerMapOnUser() {
   const status = document.getElementById("customerMapStatus");
-  if (window.customerUserCoords && window.customerMap) {
-    window.customerMap.setView(window.customerUserCoords, 16);
-
-    return;
-  }
   const latInput = document.getElementById("customerLat"),
     lngInput = document.getElementById("customerLng");
+  if (window.customerUserCoords && window.customerMap) {
+    window.customerMap.setView(window.customerUserCoords, 16);
+    setCustomerMapPoint(
+      window.customerUserCoords[0],
+      window.customerUserCoords[1],
+      "Таны байршил",
+    );
+    return;
+  }
   const hasPin = !!(latInput?.value && lngInput?.value);
   if (status) status.textContent = "Байршил татаж байна...";
-  showCustomerUserLocation(hasPin);
+  showCustomerUserLocation(hasPin, { setPin: true });
 }
 function scheduleCustomerMapResize() {
   const fix = () => {
@@ -11579,20 +11662,7 @@ function initCustomerMap(lat, lng) {
       },
     ).addTo(window.customerMap);
   });
-  const setPoint = (la, ln) => {
-    if (!window.customerMap) return;
-    const fixedLat = Number(la).toFixed(6),
-      fixedLng = Number(ln).toFixed(6);
-    if (latInput) latInput.value = fixedLat;
-    if (lngInput) lngInput.value = fixedLng;
-    if (window.customerMapMarker)
-      window.customerMapMarker.setLatLng([fixedLat, fixedLng]);
-    else
-      window.customerMapMarker = L.marker([fixedLat, fixedLng]).addTo(
-        window.customerMap,
-      );
-    if (status) status.textContent = `Pin: ${fixedLat}, ${fixedLng}`;
-  };
+  const setPoint = (la, ln) => setCustomerMapPoint(la, ln);
   if (has) setPoint(start[0], start[1]);
   window.customerMap.on("click", (e) => setPoint(e.latlng.lat, e.latlng.lng));
   showCustomerUserLocation(has);
