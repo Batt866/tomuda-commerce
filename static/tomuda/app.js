@@ -466,7 +466,7 @@ function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
   return (items || [])
     .map((i, n) => {
       const p = state.products.find((x) => x.id === i.productId) || {};
-      return `<tr class="receipt-grid__item"><td class="receipt-grid__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-grid__name">${esc(i.productName)}</td><td class="receipt-grid__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-grid__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-grid__qty">${i.quantity}</td><td class="receipt-grid__money">${receiptMoney(i.price)}</td><td class="receipt-grid__money">${receiptMoney(i.total)}</td></tr>`;
+      return `<tr class="receipt-grid__item"><td class="receipt-grid__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-grid__name">${esc(i.productName)}</td><td class="receipt-grid__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-grid__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-grid__qty">${i.quantity}</td><td class="receipt-grid__money">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-grid__money">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
 }
@@ -493,6 +493,47 @@ function productForReceiptLine(i) {
     if (loose) return loose;
   }
   return {};
+}
+function orderItemCatalogUnitPrice(item) {
+  if (!item || item.isPromoFree) return 0;
+  const p = productForReceiptLine(item);
+  return Number(p.price ?? p.sellPrice ?? 0) || 0;
+}
+function resolveOrderItemUnitPrice(item) {
+  if (!item || item.isPromoFree) return 0;
+  const catalog = orderItemCatalogUnitPrice(item);
+  if (catalog > 0) return catalog;
+  const stored = Number(item.price);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  const qty = Number(item.quantity) || 0;
+  const total = Number(item.total);
+  if (qty > 0 && Number.isFinite(total) && total > 0) return total / qty;
+  return 0;
+}
+function resolveOrderItemLineTotal(item) {
+  if (!item || item.isPromoFree) return 0;
+  const qty = Number(item.quantity) || 0;
+  const unit = resolveOrderItemUnitPrice(item);
+  if (unit > 0 && qty > 0) return unit * qty;
+  const total = Number(item.total);
+  return Number.isFinite(total) ? total : 0;
+}
+function normalizeOrderItemPrices(o) {
+  if (!o?.items) return false;
+  let changed = false;
+  for (const item of o.items) {
+    if (item.isPromoFree) continue;
+    const unit = resolveOrderItemUnitPrice(item);
+    if (unit <= 0) continue;
+    const qty = Number(item.quantity) || 0;
+    const total = unit * qty;
+    if (item.price !== unit || item.total !== total) {
+      item.price = unit;
+      item.total = total;
+      changed = true;
+    }
+  }
+  return changed;
 }
 function receiptPromoCatalogPrice(i) {
   const p = productForReceiptLine(i);
@@ -829,10 +870,12 @@ function receiptMoneyDetailed(n) {
   });
 }
 function orderGrossTotal(o) {
-  if (o.grossTotal != null) return Number(o.grossTotal);
-  return (o.items || [])
-    .filter((i) => !i.isPromoFree)
-    .reduce((s, i) => s + (i.total || 0), 0);
+  const live = orderGrossFromItems(o);
+  if (o.grossTotal != null) {
+    const cached = Number(o.grossTotal);
+    if (Number.isFinite(cached) && Math.abs(cached - live) < 0.01) return cached;
+  }
+  return live;
 }
 function orderDiscountAmount(o) {
   if (o.discountAmount != null) return Number(o.discountAmount);
@@ -849,7 +892,7 @@ function orderPayableTotal(o) {
 function orderGrossFromItems(o) {
   return (o.items || [])
     .filter((i) => !i.isPromoFree)
-    .reduce((s, i) => s + (Number(i.total) || 0), 0);
+    .reduce((s, i) => s + resolveOrderItemLineTotal(i), 0);
 }
 function recalcOrderTotals(o) {
   if (!o) return o;
@@ -1072,9 +1115,11 @@ function normalizeOrderDeliveryDates() {
 function normalizeOrderTotals() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
+    const itemsChanged = normalizeOrderItemPrices(o);
     const liveGross = orderGrossFromItems(o);
     const cachedGross = o.grossTotal != null ? Number(o.grossTotal) : null;
     if (
+      itemsChanged ||
       !Number.isFinite(Number(o.total)) ||
       (cachedGross != null && Math.abs(cachedGross - liveGross) > 0.01)
     ) {
@@ -4745,8 +4790,8 @@ function buildOrderReceiptExcelRows(o) {
         p.unit || "ш",
         p.barcode || "-",
         i.quantity,
-        i.price,
-        i.total,
+        resolveOrderItemUnitPrice(i),
+        resolveOrderItemLineTotal(i),
       ]);
     });
   const promoItems = (o.items || []).filter((i) => i.isPromoFree);
@@ -5164,10 +5209,10 @@ function buildReceiptSheetXml(
         ? xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n")
         : xlsxCellXml(`H${r}`, 10, null, "empty"),
       item
-        ? xlsxCellXml(`J${r}`, 10, Number(item.price) || 0, "n")
+        ? xlsxCellXml(`J${r}`, 10, resolveOrderItemUnitPrice(item), "n")
         : xlsxCellXml(`J${r}`, 10, null, "empty"),
       item
-        ? xlsxCellXml(`K${r}`, 10, Number(item.total) || 0, "n")
+        ? xlsxCellXml(`K${r}`, 10, resolveOrderItemLineTotal(item), "n")
         : xlsxCellXml(`K${r}`, 10, null, "empty"),
       xlsxCellXml(`C${r}`, 8, null, "empty"),
       xlsxCellXml(`D${r}`, 8, null, "empty"),
@@ -5556,7 +5601,7 @@ function warehouseOrderDetail(o) {
     itemRows = displayItems
       .map((i) => {
         const isPromo = !!i.isPromoFree;
-        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(i.total)}</td></tr>`;
+        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       })
       .join("");
   return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}', event)" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
@@ -6175,8 +6220,8 @@ function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
     }
     const at = new Date(a.createdAt || 0).getTime(),
       bt = new Date(b.createdAt || 0).getTime();
-    if (at !== bt) return at - bt;
-    return String(a.id || "").localeCompare(String(b.id || ""), "mn");
+    if (at !== bt) return bt - at;
+    return String(b.id || "").localeCompare(String(a.id || ""), "mn");
   });
 }
 function canPickWarehouseWorkers() {
@@ -10299,6 +10344,15 @@ function scrollWorkerOrdersToDate() {
     .querySelector(`[data-order-day="${day}"]`)
     ?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+function scrollWarehouseReceiptListToActive() {
+  if (state.currentView !== "warehouseReceipts") return;
+  if (window.matchMedia("(min-width: 1024px)").matches) return;
+  requestAnimationFrame(() => {
+    document
+      .querySelector(".wh-receipt-list__item.is-active")
+      ?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+  });
+}
 function warehouseView() {
   const orders = warehouseOrdersForSelectedWorkers();
   return `<div class="space-y-3">${pageHead("Нярав")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
@@ -10606,8 +10660,8 @@ function workerChooser(orders) {
         : "Худалдааны төлөөлөгч сонгоно уу"
       : "Өнөөдрийн захиалга алга",
     pickerHtml = canPick
-      ? `<button onclick="workerSelectModal()" class="w-full text-left bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate ${hasOrders || hasSelection ? "" : "text-muted-foreground"}">${esc(chooserLabel)}</span></button>`
-      : `<div class="w-full bg-secondary rounded p-3 flex items-center justify-between gap-2"><span class="font-semibold">Худалдааны төлөөлөгч</span><span class="text-sm truncate">${esc(chooserLabel)}</span></div>`;
+      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${hasOrders || hasSelection ? "" : " is-placeholder"}">${esc(chooserLabel)}</span></button>`
+      : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></div>`;
   return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
@@ -10929,6 +10983,8 @@ function render() {
   }
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
+  if (state.currentView === "warehouseReceipts")
+    scrollWarehouseReceiptListToActive();
   bindReceiptPrintWorkerPickerDismiss();
   if (state.currentView === "count" && !state.countDone)
     syncCountInputsFromState();
@@ -12150,7 +12206,7 @@ function orderReceiptEditRows() {
       if (i.isPromoFree) {
         return `<tr class="receipt-edit-row receipt-edit-row--promo"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum">0</td></tr>`;
       }
-      return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" onfocus="receiptEditQtyFocus(this)" oninput="receiptEditQtyDraft(this)" onkeydown="receiptEditQtyKeydown(event, this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(i.total)}</td></tr>`;
+      return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" onfocus="receiptEditQtyFocus(this)" oninput="receiptEditQtyDraft(this)" onkeydown="receiptEditQtyKeydown(event, this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
 }
@@ -12159,7 +12215,7 @@ function refreshReceiptEditTotals() {
   if (!draft) return;
   (state.receiptEditItems || []).forEach((item, idx) => {
     const el = document.querySelector(`[data-receipt-line-total="${idx}"]`);
-    if (el) el.textContent = item.isPromoFree ? "0" : fmt(item.total);
+    if (el) el.textContent = item.isPromoFree ? "0" : fmt(resolveOrderItemLineTotal(item));
   });
   const totalEl = document.getElementById("receipt-edit-total");
   if (totalEl) totalEl.textContent = fmt(orderPayableTotal(draft));
@@ -12205,8 +12261,9 @@ function receiptEditQtyCommit(el) {
   );
   if (q === oldQ) return;
   const name = esc(item.productName);
-  const oldTotal = oldQ * (item.price || 0);
-  const newTotal = q * (item.price || 0);
+  const unitPrice = resolveOrderItemUnitPrice(item);
+  const oldTotal = oldQ * unitPrice;
+  const newTotal = q * unitPrice;
   receiptEditQtyConfirmOpen = true;
   confirmModal(
     "Тоо өөрчлөх",
@@ -12216,6 +12273,7 @@ function receiptEditQtyCommit(el) {
       onConfirm: () => {
         receiptEditQtyConfirmOpen = false;
         item.quantity = q;
+        item.price = unitPrice;
         item.total = newTotal;
         el.value = String(q);
         refreshReceiptEditTotals();
