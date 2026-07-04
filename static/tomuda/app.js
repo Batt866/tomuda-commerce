@@ -10973,7 +10973,7 @@ function workerOrderOptionsHtml(cart) {
     cashOnly = isCashPayment(),
     settlementText = settlementTextForInput(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><textarea rows="1" class="app-input worker-order-opt__input" data-settlement-input aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value);growSettlementInput(this)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()">${esc(settlementText)}</textarea></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><textarea rows="1" class="app-input worker-order-opt__input" data-settlement-input aria-label="Тэмдэглэл" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value);growSettlementInput(this)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()">${esc(settlementText)}</textarea></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -10981,7 +10981,7 @@ function workerOrderOptionsHtml(cart) {
     pctRow = pctAllowed
       ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
       : "";
-  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;state.settlementText='';state.settlementMonth='';state.settlementDay='';render()" aria-label="Тооцоо нийлэх өдөр идэвхжүүлэх"><span class="worker-order-opt__title">Тооцоо нийлэх өдөр</span></label>${settlementBody}</div>${pctRow}</div>`;
+  return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;state.settlementText='';state.settlementMonth='';state.settlementDay='';render()" aria-label="Тэмдэглэл идэвхжүүлэх"><span class="worker-order-opt__title">Тэмдэглэл</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
 function setPaymentTerm(term) {
   state.paymentTerm = term;
