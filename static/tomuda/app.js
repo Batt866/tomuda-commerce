@@ -4249,11 +4249,7 @@ async function retryPendingBackendSave() {
   render();
 }
 function dataSaveBannerHtml() {
-  if (!state.isLoggedIn || !hasUnsavedLocalData()) return "";
-  const detail = backendSaveFailedMessage
-    ? esc(backendSaveFailedMessage)
-    : "Шинэ өгөгдөл серверт бүрэн хадгалагдаагүй байж болно.";
-  return `<div class="data-save-banner" role="alert"><div class="data-save-banner__copy"><strong>Хадгалагдаагүй өгөгдөл</strong><p>${detail}</p></div><button type="button" class="btn btn--sm btn--secondary" onclick="retryPendingBackendSave()">Дахин хадгалах</button></div>`;
+  return "";
 }
 function warehouseDateFilterActive() {
   return !state.filters.warehouseDate;
