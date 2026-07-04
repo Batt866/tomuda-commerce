@@ -4077,9 +4077,11 @@ button:focus-visible,
 
   #app input.worker-order-opt__input,
   #modal input.worker-order-opt__input {
-    min-height: 34px !important;
-    height: 34px;
+    min-height: 30px !important;
+    height: 30px !important;
+    max-height: 30px;
     font-size: 13px !important;
+    line-height: 30px !important;
   }
 
   .auth-card {
@@ -5227,7 +5229,7 @@ input::placeholder, textarea::placeholder {
 }
 
 .worker-order-opt.is-open .worker-order-opt__head {
-  padding-bottom: 6px;
+  padding-bottom: 4px;
 }
 
 .worker-order-opt__head input[type="checkbox"] {
@@ -5268,13 +5270,13 @@ input::placeholder, textarea::placeholder {
 }
 
 .worker-order-opt__body {
-  padding: 0 10px 8px;
+  padding: 0 10px 4px;
 }
 
 .worker-order-opt__fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 4px;
 }
 
 .worker-order-opt__field {
@@ -5312,11 +5314,28 @@ input::placeholder, textarea::placeholder {
 .worker-order-opt__input {
   grid-column: 1 / -1;
   width: 100%;
-  min-height: 34px !important;
-  height: 34px;
-  padding: 0 10px !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  max-height: 30px;
+  padding: 0 8px !important;
+  border: 1px solid var(--hex-border);
+  border-radius: 8px;
+  background: var(--hex-card);
   font-size: 13px !important;
-  line-height: 1.2;
+  line-height: 30px !important;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#app input.worker-order-opt__input,
+#modal input.worker-order-opt__input {
+  min-height: 30px !important;
+  height: 30px !important;
+  max-height: 30px;
+  padding: 0 8px !important;
+  font-size: 13px !important;
+  line-height: 30px !important;
 }
 
 .worker-order-discount-preview {
