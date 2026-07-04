@@ -5799,15 +5799,27 @@ function customerRegistrationDigits(c) {
   return parseRegistrationNumber(c?.registrationNumber).digits;
 }
 const REGISTRATION_LABEL_RE = /^(?:р\.?\s*д\.?|rd|РД|Р\s*Д)\s*:?\s*/iu;
+const REGISTRATION_PREFIX_RE = /^[A-Za-zА-ЯӨҮЁа-яөүё]{1,2}$/u;
+const REGISTRATION_PREFIX_BEFORE_DIGITS_RE =
+  /^([A-Za-zА-ЯӨҮЁа-яөүё]{1,2})(?=\d)/u;
+function normalizeRegistrationInput(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
 function parseRegistrationNumber(value) {
-  const raw = String(value || "").trim();
-  let cleaned = raw.replace(/\s+/g, "");
+  const raw = normalizeRegistrationInput(value);
+  let cleaned = raw.replace(/\s+/g, "").replace(/-/g, "");
   cleaned = cleaned.replace(REGISTRATION_LABEL_RE, "");
-  const match = cleaned.match(/^([A-Za-zА-ЯӨҮЁа-яөүё]{2})(\d{5,10})$/u);
-  const prefix = match ? match[1].toUpperCase() : "";
-  const digits = match
-    ? match[2]
-    : cleaned.match(/(\d{5,10})/)?.[1] || cleaned.replace(/\D/g, "");
+  const digits = cleaned.replace(/\D/g, "");
+  let prefix = "";
+  const prefixMatch = cleaned.match(REGISTRATION_PREFIX_BEFORE_DIGITS_RE);
+  if (prefixMatch) {
+    prefix = prefixMatch[1].toUpperCase();
+  } else if (REGISTRATION_PREFIX_RE.test(cleaned) && !digits) {
+    prefix = cleaned.toUpperCase();
+  }
   const full = prefix && digits ? `${prefix}${digits}` : digits || cleaned;
   const lookupKeys = [];
   if (digits) {
@@ -5822,13 +5834,18 @@ function parseRegistrationNumber(value) {
     lookupKeys.push(`${prefix}${digits}`, `${prefix.toLowerCase()}${digits}`);
   }
   if (cleaned && !lookupKeys.includes(cleaned)) lookupKeys.push(cleaned);
+  const searchKey = digits
+    ? digits.toLowerCase()
+    : prefix
+      ? prefix.toLowerCase()
+      : full.toLowerCase();
   return {
     raw,
     cleaned,
     prefix,
     digits,
     full,
-    searchKey: full.toLowerCase(),
+    searchKey,
     lookupKeys: [...new Set(lookupKeys.filter(Boolean))],
   };
 }
@@ -5874,7 +5891,9 @@ function findCustomerByRegistrationNumber(registrationNumber, excludeId = "") {
 }
 function customerMatchesQuery(c, q) {
   const parsedQ = parseRegistrationNumber(q);
-  const needle = parsedQ.searchKey || registrationSearchKey(q);
+  const needle = String(q || "")
+    .trim()
+    .toLowerCase();
   if (!needle) return true;
   const nameMatch = String(c.name || "")
     .toLowerCase()
@@ -5883,19 +5902,23 @@ function customerMatchesQuery(c, q) {
     .toLowerCase()
     .includes(needle);
   const stored = parseRegistrationNumber(c.registrationNumber);
-  const rdMatch =
-    !!stored.searchKey &&
-    (stored.searchKey.includes(needle) || needle.includes(stored.searchKey));
   const rdDigitsMatch =
     !!parsedQ.digits &&
     !!stored.digits &&
-    stored.digits.includes(parsedQ.digits);
+    (stored.digits.includes(parsedQ.digits) ||
+      parsedQ.digits.includes(stored.digits));
+  const rdFullMatch =
+    !!parsedQ.full &&
+    !!stored.full &&
+    stored.full.toLowerCase().includes(parsedQ.full.toLowerCase());
   const rdPrefixMatch =
     !!parsedQ.prefix &&
     !parsedQ.digits &&
     !!stored.prefix &&
     stored.prefix.toLowerCase() === parsedQ.prefix.toLowerCase();
-  return nameMatch || companyMatch || rdMatch || rdDigitsMatch || rdPrefixMatch;
+  return (
+    nameMatch || companyMatch || rdDigitsMatch || rdFullMatch || rdPrefixMatch
+  );
 }
 function sortCustomersByName(customers) {
   return [...(customers || [])].sort((a, b) =>
@@ -11725,10 +11748,14 @@ async function fillCustomerFromRegistration(code) {
     lookupId = ++customerRegistryLookupId;
   if (!form) return;
   if (!reg) {
-    if (status) status.textContent = "";
+    if (status) {
+      status.textContent = parsed.prefix
+        ? "Регистрийн тоог үргэлжлүүлэн бичнэ үү"
+        : "";
+    }
     return;
   }
-  if (reg.length < 6) {
+  if (reg.length < 5) {
     if (status) status.textContent = "";
     return;
   }
