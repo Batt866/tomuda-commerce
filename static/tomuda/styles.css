@@ -4068,11 +4068,18 @@ button:focus-visible,
   }
 
   .field-input,
-  #app input.app-input:not(.qty-stepper__input),
+  #app input.app-input:not(.qty-stepper__input):not(.worker-order-opt__input),
   #app select,
-  #modal input.app-input:not(.qty-stepper__input),
+  #modal input.app-input:not(.qty-stepper__input):not(.worker-order-opt__input),
   #modal select {
     min-height: var(--field-h);
+  }
+
+  #app input.worker-order-opt__input,
+  #modal input.worker-order-opt__input {
+    min-height: 34px !important;
+    height: 34px;
+    font-size: 13px !important;
   }
 
   .auth-card {
@@ -5303,7 +5310,13 @@ input::placeholder, textarea::placeholder {
 }
 
 .worker-order-opt__input {
+  grid-column: 1 / -1;
   width: 100%;
+  min-height: 34px !important;
+  height: 34px;
+  padding: 0 10px !important;
+  font-size: 13px !important;
+  line-height: 1.2;
 }
 
 .worker-order-discount-preview {
