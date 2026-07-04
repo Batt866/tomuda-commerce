@@ -3023,8 +3023,7 @@ function isEditingSettlementText() {
   return (
     !!el &&
     (el.matches?.("[data-settlement-input]") ||
-      el.matches?.(".worker-order-opt__input") ||
-      el.matches?.(".worker-order-opt__textarea"))
+      el.matches?.(".worker-order-opt__input"))
   );
 }
 function flushPendingWarehouseDateRender() {
@@ -10761,8 +10760,8 @@ function workerChooser(orders) {
         : "Худалдааны төлөөлөгч сонгоно уу"
       : "Өнөөдрийн захиалга алга",
     pickerHtml = canPick
-      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${hasOrders || hasSelection ? "" : " is-placeholder"}">${esc(chooserLabel)}</span></button>`
-      : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></div>`;
+      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч сонгох</span><span class="wh-worker-chooser__value${hasOrders || hasSelection ? "" : " is-placeholder"}">${esc(chooserLabel)}</span></button>`
+      : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч сонгох</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></div>`;
   return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
@@ -10962,7 +10961,7 @@ function workerOrderOptionsHtml(cart) {
     cashOnly = isCashPayment(),
     settlementText = settlementTextForInput(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><textarea rows="2" class="app-input worker-order-opt__textarea" data-settlement-input aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()">${esc(settlementText)}</textarea></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><input type="text" class="app-input worker-order-opt__input" data-settlement-input aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" value="${esc(settlementText)}" oninput="applySettlementTextInput(this.value)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()"></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
