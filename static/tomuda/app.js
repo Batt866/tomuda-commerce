@@ -267,6 +267,8 @@ let countFocusedProductId = "";
 let countInputSyncing = false;
 let warehouseDateRenderPending = false;
 let warehouseDateBlurTimer = null;
+let settlementRenderPending = false;
+let settlementBlurTimer = null;
 let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
@@ -921,15 +923,32 @@ function settlementNoteText(o) {
   if (!parts) return "";
   return settlementNoteFromParts(parts, "тооцоо нийлэхээр тохиролцов");
 }
+function settlementTextForInput(source = state) {
+  return String(source?.settlementText ?? "");
+}
 function settlementTextInputValue(source = state) {
-  return String(source?.settlementText || "").trim();
+  return settlementTextForInput(source).trim();
 }
 function normalizeSettlementTextDraft() {
   if (!state.settlementAgreed) state.settlementText = "";
 }
 function applySettlementTextInput(value) {
   state.settlementAgreed = true;
-  state.settlementText = String(value || "");
+  state.settlementText = String(value ?? "");
+}
+function settlementInputFocus() {
+  clearTimeout(settlementBlurTimer);
+}
+function settlementInputBlur() {
+  clearTimeout(settlementBlurTimer);
+  settlementBlurTimer = setTimeout(flushPendingSettlementRender, 150);
+  scheduleBackendSave();
+}
+function flushPendingSettlementRender() {
+  if (isEditingSettlementText()) return;
+  if (!settlementRenderPending) return;
+  settlementRenderPending = false;
+  render();
 }
 function receiptGrossPercentNoticeHtml(o) {
   if (!o || o.applyPercentDiscount || !isCashPayment(o.paymentTerm)) return "";
@@ -2955,7 +2974,12 @@ function isWarehouseDateEditing() {
 }
 function isEditingSettlementText() {
   const el = document.activeElement;
-  return el?.matches?.(".worker-order-opt__input");
+  return (
+    !!el &&
+    (el.matches?.("[data-settlement-input]") ||
+      el.matches?.(".worker-order-opt__input") ||
+      el.matches?.(".worker-order-opt__textarea"))
+  );
 }
 function flushPendingWarehouseDateRender() {
   if (isWarehouseDateEditing()) return;
@@ -3031,7 +3055,7 @@ function applyRemoteState(payload) {
   }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   saveLocalBackendCache({ state: merged, updatedAt: payload.updatedAt || "" });
-  render();
+  safeRender();
   if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
     pickerModal();
@@ -10781,9 +10805,9 @@ function workerOrderOptionsHtml(cart) {
   const pct = percentDiscountRate(),
     pctAllowed = canApplyPercentDiscount(),
     cashOnly = isCashPayment(),
-    settlementText = settlementTextInputValue(state),
+    settlementText = settlementTextForInput(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><input type="text" class="app-input worker-order-opt__input" aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" value="${esc(settlementText)}" oninput="applySettlementTextInput(this.value)" onblur="scheduleBackendSave()"></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><textarea rows="2" class="app-input worker-order-opt__textarea" data-settlement-input aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()">${esc(settlementText)}</textarea></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -10854,8 +10878,14 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
+  if (isEditingSettlementText()) {
+    settlementRenderPending = true;
+    if (localStateDirty()) scheduleBackendSave();
+    return;
+  }
   countRenderPending = false;
   warehouseDateRenderPending = false;
+  settlementRenderPending = false;
   if (!state.isLoggedIn) {
     app.innerHTML = loginView();
     return;
