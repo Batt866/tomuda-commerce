@@ -1437,13 +1437,13 @@ a.customer-card__line .customer-card__icon {
 }
 
 .btn--toolbar-primary:hover:not(:disabled) {
-  background: #0d5f6c;
-  border-color: #0d5f6c;
+  background: #1eb3c7;
+  border-color: #1eb3c7;
 }
 
 .btn--toolbar-primary:active:not(:disabled) {
-  background: #0a4f59;
-  border-color: #0a4f59;
+  background: var(--hex-primary-dark);
+  border-color: var(--hex-primary-dark);
 }
 
 .btn--toolbar-secondary {
