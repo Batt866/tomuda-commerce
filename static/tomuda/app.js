@@ -980,6 +980,18 @@ function applySettlementTextInput(value) {
   state.settlementAgreed = true;
   state.settlementText = String(value ?? "");
 }
+function growSettlementInput(el) {
+  if (!el) return;
+  el.style.height = "0px";
+  const min = 30;
+  const max = 120;
+  const next = Math.min(max, Math.max(min, el.scrollHeight));
+  el.style.height = `${next}px`;
+  el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+}
+function syncSettlementInputHeights(root = document) {
+  root.querySelectorAll("[data-settlement-input]").forEach(growSettlementInput);
+}
 function settlementInputFocus() {
   clearTimeout(settlementBlurTimer);
 }
@@ -10961,7 +10973,7 @@ function workerOrderOptionsHtml(cart) {
     cashOnly = isCashPayment(),
     settlementText = settlementTextForInput(state),
     settlementBody = state.settlementAgreed
-      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><input type="text" class="app-input worker-order-opt__input" data-settlement-input aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" value="${esc(settlementText)}" oninput="applySettlementTextInput(this.value)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()"></div></div>`
+      ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><textarea rows="1" class="app-input worker-order-opt__input" data-settlement-input aria-label="Тооцоо нийлэх тайлбар" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value);growSettlementInput(this)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()">${esc(settlementText)}</textarea></div></div>`
       : "",
     pctBody = workerPercentDiscountActive()
       ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
@@ -11092,6 +11104,7 @@ function render() {
     enhanceMobileNumericInputs(document);
     permApi()?.syncAllPermissionRowDeps?.();
     bindProductImages(document);
+    syncSettlementInputHeights(app);
   });
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
@@ -13568,6 +13581,10 @@ Object.assign(window, {
   productDetail,
   productModal,
   handleProductImage,
+  applySettlementTextInput,
+  growSettlementInput,
+  settlementInputFocus,
+  settlementInputBlur,
   fillProductFromBarcode,
   fillCustomerFromRegistration,
   scheduleCustomerRegistryLookup,

@@ -4069,19 +4069,19 @@ button:focus-visible,
 
   .field-input,
   #app input.app-input:not(.qty-stepper__input):not(.worker-order-opt__input),
+  #app textarea.app-input:not(.worker-order-opt__input),
   #app select,
   #modal input.app-input:not(.qty-stepper__input):not(.worker-order-opt__input),
+  #modal textarea.app-input:not(.worker-order-opt__input),
   #modal select {
     min-height: var(--field-h);
   }
 
-  #app input.worker-order-opt__input,
-  #modal input.worker-order-opt__input {
+  #app textarea.worker-order-opt__input,
+  #modal textarea.worker-order-opt__input {
     min-height: 30px !important;
-    height: 30px !important;
-    max-height: 30px;
     font-size: 13px !important;
-    line-height: 30px !important;
+    line-height: 1.35 !important;
   }
 
   .auth-card {
@@ -5315,27 +5315,27 @@ input::placeholder, textarea::placeholder {
   grid-column: 1 / -1;
   width: 100%;
   min-height: 30px !important;
-  height: 30px !important;
-  max-height: 30px;
-  padding: 0 8px !important;
+  height: 30px;
+  max-height: 120px;
+  padding: 6px 8px !important;
   border: 1px solid var(--hex-border);
   border-radius: 8px;
   background: var(--hex-card);
   font-size: 13px !important;
-  line-height: 30px !important;
+  line-height: 1.35 !important;
   box-shadow: none;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: hidden;
   -webkit-appearance: none;
   appearance: none;
 }
 
-#app input.worker-order-opt__input,
-#modal input.worker-order-opt__input {
+#app textarea.worker-order-opt__input,
+#modal textarea.worker-order-opt__input {
   min-height: 30px !important;
-  height: 30px !important;
-  max-height: 30px;
-  padding: 0 8px !important;
   font-size: 13px !important;
-  line-height: 30px !important;
+  line-height: 1.35 !important;
 }
 
 .worker-order-discount-preview {
