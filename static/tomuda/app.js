@@ -8945,19 +8945,15 @@ function paymentRow(o) {
     actions = paid
       ? ""
       : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Тооцоо дууссан</button>`;
-  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Төлсөн" : "Төлөөгүй"}</span><div class="payment-row__actions">${actions}</div></div>`;
+  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Тооцоо дууссан" : "Төлөөгүй"}</span><div class="payment-row__actions">${actions}</div></div>`;
 }
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || orderIsPaid(o)) return;
-  confirmModal(
-    "Тооцоо баталгаажуулах",
-    `<b>${esc(o.customerName)}</b> захиалгыг (<b>${fmt(orderAmount(o))}</b>) тооцоо дууссан болгох уу?`,
-    {
-      confirmLabel: "Тооцоо дууссан",
-      onConfirm: () => setPaid(id, true),
-    },
-  );
+  confirmModal("Төлбөр баталгаажуулах", "Тооцоо дууссаныг баталгаажуулах уу?", {
+    confirmLabel: "Тийм",
+    onConfirm: () => setPaid(id, true),
+  });
 }
 function promotionTypeLabel(type) {
   return (
