@@ -1441,6 +1441,12 @@ a.customer-card__line .customer-card__icon {
   height: var(--field-h);
 }
 
+label.excel-import-toolbar__upload {
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+}
+
 .list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel {
   background: var(--hex-primary-soft);
   color: var(--hex-primary);
@@ -12158,6 +12164,12 @@ body.image-lightbox-open {
   font-size: 13px;
   font-weight: 600;
   gap: 6px;
+}
+
+label.excel-import-toolbar__upload {
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
 }
 
 .excel-import-toolbar__btn.btn--toolbar-excel {

@@ -258,6 +258,27 @@ class ProductExcelImportTests(TestCase):
         self.assertEqual(len(next_state["products"]), 1)
         self.assertEqual(next_state["products"][0]["name"], "Шинэ бараа")
 
+    def test_import_accepts_edited_template_row(self):
+        from dashboard.excel_import import import_products_into_state
+
+        state = default_state()
+        state["products"] = []
+        rows = [
+            ["Barcode", "Барааны нэр", "Хэмжих нэгж", "Борлуулалтын үнэ", "Үйлдвэрлэсэн улс"],
+            ["5555555555555", "Миний бараа", "ширхэг", "18000", "Монгол"],
+        ]
+        next_state, report = import_products_into_state(state, rows)
+        self.assertEqual(report["success"], 1)
+        self.assertEqual(next_state["products"][0]["name"], "Миний бараа")
+
+    def test_load_sheet_rows_sniffs_xlsx_without_extension(self):
+        from dashboard.excel_import import build_product_template_bytes, load_sheet_rows
+
+        content = build_product_template_bytes()
+        rows = load_sheet_rows(content, "upload")
+        self.assertTrue(rows)
+        self.assertIn("Barcode", rows[0])
+
     def test_import_updates_existing_barcode_with_create_permission(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 

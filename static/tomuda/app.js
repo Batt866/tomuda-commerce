@@ -1236,7 +1236,7 @@ const EXCEL_FILE_DOWNLOAD = "Excel файл татах";
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const IMPORT_FILE_FORMAT_HINT =
-  "Файлын формат .xlsx байх ёстой. «Формат татах» товчоор татсан .xlsx загвар ашиглана уу. Хуучин .xls файл мөн дэмжигдэнэ.";
+  "Файлын формат .xlsx байх ёстой. «Формат татах» товчоор татсан .xlsx загвар ашиглана уу. 2-р мөр жишээ — өөрийн мэдээллээ 2-р мөр эсвэл доош нь оруулна уу.";
 function excelIconHtml() {
   return `<svg class="ui-icon page-toolbar__excel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`;
 }
@@ -1255,11 +1255,12 @@ function excelDownloadBtn(onclick, opts = {}) {
 function excelImportToolbar(kind) {
   const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return "";
+  ensureGlobalImportFileInputs();
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
-  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" data-import-download="${esc(kind)}" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><button type="button" data-import-upload="${esc(kind)}" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></button></div>`;
+  const inputId = `import-file-${kind}`;
+  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" data-import-download="${esc(kind)}" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><label for="${inputId}" data-import-upload="${esc(kind)}" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn excel-import-toolbar__upload" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></label></div>`;
 }
 let importLoading = false;
-let importUploadOpening = false;
 const IMPORT_FILE_ACCEPT =
   ".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel";
 function ensureGlobalImportFileInputs() {
@@ -1271,15 +1272,52 @@ function ensureGlobalImportFileInputs() {
     document.body.appendChild(host);
   }
   for (const kind of ["products", "customers"]) {
-    if (host.querySelector(`[data-import-file="${kind}"]`)) continue;
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = IMPORT_FILE_ACCEPT;
-    input.className = "import-file-host__input";
-    input.setAttribute("data-import-file", kind);
-    input.setAttribute("aria-label", `${importKindLabel(kind)} Excel upload`);
-    host.appendChild(input);
+    const inputId = `import-file-${kind}`;
+    let input = document.getElementById(inputId);
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "file";
+      input.id = inputId;
+      input.accept = IMPORT_FILE_ACCEPT;
+      input.className = "import-file-host__input";
+      input.setAttribute("data-import-file", kind);
+      input.setAttribute("aria-label", `${importKindLabel(kind)} Excel upload`);
+      host.appendChild(input);
+    }
   }
+}
+function csrfTokenFromCookie() {
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+function importUploadFilename(file, kind) {
+  const raw = String(file?.name || "").trim();
+  if (/\.(xlsx|xls)$/i.test(raw)) return raw;
+  const base = raw.replace(/\.[^.]+$/, "") || (kind === "customers" ? "hariltsagch" : "baraa");
+  return `${base}.xlsx`;
+}
+async function importFileLooksLikeExcel(file) {
+  if (!file) return false;
+  const name = String(file.name || "").toLowerCase();
+  if (name.endsWith(".xlsx") || name.endsWith(".xls")) return true;
+  const type = String(file.type || "").toLowerCase();
+  if (
+    type.includes("spreadsheet") ||
+    type.includes("excel") ||
+    type === "application/vnd.ms-excel" ||
+    type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  ) {
+    return true;
+  }
+  try {
+    const head = await file.slice(0, 4).arrayBuffer();
+    const bytes = new Uint8Array(head);
+    if (bytes.length >= 2 && bytes[0] === 0xd0 && bytes[1] === 0xcf) return true;
+    if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
 }
 function setImportLoading(active, message = "Excel импорт хийж байна...") {
   importLoading = !!active;
@@ -1334,7 +1372,7 @@ function importKindLabel(kind) {
 }
 function importFileInput(kind) {
   ensureGlobalImportFileInputs();
-  return document.querySelector(`#import-file-host [data-import-file="${kind}"]`);
+  return document.getElementById(`import-file-${kind}`);
 }
 async function downloadImportTemplate(kind) {
   const perm = kind === "customers" ? "customers.create" : "products.create";
@@ -1374,27 +1412,6 @@ async function downloadImportTemplate(kind) {
       );
     }
   }
-}
-function triggerImportUpload(kind) {
-  if (importUploadOpening) return;
-  const input = importFileInput(kind);
-  if (!input) {
-    alertModal("Алдаа", "Excel сонгох талбар олдсонгүй. Хуудсыг дахин ачаална уу.");
-    return;
-  }
-  importUploadOpening = true;
-  input.value = "";
-  try {
-    input.click();
-  } catch (error) {
-    importUploadOpening = false;
-    console.warn("Import file picker failed", error);
-    alertModal("Алдаа", "Файл сонгох цонх нээгдсэнгүй.");
-    return;
-  }
-  window.setTimeout(() => {
-    importUploadOpening = false;
-  }, 700);
 }
 function importApiDetail(payload, fallback = "Импорт амжилтгүй") {
   const detail = payload?.detail ?? payload?.message;
@@ -1478,7 +1495,8 @@ function applyImportPayload(kind, payload) {
 }
 function finishImportSuccess(kind, payload, report) {
   applyImportPayload(kind, payload);
-  syncBackendMarkers(payload);
+  syncBackendSaveMarker();
+  if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
   clearOrderPersistenceCache();
   clearBackendSaveFailed();
   saveLocalBackendCache({
@@ -1513,8 +1531,7 @@ async function handleImportFile(kind, file) {
   const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
   if (!file) return;
-  const name = String(file.name || "").toLowerCase();
-  if (!name.endsWith(".xlsx") && !name.endsWith(".xls")) {
+  if (!(await importFileLooksLikeExcel(file))) {
     return alertModal("Алдаа", IMPORT_FILE_FORMAT_HINT);
   }
   if (importLoading) return;
@@ -1526,9 +1543,12 @@ async function handleImportFile(kind, file) {
     );
   }
   const path = importApiPath(kind);
+  const uploadName = importUploadFilename(file, kind);
   const fd = new FormData();
-  fd.append("file", file, file.name || "import.xlsx");
+  fd.append("file", file, uploadName);
   fd.append("actor", importActorPayload());
+  const csrf = csrfTokenFromCookie();
+  const headers = csrf ? { "X-CSRFToken": csrf } : {};
   clearTimeout(backendSaveTimer);
   backendSaveTimer = null;
   setImportLoading(true, `${importKindLabel(kind)} Excel импорт хийж байна...`);
@@ -1538,6 +1558,7 @@ async function handleImportFile(kind, file) {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       body: fd,
+      headers,
       cache: "no-store",
       credentials: "same-origin",
     });
@@ -1578,7 +1599,9 @@ function onImportFileSelected(input) {
   if (!input?.files?.[0]) return;
   const kind = input.getAttribute("data-import-file") || "";
   if (!kind) return;
-  handleImportFile(kind, input.files[0]);
+  const file = input.files[0];
+  input.value = "";
+  void handleImportFile(kind, file);
 }
 function initExcelImportHandlers() {
   if (initExcelImportHandlers._bound) return;
@@ -1599,8 +1622,7 @@ function initExcelImportHandlers() {
       const uploadBtn = e.target.closest?.("[data-import-upload]");
       if (uploadBtn) {
         e.preventDefault();
-        e.stopPropagation();
-        triggerImportUpload(uploadBtn.getAttribute("data-import-upload") || "");
+        return;
       }
     },
     true,
@@ -9803,7 +9825,7 @@ function promotionTypeLabel(type) {
     }[type] || "Урамшуулал"
   );
 }
-function promotionMenuHtml(activeType = "") {
+function promotionMenuHtml() {
   const items = [
     ["price", "Нийт үнийн дүнгээс хөнгөлөлт олгох"],
     ["quantity", "Багцын хөнгөлөлт"],
@@ -9815,8 +9837,7 @@ function promotionMenuHtml(activeType = "") {
       const badge = count
         ? `<span class="promo-type-menu__count">${count}</span>`
         : "";
-      const active = activeType === id ? " is-active" : "";
-      return `<button type="button" onclick="openPromotionPage('${id}')" class="admin-menu__item promo-type-menu__item${active}" aria-current="${activeType === id ? "page" : "false"}"><span class="promo-type-menu__label">${esc(label)}</span>${badge}</button>`;
+      return `<button type="button" onclick="openPromotionPage('${id}')" class="admin-menu__item promo-type-menu__item"><span class="promo-type-menu__label">${esc(label)}</span>${badge}</button>`;
     })
     .join("")}</nav>`;
 }
@@ -9841,7 +9862,7 @@ function promotionsView() {
         : detail === "payment"
           ? promotionPaymentPanel(payment)
           : promotionPricePanel(price);
-  return `<div class="space-y-4">${pageHead(promotionTypeLabel(detail))}${promotionMenuHtml(detail)}${panel}</div>`;
+  return `<div class="space-y-4">${pageHead(promotionTypeLabel(detail))}${panel}</div>`;
 }
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
@@ -14898,7 +14919,6 @@ Object.assign(window, {
   initCustomerAddressFields,
   confirmCustomerExcel,
   downloadImportTemplate,
-  triggerImportUpload,
   confirmProductsExport,
   confirmInventoryExport,
   confirmFinishStockIn,

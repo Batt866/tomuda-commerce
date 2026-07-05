@@ -240,23 +240,22 @@ def _trim_empty_tail(rows: list[list[str]]) -> list[list[str]]:
 
 def _is_template_example_customer(name: str, reg_raw: str) -> bool:
     normalized = _normalize_header(name)
-    if normalized in {"жишээ ххк", "жишээ", "example", "sample"}:
-        return True
     reg_digits = _registration_digits(reg_raw)
-    return normalized == "жишээ ххк" or reg_digits == "1234567"
+    if normalized in {"жишээ ххк", "example company", "sample company"}:
+        return reg_digits in {"", "1234567"}
+    if normalized in {"жишээ", "example", "sample"} and not reg_digits:
+        return True
+    return normalized == "жишээ ххк" and reg_digits == "1234567"
 
 
 def _is_template_example_product(barcode: str, name: str) -> bool:
     normalized = _normalize_header(name)
-    if normalized in {"жишээ бараа", "жишээ", "example", "sample"}:
-        return True
     digits = re.sub(r"\D", "", barcode or "")
-    return digits == "6977236071316" and normalized in {
-        "жишээ бараа",
-        "жишээ",
-        "example",
-        "sample",
-    }
+    if normalized in {"жишээ бараа", "example product", "sample product"}:
+        return digits in {"", "6977236071316"}
+    if normalized in {"жишээ", "example", "sample"} and not digits:
+        return True
+    return digits == "6977236071316" and normalized == "жишээ бараа"
 
 
 def _load_rows_xlsx(data: bytes) -> list[list[str]]:
@@ -334,6 +333,8 @@ def _best_rows_xlsx(data: bytes) -> list[list[str]]:
 
 
 def _load_workbook_rows(data: bytes, filename: str) -> list[list[str]]:
+    if data.startswith(b"PK"):
+        return _best_rows_xlsx(data)
     name = (filename or "").lower()
     if name.endswith(".xlsx"):
         return _best_rows_xlsx(data)
@@ -343,11 +344,9 @@ def _load_workbook_rows(data: bytes, filename: str) -> list[list[str]]:
 
 
 def _best_sheet_rows(data: bytes, filename: str) -> list[list[str]]:
-    name = (filename or "").lower()
-    if not name.endswith(".xlsx"):
-        return _load_workbook_rows(data, filename)
-
-    return _best_rows_xlsx(data)
+    if data.startswith(b"PK"):
+        return _best_rows_xlsx(data)
+    return _load_workbook_rows(data, filename)
 
 
 def _load_rows_xls(data: bytes) -> list[list[str]]:
@@ -497,6 +496,8 @@ def build_customer_template_bytes() -> bytes:
     )
     for col_idx in (9, 10):
         ws.cell(row=2, column=col_idx).number_format = "0.000000"
+    for row_idx in range(3, 8):
+        ws.append([""] * len(CUSTOMER_HEADERS))
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -515,6 +516,8 @@ def build_product_template_bytes() -> bytes:
         min_col_widths=[18, 26, 20, 30, 22],
     )
     ws.cell(row=2, column=4).number_format = "#,##0"
+    for row_idx in range(3, 8):
+        ws.append([""] * len(PRODUCT_HEADERS))
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
