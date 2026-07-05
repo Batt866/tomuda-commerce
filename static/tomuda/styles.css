@@ -12103,6 +12103,30 @@ body.image-lightbox-open {
     color-mix(in srgb, var(--hex-primary) 35%, transparent);
 }
 
+.stock-in-pack-preview {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hex-primary-dark);
+  min-height: 1.1em;
+}
+
+.stock-in-pack-preview--spacer {
+  visibility: hidden;
+}
+
+.stock-in-qty-total {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-foreground);
+  min-height: 1.2em;
+}
+
+.stock-in-qty-fields {
+  margin-bottom: 2px;
+}
+
 .stock-in-receipt-panel {
   overflow: hidden;
   border: 1px solid var(--hex-border);
