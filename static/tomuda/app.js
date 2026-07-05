@@ -4621,7 +4621,7 @@ function adminHubHtml() {
     ["stockAlertModal()", "ҮЛДЭГДЭЛ САНУУЛАХ", "stock"],
     [
       "percentDiscountSettingsModal()",
-      `Хувь тооцох (${percentDiscountRate()}%)`,
+      `Шууд төлөлтийн хувь (${percentDiscountRate()}%)`,
       "employees",
     ],
     [
@@ -4674,8 +4674,8 @@ function percentDiscountSettingsModal() {
   ensureSettings();
   const rate = percentDiscountRate();
   box(
-    "Хувь тооцох тохиргоо",
-    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалга дээр «Хувь тооцох» сонголтын хувь. Ажилтан бүрт зөвшөөрөл нь Админ → Эрх үүсгэх хэсэгт тохируулна.</p><label class="block text-sm font-medium">Хөнгөлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    "Шууд төлөлтийн хувь",
+    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">(Харилцагч хүлээн авсан барааны төлбөрийг шууд төлөх үед хөнгөлөлтийн хэмжээ)</p><label class="block text-sm font-medium">Шууд төлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -4691,7 +4691,7 @@ function savePercentDiscountSettings(e) {
   if (!canApplyPercentDiscount()) state.applyPercentDiscount = false;
   closeModal();
   render();
-  showInstallToast("Хувь тооцох тохиргоо хадгалагдлаа");
+  showInstallToast("Шууд төлөлтийн хувь хадгалагдлаа");
   criticalBackendSave();
 }
 function orderRetentionSettingsModal() {
