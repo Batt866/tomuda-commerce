@@ -1244,7 +1244,7 @@ function excelImportToolbar(kind) {
   const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return "";
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
-  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><button type="button" onclick="triggerImportUpload('${kind}')" class="btn btn--toolbar btn--toolbar-primary excel-import-toolbar__btn" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"></div>`;
+  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><button type="button" onclick="triggerImportUpload('${kind}')" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"></div>`;
 }
 let importLoading = false;
 function setImportLoading(active, message = "Excel импорт хийж байна...") {
@@ -1519,6 +1519,18 @@ function pageToolbarSearch({
 }
 function pageToolbarPrimaryBtn(label, onclick, extraClass = "") {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-primary ${extraClass}">${esc(label)}</button>`;
+}
+function pageActionAddBtn(label, onclick) {
+  return `<button type="button" onclick="${onclick}" class="btn page-action-add">+ ${esc(label)}</button>`;
+}
+function listActionToolbarHtml({
+  search = "",
+  excelBtn = "",
+  addBtn = "",
+  importKind = "",
+} = {}) {
+  const importHtml = importKind ? excelImportToolbar(importKind) : "";
+  return `<div class="list-action-toolbar">${search}${excelBtn ? `<div class="list-action-toolbar__tools">${excelBtn}</div>` : ""}${addBtn}${importHtml}</div>`;
 }
 function pageToolbarSecondaryBtn(label, onclick, extraClass = "") {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-secondary ${extraClass}">${esc(label)}</button>`;
@@ -6078,15 +6090,11 @@ function customersView() {
     rows = sortCustomersByName(
       state.customers.filter((c) => customerMatchesQuery(c, q)),
     ),
-    toolbarActions = [
-      hasPermission("reports.view")
-        ? excelDownloadBtn("confirmCustomerExcel()")
-        : "",
-      pageToolbarPrimaryBtn("Харилцагч нэмэх", "customerModal()"),
-    ]
-      .filter(Boolean)
-      .join("");
-  return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), actions: toolbarActions })}${excelImportToolbar("customers")}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+    excelBtn = hasPermission("reports.view")
+      ? excelDownloadBtn("confirmCustomerExcel()")
+      : "",
+    addBtn = pageActionAddBtn("Харилцагч нэмэх", "customerModal()");
+  return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel list-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Excel файл татах уу?") {
   confirmModal(title, message, {

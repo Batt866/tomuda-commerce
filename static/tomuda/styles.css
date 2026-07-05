@@ -1306,6 +1306,92 @@ a.customer-card__line .customer-card__icon {
   line-height: 1;
 }
 
+.list-panel--customers {
+  border-top: none;
+}
+
+.list-action-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.list-action-toolbar .page-toolbar__search {
+  width: 100%;
+  flex: none;
+}
+
+.list-action-toolbar__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.list-action-toolbar__tools .btn--toolbar-excel {
+  flex: 0 0 auto;
+}
+
+.page-action-add {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: #76b3b8;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 10px rgba(118, 179, 184, 0.32);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.page-action-add:hover:not(:disabled) {
+  background: #6aa8ad;
+}
+
+.page-action-add:active:not(:disabled) {
+  background: #5f9da2;
+  box-shadow: 0 1px 4px rgba(118, 179, 184, 0.28);
+  transform: translateY(1px);
+}
+
+.list-action-toolbar .excel-import-toolbar {
+  padding: 0;
+  grid-template-columns: 1fr 1fr;
+}
+
+.list-action-toolbar .excel-import-toolbar__btn {
+  min-height: 42px;
+  height: 42px;
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  border: 1.5px solid var(--hex-border);
+}
+
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel {
+  background: #e8f5ec;
+  color: #107c41;
+  border-color: #9fd4b3;
+}
+
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel:hover:not(:disabled) {
+  background: #d4eddf;
+  border-color: #7bc499;
+  color: #0d6635;
+}
+
 .list-panel {
   background: transparent;
   border-radius: 0;
