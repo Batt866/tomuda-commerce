@@ -1442,27 +1442,27 @@ a.customer-card__line .customer-card__icon {
 }
 
 .list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel {
-  background: #e8f5ec;
-  color: #107c41;
-  border-color: #9fd4b3;
-}
-
-.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel:hover:not(:disabled) {
-  background: #d4eddf;
-  border-color: #7bc499;
-  color: #0d6635;
-}
-
-.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-secondary {
   background: var(--hex-primary-soft);
   color: var(--hex-primary);
   border-color: color-mix(in srgb, var(--hex-primary) 38%, var(--hex-border));
 }
 
-.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-secondary:hover:not(:disabled) {
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel:hover:not(:disabled) {
   background: var(--hex-primary-active);
   border-color: var(--hex-primary);
   color: var(--hex-primary-dark);
+}
+
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-secondary {
+  background: #e8f5ec;
+  color: #107c41;
+  border-color: #9fd4b3;
+}
+
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-secondary:hover:not(:disabled) {
+  background: #d4eddf;
+  border-color: #7bc499;
+  color: #0d6635;
 }
 
 .list-panel {
@@ -1507,6 +1507,18 @@ a.customer-card__line .customer-card__icon {
   gap: 8px;
   margin-left: auto;
   flex-shrink: 0;
+}
+
+.page-toolbar__actions .btn--toolbar-excel {
+  background: #e8f5ec;
+  color: #107c41;
+  border-color: #9fd4b3;
+}
+
+.page-toolbar__actions .btn--toolbar-excel:hover:not(:disabled) {
+  background: #d4eddf;
+  border-color: #7bc499;
+  color: #0d6635;
 }
 
 .page-toolbar__search,
@@ -11974,27 +11986,27 @@ body.image-lightbox-open {
 }
 
 .excel-import-toolbar__btn.btn--toolbar-excel {
-  background: #e8f5ec;
-  color: #107c41;
-  border-color: #9fd4b3;
-}
-
-.excel-import-toolbar__btn.btn--toolbar-excel:hover:not(:disabled) {
-  background: #d4eddf;
-  border-color: #7bc499;
-  color: #0d6635;
-}
-
-.excel-import-toolbar__btn.btn--toolbar-secondary {
   background: var(--hex-primary-soft);
   color: var(--hex-primary);
   border-color: color-mix(in srgb, var(--hex-primary) 38%, var(--hex-border));
 }
 
-.excel-import-toolbar__btn.btn--toolbar-secondary:hover:not(:disabled) {
+.excel-import-toolbar__btn.btn--toolbar-excel:hover:not(:disabled) {
   background: var(--hex-primary-active);
   border-color: var(--hex-primary);
   color: var(--hex-primary-dark);
+}
+
+.excel-import-toolbar__btn.btn--toolbar-secondary {
+  background: #e8f5ec;
+  color: #107c41;
+  border-color: #9fd4b3;
+}
+
+.excel-import-toolbar__btn.btn--toolbar-secondary:hover:not(:disabled) {
+  background: #d4eddf;
+  border-color: #7bc499;
+  color: #0d6635;
 }
 
 .excel-import-toolbar__label {
