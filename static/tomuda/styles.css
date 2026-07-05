@@ -12104,11 +12104,12 @@ body.image-lightbox-open {
 }
 
 .stock-in-pack-preview {
-  margin: 6px 0 0;
-  font-size: 12px;
-  font-weight: 600;
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 700;
   color: var(--hex-primary-dark);
-  min-height: 1.1em;
+  line-height: 1.25;
+  min-height: 1.25em;
 }
 
 .stock-in-pack-preview--spacer {
