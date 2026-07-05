@@ -12390,20 +12390,19 @@ label.excel-import-toolbar__upload {
   position: fixed;
   left: 0;
   top: 0;
-  width: 1px;
-  height: 1px;
+  width: 0;
+  height: 0;
   overflow: hidden;
-  opacity: 0;
-  z-index: -1;
+  pointer-events: none;
 }
 
 .import-file-host__input {
-  position: absolute;
+  position: fixed;
   left: 0;
   top: 0;
   width: 1px;
   height: 1px;
-  opacity: 0.001;
+  opacity: 0;
   overflow: hidden;
 }
 

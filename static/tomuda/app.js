@@ -1679,6 +1679,10 @@ function initExcelImportHandlers() {
       const uploadBtn = e.target.closest?.("[data-import-upload]");
       if (uploadBtn) {
         e.preventDefault();
+        e.stopPropagation();
+        const kind = uploadBtn.getAttribute("data-import-upload") || "";
+        const input = importFileInput(kind);
+        if (input) input.click();
         return;
       }
     },
