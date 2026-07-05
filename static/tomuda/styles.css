@@ -1973,8 +1973,8 @@ a.customer-card__line .customer-card__icon {
 .product-card__actions {
   grid-area: actions;
   display: flex;
-  flex-direction: row;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   width: auto;
   margin: 0;
   padding: 0;
