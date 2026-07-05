@@ -2770,14 +2770,13 @@ function mergeBootPersistentState(backendState, pendingState, ordersBackup) {
   return merged;
 }
 const MERGE_BY_ID_KEYS = ["customers", "products", "employees", "orders"];
-const DELETION_GUARDED_KEYS = ["customers", "products"];
+const DELETION_GUARDED_KEYS = ["customers", "products", "employees"];
 
 function deletionKeyForCollection(collectionKey) {
-  return collectionKey === "customers"
-    ? "customer"
-    : collectionKey === "products"
-      ? "product"
-      : collectionKey;
+  if (collectionKey === "customers") return "customer";
+  if (collectionKey === "products") return "product";
+  if (collectionKey === "employees") return "employee";
+  return collectionKey;
 }
 function normalizeDeletionLog(log = []) {
   if (!Array.isArray(log)) return [];
@@ -4715,7 +4714,9 @@ function deletionLogLabel(entry) {
       ? "Бараа"
       : entry.type === "customer"
         ? "Харилцагч"
-        : String(entry.type || "-");
+        : entry.type === "employee"
+          ? "Ажилтан"
+          : String(entry.type || "-");
   const actor =
     state.employees.find((e) => e.id === entry.actorId)?.name ||
     entry.actorId ||
@@ -10329,7 +10330,7 @@ function employeeRow(e) {
       })
     : "";
   const deleteBtn =
-    canEdit && canDelete()
+    hasPermission("employees.delete") || hasPermission("employees.edit")
       ? deleteIconButton({
           className: "employee-card__btn employee-card__btn--danger",
           attrs: `data-confirm-delete="employee" data-id="${esc(e.id)}"`,
@@ -13593,7 +13594,7 @@ function cancelOrderNow(id) {
   setOrder(id, "cancelled");
 }
 function recordDeletion(type, id) {
-  if (!["product", "customer"].includes(type) || !id) return;
+  if (!["product", "customer", "employee"].includes(type) || !id) return;
   state.deletionLog = normalizeDeletionLog([
     ...(state.deletionLog || []),
     {
@@ -13610,8 +13611,14 @@ function deleteNow(type, id) {
     recordDeletion("product", id);
     state.products = state.products.filter((p) => p.id !== id);
   }
-  if (type === "employee")
+  if (type === "employee") {
+    recordDeletion("employee", id);
     state.employees = state.employees.filter((e) => e.id !== id);
+    if (state.currentEmployee?.id === id) {
+      state.currentEmployee = null;
+      state.isLoggedIn = false;
+    }
+  }
   if (type === "customer") {
     recordDeletion("customer", id);
     state.customers = state.customers.filter((c) => c.id !== id);

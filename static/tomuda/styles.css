@@ -1811,14 +1811,17 @@ a.customer-card__line .customer-card__icon {
 
 .employee-card__actions {
   display: flex;
+  flex-direction: column;
   flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: stretch;
+  justify-content: center;
   gap: 6px;
   flex-shrink: 0;
-  padding-top: 0;
-  margin-top: 0;
+  padding: 0;
+  margin: 0;
   border-top: none;
+  align-self: center;
+  justify-self: end;
 }
 
 .employee-card__btn {
@@ -2354,10 +2357,12 @@ a.customer-card__line .customer-card__icon {
 
   .employee-card__actions {
     grid-area: actions;
-    justify-content: flex-end;
+    flex-direction: column;
+    justify-content: center;
+    justify-self: end;
     flex-wrap: nowrap;
-    padding-top: 0;
-    margin-top: 0;
+    padding: 0;
+    margin: 0;
     border-top: none;
   }
 
