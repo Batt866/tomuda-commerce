@@ -635,8 +635,11 @@ textarea.text-sm,
 }
 
 .customer-card__avatar-img {
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   background: var(--hex-secondary);
+  border: none;
+  box-shadow: none;
 }
 
 .customer-image-upload {
@@ -712,12 +715,14 @@ textarea.text-sm,
 .customer-detail__avatar,
 .customer-detail__avatar.customer-card__avatar-img {
   flex-shrink: 0;
-  width: 72px;
-  height: 72px;
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
   border-radius: 16px;
-  object-fit: cover;
-  border: var(--thumb-border);
-  box-shadow: var(--thumb-shadow);
+  object-fit: contain;
+  object-position: center;
+  border: none;
+  box-shadow: none;
+  background: var(--hex-secondary);
 }
 
 .customer-detail__avatar.customer-card__avatar {
@@ -851,16 +856,17 @@ textarea.text-sm,
 
 .customer-card__avatar {
   flex-shrink: 0;
-  width: var(--avatar-md);
-  height: var(--avatar-md);
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
   border-radius: 14px;
   display: grid;
   place-items: center;
   background: var(--hex-primary);
   color: var(--hex-primary-foreground);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 800;
-  box-shadow: var(--thumb-shadow);
+  border: none;
+  box-shadow: none;
 }
 
 .employee-card__avatar-img {
@@ -1367,16 +1373,20 @@ a.customer-card__line .customer-card__icon {
   padding: 0 16px;
   border: none;
   border-radius: 12px;
-  background: #76b3b8;
-  color: #fff;
+  background: linear-gradient(
+    180deg,
+    var(--hex-primary) 0%,
+    var(--hex-primary-dark) 100%
+  );
+  color: var(--hex-primary-foreground);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  box-shadow: 0 2px 10px rgba(118, 179, 184, 0.32);
+  box-shadow: 0 4px 16px rgba(22, 137, 154, 0.42);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
@@ -1386,12 +1396,17 @@ a.customer-card__line .customer-card__icon {
 }
 
 .page-action-add:hover:not(:disabled) {
-  background: #6aa8ad;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hex-primary) 92%, #fff) 0%,
+    var(--hex-primary) 100%
+  );
+  box-shadow: 0 5px 18px rgba(22, 137, 154, 0.48);
 }
 
 .page-action-add:active:not(:disabled) {
-  background: #5f9da2;
-  box-shadow: 0 1px 4px rgba(118, 179, 184, 0.28);
+  background: var(--hex-primary-dark);
+  box-shadow: 0 2px 8px rgba(22, 137, 154, 0.34);
   transform: translateY(1px);
 }
 
@@ -2898,6 +2913,7 @@ a.customer-card__line .customer-card__icon {
   --thumb-md: 56px;
   --thumb-lg: 60px;
   --avatar-md: 52px;
+  --avatar-lg: 72px;
   --thumb-radius: 12px;
   --thumb-border: 1.5px solid
     color-mix(in srgb, var(--hex-foreground) 14%, var(--hex-border));
