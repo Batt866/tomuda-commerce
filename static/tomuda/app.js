@@ -5808,7 +5808,12 @@ function initCustomerImageField(c) {
 }
 function compressImageFile(
   file,
-  { maxSize = 960, quality = 0.82, maxBytes = MAX_INLINE_IMAGE_CHARS } = {},
+  {
+    maxSize = 960,
+    quality = 0.82,
+    maxBytes = MAX_INLINE_IMAGE_CHARS,
+    background = null,
+  } = {},
 ) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -5830,6 +5835,10 @@ function compressImageFile(
           reject(new Error("canvas unavailable"));
           return;
         }
+        if (background) {
+          ctx.fillStyle = background;
+          ctx.fillRect(0, 0, width, height);
+        }
         ctx.drawImage(img, 0, 0, width, height);
         let q = quality;
         let dataUrl = canvas.toDataURL("image/jpeg", q);
@@ -5847,6 +5856,9 @@ function compressImageFile(
     };
     reader.readAsDataURL(file);
   });
+}
+function compressProductImageFile(file) {
+  return compressImageFile(file, { background: "#ffffff" });
 }
 function handleCustomerImage(input) {
   const file = input.files?.[0];
@@ -11465,7 +11477,19 @@ function cleanupCustomerMapInstance() {
 function capGeolocationPlugin() {
   const cap = window.Capacitor;
   if (!cap?.isNativePlatform?.()) return null;
+  if (!cap.Plugins?.Geolocation && typeof cap.registerPlugin === "function") {
+    try {
+      cap.registerPlugin("Geolocation");
+    } catch (e) {
+      console.warn("Geolocation plugin register failed", e);
+    }
+  }
   return cap.Plugins?.Geolocation || null;
+}
+function geolocationPermissionDenied(perm = {}) {
+  const loc = String(perm.location || "").toLowerCase();
+  const coarse = String(perm.coarseLocation || "").toLowerCase();
+  return loc === "denied" && coarse === "denied";
 }
 function geolocationErrorMessage(err) {
   const code = err?.code;
@@ -11481,30 +11505,44 @@ function geolocationErrorMessage(err) {
 async function requestDevicePosition(options = {}) {
   const geoOpts = {
     enableHighAccuracy: true,
-    timeout: 15000,
-    maximumAge: 60000,
+    timeout: 20000,
+    maximumAge: 0,
     ...options,
   };
   const capGeo = capGeolocationPlugin();
   if (capGeo) {
-    const perm = await capGeo.requestPermissions();
-    const denied =
-      perm?.location === "denied" && perm?.coarseLocation === "denied";
-    if (denied) {
-      const err = new Error("denied");
-      err.code = 1;
-      throw err;
+    const readPosition = () =>
+      capGeo.getCurrentPosition({
+        enableHighAccuracy: geoOpts.enableHighAccuracy,
+        timeout: geoOpts.timeout,
+        maximumAge: geoOpts.maximumAge,
+      });
+    try {
+      const pos = await readPosition();
+      return {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      };
+    } catch (err) {
+      if (typeof capGeo.requestPermissions !== "function") throw err;
+      try {
+        const perm = await capGeo.requestPermissions();
+        if (geolocationPermissionDenied(perm)) {
+          const denied = new Error("denied");
+          denied.code = 1;
+          throw denied;
+        }
+      } catch (permErr) {
+        if (geolocationPermissionDenied(permErr)) throw permErr;
+      }
+      const pos = await readPosition();
+      return {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      };
     }
-    const pos = await capGeo.getCurrentPosition({
-      enableHighAccuracy: geoOpts.enableHighAccuracy,
-      timeout: geoOpts.timeout,
-      maximumAge: geoOpts.maximumAge,
-    });
-    return {
-      latitude: pos.coords.latitude,
-      longitude: pos.coords.longitude,
-      accuracy: pos.coords.accuracy,
-    };
   }
   if (!navigator.geolocation) {
     const err = new Error("unsupported");
@@ -11564,48 +11602,60 @@ function showCustomerUserMarker(la, ln, accuracy) {
     }).addTo(window.customerMap);
   }
 }
+function applyCustomerUserPosition({ setPin = false, hasCustomerPin = false } = {}) {
+  const status = document.getElementById("customerMapStatus");
+  if (!window.customerMap) {
+    if (status) status.textContent = "Газрын зураг ачаалж байна...";
+    return Promise.resolve();
+  }
+  if (!capGeolocationPlugin() && !navigator.geolocation) {
+    if (status && (!hasCustomerPin || setPin))
+      status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
+    return Promise.resolve();
+  }
+  return requestDevicePosition()
+    .then((coords) => {
+      if (!window.customerMap) return;
+      const la = coords.latitude,
+        ln = coords.longitude;
+      window.customerUserCoords = [la, ln];
+      showCustomerUserMarker(la, ln, coords.accuracy);
+      if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
+      if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
+      else if (status && !hasCustomerPin) status.textContent = "";
+    })
+    .catch((err) => {
+      if (status && (!hasCustomerPin || setPin))
+        status.textContent = geolocationErrorMessage(err);
+    });
+}
 async function showCustomerUserLocation(
   hasCustomerPin,
   { setPin = false } = {},
 ) {
-  const status = document.getElementById("customerMapStatus");
-  if (!window.customerMap) return;
-  if (!capGeolocationPlugin() && !navigator.geolocation) {
-    if (status && (!hasCustomerPin || setPin))
-      status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
-    return;
-  }
-  try {
-    const coords = await requestDevicePosition();
-    if (!window.customerMap) return;
-    const la = coords.latitude,
-      ln = coords.longitude;
-    window.customerUserCoords = [la, ln];
-    showCustomerUserMarker(la, ln, coords.accuracy);
-    if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
-    if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
-    else if (status && !hasCustomerPin) status.textContent = "";
-  } catch (err) {
-    if (status && (!hasCustomerPin || setPin))
-      status.textContent = geolocationErrorMessage(err);
-  }
+  return applyCustomerUserPosition({ setPin, hasCustomerPin });
 }
 function centerCustomerMapOnUser() {
   const status = document.getElementById("customerMapStatus");
   const latInput = document.getElementById("customerLat"),
     lngInput = document.getElementById("customerLng");
-  if (window.customerUserCoords && window.customerMap) {
-    window.customerMap.setView(window.customerUserCoords, 16);
-    setCustomerMapPoint(
-      window.customerUserCoords[0],
-      window.customerUserCoords[1],
-      "Таны байршил",
-    );
+  if (!window.customerMap) {
+    if (status) status.textContent = "Газрын зураг ачаалж байна...";
     return;
   }
   const hasPin = !!(latInput?.value && lngInput?.value);
   if (status) status.textContent = "Байршил татаж байна...";
-  showCustomerUserLocation(hasPin, { setPin: true });
+  applyCustomerUserPosition({ setPin: true, hasCustomerPin: hasPin });
+}
+function bindCustomerMapLocateButton() {
+  const btn = document.querySelector(".customer-map-locate");
+  if (!btn || btn.dataset.geoBound) return;
+  btn.dataset.geoBound = "1";
+  btn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    centerCustomerMapOnUser();
+  });
 }
 function scheduleCustomerMapResize() {
   const fix = () => {
@@ -11782,6 +11832,7 @@ function customerModal(id, draft = null) {
     window.customerMapInitTimer = null;
     initCustomerMap(c.latitude, c.longitude);
   }, 120);
+  requestAnimationFrame(bindCustomerMapLocateButton);
   loadMnLocations().then(() => {
     if (modal.querySelector("form[data-customer-form]"))
       initCustomerAddressFields(c);
@@ -11865,8 +11916,15 @@ function initCustomerMap(lat, lng) {
   const setPoint = (la, ln) => setCustomerMapPoint(la, ln);
   if (has) setPoint(start[0], start[1]);
   window.customerMap.on("click", (e) => setPoint(e.latlng.lat, e.latlng.lng));
-  showCustomerUserLocation(has);
+  if (window.L?.DomEvent) {
+    L.DomEvent.disableScrollPropagation(mapEl);
+    L.DomEvent.disableClickPropagation(mapEl);
+  }
+  if (!has && !window.Capacitor?.isNativePlatform?.()) {
+    showCustomerUserLocation(has);
+  }
   scheduleCustomerMapResize();
+  bindCustomerMapLocateButton();
 }
 async function applyCustomerSave(data, id) {
   const incomingImage = String(data.image || "").trim();
@@ -11974,7 +12032,7 @@ function productModal(id) {
 function handleProductImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  productImageCompressTask = compressImageFile(file)
+  productImageCompressTask = compressProductImageFile(file)
     .then((dataUrl) => {
       const value = document.getElementById("productImageValue"),
         preview = document.getElementById("productImagePreview");

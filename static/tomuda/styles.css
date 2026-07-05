@@ -1862,6 +1862,14 @@ a.customer-card__line .customer-card__icon {
   padding: 0;
 }
 
+img[data-product-img],
+#productImagePreview {
+  object-fit: contain;
+  object-position: center;
+  background: #fff;
+  box-sizing: border-box;
+}
+
 .product-card {
   display: flex;
   flex-direction: column;
@@ -1900,13 +1908,10 @@ a.customer-card__line .customer-card__icon {
   height: 80px;
   flex-shrink: 0;
   border-radius: 0;
-  object-fit: contain;
-  object-position: left center;
-  padding: 0;
-  box-sizing: border-box;
+  object-position: center;
+  padding: 4px;
   border: none;
   box-shadow: none;
-  background: transparent;
   justify-self: start;
 }
 
@@ -2129,10 +2134,8 @@ a.customer-card__line .customer-card__icon {
     border-radius: 0;
     border: none;
     box-shadow: none;
-    object-fit: contain;
     object-position: center;
-    padding: 5px;
-    box-sizing: border-box;
+    padding: 4px;
   }
 
   .product-card__title {
@@ -2373,11 +2376,7 @@ a.customer-card__line .customer-card__icon {
 }
 
 .product-detail__img {
-  object-fit: contain;
-  object-position: center;
-  padding: 8px;
-  box-sizing: border-box;
-  background: var(--hex-secondary);
+  padding: 6px;
   border: none;
   box-shadow: none;
 }
@@ -2391,9 +2390,10 @@ a.customer-card__line .customer-card__icon {
 }
 
 .product-detail .customer-detail__avatar.product-detail__img {
-  width: min(100%, 300px);
-  height: min(68vw, 300px);
-  max-height: 300px;
+  width: auto;
+  height: auto;
+  max-width: min(100%, 320px);
+  max-height: min(70vw, 320px);
   border-radius: 0;
 }
 
@@ -2449,11 +2449,7 @@ a.customer-card__line .customer-card__icon {
   width: var(--thumb-md);
   height: var(--thumb-md);
   border-radius: 0;
-  object-fit: contain;
-  object-position: center;
-  padding: 4px;
-  box-sizing: border-box;
-  background: var(--hex-card);
+  padding: 3px;
   border: none;
   box-shadow: none;
 }
@@ -4742,14 +4738,18 @@ textarea::placeholder {
 
 .customer-map-locate {
   flex-shrink: 0;
-  padding: 6px 10px;
+  min-height: 44px;
+  padding: 8px 12px;
   border-radius: 8px;
   background: var(--hex-secondary);
   border: 1px solid var(--hex-border);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #16899a;
   white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .customer-map-locate:active {
@@ -4823,13 +4823,9 @@ textarea::placeholder {
   height: 80px;
   flex-shrink: 0;
   border-radius: 0;
-  object-fit: contain;
-  object-position: center;
-  padding: 6px;
-  box-sizing: border-box;
+  padding: 4px;
   border: none;
   box-shadow: none;
-  background: var(--hex-secondary);
 }
 
 .count-row__title {
