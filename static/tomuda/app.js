@@ -1128,6 +1128,63 @@ function orderIsPaid(o) {
   if (o.paymentTerm === "credit") return !!o.isPaid;
   return !!o.isPaid;
 }
+function customerUnpaidOrders(customerId) {
+  if (!customerId) return [];
+  return retainedOrders(state.orders || [])
+    .filter((o) => o.customerId === customerId && !orderIsPaid(o))
+    .sort(compareOrdersNewestFirst);
+}
+function workerReceivableItemHtml(o, opts = {}) {
+  const { actions = "" } = opts;
+  return `<div class="worker-receivable__item"><div class="worker-receivable__item-main"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span></div>${actions}</div>`;
+}
+function workerReceivableHtml(customerId, opts = {}) {
+  const orders = customerUnpaidOrders(customerId);
+  if (!orders.length) return "";
+  const items = orders
+    .map((o) => {
+      const actions =
+        opts.withPayActions && !orderIsPaid(o)
+          ? `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="btn btn--primary btn--sm worker-receivable__action">Тооцоо дууссан</button>`
+          : "";
+      return workerReceivableItemHtml(o, { actions });
+    })
+    .join("");
+  return `<div class="worker-receivable"><p class="worker-receivable__label">Авлага</p><div class="worker-receivable__list">${items}</div></div>`;
+}
+function reportCustomerReceivableRow(customerName, unpaidOrders) {
+  const first = unpaidOrders[0] || {},
+    term = paymentTermLabel(first.paymentTerm),
+    items = unpaidOrders
+      .map((o) => {
+        return workerReceivableItemHtml(o, {
+          actions: `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="btn btn--primary btn--sm worker-receivable__action">Тооцоо дууссан</button>`,
+        });
+      })
+      .join("");
+  return `<div class="line-list__row line-list__row--static report-receivable-row"><div class="report-receivable-row__main"><p class="payment-row__customer">${esc(customerName)}</p><div class="worker-receivable"><p class="worker-receivable__label">Авлага</p><div class="worker-receivable__list">${items}</div></div><p class="line-list__meta">${esc(first.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(first))}</p></div></div>`;
+}
+function reportPaymentListHtml(orders) {
+  if (!orders.length)
+    return `<div class="line-panel__empty">Захиалга байхгүй</div>`;
+  const output = [],
+    emittedUnpaidCustomers = new Set();
+  for (const o of orders) {
+    if (orderIsPaid(o)) {
+      output.push(paymentRow(o));
+      continue;
+    }
+    const key = o.customerId || o.customerName;
+    if (emittedUnpaidCustomers.has(key)) continue;
+    emittedUnpaidCustomers.add(key);
+    const group = orders.filter(
+      (x) =>
+        !orderIsPaid(x) && (x.customerId || x.customerName) === key,
+    );
+    output.push(reportCustomerReceivableRow(o.customerName, group));
+  }
+  return output.join("");
+}
 function normalizeOrderPayments() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
@@ -9797,7 +9854,7 @@ function reportsView() {
         commission: (sum * e.commissionRate) / 100,
       };
     });
-  return `<div class="space-y-4">${pageHead("Тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр</div><div class="line-list">${orders.length ? orders.map(paymentRow).join("") : `<div class="line-panel__empty">Захиалга байхгүй</div>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр</div><div class="line-list">${reportPaymentListHtml(orders)}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
   const paid = orderIsPaid(o),
@@ -11673,7 +11730,7 @@ function workerStorePickStep() {
       ? state.customers.find((c) => c.id === state.workerCustomer)
       : null;
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}${workerReceivableHtml(selected.id)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
   return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" aria-label="Харилцагч хайх"></div>${selectedBanner}${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
 }
@@ -11749,13 +11806,14 @@ function workerNewOrderStep(cart) {
     agentMetaHtml = showAgentPicker
       ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
       : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(state.currentEmployee?.name || "-")}</p></div>`,
+    receivableHtml = workerReceivableHtml(customer?.id),
     paidProducts = workerPaidProductsInCart(),
     hasItems = paidProducts.length > 0,
     listHtml = hasItems
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
       : "";
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body">${hasItems ? workerOrderStatsHtml(cart) : ""}<div class="worker-order-card__tools">${agentMetaHtml}<button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body">${hasItems ? workerOrderStatsHtml(cart) : ""}<div class="worker-order-card__tools">${receivableHtml}${agentMetaHtml}<button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
