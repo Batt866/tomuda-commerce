@@ -1678,6 +1678,9 @@ function productCostMetaHtml(p) {
 function canManageProducts() {
   return hasPermission("products.create") || hasPermission("products.edit");
 }
+function canManageProductCategories() {
+  return canManageProducts();
+}
 function canManageEmployees() {
   return hasPermission("employees.create") || hasPermission("employees.edit");
 }
@@ -13062,21 +13065,23 @@ function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
 }
 function categoryModal() {
-  if (!hasPermission("products.edit")) return;
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Төрөл удирдах эрхгүй.");
+  }
   const rows = cats()
     .filter(Boolean)
     .sort((a, b) => String(a).localeCompare(String(b), "mn"))
     .map((cat) => {
       const count = categoryProductCount(cat);
-      const action =
+      const meta =
         count > 0
           ? `<span class="category-row__meta">${count} бараа</span>`
-          : deleteIconButton({
-              className: "category-row__delete",
-              attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
-              label: "Төрөл устгах",
-            });
-      return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span>${action}</div>`;
+          : `<span class="category-row__meta category-row__meta--empty">Хоосон</span>`;
+      return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span><div class="category-row__actions">${meta}${deleteIconButton({
+        className: "category-row__delete",
+        attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
+        label: "Төрөл устгах",
+      })}</div></div>`;
     })
     .join("");
   box(
@@ -13085,62 +13090,87 @@ function categoryModal() {
     "max-w-lg",
   );
 }
+function applyAddCategory(name) {
+  if (!canManageProductCategories()) return;
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return;
+  if (!state.extraCategories.includes(trimmed)) {
+    state.extraCategories.push(trimmed);
+  }
+  criticalBackendSave();
+  showAppToast(`«${trimmed}» төрөл нэмэгдлээ`, "success");
+  categoryModal();
+}
 function addCategory(e) {
   e.preventDefault();
-  if (!hasPermission("products.edit")) return;
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Төрөл нэмэх эрхгүй.");
+  }
   const name = String(new FormData(e.target).get("category") || "").trim();
   if (!name) return alert("Төрөлийн нэр оруулна уу");
-  if (cats().includes(name))
-    return alert("Энэ төрөл аль хэдийн бүртгэгдсэн байна");
-  state.extraCategories.push(name);
-  closeModal();
-  render();
-  showInstallToast("Төрөл нэмэгдлээ");
-  criticalBackendSave();
+  if (cats().includes(name)) {
+    return alertModal(
+      "Давхардал",
+      `<strong>${esc(name)}</strong> нэртэй төрөл аль хэдийн байна.`,
+    );
+  }
+  confirmModal(
+    "Төрөл нэмэх үү?",
+    `<strong>${esc(name)}</strong> нэртэй шинэ төрөл нэмэх гэж байна.`,
+    {
+      confirmLabel: "Нэмэх",
+      onConfirm: () => applyAddCategory(name),
+    },
+  );
 }
 function confirmDeleteCategory(name) {
-  if (!hasPermission("products.edit")) return;
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Төрөл устгах эрхгүй.");
+  }
+  if (name === "Бусад") {
+    return alertModal(
+      "Устгах боломжгүй",
+      "«Бусад» үндсэн төрөл тул устгах боломжгүй.",
+    );
+  }
   const count = categoryProductCount(name);
   if (count > 0) {
-    alertModal(
-      "Устгах боломжгүй",
-      `<p><strong>${esc(name)}</strong> төрөлд <strong>${count}</strong> бараа байна.</p><p class="text-sm text-muted-foreground mt-2">Эхлээд барааны төрлийг өөрчилнө үү.</p>`,
+    confirmModal(
+      "Төрөл устгах уу?",
+      `<p><strong>${esc(name)}</strong> төрөлд <strong>${count}</strong> бараа байна.</p><p class="text-sm text-muted-foreground mt-2">Устгахад эдгээр барааг «Бусад» төрөл рүү шилжүүлнэ.</p>`,
+      {
+        confirmLabel: "Устгах",
+        danger: true,
+        onConfirm: () => deleteCategoryNow(name),
+      },
     );
     return;
   }
   confirmModal(
-    "Төрөл устгах уу?",
+    "Төрөл устгах уu?",
     `<strong>${esc(name)}</strong> төрлийг устгах гэж байна.`,
     {
-      confirmLabel: "Тийм",
+      confirmLabel: "Устгах",
       danger: true,
-      onConfirm: () => {
-        confirmModal(
-          "Баталгаажуулах",
-          `<strong>${esc(name)}</strong> төрлийг бүрмөсөн устгахдаа итгэлтэй байна уу?`,
-          {
-            confirmLabel: "Батлах",
-            danger: true,
-            closable: true,
-            onConfirm: () => deleteCategoryNow(name),
-          },
-        );
-      },
+      onConfirm: () => deleteCategoryNow(name),
     },
   );
 }
 function deleteCategoryNow(name) {
-  if (!hasPermission("products.edit")) return;
+  if (!canManageProductCategories()) return;
+  if (name === "Бусад") return;
+  state.products.forEach((p) => {
+    if (p.category === name) p.category = "Бусад";
+  });
   state.extraCategories = state.extraCategories.filter((c) => c !== name);
   if (state.filters.category === name) state.filters.category = "all";
   if (state.filters.inventoryCategory === name)
     state.filters.inventoryCategory = "all";
   if (state.filters.countCategory === name) state.filters.countCategory = "all";
   if (state.filters.workerCategory === name) state.filters.workerCategory = "";
-  closeModal();
-  render();
-  showInstallToast("Төрөл устгагдлаа");
   criticalBackendSave();
+  showAppToast(`«${name}» төрөл устгагдлаа`, "success");
+  categoryModal();
 }
 function employeeModal(id) {
   const editId = id ? String(id) : "";
