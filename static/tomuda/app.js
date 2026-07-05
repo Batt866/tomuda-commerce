@@ -1136,7 +1136,7 @@ function customerUnpaidOrders(customerId) {
 }
 function workerReceivableItemHtml(o, opts = {}) {
   const { actions = "" } = opts;
-  return `<div class="worker-receivable__item"><div class="worker-receivable__item-main"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span></div>${actions}</div>`;
+  return `<div class="worker-receivable__item"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span>${actions}</div>`;
 }
 function workerReceivableHtml(customerId, opts = {}) {
   const orders = customerUnpaidOrders(customerId);

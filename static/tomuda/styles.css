@@ -5692,6 +5692,10 @@ textarea::placeholder {
 }
 
 .worker-receivable {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 4px;
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--hex-warning-soft);
@@ -5700,43 +5704,36 @@ textarea::placeholder {
 }
 
 .worker-receivable__label {
-  margin: 0 0 6px;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: center;
+  margin: 0;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--hex-warning-text);
+  white-space: nowrap;
 }
 
 .worker-receivable__list {
+  grid-column: 2;
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .worker-receivable__item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
   min-width: 0;
-  flex: 0 1 auto;
-  padding: 0;
-  border: none;
 }
 
-.worker-receivable__item:first-child {
-  padding-top: 0;
-}
-
-.worker-receivable__item-main {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
+.worker-receivable__item:has(.worker-receivable__action) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .worker-receivable__no .receipt-no--xs {
@@ -5751,6 +5748,8 @@ textarea::placeholder {
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: var(--hex-foreground);
+  text-align: right;
+  white-space: nowrap;
 }
 
 .worker-receivable__action {
@@ -5762,16 +5761,6 @@ textarea::placeholder {
 
 .worker-pick-selected__store .worker-receivable {
   margin-top: 8px;
-}
-
-.report-receivable-row .worker-receivable__list {
-  gap: 10px 14px;
-}
-
-.report-receivable-row .worker-receivable__item {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
 }
 
 .report-receivable-row {
