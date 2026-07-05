@@ -4601,6 +4601,38 @@ main {
 .text-muted-foreground {
   color: var(--hex-muted-foreground) !important;
 }
+
+@media (max-width: 1023px) {
+  #app .text-sm,
+  #modal .text-sm {
+    font-size: 15px !important;
+    line-height: 1.45;
+  }
+
+  #app .text-xs,
+  #modal .text-xs {
+    font-size: 13px !important;
+    line-height: 1.4;
+  }
+
+  .page-head__title {
+    font-size: 1.125rem;
+    line-height: 1.35;
+  }
+
+  .admin-menu__item {
+    font-size: 16px;
+  }
+
+  .promo-type-menu__label {
+    font-size: 16px;
+  }
+
+  .product-card__title {
+    font-size: 16px;
+  }
+}
+
 .border-border {
   border-color: var(--hex-border) !important;
 }
@@ -10930,7 +10962,7 @@ textarea::placeholder {
   border-radius: 999px;
   background: var(--hex-primary-soft);
   color: var(--hex-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-align: center;
 }
