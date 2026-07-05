@@ -1939,7 +1939,7 @@ function allowedNavIds() {
   }
   const r = currentRole();
   if (r === "admin")
-    return ["worker", "customers", "products", "warehouse", "count", "admin"];
+    return ["worker", "customers", "products", "warehouse", "admin"];
   if (r === "warehouse") return ["warehouse"];
   if (r === "delivery") return ["delivery"];
   if (r === "sales") return ["worker", "customers", "products", "warehouse"];
@@ -2185,6 +2185,8 @@ const ADMIN_METRIC_ICONS = {
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   employees:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+  count:
+    '<path d="M4 7h16M4 12h10M4 17h16"/><path d="M18 10v6M15 13h6"/>',
 };
 function adminMetricCard(
   label,
@@ -2219,6 +2221,7 @@ function canPageBack() {
     "reports",
     "promotions",
     "warehouseReceipts",
+    "count",
   ].includes(state.currentView);
 }
 const pageHead = (title, action = "", opts = {}) => {
@@ -2277,7 +2280,6 @@ function sidebarNavForRole(role) {
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
       ["warehouse", "Нярав"],
-      ["count", "Тооллого"],
       ["employees", "Ажилтан"],
       ["inventory", "Агуулахын бүртгэл"],
       ["reports", "Тайлан"],
@@ -2289,14 +2291,13 @@ function sidebarNavForRole(role) {
     ["customers", "Харилцагч"],
     ["products", "Бараа"],
     ["warehouse", "Нярав"],
-    ["count", "Тооллого"],
     ["admin", "Админ"],
   ].filter(([id]) => allowedNavIds().includes(id));
 }
 function bottomNavForRole(role) {
   const allowed = new Set(allowedNavIds());
   const mobileIds = {
-    admin: ["worker", "customers", "products", "warehouse", "count", "admin"],
+    admin: ["worker", "customers", "products", "warehouse", "admin"],
     sales: ["worker", "customers", "products", "warehouse"],
     warehouse: ["warehouse"],
     delivery: ["delivery"],
@@ -2314,7 +2315,8 @@ function mobileNavIcon(id) {
 }
 function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
-  if (navId === "admin" && viewId === "warehouseReceipts") return true;
+  if (navId === "admin" && (viewId === "warehouseReceipts" || viewId === "count"))
+    return true;
   return false;
 }
 function sidebarNavItems(nav) {
@@ -2356,6 +2358,7 @@ function currentPageTitle(nav) {
     reports: "Тайлан",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
+    count: "Тооллого",
     delivery: "Хүргэлт",
   };
   if (extra[state.currentView]) return extra[state.currentView];
@@ -3862,6 +3865,7 @@ function canAppBack() {
     "reports",
     "promotions",
     "warehouseReceipts",
+    "count",
   ];
   if (subAdminViews.includes(state.currentView)) return true;
   const defaultView = defaultViewForRole(currentRole());
@@ -3956,6 +3960,7 @@ function handleAppBack() {
     "reports",
     "promotions",
     "warehouseReceipts",
+    "count",
   ];
   if (subAdminViews.includes(state.currentView)) {
     go("admin", { silent: true });
@@ -5140,6 +5145,7 @@ function adminHubHtml() {
     ["reports", "Тайлан", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "settings.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "warehouse.view"],
+    ["count", "Тооллого", "count", "warehouse.edit"],
     ["employeePermissions", "Эрх үүсгэх", "employees", "__permissions__"],
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();

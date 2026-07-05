@@ -101,7 +101,6 @@
     ["customers", "Харилцагч", "customers.view"],
     ["products", "Бараа", "products.view"],
     ["warehouse", "Агуулах", "warehouse.view"],
-    ["count", "Тооллого", "warehouse.edit"],
     ["employees", "Ажилтан", "employees.view"],
     ["inventory", "Агуулахын бүртгэл", "warehouse.view"],
     ["reports", "Тайлан", "reports.view"],
