@@ -276,6 +276,7 @@ let toolbarSelectBlurTimer = null;
 let toolbarSelectRenderPending = false;
 let userScrollActiveUntil = 0;
 let searchRenderTimer = null;
+let promotionSaveLock = false;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -2907,16 +2908,83 @@ function mergeArrayById(remote = [], local = [], opts = {}) {
   return Array.from(map.values());
 }
 
-function mergeRuleArrays(remote = [], local = []) {
+function promotionRuleFingerprint(rule) {
+  if (!rule || typeof rule !== "object") return JSON.stringify(rule);
+  const copy = { ...rule };
+  delete copy.freeProductId;
+  for (const key of [
+    "buyProductIds",
+    "freeProductIds",
+    "priceFreeProductIds",
+    "paymentFreeProductIds",
+  ]) {
+    if (Array.isArray(copy[key])) {
+      copy[key] = [...copy[key]].map(String).filter(Boolean).sort();
+    }
+  }
+  const ordered = {};
+  Object.keys(copy)
+    .sort()
+    .forEach((key) => {
+      ordered[key] = copy[key];
+    });
+  return JSON.stringify(ordered);
+}
+function dedupePromotionRuleList(list = []) {
   const seen = new Set();
   const merged = [];
-  [...(remote || []), ...(local || [])].forEach((item) => {
-    const key = JSON.stringify(item);
-    if (seen.has(key)) return;
+  for (const item of list || []) {
+    const key = promotionRuleFingerprint(item);
+    if (seen.has(key)) continue;
     seen.add(key);
     merged.push(item);
-  });
+  }
   return merged;
+}
+function mergeRuleArrays(remote = [], local = []) {
+  return dedupePromotionRuleList([...(remote || []), ...(local || [])]);
+}
+function appendPromotionRule(kind, rule) {
+  if (!state.promotionRules || typeof state.promotionRules !== "object") {
+    state.promotionRules = { quantity: [], price: [], payment: [] };
+  }
+  if (!Array.isArray(state.promotionRules[kind])) state.promotionRules[kind] = [];
+  const key = promotionRuleFingerprint(rule);
+  if (
+    state.promotionRules[kind].some(
+      (item) => promotionRuleFingerprint(item) === key,
+    )
+  ) {
+    return false;
+  }
+  state.promotionRules[kind].push(rule);
+  state.promotionRules[kind] = dedupePromotionRuleList(state.promotionRules[kind]);
+  return true;
+}
+function resetPromotionModalDraft(kind) {
+  state.promoPick = null;
+  state.promoFormDraft = null;
+  state.promoModalKind = "";
+  if (kind === "quantity" || kind === "all") {
+    state.searches.promo_buyProductIds = "";
+    state.searches.promo_freeProductIds = "";
+    state.searches.promo_buyProductIds_category = "all";
+    state.searches.promo_freeProductIds_category = "all";
+  }
+  if (kind === "price" || kind === "all") {
+    state.searches.promo_priceFreeProductIds = "";
+    state.searches.promo_priceFreeProductIds_category = "all";
+  }
+  if (kind === "payment" || kind === "all") {
+    state.searches.promo_paymentFreeProductIds = "";
+    state.searches.promo_paymentFreeProductIds_category = "all";
+  }
+}
+function finishPromotionSave(kind) {
+  resetPromotionModalDraft(kind);
+  closeModal();
+  render();
+  criticalBackendSave();
 }
 
 function countSessionMs(at) {
@@ -3103,6 +3171,11 @@ function applyPersistentState(data) {
       state.promotionRules.price = [];
     if (!Array.isArray(state.promotionRules.payment))
       state.promotionRules.payment = [];
+    for (const kind of ["quantity", "price", "payment"]) {
+      state.promotionRules[kind] = dedupePromotionRuleList(
+        state.promotionRules[kind],
+      );
+    }
   }
   if (!state.workerQty || typeof state.workerQty !== "object")
     state.workerQty = {};
@@ -10303,30 +10376,36 @@ function promotionPaymentModal() {
 }
 function savePromotionQty(e) {
   e.preventDefault();
-  const f = new FormData(e.target),
-    buyProductIds = f.getAll("buyProductIds").filter(Boolean),
-    freeProductIds = f.getAll("freeProductIds").filter(Boolean);
-  if (!buyProductIds.length || !freeProductIds.length)
-    return alert("Авах болон үнэгүй бараа сонгоно уу");
-  if (buyProductIds.some((id) => freeProductIds.includes(id)))
-    return alert("Авах болон үнэгүй бараа өөр байх ёстой");
-  state.promotionRules.quantity.push({
-    buyProductIds,
-    buyQty: Number(f.get("buyQty")),
-    freeProductIds,
-    freeProductId: freeProductIds[0],
-    freeQty: Number(f.get("freeQty")) || 1,
-  });
-  state.promoPick = null;
-  state.promoFormDraft = null;
-  state.promoModalKind = "";
-  state.searches.promo_buyProductIds = "";
-  state.searches.promo_freeProductIds = "";
-  state.searches.promo_buyProductIds_category = "all";
-  state.searches.promo_freeProductIds_category = "all";
-  closeModal();
-  render();
-  criticalBackendSave();
+  if (promotionSaveLock) return;
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  promotionSaveLock = true;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    const f = new FormData(form),
+      buyProductIds = f.getAll("buyProductIds").filter(Boolean),
+      freeProductIds = f.getAll("freeProductIds").filter(Boolean);
+    if (!buyProductIds.length || !freeProductIds.length) {
+      alert("Авах болон үнэгүй бараа сонгоно уу");
+      return;
+    }
+    if (buyProductIds.some((id) => freeProductIds.includes(id))) {
+      alert("Авах болон үнэгүй бараа өөр байх ёстой");
+      return;
+    }
+    const added = appendPromotionRule("quantity", {
+      buyProductIds,
+      buyQty: Number(f.get("buyQty")),
+      freeProductIds,
+      freeProductId: freeProductIds[0],
+      freeQty: Number(f.get("freeQty")) || 1,
+    });
+    if (!added) return;
+    finishPromotionSave("quantity");
+  } finally {
+    promotionSaveLock = false;
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }
 function matchingPricePromotionRule(gross) {
   let best = null;
@@ -10544,74 +10623,98 @@ function workerCartSummary() {
 }
 function savePromotionPrice(e) {
   e.preventDefault();
-  const form = new FormData(e.target),
-    f = Object.fromEntries(form),
-    minAmount = Number(f.minAmount),
-    maxAmount = Number(f.maxAmount) || 0;
-  if (!Number.isFinite(minAmount) || minAmount < 0)
-    return alert("Доод дүн оруулна уу");
-  if (maxAmount > 0 && maxAmount <= minAmount)
-    return alert("Дээд дүн доод дүнээс их байх ёстой");
-  const type = f.type === "percent" ? "percent" : "free",
-    rule = { minAmount, maxAmount, type };
-  if (type === "free") {
-    const freeProductIds = form.getAll("priceFreeProductIds").filter(Boolean);
-    if (!freeProductIds.length) return alert("Үнэгүй бараа сонгоно уу");
-    rule.freeProductIds = freeProductIds;
-    rule.freeProductId = freeProductIds[0];
-    rule.freeQty = Number(f.freeQty) || 1;
-  } else {
-    const pct = Number(f.discountPercent);
-    if (!pct || pct < 1 || pct > 100)
-      return alert("Хөнгөлөлтийн хувь 1-100 хооронд байна");
-    rule.discountPercent = pct;
+  if (promotionSaveLock) return;
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  promotionSaveLock = true;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    const formData = new FormData(form),
+      f = Object.fromEntries(formData),
+      minAmount = Number(f.minAmount),
+      maxAmount = Number(f.maxAmount) || 0;
+    if (!Number.isFinite(minAmount) || minAmount < 0) {
+      alert("Доод дүн оруулна уу");
+      return;
+    }
+    if (maxAmount > 0 && maxAmount <= minAmount) {
+      alert("Дээд дүн доод дүнээс их байх ёстой");
+      return;
+    }
+    const type = f.type === "percent" ? "percent" : "free",
+      rule = { minAmount, maxAmount, type };
+    if (type === "free") {
+      const freeProductIds = formData
+        .getAll("priceFreeProductIds")
+        .filter(Boolean);
+      if (!freeProductIds.length) {
+        alert("Үнэгүй бараа сонгоно уу");
+        return;
+      }
+      rule.freeProductIds = freeProductIds;
+      rule.freeProductId = freeProductIds[0];
+      rule.freeQty = Number(f.freeQty) || 1;
+    } else {
+      const pct = Number(f.discountPercent);
+      if (!pct || pct < 1 || pct > 100) {
+        alert("Хөнгөлөлтийн хувь 1-100 хооронд байна");
+        return;
+      }
+      rule.discountPercent = pct;
+    }
+    if (!appendPromotionRule("price", rule)) return;
+    finishPromotionSave("price");
+  } finally {
+    promotionSaveLock = false;
+    if (submitBtn) submitBtn.disabled = false;
   }
-  state.promotionRules.price.push(rule);
-  state.promoPick = null;
-  state.promoFormDraft = null;
-  state.promoModalKind = "";
-  state.searches.promo_priceFreeProductIds = "";
-  state.searches.promo_priceFreeProductIds_category = "all";
-  closeModal();
-  render();
-  criticalBackendSave();
 }
 function savePromotionPayment(e) {
   e.preventDefault();
-  const form = new FormData(e.target),
-    f = Object.fromEntries(form),
-    minAmount = f.minAmount === "" ? 0 : Number(f.minAmount);
-  if (!Number.isFinite(minAmount) || minAmount < 0)
-    return alert("Доод дүн зөв оруулна уу");
-  const type = f.type === "percent" ? "percent" : "free",
-    rule = {
-      paymentTerm: f.paymentTerm === "credit" ? "credit" : "cash",
-      minAmount,
-      type,
-    };
-  if (type === "free") {
-    const freeProductIds = form.getAll("paymentFreeProductIds").filter(Boolean);
-    if (!freeProductIds.length) return alert("Үнэгүй бараа сонгоно уу");
-    rule.freeProductIds = freeProductIds;
-    rule.freeProductId = freeProductIds[0];
-    rule.freeQty = Number(f.freeQty) || 1;
-  } else {
-    const pct = Number(f.discountPercent);
-    if (!pct || pct < 1 || pct > 100)
-      return alert("Хөнгөлөлтийн хувь 1-100 хооронд байна");
-    rule.discountPercent = pct;
+  if (promotionSaveLock) return;
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  promotionSaveLock = true;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    const formData = new FormData(form),
+      f = Object.fromEntries(formData),
+      minAmount = f.minAmount === "" ? 0 : Number(f.minAmount);
+    if (!Number.isFinite(minAmount) || minAmount < 0) {
+      alert("Доод дүн зөв оруулна уу");
+      return;
+    }
+    const type = f.type === "percent" ? "percent" : "free",
+      rule = {
+        paymentTerm: f.paymentTerm === "credit" ? "credit" : "cash",
+        minAmount,
+        type,
+      };
+    if (type === "free") {
+      const freeProductIds = formData
+        .getAll("paymentFreeProductIds")
+        .filter(Boolean);
+      if (!freeProductIds.length) {
+        alert("Үнэгүй бараа сонгоно уу");
+        return;
+      }
+      rule.freeProductIds = freeProductIds;
+      rule.freeProductId = freeProductIds[0];
+      rule.freeQty = Number(f.freeQty) || 1;
+    } else {
+      const pct = Number(f.discountPercent);
+      if (!pct || pct < 1 || pct > 100) {
+        alert("Хөнгөлөлтийн хувь 1-100 хооронд байна");
+        return;
+      }
+      rule.discountPercent = pct;
+    }
+    if (!appendPromotionRule("payment", rule)) return;
+    finishPromotionSave("payment");
+  } finally {
+    promotionSaveLock = false;
+    if (submitBtn) submitBtn.disabled = false;
   }
-  if (!Array.isArray(state.promotionRules.payment))
-    state.promotionRules.payment = [];
-  state.promotionRules.payment.push(rule);
-  state.promoPick = null;
-  state.promoFormDraft = null;
-  state.promoModalKind = "";
-  state.searches.promo_paymentFreeProductIds = "";
-  state.searches.promo_paymentFreeProductIds_category = "all";
-  closeModal();
-  render();
-  criticalBackendSave();
 }
 function removePromotionRule(type, index) {
   if (!requireAdminDelete()) return;
