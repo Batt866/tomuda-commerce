@@ -4806,6 +4806,67 @@ textarea::placeholder {
   border: 1px solid var(--hex-border);
 }
 
+.customer-map-user-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.customer-map-user-marker__pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hex-primary) 28%, transparent);
+  animation: customer-map-user-pulse 1.8s ease-out infinite;
+}
+
+.customer-map-user-marker__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: var(--hex-primary);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+
+.customer-map-user-marker__label {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 14px);
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--hex-border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hex-primary);
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+@keyframes customer-map-user-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
 .count-list {
   display: flex;
   flex-direction: column;

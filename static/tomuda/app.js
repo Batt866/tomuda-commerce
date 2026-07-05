@@ -11798,10 +11798,41 @@ function readBrowserGeolocationWithWatch(options, onSuccess, onError) {
   );
   return watchId;
 }
+function readBrowserGeolocationWatchPromise(options = {}) {
+  const high = {
+    enableHighAccuracy: true,
+    timeout: 35000,
+    maximumAge: 0,
+    ...options,
+  };
+  const low = {
+    enableHighAccuracy: false,
+    timeout: 45000,
+    maximumAge: 120000,
+    ...options,
+  };
+  return new Promise((resolve, reject) => {
+    readBrowserGeolocationWithWatch(
+      high,
+      (pos) => resolve(normalizeDeviceCoords(pos)),
+      (err) => {
+        if (err?.code === 1) {
+          reject(err);
+          return;
+        }
+        readBrowserGeolocationWithWatch(
+          low,
+          (pos) => resolve(normalizeDeviceCoords(pos)),
+          reject,
+        );
+      },
+    );
+  });
+}
 function readBrowserGeolocationPromise(options = {}) {
   const geoOpts = {
     enableHighAccuracy: true,
-    timeout: 25000,
+    timeout: 35000,
     maximumAge: 0,
     ...options,
   };
@@ -11815,7 +11846,7 @@ function readBrowserGeolocationPromise(options = {}) {
             {
               ...geoOpts,
               enableHighAccuracy: false,
-              timeout: 30000,
+              timeout: 45000,
               maximumAge: 120000,
             },
             (pos) => resolve(normalizeDeviceCoords(pos)),
@@ -11827,6 +11858,10 @@ function readBrowserGeolocationPromise(options = {}) {
       },
     );
   });
+}
+function readBrowserGeolocationForDevice(options = {}) {
+  if (isAndroidDevice()) return readBrowserGeolocationWatchPromise(options);
+  return readBrowserGeolocationPromise(options);
 }
 async function ensureCapacitorGeolocationPermission(capGeo) {
   if (!capGeo) return;
@@ -11882,12 +11917,16 @@ async function requestCapacitorPosition(options = {}) {
 }
 function requestDevicePosition(options = {}) {
   if (isCapacitorNative()) {
-    return requestCapacitorPosition(options);
+    return requestCapacitorPosition(options).catch((err) => {
+      const normalized = normalizeGeolocationError(err);
+      if (normalized.code === 1 || !navigator.geolocation) throw normalized;
+      return readBrowserGeolocationForDevice(options);
+    });
   }
   if (!navigator.geolocation) {
     return Promise.reject(Object.assign(new Error("unsupported"), { code: 0 }));
   }
-  return readBrowserGeolocationPromise(options);
+  return readBrowserGeolocationForDevice(options);
 }
 function waitForCustomerMap(callback, attempt = 0) {
   if (window.customerMap) {
@@ -11903,9 +11942,14 @@ function applyCustomerCoords(coords, { setPin = false, hasCustomerPin = false } 
     ln = coords.longitude;
   window.customerUserCoords = [la, ln];
   showCustomerUserMarker(la, ln, coords.accuracy);
-  if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
-  if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
-  else if (status && !hasCustomerPin) status.textContent = "";
+  const shouldPin = setPin || !hasCustomerPin;
+  if (shouldPin) {
+    setCustomerMapPoint(la, ln, "Таны байршил");
+    window.customerMap.setView([la, ln], 16);
+  } else {
+    window.customerMap.setView([la, ln], Math.max(window.customerMap.getZoom(), 15));
+    if (status) status.textContent = "Таны байршил хараглаа";
+  }
   hideCustomerLocationSettingsPrompt();
 }
 function setCustomerMapPoint(la, ln, label = "") {
@@ -11928,22 +11972,23 @@ function setCustomerMapPoint(la, ln, label = "") {
 function showCustomerUserMarker(la, ln, accuracy) {
   if (!window.customerMap || !window.L) return;
   if (window.customerUserMarker) window.customerUserMarker.remove();
-  window.customerUserMarker = window.L.circleMarker([la, ln], {
-    radius: 9,
-    fillColor: "#16899a",
-    color: "#ffffff",
-    weight: 3,
-    fillOpacity: 0.95,
-  })
-    .addTo(window.customerMap)
-    .bindTooltip("Таны байршил", { direction: "top" });
+  window.customerUserMarker = window.L.marker([la, ln], {
+    icon: window.L.divIcon({
+      className: "customer-map-user-marker",
+      html: '<div class="customer-map-user-marker__pulse"></div><div class="customer-map-user-marker__dot"></div><div class="customer-map-user-marker__label">Та энд</div>',
+      iconSize: [56, 56],
+      iconAnchor: [28, 28],
+    }),
+    zIndexOffset: 1200,
+    interactive: false,
+  }).addTo(window.customerMap);
   if (window.customerUserAccuracy) window.customerUserAccuracy.remove();
   if (accuracy && accuracy < 500) {
     window.customerUserAccuracy = window.L.circle([la, ln], {
       radius: accuracy,
       color: "#16899a",
       fillColor: "#16899a",
-      fillOpacity: 0.1,
+      fillOpacity: 0.12,
       weight: 1,
     }).addTo(window.customerMap);
   }
@@ -11959,6 +12004,8 @@ function applyCustomerUserPosition({ setPin = false, hasCustomerPin = false } = 
       status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
     return Promise.resolve();
   }
+  if (status && (setPin || !hasCustomerPin))
+    status.textContent = "Байршил татаж байна...";
   return requestDevicePosition()
     .then((coords) => {
       if (!window.customerMap) return;
@@ -12313,11 +12360,12 @@ function initCustomerMap(lat, lng) {
     L.DomEvent.disableScrollPropagation(mapEl);
     L.DomEvent.disableClickPropagation(mapEl);
   }
-  if (!has && !window.Capacitor?.isNativePlatform?.()) {
-    showCustomerUserLocation(has);
+  if (!has) {
+    setTimeout(() => showCustomerUserLocation(false, { setPin: true }), 400);
   }
   scheduleCustomerMapResize();
   bindCustomerMapLocateButton();
+  bindCustomerMapSettingsButton();
 }
 async function applyCustomerSave(data, id) {
   const incomingImage = String(data.image || "").trim();
