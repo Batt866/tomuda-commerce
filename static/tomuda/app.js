@@ -7201,7 +7201,7 @@ function productsView() {
       : "",
     canManageProducts()
       ? pageToolbarPrimaryBtn(
-          "Бараа нэмэх",
+          "+ Бараа нэмэх",
           "productModal()",
           "btn--toolbar-add-product",
         )
