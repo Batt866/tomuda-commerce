@@ -5897,10 +5897,19 @@ function customerSubtitle(c) {
   if (company && company !== name) parts.push(company);
   return parts.join(" · ");
 }
+const ACTION_VIEW_ICON = `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
 const ACTION_EDIT_ICON = `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5z"/></svg>`;
 const ACTION_DELETE_ICON = `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>`;
 function actionIconButton({ className, label, attrs = "", icon }) {
   return `<button type="button" ${attrs} class="${className}" aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
+}
+function viewIconButton({ className, attrs = "", label = "Харах" }) {
+  return actionIconButton({
+    className,
+    label,
+    attrs,
+    icon: ACTION_VIEW_ICON,
+  });
 }
 function editIconButton({ className, attrs = "", label = "Засах" }) {
   return actionIconButton({
@@ -6615,16 +6624,17 @@ function customerAddress(c) {
   );
 }
 function customerRow(c) {
+  const id = esc(c.id);
   const deleteBtn = canDelete()
     ? deleteIconButton({
-        className: "customer-card__btn customer-card__btn--danger",
-        attrs: `data-confirm-delete="customer" data-id="${esc(c.id)}"`,
+        className: "customer-card__icon-btn",
+        attrs: `data-confirm-delete="customer" data-id="${id}"`,
         label: "Харилцагч устгах",
       })
     : "";
   return customerListRow(
     c,
-    `<button type="button" onclick="customerDetail('${esc(c.id)}')" class="customer-card__btn customer-card__btn--ghost">Харах</button>${editIconButton({ className: "customer-card__btn customer-card__btn--primary", attrs: `onclick="confirmEditCustomer('${esc(c.id)}')"`, label: "Харилцагч засах" })}${deleteBtn}`,
+    `${viewIconButton({ className: "customer-card__icon-btn", attrs: `onclick="customerDetail('${id}')"`, label: "Харах" })}${editIconButton({ className: "customer-card__icon-btn", attrs: `onclick="confirmEditCustomer('${id}')"`, label: "Харилцагч засах" })}${deleteBtn}`,
   );
 }
 function workerPickCard(c) {

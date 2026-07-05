@@ -608,9 +608,9 @@ textarea.text-sm,
   grid-template-areas:
     "head actions"
     "addr actions";
-  gap: 8px 10px;
+  gap: 8px 4px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 10px 4px 10px 12px;
   border-radius: 0;
   border: none;
   border-bottom: 1px solid var(--hex-border);
@@ -1050,15 +1050,43 @@ a.customer-card__line .customer-card__icon {
 .customer-card__actions {
   grid-area: actions;
   display: flex;
+  flex-direction: column;
   flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
   flex-shrink: 0;
-  padding-top: 0;
-  margin-top: 0;
+  padding: 0;
+  margin: 0;
   border-top: none;
   align-self: center;
+  justify-self: end;
+}
+
+.customer-card__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: 1px solid var(--hex-border);
+  border-radius: 8px;
+  background: var(--hex-card);
+  color: var(--hex-muted-foreground);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none !important;
+}
+
+.customer-card__icon-btn .ui-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.customer-card__icon-btn:active {
+  opacity: 0.85;
 }
 
 .customer-card__btn {
@@ -2172,14 +2200,11 @@ a.customer-card__line .customer-card__icon {
 
   .customer-card {
     display: grid;
-    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(
-        200px,
-        auto
-      );
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) auto;
     grid-template-areas: "head addr actions";
-    gap: 12px 16px;
+    gap: 12px 8px;
     align-items: center;
-    padding: 12px 16px;
+    padding: 12px 6px 12px 16px;
     border-radius: 0;
     border: none;
     border-bottom: 1px solid var(--hex-border);
@@ -2197,16 +2222,13 @@ a.customer-card__line .customer-card__icon {
 
   .customer-card__actions {
     grid-area: actions;
-    justify-content: flex-end;
+    flex-direction: column;
+    justify-content: center;
+    justify-self: end;
     flex-wrap: nowrap;
-    padding-top: 0;
-    margin-top: 0;
+    padding: 0;
+    margin: 0;
     border-top: none;
-  }
-
-  .customer-card__btn {
-    flex: 0 0 auto;
-    min-width: 64px;
   }
 
   .customer-card__line span {
