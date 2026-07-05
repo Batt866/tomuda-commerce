@@ -271,6 +271,11 @@ let warehouseDateBlurTimer = null;
 let warehouseDatePickerActiveUntil = 0;
 let receiptStatusSelectActiveUntil = 0;
 let receiptStatusFilterPending = false;
+let toolbarSelectActiveUntil = 0;
+let toolbarSelectBlurTimer = null;
+let toolbarSelectRenderPending = false;
+let userScrollActiveUntil = 0;
+let searchRenderTimer = null;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -3048,6 +3053,9 @@ function shouldDeferBackendSync() {
   if (isWarehouseDateEditing()) return true;
   if (isEditingSettlementText()) return true;
   if (isWhReceiptPickerOpen()) return true;
+  if (isReceiptStatusSelecting()) return true;
+  if (isToolbarSelectActive()) return true;
+  if (isUserScrolling()) return true;
   if (
     state.currentView === "count" &&
     (state.countDone || countSessionActive())
@@ -3055,6 +3063,48 @@ function shouldDeferBackendSync() {
     return true;
   }
   return false;
+}
+function isUserScrolling() {
+  return Date.now() < userScrollActiveUntil;
+}
+function markUserScrollActive() {
+  userScrollActiveUntil = Date.now() + 2000;
+}
+function isToolbarSelectActive() {
+  if (Date.now() < toolbarSelectActiveUntil) return true;
+  const el = document.activeElement;
+  return !!el?.matches?.(
+    ".page-toolbar__select, .page-toolbar__search, select.app-input, .worker-orders-filters select, .worker-orders-filters input[type=date]",
+  );
+}
+function toolbarSelectFocus() {
+  clearTimeout(toolbarSelectBlurTimer);
+  toolbarSelectActiveUntil = Date.now() + 60000;
+}
+function toolbarSelectBlur() {
+  clearTimeout(toolbarSelectBlurTimer);
+  toolbarSelectBlurTimer = setTimeout(() => {
+    toolbarSelectActiveUntil = 0;
+    if (toolbarSelectRenderPending) {
+      toolbarSelectRenderPending = false;
+      render();
+    }
+  }, 400);
+}
+function pageToolbarSelectHandlers() {
+  return ` onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" ontouchstart="toolbarSelectFocus()"`;
+}
+function setProductCategory(value) {
+  state.filters.category = value || "all";
+  render();
+}
+function setOrderStatusFilter(value) {
+  state.filters.order = value || "all";
+  render();
+}
+function setWorkerPayFilter(value) {
+  state.filters.workerPay = value || "all";
+  render();
 }
 function syncBackendSaveMarker(stateData = null) {
   backendLastSaved = backendStateSnapshot(stateData || persistentState());
@@ -3300,6 +3350,11 @@ function safeRender() {
     receiptStatusFilterPending = true;
     return;
   }
+  if (isToolbarSelectActive()) {
+    toolbarSelectRenderPending = true;
+    return;
+  }
+  if (isUserScrolling()) return;
   if (isEditingSettlementText()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
@@ -3409,6 +3464,7 @@ function completeBootUiInit(options = {}) {
   restoreAuthSession();
   initNoZoom();
   initNestedScrollChain();
+  initScrollRenderGuard();
   initPickerModalActions();
   initEmployeeModalActions();
   initQtyStepperButtons();
@@ -4096,7 +4152,39 @@ function initNoZoom() {
   );
 }
 const NESTED_SCROLL_CHAIN_SELECTOR =
-  ".worker-order-lines-wrap, .picker-step2__scroll, .stock-alert-list, .employee-form__body, .modal-scroll";
+  ".line-list--scroll, .worker-order-lines-wrap, .picker-step2__scroll, .stock-alert-list, .employee-form__body, .modal-scroll";
+
+function initScrollRenderGuard() {
+  if (initScrollRenderGuard._bound) return;
+  initScrollRenderGuard._bound = true;
+  document.addEventListener(
+    "scroll",
+    (e) => {
+      const t = e.target;
+      if (
+        t?.matches?.(
+          ".app-main, .line-list--scroll, .line-list, .product-list, .wh-receipt-list",
+        )
+      ) {
+        markUserScrollActive();
+      }
+    },
+    { passive: true, capture: true },
+  );
+  document.addEventListener(
+    "touchstart",
+    (e) => {
+      if (
+        e.target?.closest?.(
+          ".line-list--scroll, .line-list, .product-list, .app-main, .wh-receipt-list",
+        )
+      ) {
+        markUserScrollActive();
+      }
+    },
+    { passive: true, capture: true },
+  );
+}
 
 function findScrollableParent(node) {
   while (node && node !== document.documentElement) {
@@ -4651,12 +4739,15 @@ function go(view, opts = {}) {
 }
 function search(key, value) {
   state.searches[key] = value;
-  render();
-  const el = document.querySelector(`[data-focus="${key}"]`);
-  if (el) {
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }
+  clearTimeout(searchRenderTimer);
+  searchRenderTimer = setTimeout(() => {
+    render();
+    const el = document.querySelector(`[data-focus="${key}"]`);
+    if (el) {
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, 220);
 }
 function scrollAppMainToTop() {
   requestAnimationFrame(() => {
@@ -4666,9 +4757,11 @@ function scrollAppMainToTop() {
 let lastRenderedView = null;
 function captureRenderScroll() {
   const main = document.querySelector(".app-main");
+  const lineList = document.querySelector(".line-list--scroll");
   const snap = {
     sameView: lastRenderedView === state.currentView,
     mainTop: main?.scrollTop ?? 0,
+    lineListTop: lineList?.scrollTop ?? null,
     pickerLists: {},
     receiptListTop: null,
   };
@@ -4706,6 +4799,10 @@ function restoreRenderScroll(snap) {
     if (snap.receiptListTop != null) {
       const receiptList = document.querySelector(".wh-receipt-list");
       if (receiptList) receiptList.scrollTop = snap.receiptListTop;
+    }
+    if (snap.lineListTop != null) {
+      const lineList = document.querySelector(".line-list--scroll");
+      if (lineList) lineList.scrollTop = snap.lineListTop;
     }
   });
 }
@@ -5740,7 +5837,7 @@ function orderReceiptsPanel({
   const exportBtn = excelDownloadBtn(
     `confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
   );
-  const toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}<select onchange="state.filters.order=this.value;render()" class="page-toolbar__select app-input"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select>`;
+  const toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}<select onchange="setOrderStatusFilter(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input"><option value="all">Бүгд</option>${["pending", "confirmed", "delivered", "cancelled"].map((s) => `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`).join("")}</select>`;
   const toolbarActions = `${exportBtn}${showCreate ? pageToolbarPrimaryBtn("+ Шинэ", "orderModal()") : ""}`;
   return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border"><h2 class="page-head__title">${title}</h2></div><div class="px-3 pb-3">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}</div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold">Захиалга</th><th class="px-4 py-3 text-left text-xs font-semibold">Ажилтан</th><th class="px-4 py-3 text-left text-xs font-semibold">Бараа</th><th class="px-4 py-3 text-left text-xs font-semibold">Төлөв</th><th class="px-4 py-3 text-right text-xs font-semibold">Дүн</th><th class="px-4 py-3 text-right text-xs font-semibold">Үйлдэл</th></tr></thead><tbody class="divide-y divide-border">${rows.map(orderRow).join("")}</tbody></table></div>${rows.length ? "" : `<div class="p-12 text-center text-muted-foreground">Захиалга олдсонгүй</div>`}</section>`;
 }
@@ -5808,7 +5905,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     exportBtn = excelDownloadBtn(
       `confirmWarehouseReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
     ),
-    toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${statusOptions
+    toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="setOrderStatusFilter(this.value)" onfocus="receiptStatusFilterFocus()" onblur="receiptStatusFilterBlur()" ontouchstart="receiptStatusFilterFocus()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${statusOptions
       .map(
         (s) =>
           `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
@@ -6777,7 +6874,7 @@ function productsView() {
         (cat === "all" || p.category === cat),
     ),
     low = lowStockProducts().length;
-  const toolbarFilters = `${pageToolbarSearch({ focusKey: "products", value: q, placeholder: "Хайх..." })}<select onchange="state.filters.category=this.value;render()" class="page-toolbar__select app-input"><option value="all">Бүх төрөл</option>${cats()
+  const toolbarFilters = `${pageToolbarSearch({ focusKey: "products", value: q, placeholder: "Хайх..." })}<select onchange="setProductCategory(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input"><option value="all">Бүх төрөл</option>${cats()
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join("")}</select>`;
   const toolbarActions = [
@@ -10797,7 +10894,7 @@ function scrollWorkerOrdersToDate() {
   if (!day) return;
   document
     .querySelector(`[data-order-day="${day}"]`)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    ?.scrollIntoView({ behavior: "auto", block: "nearest" });
 }
 function scrollWarehouseReceiptListToActive() {
   if (state.currentView !== "warehouseReceipts") return;
@@ -11380,7 +11477,7 @@ function workerOrders(orders) {
     today = todayIso(),
     todayPastDisabled = isDayBeforeToday(day),
     todayBtnClass = `worker-orders-filters__chip${day === today ? " is-active" : ""}${todayPastDisabled ? " is-disabled" : ""}`;
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="${todayBtnClass}"${todayPastDisabled ? " disabled" : ""}>Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="state.filters.workerPay=this.value;render()" class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="setWorkerOrderDate('${today}')" class="${todayBtnClass}"${todayPastDisabled ? " disabled" : ""}>Өнөөдөр</button><input type="date" value="${day}" onchange="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">Захиалга байхгүй</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   orderReceiptModal(id);
@@ -11458,8 +11555,6 @@ function render() {
   } else {
     destroyDeliveryMap();
   }
-  if (state.filters.worker === "orders")
-    requestAnimationFrame(scrollWorkerOrdersToDate);
   if (state.currentView === "warehouseReceipts" && !isWhReceiptPickerOpen())
     scrollWarehouseReceiptListToActive();
   bindReceiptPrintWorkerPickerDismiss();
@@ -14620,6 +14715,13 @@ Object.assign(window, {
   printSelectedOrderReceipts,
   printOrderReceiptsNow,
   scrollWorkerOrdersToDate,
+  toolbarSelectFocus,
+  toolbarSelectBlur,
+  setProductCategory,
+  setOrderStatusFilter,
+  setWorkerPayFilter,
+  receiptStatusFilterFocus,
+  receiptStatusFilterBlur,
   openPromotionQtyModal,
   openPromotionPage,
   promotionQtyModal,

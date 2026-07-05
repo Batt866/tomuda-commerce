@@ -11105,6 +11105,13 @@ textarea::placeholder {
   -webkit-overflow-scrolling: touch;
 }
 
+@media (max-width: 1023px) {
+  .app-shell--bottom-nav .line-list--scroll {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 .line-list__row {
   display: block;
   width: 100%;
