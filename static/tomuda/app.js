@@ -11585,8 +11585,11 @@ function capGeolocationPlugin() {
   }
   return null;
 }
-async function waitForCapGeolocationPlugin(attempts = 40) {
+async function waitForCapGeolocationPlugin(attempts = 80) {
   for (let i = 0; i < attempts; i++) {
+    if (typeof window.__initTomudaGeolocation === "function") {
+      window.__initTomudaGeolocation();
+    }
     const plugin = capGeolocationPlugin();
     if (plugin) return plugin;
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -11609,19 +11612,38 @@ function geolocationPermissionDenied(perm = {}) {
 function normalizeGeolocationError(err) {
   if (!err) return Object.assign(new Error("geolocation"), { code: 2 });
   const msg = String(err.message || err.errorMessage || "").toLowerCase();
+  const capCode = String(err.code || "");
   const normalized =
     err instanceof Error ? err : new Error(msg || "geolocation error");
+  if (capCode.includes("OS-PLUG-GLOC-0003") || capCode.includes("OS-PLUG-GLOC-0009")) {
+    normalized.code = 1;
+    return normalized;
+  }
+  if (
+    capCode.includes("OS-PLUG-GLOC-0007") ||
+    capCode.includes("OS-PLUG-GLOC-0016") ||
+    capCode.includes("OS-PLUG-GLOC-0017")
+  ) {
+    normalized.code = 2;
+    return normalized;
+  }
+  if (capCode.includes("OS-PLUG-GLOC-0010")) {
+    normalized.code = 3;
+    return normalized;
+  }
   if (normalized.code == null) {
     if (msg.includes("denied") || msg.includes("permission")) normalized.code = 1;
     else if (
       msg.includes("disabled") ||
       msg.includes("not enabled") ||
       msg.includes("unavailable") ||
-      msg.includes("provider")
+      msg.includes("provider") ||
+      msg.includes("turned off")
     )
       normalized.code = 2;
-    else if (msg.includes("timeout")) normalized.code = 3;
-    else if (msg.includes("unsupported")) normalized.code = 0;
+    else if (msg.includes("timeout") || msg.includes("in time")) normalized.code = 3;
+    else if (msg.includes("unsupported") || msg.includes("plugin missing"))
+      normalized.code = 0;
     else normalized.code = 2;
   }
   return normalized;
@@ -11882,27 +11904,46 @@ async function ensureCapacitorGeolocationPermission(capGeo) {
     throw denied;
   }
 }
-async function readCapacitorPosition(capGeo, options = {}) {
+async function readCapacitorPosition(capGeo, options = {}, { androidFirst = false } = {}) {
   const geo = capGeo || (await waitForCapGeolocationPlugin());
   if (!geo) {
     const missing = new Error("Capacitor Geolocation plugin missing");
     missing.code = 0;
     throw missing;
   }
-  const attempts = [
-    {
-      enableHighAccuracy: true,
-      timeout: 35000,
-      maximumAge: 0,
-      ...options,
-    },
-    {
-      enableHighAccuracy: false,
-      timeout: 45000,
-      maximumAge: 120000,
-      ...options,
-    },
-  ];
+  const attempts = androidFirst
+    ? [
+        {
+          enableHighAccuracy: false,
+          timeout: 25000,
+          maximumAge: 60000,
+          enableLocationFallback: true,
+          ...options,
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 60000,
+          maximumAge: 0,
+          enableLocationFallback: true,
+          ...options,
+        },
+      ]
+    : [
+        {
+          enableHighAccuracy: true,
+          timeout: 35000,
+          maximumAge: 0,
+          enableLocationFallback: true,
+          ...options,
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 45000,
+          maximumAge: 120000,
+          enableLocationFallback: true,
+          ...options,
+        },
+      ];
   let lastErr = null;
   for (const geoOpts of attempts) {
     try {
@@ -11910,6 +11951,7 @@ async function readCapacitorPosition(capGeo, options = {}) {
         enableHighAccuracy: geoOpts.enableHighAccuracy,
         timeout: geoOpts.timeout,
         maximumAge: geoOpts.maximumAge,
+        enableLocationFallback: geoOpts.enableLocationFallback !== false,
       });
       return normalizeDeviceCoords(pos);
     } catch (err) {
@@ -11926,20 +11968,38 @@ async function requestCapacitorPosition(options = {}) {
     missing.code = 0;
     throw missing;
   }
-  await ensureCapacitorGeolocationPermission(capGeo);
-  return readCapacitorPosition(capGeo, options);
+  return readCapacitorPosition(capGeo, options, {
+    androidFirst: isAndroidDevice(),
+  });
 }
 async function requestDevicePosition(options = {}) {
-  const capGeo = isCapacitorNative() ? await waitForCapGeolocationPlugin() : null;
-  if (capGeo) {
-    await ensureCapacitorGeolocationPermission(capGeo).catch((err) => {
-      throw normalizeGeolocationError(err);
-    });
+  const androidNative = isCapacitorNative() && isAndroidDevice();
+
+  if (androidNative) {
+    const capGeo = await waitForCapGeolocationPlugin();
+    if (!capGeo) {
+      const missing = new Error("Capacitor Geolocation plugin missing");
+      missing.code = 0;
+      throw missing;
+    }
+    try {
+      return await readCapacitorPosition(capGeo, options, { androidFirst: true });
+    } catch (nativeErr) {
+      const normalized = normalizeGeolocationError(nativeErr);
+      if (navigator.geolocation && normalized.code !== 1) {
+        try {
+          return await readBrowserGeolocationForDevice(options);
+        } catch (browserErr) {
+          throw normalized.code !== 2 ? normalized : normalizeGeolocationError(browserErr);
+        }
+      }
+      throw normalized;
+    }
   }
 
+  const capGeo = isCapacitorNative() ? await waitForCapGeolocationPlugin() : null;
   let lastErr = null;
 
-  // iPhone шиг эхлээд browser GPS (iOS WebView дээр сайн ажилладаг)
   if (navigator.geolocation) {
     try {
       return await readBrowserGeolocationForDevice(options);
@@ -11949,7 +12009,6 @@ async function requestDevicePosition(options = {}) {
     }
   }
 
-  // Android app дээр native Capacitor GPS (registerPlugin-ээр холбогдсон)
   if (capGeo) {
     try {
       return await readCapacitorPosition(capGeo, options);
