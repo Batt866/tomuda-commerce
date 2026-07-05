@@ -277,6 +277,8 @@ let whReceiptPickerSuppressDismissUntil = 0;
 let whReceiptPickerSkipAnim = false;
 let settlementRenderPending = false;
 let settlementBlurTimer = null;
+let loginFormActiveUntil = 0;
+let loginFormGuardBound = false;
 let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
@@ -3041,7 +3043,7 @@ function localStateDirty() {
   return backendStateSnapshot() !== backendLastSaved;
 }
 function shouldDeferBackendSync() {
-  if (isEditingLoginForm()) return true;
+  if (isLoginFormActive()) return true;
   if (isEditingCountQty()) return true;
   if (isWarehouseDateEditing()) return true;
   if (isEditingSettlementText()) return true;
@@ -3127,9 +3129,88 @@ function isEditingLoginForm() {
   const el = document.activeElement;
   return !!el?.closest?.(".auth-form");
 }
+function armLoginFormGuard(ms = 600000) {
+  loginFormActiveUntil = Date.now() + ms;
+}
+function isLoginFormActive() {
+  if (Date.now() < loginFormActiveUntil) return true;
+  return isEditingLoginForm();
+}
+function captureLoginFormSnapshot() {
+  const email = document.getElementById("loginEmail");
+  const password = document.getElementById("loginPassword");
+  const remember = document.getElementById("loginRemember");
+  if (!email && !password) return null;
+  return {
+    email: email?.value || "",
+    password: password?.value || "",
+    remember: !!remember?.checked,
+    focusId:
+      document.activeElement?.id === "loginEmail" ||
+      document.activeElement?.id === "loginPassword"
+        ? document.activeElement.id
+        : "",
+    selectionStart:
+      document.activeElement?.selectionStart == null
+        ? null
+        : document.activeElement.selectionStart,
+    selectionEnd:
+      document.activeElement?.selectionEnd == null
+        ? null
+        : document.activeElement.selectionEnd,
+  };
+}
+function restoreLoginFormSnapshot(snapshot) {
+  if (!snapshot) return;
+  const email = document.getElementById("loginEmail");
+  const password = document.getElementById("loginPassword");
+  const remember = document.getElementById("loginRemember");
+  if (email) email.value = snapshot.email;
+  if (password) password.value = snapshot.password;
+  if (remember) remember.checked = snapshot.remember;
+  const focusEl = snapshot.focusId
+    ? document.getElementById(snapshot.focusId)
+    : null;
+  if (!focusEl) return;
+  requestAnimationFrame(() => {
+    focusEl.focus({ preventScroll: true });
+    if (
+      snapshot.selectionStart != null &&
+      snapshot.selectionEnd != null &&
+      typeof focusEl.setSelectionRange === "function"
+    ) {
+      try {
+        focusEl.setSelectionRange(
+          snapshot.selectionStart,
+          snapshot.selectionEnd,
+        );
+      } catch (e) {}
+    }
+  });
+}
+function bindLoginFormGuard() {
+  const form = document.querySelector(".auth-form");
+  if (!form) return;
+  if (!form.dataset.guardBound) {
+    form.dataset.guardBound = "1";
+    const arm = () => armLoginFormGuard();
+    form.addEventListener("focusin", arm);
+    form.addEventListener("input", arm);
+    form.addEventListener("touchstart", arm, { passive: true });
+    form.addEventListener("pointerdown", arm, { passive: true });
+  }
+  loginFormGuardBound = true;
+}
 function mountLoginView(force = false) {
-  if (!force && app.querySelector(".auth-screen")) return;
+  const existing = app.querySelector(".auth-screen");
+  if (!force && existing) {
+    bindLoginFormGuard();
+    return;
+  }
+  const snapshot = force ? null : captureLoginFormSnapshot();
   app.innerHTML = loginView();
+  bindLoginFormGuard();
+  restoreLoginFormSnapshot(snapshot);
 }
 function isWhReceiptPickerOpen() {
   return !!(
@@ -3206,6 +3287,7 @@ function closeReceiptPrintPickersState() {
   state.permissionEmployeePickerOpen = false;
 }
 function safeRender() {
+  if (!state.isLoggedIn && isLoginFormActive()) return;
   if (isEditingCountQty()) {
     countRenderPending = true;
     return;
@@ -3257,6 +3339,7 @@ function applyRemoteState(payload) {
   }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   saveLocalBackendCache({ state: merged, updatedAt: payload.updatedAt || "" });
+  if (!state.isLoggedIn) return true;
   safeRender();
   if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
@@ -11260,7 +11343,7 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
-  if (!state.isLoggedIn && isEditingLoginForm()) return;
+  if (!state.isLoggedIn && isLoginFormActive()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
   settlementRenderPending = false;
@@ -11553,9 +11636,34 @@ function normalizeDeviceCoords(raw = {}) {
 function readBrowserGeolocation(options, onSuccess, onError) {
   if (!navigator.geolocation) {
     onError(Object.assign(new Error("unsupported"), { code: 0 }));
-    return;
+    return null;
   }
   navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
+  return true;
+}
+function readBrowserGeolocationWithWatch(options, onSuccess, onError) {
+  if (!navigator.geolocation) {
+    onError(Object.assign(new Error("unsupported"), { code: 0 }));
+    return null;
+  }
+  let settled = false;
+  const finish = (fn, value) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    if (watchId != null) navigator.geolocation.clearWatch(watchId);
+    fn(value);
+  };
+  let watchId = null;
+  const timer = setTimeout(() => {
+    finish(onError, Object.assign(new Error("timeout"), { code: 3 }));
+  }, Number(options.timeout || 25000) + 2000);
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => finish(onSuccess, pos),
+    (err) => finish(onError, err),
+    options,
+  );
+  return watchId;
 }
 function readBrowserGeolocationPromise(options = {}) {
   const geoOpts = {
@@ -11724,46 +11832,67 @@ function centerCustomerMapOnUser() {
     if (status) status.textContent = geolocationErrorMessage(err);
   };
   const onCoords = (coords) => {
+    const apply = () => {
+      applyCustomerCoords(coords, { setPin: true, hasCustomerPin: hasPin });
+      scheduleCustomerMapResize();
+    };
     if (!window.customerMap) {
       waitForCustomerMap(() => {
         if (!window.customerMap) {
           onFail(Object.assign(new Error("map unavailable"), { code: 2 }));
           return;
         }
-        applyCustomerCoords(coords, { setPin: true, hasCustomerPin: hasPin });
+        apply();
       });
       return;
     }
-    applyCustomerCoords(coords, { setPin: true, hasCustomerPin: hasPin });
+    apply();
   };
-  if (!capGeolocationPlugin() && !navigator.geolocation) {
+  if (!navigator.geolocation && !capGeolocationPlugin()) {
     if (status) status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
     return;
   }
   if (status) status.textContent = "Байршил татаж байна...";
-  if (navigator.geolocation && !capGeolocationPlugin()) {
-    readBrowserGeolocation(
-      { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 },
+  const tryCapacitor = () => {
+    requestDevicePosition()
+      .then(onCoords)
+      .catch(onFail);
+  };
+  const tryBrowser = (opts, next) => {
+    if (!navigator.geolocation) {
+      next();
+      return;
+    }
+    readBrowserGeolocationWithWatch(
+      opts,
       (pos) => onCoords(normalizeDeviceCoords(pos)),
       (err) => {
-        if (err?.code === 3 || err?.code === 2) {
-          readBrowserGeolocation(
+        if ((err?.code === 3 || err?.code === 2) && opts.enableHighAccuracy) {
+          tryBrowser(
             {
               enableHighAccuracy: false,
               timeout: 30000,
               maximumAge: 120000,
             },
-            (pos) => onCoords(normalizeDeviceCoords(pos)),
-            onFail,
+            next,
           );
           return;
         }
-        onFail(err);
+        next(err);
       },
     );
-    return;
-  }
-  requestDevicePosition().then(onCoords).catch(onFail);
+  };
+  tryBrowser(
+    { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 },
+    (err) => {
+      if (capGeolocationPlugin()) {
+        tryCapacitor();
+        return;
+      }
+      if (err) onFail(err);
+      else if (status) status.textContent = "Байршил авахад алдаа гарлаа";
+    },
+  );
 }
 function bindCustomerMapLocateButton() {
   const btn = document.querySelector(".customer-map-locate");
@@ -13602,6 +13731,7 @@ function login(e) {
   );
   state.currentEmployee = emp;
   state.isLoggedIn = true;
+  loginFormActiveUntil = 0;
   state.orderEmployee = emp.id;
   applyLoginRoleDefaults(emp);
   ensureOrderEmployeeSelection();

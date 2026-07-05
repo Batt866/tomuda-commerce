@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#16899a" />
@@ -274,12 +274,12 @@
     </style>
     <link
       rel="preload"
-      href="{% static 'tomuda/styles.css' %}?v=20260705-customer-add-primary"
+      href="{% static 'tomuda/styles.css' %}?v=20260705-mobile-fixes"
       as="style"
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260705-customer-add-primary"
+      href="{% static 'tomuda/app.js' %}?v=20260705-mobile-fixes"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -317,7 +317,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260705-customer-add-primary"
+      href="{% static 'tomuda/styles.css' %}?v=20260705-mobile-fixes"
     />
   </head>
   <body>
@@ -417,8 +417,9 @@
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
     <script src="{% static 'tomuda/permissions.js' %}?v=20260630-perm-view-deps"></script>
+    <script src="{% static 'tomuda/capacitor-geolocation.js' %}?v=20260705-mobile-fixes"></script>
     <script
-      src="{% static 'tomuda/app.js' %}?v=20260705-customer-add-primary"
+      src="{% static 'tomuda/app.js' %}?v=20260705-mobile-fixes"
       onerror="
         __showTomudaFatal(
           'App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.',
