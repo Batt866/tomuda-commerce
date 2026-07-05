@@ -76,7 +76,7 @@ python manage.py collectstatic --noinput
 python manage.py migrate --noinput
 python manage.py sanitize_state --apply || true
 python manage.py seed_tomuda --only-if-empty || true
-python manage.py sync_product_images || true
+python manage.py sync_product_images --timeout 8 || true
 
 chown -R "$APP_USER:$APP_USER" "$APP_DIR/media" "$APP_DIR/staticfiles" 2>/dev/null || true
 
