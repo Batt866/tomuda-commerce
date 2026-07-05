@@ -1120,7 +1120,7 @@ function paidFromPaymentTerm(term) {
   return term === "cash";
 }
 function paymentTermLabel(term) {
-  return term === "credit" ? "Зээлээр" : "Бэлнээр";
+  return term === "credit" ? "Зээлээр" : "Шууд төлөх";
 }
 function orderIsPaid(o) {
   if (!o) return false;
@@ -5361,7 +5361,7 @@ function buildOrderReceiptExcelRows(o) {
       ["Компани", c.companyName || "-"],
       ["Утас", c.phone1 || "-"],
       ["Хаяг", addr === "-" ? "" : addr],
-      ["Төлбөр", paid ? "Бэлнээр" : "Дансаар"],
+      ["Төлбөр", paid ? "Шууд төлөх" : "Дансаар"],
       ["Төлөв", status(o.status)],
       [],
       ["№", "Барааны нэр", "Нэгж", "Баркод", "Тоо/ш", "Нэгж үнэ", "Нийт үнэ"],
@@ -6173,7 +6173,7 @@ function warehouseOrderDetail(o) {
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}', event)" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Шууд төлөх" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}', event)" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
@@ -9816,6 +9816,8 @@ function confirmSetPaid(id) {
     onConfirm: () => setPaid(id, true),
   });
 }
+const PROMO_PRODUCT_LABEL = "Урамшуулалын бараа";
+const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
 function promotionTypeLabel(type) {
   return (
     {
@@ -10183,7 +10185,7 @@ function promoPickConflict(pickKey, id) {
   if (pickKey === "buyProductIds") {
     const freeIds = promotionPickIds(pick, "freeProductIds");
     if (freeIds.includes(id)) {
-      return "Үнэгүй өгөх бараатай ижил байж болохгүй.";
+      return "Урамшуулалын бараатай ижил байж болохгүй.";
     }
   }
   if (pickKey === "freeProductIds") {
@@ -10260,7 +10262,7 @@ function promotionQtyRuleText(r) {
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Сонгосон бараануудаас нийт тодорхой тоо авахад өөр барааг үнэгүй өгнө.</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Багцын хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцад хамаарах урамшуулалын бараа сонгох</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Багцын хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -10298,7 +10300,7 @@ function promotionQtyRuleCard(r, i) {
           `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
-  return `<div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="text-muted-foreground shrink-0">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
+  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -10320,10 +10322,10 @@ function promotionPricePanel(rows) {
   const sorted = [...rows].sort(
     (a, b) => (Number(a.minAmount) || 0) - (Number(b.minAmount) || 0),
   );
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд үнэгүй бараа эсвэл хувийн хөнгөлөлт олгоно.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">Нийт үнийн дүнгийн хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд урамшуулалын бараа эсвэл хувийн хөнгөлөлт олгон.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">Нийт үнийн дүнгийн хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionPaymentRuleText(r) {
-  const term = r.paymentTerm === "credit" ? "Дансаар" : "Бэлнээр",
+  const term = r.paymentTerm === "credit" ? "Зээлээр" : "Шууд төлөх",
     min = Number(r.minAmount) || 0,
     minText = min > 0 ? ` · ${fmt(min)}-с дээш` : "";
   if (
@@ -10336,7 +10338,7 @@ function promotionPaymentRuleText(r) {
   return `${term}${minText} · ${freeNames || "-"} ${r.freeQty || 1} ш үнэгүй`;
 }
 function promotionPaymentPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн хэлбэр (бэлэн эсвэл дансаар) сонгосон үед хөнгөлөлт эсвэл үнэгүй бараа олгоно.</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн нөхцлөөс хамаарах урамшуулалын бараа сонгох</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionPaymentRuleCard(r, i) {
   return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('payment',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
@@ -10375,7 +10377,7 @@ function promotionQtyModal() {
     freeIds = state.promoPick.freeProductIds;
   box(
     "Багцын хөнгөлөлт",
-    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds, freeIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: buyIds, title: "Үнэгүй өгөх бараа", hint: "Олон бараа сонгож болно", placeholder: "Үнэгүй бараа хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds, freeIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: buyIds, title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно", placeholder: "${PROMO_PRODUCT_LABEL} хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
 }
@@ -10404,7 +10406,7 @@ function promotionPriceModal() {
   }
   const type = state.promoPriceRuleType === "percent" ? "percent" : "free",
     freeIds = state.promoPick.priceFreeProductIds || [],
-    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувийн хөнгөлөлт</button></div>`,
+    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">${PROMO_PRODUCT_LABEL}</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">${PROMO_PERCENT_TAB_LABEL}</button></div>`,
     amountFields = `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { required: true, placeholder: "200000", value: promoFormDraftVal("minAmount") })}</label><label class="block"><span class="block text-sm font-medium mb-2">Дээд дүн (₮)</span>${promoAmountInputHtml("maxAmount", { placeholder: "400000", value: promoFormDraftVal("maxAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label></div>`,
     freeBlock =
       type === "free"
@@ -10412,7 +10414,7 @@ function promotionPriceModal() {
             pickKey: "priceFreeProductIds",
             fieldName: "priceFreeProductIds",
             selectedIds: freeIds,
-            title: "Үнэгүй өгөх бараа",
+            title: PROMO_PRODUCT_LABEL,
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайж нэмэх...",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
@@ -10420,7 +10422,7 @@ function promotionPriceModal() {
         : "",
     percentBlock =
       type === "percent"
-        ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
+        ? `<label class="block"><span class="block text-sm font-medium mb-2">${PROMO_PERCENT_TAB_LABEL} (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
         : "";
   box(
     "Нийт үнийн дүнгээс хөнгөлөлт олгох",
@@ -10460,8 +10462,8 @@ function promotionPaymentModal() {
   const term = state.promoPaymentTerm === "credit" ? "credit" : "cash",
     type = state.promoPaymentRuleType === "percent" ? "percent" : "free",
     freeIds = state.promoPick.paymentFreeProductIds || [],
-    termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Бэлнээр</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Дансаар</button></div>`,
-    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">Үнэгүй бараа</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувь тооцох</button></div>`,
+    termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Шууд төлөх</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Зээлээр</button></div>`,
+    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">${PROMO_PRODUCT_LABEL}</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувь тооцох</button></div>`,
     minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { placeholder: "0", value: promoFormDraftVal("minAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
     freeBlock =
       type === "free"
@@ -10469,7 +10471,7 @@ function promotionPaymentModal() {
             pickKey: "paymentFreeProductIds",
             fieldName: "paymentFreeProductIds",
             selectedIds: freeIds,
-            title: "Үнэгүй өгөх бараа",
+            title: PROMO_PRODUCT_LABEL,
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайх...",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
@@ -10497,11 +10499,11 @@ function savePromotionQty(e) {
       buyProductIds = f.getAll("buyProductIds").filter(Boolean),
       freeProductIds = f.getAll("freeProductIds").filter(Boolean);
     if (!buyProductIds.length || !freeProductIds.length) {
-      alert("Авах болон үнэгүй бараа сонгоно уу");
+      alert("Авах болон урамшуулалын бараа сонгоно уу");
       return;
     }
     if (buyProductIds.some((id) => freeProductIds.includes(id))) {
-      alert("Авах болон үнэгүй бараа өөр байх ёстой");
+      alert("Авах болон урамшуулалын бараа өөр байх ёстой");
       return;
     }
     const added = appendPromotionRule("quantity", {
@@ -10759,7 +10761,7 @@ function savePromotionPrice(e) {
         .getAll("priceFreeProductIds")
         .filter(Boolean);
       if (!freeProductIds.length) {
-        alert("Үнэгүй бараа сонгоно уу");
+        alert(`${PROMO_PRODUCT_LABEL} сонгоно уу`);
         return;
       }
       rule.freeProductIds = freeProductIds;
@@ -10806,7 +10808,7 @@ function savePromotionPayment(e) {
         .getAll("paymentFreeProductIds")
         .filter(Boolean);
       if (!freeProductIds.length) {
-        alert("Үнэгүй бараа сонгоно уу");
+        alert(`${PROMO_PRODUCT_LABEL} сонгоно уу`);
         return;
       }
       rule.freeProductIds = freeProductIds;
