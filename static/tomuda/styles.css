@@ -1430,9 +1430,6 @@ a.customer-card__line .customer-card__icon {
 .list-action-toolbar .excel-import-toolbar__btn {
   min-height: var(--field-h);
   height: var(--field-h);
-  background: var(--hex-card);
-  color: var(--hex-foreground);
-  border: 1.5px solid var(--hex-border);
 }
 
 .list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-excel {
@@ -1445,6 +1442,18 @@ a.customer-card__line .customer-card__icon {
   background: #d4eddf;
   border-color: #7bc499;
   color: #0d6635;
+}
+
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-secondary {
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary);
+  border-color: color-mix(in srgb, var(--hex-primary) 38%, var(--hex-border));
+}
+
+.list-action-toolbar .excel-import-toolbar__btn.btn--toolbar-secondary:hover:not(:disabled) {
+  background: var(--hex-primary-active);
+  border-color: var(--hex-primary);
+  color: var(--hex-primary-dark);
 }
 
 .list-panel {
@@ -11953,6 +11962,30 @@ body.image-lightbox-open {
   font-size: 13px;
   font-weight: 600;
   gap: 6px;
+}
+
+.excel-import-toolbar__btn.btn--toolbar-excel {
+  background: #e8f5ec;
+  color: #107c41;
+  border-color: #9fd4b3;
+}
+
+.excel-import-toolbar__btn.btn--toolbar-excel:hover:not(:disabled) {
+  background: #d4eddf;
+  border-color: #7bc499;
+  color: #0d6635;
+}
+
+.excel-import-toolbar__btn.btn--toolbar-secondary {
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary);
+  border-color: color-mix(in srgb, var(--hex-primary) 38%, var(--hex-border));
+}
+
+.excel-import-toolbar__btn.btn--toolbar-secondary:hover:not(:disabled) {
+  background: var(--hex-primary-active);
+  border-color: var(--hex-primary);
+  color: var(--hex-primary-dark);
 }
 
 .excel-import-toolbar__label {
