@@ -2263,6 +2263,9 @@ function currentPageTitle(nav) {
     const c = state.customers.find((x) => x.id === state.workerCustomer);
     if (c?.name) return c.name;
   }
+  if (state.currentView === "promotions" && state.filters.promotionDetail) {
+    return promotionTypeLabel(state.filters.promotionDetail);
+  }
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрх үүсгэх",
@@ -2275,9 +2278,6 @@ function currentPageTitle(nav) {
   if (extra[state.currentView]) return extra[state.currentView];
   const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
   if (hit) return hit[1];
-  if (state.currentView === "promotions" && state.filters.promotionDetail) {
-    return promotionTypeLabel(state.filters.promotionDetail);
-  }
   return "ТОМУДА";
 }
 const PRODUCT_IMAGE_FALLBACK =
@@ -9803,7 +9803,7 @@ function promotionTypeLabel(type) {
     }[type] || "Урамшуулал"
   );
 }
-function promotionMenuHtml() {
+function promotionMenuHtml(activeType = "") {
   const items = [
     ["price", "Нийт үнийн дүнгээс хөнгөлөлт олгох"],
     ["quantity", "Багцын хөнгөлөлт"],
@@ -9815,7 +9815,8 @@ function promotionMenuHtml() {
       const badge = count
         ? `<span class="promo-type-menu__count">${count}</span>`
         : "";
-      return `<button type="button" onclick="openPromotionPage('${id}')" class="admin-menu__item promo-type-menu__item"><span class="promo-type-menu__label">${esc(label)}</span>${badge}</button>`;
+      const active = activeType === id ? " is-active" : "";
+      return `<button type="button" onclick="openPromotionPage('${id}')" class="admin-menu__item promo-type-menu__item${active}" aria-current="${activeType === id ? "page" : "false"}"><span class="promo-type-menu__label">${esc(label)}</span>${badge}</button>`;
     })
     .join("")}</nav>`;
 }
@@ -9840,7 +9841,7 @@ function promotionsView() {
         : detail === "payment"
           ? promotionPaymentPanel(payment)
           : promotionPricePanel(price);
-  return `<div class="space-y-4">${pageHead(promotionTypeLabel(detail))}${panel}</div>`;
+  return `<div class="space-y-4">${pageHead(promotionTypeLabel(detail))}${promotionMenuHtml(detail)}${panel}</div>`;
 }
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
@@ -10138,12 +10139,12 @@ function promoPickSearch(pickKey, value) {
   const key = promoPickSearchKey(pickKey);
   if (!key) return;
   state.searches[key] = value;
-  refreshPromoModal();
+  refreshPromoModal({ focusPickKey: value.trim() ? pickKey : "" });
   if (value.trim()) {
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-promo-pick="${pickKey}"]`);
       if (el) {
-        el.focus();
+        el.focus({ preventScroll: true });
         el.setSelectionRange(el.value.length, el.value.length);
       }
     });
@@ -10198,11 +10199,31 @@ function removePromoBuyProduct(id) {
 function promoProductSearch(fieldName, value) {
   promoPickSearch(fieldName, value);
 }
-function refreshPromoModal() {
+function refreshPromoModal(opts = {}) {
+  const scrollEl = modal.querySelector(".modal-scroll");
+  const scrollSnap = {
+    top: scrollEl?.scrollTop ?? 0,
+    pickKey: opts.focusPickKey || "",
+  };
   capturePromoFormDraft();
   if (state.promoModalKind === "price") promotionPriceModal();
   else if (state.promoModalKind === "payment") promotionPaymentModal();
   else promotionQtyModal();
+  requestAnimationFrame(() => {
+    const nextScroll = modal.querySelector(".modal-scroll");
+    if (nextScroll && scrollSnap.top > 0) {
+      nextScroll.scrollTop = scrollSnap.top;
+    }
+    if (scrollSnap.pickKey) {
+      const el = document.querySelector(
+        `[data-promo-pick="${scrollSnap.pickKey}"]`,
+      );
+      if (el) {
+        el.focus({ preventScroll: true });
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    }
+  });
 }
 function selectPromoProduct(fieldName, id) {
   addPromoPickProduct(fieldName, id);
@@ -11826,10 +11847,17 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
     titleHtml = opts.titleHtml ? title : esc(title),
     panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "";
   const wasOpen = !!modal.innerHTML.trim();
+  const modalScrollTop = wasOpen
+    ? modal.querySelector(".modal-scroll")?.scrollTop ?? 0
+    : 0;
   modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
   requestAnimationFrame(() => {
     enhanceMobileNumericInputs(document);
     bindProductImages(document);
+    if (wasOpen && modalScrollTop > 0) {
+      const scroll = modal.querySelector(".modal-scroll");
+      if (scroll) scroll.scrollTop = modalScrollTop;
+    }
   });
   if (!wasOpen) pushAppHistory();
 }

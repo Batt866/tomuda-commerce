@@ -10843,6 +10843,17 @@ textarea::placeholder {
   gap: 12px;
 }
 
+.promo-type-menu__item.is-active {
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary-dark);
+  border-color: color-mix(in srgb, var(--hex-primary) 35%, var(--hex-border));
+}
+
+.promo-type-menu__item.is-active .promo-type-menu__count {
+  background: var(--hex-primary);
+  color: #fff;
+}
+
 .promo-type-menu__label {
   flex: 1;
   min-width: 0;
