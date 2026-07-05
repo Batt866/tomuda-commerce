@@ -610,7 +610,7 @@ textarea.text-sm,
     "addr actions";
   gap: 8px 4px;
   align-items: center;
-  padding: 10px 4px 10px 12px;
+  padding: 10px 4px 10px 0;
   border-radius: 0;
   border: none;
   border-bottom: 1px solid var(--hex-border);
@@ -637,9 +637,10 @@ textarea.text-sm,
 .customer-card__avatar-img {
   object-fit: contain;
   object-position: center;
-  background: var(--hex-secondary);
+  background: transparent;
   border: none;
   box-shadow: none;
+  border-radius: 0;
 }
 
 .customer-image-upload {
@@ -717,12 +718,12 @@ textarea.text-sm,
   flex-shrink: 0;
   width: var(--avatar-lg);
   height: var(--avatar-lg);
-  border-radius: 16px;
+  border-radius: 0;
   object-fit: contain;
   object-position: center;
   border: none;
   box-shadow: none;
-  background: var(--hex-secondary);
+  background: transparent;
 }
 
 .customer-detail__avatar.customer-card__avatar {
@@ -858,7 +859,7 @@ textarea.text-sm,
   flex-shrink: 0;
   width: var(--avatar-lg);
   height: var(--avatar-lg);
-  border-radius: 14px;
+  border-radius: 0;
   display: grid;
   place-items: center;
   background: var(--hex-primary);
@@ -1344,6 +1345,28 @@ a.customer-card__line .customer-card__icon {
   border-top: none;
 }
 
+.list-panel--customers .customer-card {
+  padding-left: 0;
+}
+
+.list-panel--customers .customer-card__avatar,
+.list-panel--customers .customer-card__avatar.customer-card__avatar-img {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 0;
+}
+
+.list-panel--customers .customer-card__avatar {
+  font-size: 17px;
+}
+
+.list-panel--customers .customer-card__avatar-img {
+  object-fit: contain;
+  object-position: center;
+  background: transparent;
+}
+
 .list-action-toolbar {
   display: flex;
   flex-direction: column;
@@ -1373,11 +1396,7 @@ a.customer-card__line .customer-card__icon {
   padding: 0 16px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(
-    180deg,
-    var(--hex-primary) 0%,
-    var(--hex-primary-dark) 100%
-  );
+  background: var(--hex-primary);
   color: var(--hex-primary-foreground);
   font-size: 15px;
   font-weight: 800;
@@ -1386,27 +1405,20 @@ a.customer-card__line .customer-card__icon {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  box-shadow: 0 4px 16px rgba(22, 137, 154, 0.42);
+  box-shadow: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
     background 0.15s ease,
-    box-shadow 0.15s ease,
     transform 0.1s ease;
 }
 
 .page-action-add:hover:not(:disabled) {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--hex-primary) 92%, #fff) 0%,
-    var(--hex-primary) 100%
-  );
-  box-shadow: 0 5px 18px rgba(22, 137, 154, 0.48);
+  background: var(--hex-primary-dark);
 }
 
 .page-action-add:active:not(:disabled) {
   background: var(--hex-primary-dark);
-  box-shadow: 0 2px 8px rgba(22, 137, 154, 0.34);
   transform: translateY(1px);
 }
 
@@ -2219,7 +2231,7 @@ a.customer-card__line .customer-card__icon {
     grid-template-areas: "head addr actions";
     gap: 12px 8px;
     align-items: center;
-    padding: 12px 6px 12px 16px;
+    padding: 12px 6px 12px 0;
     border-radius: 0;
     border: none;
     border-bottom: 1px solid var(--hex-border);
