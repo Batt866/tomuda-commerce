@@ -394,3 +394,69 @@ class CustomerExcelImportTests(TestCase):
         self.assertEqual(customer["name"], "GPS ХХК")
         self.assertEqual(customer["latitude"], "47.925309")
         self.assertEqual(customer["longitude"], "106.930147")
+
+    def test_customer_import_api_creates_rows(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from openpyxl import Workbook
+
+        state = default_state()
+        state["customers"] = []
+        state["employees"] = [
+            {
+                "id": "emp-1",
+                "email": "admin@test.mn",
+                "name": "Admin",
+                "role": "admin",
+                "password": "x",
+            }
+        ]
+        AppState.objects.update_or_create(key="main", defaults={"data": state})
+
+        rows = [
+            [
+                "Нэр",
+                "Регистр",
+                "Утас 1",
+                "Утас 2",
+                "Аймаг / Хот",
+                "Дүүрэг",
+                "Хороо",
+                "Дэлгэрэнгүй хаяг",
+                "Уртраг",
+                "Өргөрөг",
+            ],
+            [
+                "GPS ХХК",
+                "7654321",
+                "88112233",
+                "",
+                "Улаанбаатар",
+                "Сүхбаатар",
+                "2",
+                "2-р хороо",
+                "47.925309",
+                "106.930147",
+            ],
+        ]
+        buf = io.BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        for r_idx, row in enumerate(rows, start=1):
+            for c_idx, value in enumerate(row, start=1):
+                ws.cell(row=r_idx, column=c_idx, value=value)
+        wb.save(buf)
+        upload = SimpleUploadedFile(
+            "customers.xlsx",
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        actor = json.dumps({"id": "emp-1", "email": "admin@test.mn"})
+        response = self.client.post(
+            "/api/import/customers",
+            {"file": upload, "actor": actor},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["report"]["success"], 1)
+        self.assertEqual(len(payload["customers"]), 1)
+        self.assertEqual(payload["customers"][0]["name"], "GPS ХХК")
