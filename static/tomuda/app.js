@@ -268,6 +268,7 @@ let countFocusedProductId = "";
 let countInputSyncing = false;
 let warehouseDateRenderPending = false;
 let warehouseDateBlurTimer = null;
+let warehouseReceiptScrollId = "";
 let settlementRenderPending = false;
 let settlementBlurTimer = null;
 let tombudaHistoryDepth = 0;
@@ -873,7 +874,8 @@ function orderGrossTotal(o) {
   const live = orderGrossFromItems(o);
   if (o.grossTotal != null) {
     const cached = Number(o.grossTotal);
-    if (Number.isFinite(cached) && Math.abs(cached - live) < 0.01) return cached;
+    if (Number.isFinite(cached) && Math.abs(cached - live) < 0.01)
+      return cached;
   }
   return live;
 }
@@ -6958,7 +6960,10 @@ function findProductByBarcode(code) {
     null
   );
 }
-function applyStockInBarcode(code, { qtyDelta = 1, openModalIfNoCost = true } = {}) {
+function applyStockInBarcode(
+  code,
+  { qtyDelta = 1, openModalIfNoCost = true } = {},
+) {
   ensureStockInSession();
   const product = findProductByBarcode(code);
   if (!product) {
@@ -10454,10 +10459,17 @@ function scrollWorkerOrdersToDate() {
 function scrollWarehouseReceiptListToActive() {
   if (state.currentView !== "warehouseReceipts") return;
   if (window.matchMedia("(min-width: 1024px)").matches) return;
+  const activeId = state.selectedWarehouseOrderId || "";
+  if (!activeId || warehouseReceiptScrollId === activeId) return;
+  warehouseReceiptScrollId = activeId;
   requestAnimationFrame(() => {
     document
       .querySelector(".wh-receipt-list__item.is-active")
-      ?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      ?.scrollIntoView({
+        behavior: "auto",
+        inline: "nearest",
+        block: "nearest",
+      });
   });
 }
 function warehouseView() {
@@ -11336,8 +11348,7 @@ function setCustomerMapPoint(la, ln, label = "") {
     window.customerMapMarker = window.L.marker([fixedLat, fixedLng]).addTo(
       window.customerMap,
     );
-  if (status)
-    status.textContent = label || `Pin: ${fixedLat}, ${fixedLng}`;
+  if (status) status.textContent = label || `Pin: ${fixedLat}, ${fixedLng}`;
 }
 function showCustomerUserMarker(la, ln, accuracy) {
   if (!window.customerMap || !window.L) return;
@@ -11362,7 +11373,10 @@ function showCustomerUserMarker(la, ln, accuracy) {
     }).addTo(window.customerMap);
   }
 }
-async function showCustomerUserLocation(hasCustomerPin, { setPin = false } = {}) {
+async function showCustomerUserLocation(
+  hasCustomerPin,
+  { setPin = false } = {},
+) {
   const status = document.getElementById("customerMapStatus");
   if (!window.customerMap) return;
   if (!capGeolocationPlugin() && !navigator.geolocation) {
@@ -11843,8 +11857,7 @@ async function fillCustomerFromRegistration(code) {
     }
     return;
   }
-  const lookupMinDigits =
-    reg.length >= 8 ? 8 : REGISTRATION_LOOKUP_MIN_DIGITS;
+  const lookupMinDigits = reg.length >= 8 ? 8 : REGISTRATION_LOOKUP_MIN_DIGITS;
   if (reg.length < lookupMinDigits) {
     if (status) {
       status.textContent =
@@ -12413,7 +12426,10 @@ function refreshReceiptEditTotals() {
   if (!draft) return;
   (state.receiptEditItems || []).forEach((item, idx) => {
     const el = document.querySelector(`[data-receipt-line-total="${idx}"]`);
-    if (el) el.textContent = item.isPromoFree ? "0" : fmt(resolveOrderItemLineTotal(item));
+    if (el)
+      el.textContent = item.isPromoFree
+        ? "0"
+        : fmt(resolveOrderItemLineTotal(item));
   });
   const totalEl = document.getElementById("receipt-edit-total");
   if (totalEl) totalEl.textContent = fmt(orderPayableTotal(draft));
@@ -13060,6 +13076,7 @@ function toggleWorker(id) {
 }
 function selectWarehouseOrder(id) {
   state.selectedWarehouseOrderId = id;
+  warehouseReceiptScrollId = "";
   render();
 }
 function workerSelectModal() {
