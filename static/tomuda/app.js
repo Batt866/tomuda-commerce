@@ -77,6 +77,7 @@ const state = {
   stockInSessionStartedAt: null,
   stockInReceipts: [],
   stockInHighlightId: "",
+  stockOutEmployeeId: "",
   settings: {
     stockAlertEnabled: true,
     stockAlertMin: 10,
@@ -6095,9 +6096,13 @@ function confirmWarehouseReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
 ) {
+  if (!state.receiptPrintDeliveryId) {
+    return alert("Excel татахын өмнө түгээгч сонгоно уу");
+  }
   confirmOrderReceiptsExcel(searchKey, employeeIds, {
-    ...receiptFilterOptions(),
-    requireWorkerScope: true,
+    workerIds: receiptPrintWorkerIds(),
+    deliveryIds: receiptPrintDeliveryIds(),
+    requireWorkerScope: receiptPrintWorkerIds().length > 0,
   });
 }
 function confirmOrderReceiptsExcel(
@@ -6211,6 +6216,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   const q = state.searches[searchKey] || "",
     exportBtn = excelDownloadBtn(
       `confirmWarehouseReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
+      { disabled: !state.receiptPrintDeliveryId },
     ),
     toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="setOrderStatusFilter(this.value)" onfocus="receiptStatusFilterFocus()" onblur="receiptStatusFilterBlur()" ontouchstart="receiptStatusFilterFocus()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${statusOptions
       .map(
@@ -6695,7 +6701,7 @@ function receiptFilterOptions() {
   const workerIds = receiptPrintWorkerIds();
   return {
     workerIds: workerIds.length ? workerIds : receiptWorkerIds(),
-    deliveryIds: [],
+    deliveryIds: receiptPrintDeliveryIds(),
   };
 }
 function receiptPrintDeliveryIds() {
@@ -7285,21 +7291,50 @@ function inventoryView() {
     )
     .join(
       "",
-    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockActionList(list, tab)}</div>`;
+    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}</div>`;
 }
-function stockInEmployees() {
+function inventoryEmployees() {
   return [...state.employees].sort((a, b) =>
     (a.name || "").localeCompare(b.name || "", "mn"),
   );
+}
+function defaultInventoryEmployeeId() {
+  const warehouseStaff = inventoryEmployees().filter((e) => e.role === "warehouse");
+  if (warehouseStaff.length) return warehouseStaff[0].id;
+  return state.currentEmployee?.id || "";
+}
+function inventoryEmployeeName(employeeId) {
+  return state.employees.find((e) => e.id === employeeId)?.name || "-";
+}
+function inventoryEmployeeField(selectedId, onChangeHandler) {
+  const employees = inventoryEmployees();
+  const selected = selectedId || "";
+  const options = [`<option value="">Ажилтан сонгох</option>`]
+    .concat(
+      employees.map(
+        (e) =>
+          `<option value="${esc(e.id)}"${selected === e.id ? " selected" : ""}>${esc(e.name)}</option>`,
+      ),
+    )
+    .join("");
+  return `<label class="stock-in-employee"><span class="stock-in-employee__label">Ажилтан</span><select class="field-input app-input" onchange="${onChangeHandler}(this.value)">${options}</select></label>`;
+}
+function stockInEmployees() {
+  return inventoryEmployees();
 }
 function ensureStockInSession() {
   if (!state.stockInSessionStartedAt) {
     state.stockInSessionStartedAt = new Date().toISOString();
     state.stockInDone = false;
     state.stockInReceipt = null;
-    if (!state.stockInEmployeeId && state.currentEmployee?.id) {
-      state.stockInEmployeeId = state.currentEmployee.id;
-    }
+  }
+  if (!state.stockInEmployeeId) {
+    state.stockInEmployeeId = defaultInventoryEmployeeId();
+  }
+}
+function ensureStockOutSession() {
+  if (!state.stockOutEmployeeId) {
+    state.stockOutEmployeeId = defaultInventoryEmployeeId();
   }
 }
 function stockInSessionActive() {
@@ -7365,8 +7400,8 @@ function startStockInSession() {
   state.stockInDone = false;
   state.stockInReceipt = null;
   state.stockInSessionStartedAt = new Date().toISOString();
-  if (!state.stockInEmployeeId && state.currentEmployee?.id) {
-    state.stockInEmployeeId = state.currentEmployee.id;
+  if (!state.stockInEmployeeId) {
+    state.stockInEmployeeId = defaultInventoryEmployeeId();
   }
 }
 function resetStockInSession() {
@@ -7378,10 +7413,16 @@ function setStockInEmployee(id) {
   state.stockInEmployeeId = id || "";
   render();
 }
+function setStockOutEmployee(id) {
+  ensureStockOutSession();
+  state.stockOutEmployeeId = id || "";
+  render();
+}
 function stockInEmployeeName() {
-  return (
-    state.employees.find((e) => e.id === state.stockInEmployeeId)?.name || "-"
-  );
+  return inventoryEmployeeName(state.stockInEmployeeId);
+}
+function stockOutEmployeeName() {
+  return inventoryEmployeeName(state.stockOutEmployeeId);
 }
 function stockInProductsGrouped(products) {
   const sorted = [...products].sort((a, b) => {
@@ -7569,17 +7610,11 @@ function confirmNewStockIn() {
 }
 function stockInEmployeeField() {
   ensureStockInSession();
-  const employees = stockInEmployees();
-  const selected = state.stockInEmployeeId || "";
-  const options = [`<option value="">Ажилтан сонгох</option>`]
-    .concat(
-      employees.map(
-        (e) =>
-          `<option value="${esc(e.id)}"${selected === e.id ? " selected" : ""}>${esc(e.name)}</option>`,
-      ),
-    )
-    .join("");
-  return `<label class="stock-in-employee"><span class="stock-in-employee__label">Ажилтан</span><select class="field-input app-input" onchange="setStockInEmployee(this.value)">${options}</select></label>`;
+  return inventoryEmployeeField(state.stockInEmployeeId, "setStockInEmployee");
+}
+function stockOutEmployeeField() {
+  ensureStockOutSession();
+  return inventoryEmployeeField(state.stockOutEmployeeId, "setStockOutEmployee");
 }
 function barcodeScannerPanelHtml() {
   return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
@@ -7791,6 +7826,10 @@ function stockInPanel(list) {
   ensureStockInSession();
   return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
+function stockOutPanel(list) {
+  ensureStockOutSession();
+  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${stockActionList(list, "out")}</div>`;
+}
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
@@ -7869,6 +7908,7 @@ function stockActionRow(p, tab) {
   return `<button type="button" onclick="${openModal}" class="inventory-stock-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="product-card__img inventory-stock-row__thumb" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div></button>`;
 }
 function stockOutModal(id) {
+  ensureStockOutSession();
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   box(
@@ -7879,6 +7919,8 @@ function stockOutModal(id) {
 }
 function applyStockOutModal(e, id) {
   e.preventDefault();
+  ensureStockOutSession();
+  if (!state.stockOutEmployeeId) return alert("Ажилтан сонгоно уу");
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   const q = Number(new FormData(e.target).get("quantity") || 0);
@@ -9815,6 +9857,14 @@ function setInventoryCategory(cat) {
 function setInventoryTab(tab) {
   if (tab !== "in") stopBarcodeScan();
   state.filters.inventory = tab;
+  if (tab === "in") {
+    state.stockInEmployeeId = defaultInventoryEmployeeId();
+    ensureStockInSession();
+  }
+  if (tab === "out") {
+    state.stockOutEmployeeId = defaultInventoryEmployeeId();
+    ensureStockOutSession();
+  }
   render();
   scrollAppMainToTop();
 }
@@ -10168,7 +10218,7 @@ function promotionMultiProductPickerBlock({
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
     selectedHtml = selectedProducts.length
-      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoPickProduct('${pickKey}','${esc(p.id)}')" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
+      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
       : `<p class="promo-section-hint">Хайлтаар бараа нэмнэ</p>`,
     searchHtml = promoProductSearchListHtml({
       pickKey,
@@ -10187,13 +10237,12 @@ function promotionMultiProductPickerBlock({
       : `<span class="block text-sm font-medium mb-2">${title}</span>`;
   return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block">${hiddenInputs}${head}${promotionSearchQtyRow(searchInput, qty)}${promoCategoryFilterHtml(pickKey)}${selectedHtml}${searchHtml}</div></div>`;
 }
-function promotionMultiBuyPickerBlock(selectedIds, freeIds) {
-  const freeList = Array.isArray(freeIds) ? freeIds : freeIds ? [freeIds] : [];
+function promotionMultiBuyPickerBlock(selectedIds) {
   return promotionMultiProductPickerBlock({
     pickKey: "buyProductIds",
     fieldName: "buyProductIds",
     selectedIds,
-    excludeIds: freeList,
+    excludeIds: [],
     title: "Сонгосон бараа",
     hint: "Олон бараа сонгож болно · нийт тоо шалгана",
     placeholder: "Бараа хайж нэмэх...",
@@ -10250,18 +10299,8 @@ function promoBuyProductSearch(value) {
 }
 function promoPickConflict(pickKey, id) {
   const pick = state.promoPick || {};
-  if (pickKey === "buyProductIds") {
-    const freeIds = promotionPickIds(pick, "freeProductIds");
-    if (freeIds.includes(id)) {
-      return "Урамшууллын бараатай ижил байж болохгүй.";
-    }
-  }
-  if (pickKey === "freeProductIds") {
-    const buyIds = promotionPickIds(pick, "buyProductIds");
-    if (buyIds.includes(id)) {
-      return "Сонгосон бараатай ижил байж болохгүй. Өөр бараа сонгоно уу.";
-    }
-  }
+  const ids = promotionPickIds(pick, pickKey);
+  if (ids.includes(id)) return "Энэ барааг аль хэдийн сонгосон байна.";
   return "";
 }
 function addPromoPickProduct(pickKey, id) {
@@ -10269,8 +10308,9 @@ function addPromoPickProduct(pickKey, id) {
   if (conflict) return alert(conflict);
   const pick = state.promoPick || {},
     ids = [...promotionPickIds(pick, pickKey)];
-  if (ids.includes(id)) return;
-  state.promoPick = { ...pick, [pickKey]: [...ids, id] };
+  const idStr = String(id || "").trim();
+  if (!idStr || ids.includes(idStr)) return;
+  state.promoPick = { ...pick, [pickKey]: [...ids, idStr] };
   const searchKey = promoPickSearchKey(pickKey);
   if (searchKey) state.searches[searchKey] = "";
   refreshPromoModal();
@@ -10445,7 +10485,7 @@ function promotionQtyModal() {
     freeIds = state.promoPick.freeProductIds;
   box(
     "Багцын хөнгөлөлт",
-    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds, freeIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: buyIds, title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно", placeholder: "${PROMO_PRODUCT_LABEL} хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно · сонгосон бараатай ижил байж болно", placeholder: `${PROMO_PRODUCT_LABEL} хайж нэмэх...`, badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
 }
@@ -10568,10 +10608,6 @@ function savePromotionQty(e) {
       freeProductIds = f.getAll("freeProductIds").filter(Boolean);
     if (!buyProductIds.length || !freeProductIds.length) {
       alert("Авах болон урамшууллын бараа сонгоно уу");
-      return;
-    }
-    if (buyProductIds.some((id) => freeProductIds.includes(id))) {
-      alert("Авах болон урамшууллын бараа өөр байх ёстой");
       return;
     }
     const added = appendPromotionRule("quantity", {
@@ -14062,7 +14098,10 @@ function applyStock(id, type, qty, costPrice) {
     type,
     quantity: q,
     date: new Date().toISOString(),
-    employeeName: state.currentEmployee?.name || "",
+    employeeName:
+      type === "out"
+        ? stockOutEmployeeName()
+        : state.currentEmployee?.name || "",
   });
   render();
   criticalBackendSave();
@@ -14996,6 +15035,7 @@ Object.assign(window, {
   confirmNewStockIn,
   confirmStockInExcel,
   setStockInEmployee,
+  setStockOutEmployee,
   stockInEntryModal,
   applyStockInEntryModal,
   confirmReportExport,
