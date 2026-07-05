@@ -5,5 +5,12 @@
   "server": {
     "url": "https://tomuda.jobbox.mn",
     "cleartext": false
+  },
+  "plugins": {
+    "Geolocation": {
+      "permissions": {
+        "location": "always"
+      }
+    }
   }
 }

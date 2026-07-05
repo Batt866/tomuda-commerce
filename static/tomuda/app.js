@@ -4656,7 +4656,7 @@ function adminHubHtml() {
     return hasPermission(perm);
   });
   const settings = [
-    ["stockAlertModal()", "ҮЛДЭГДЭЛ САНУУЛАХ", "stock"],
+    ["stockAlertModal()", "Үлдэгдэл сануулах", "stock"],
     [
       "percentDiscountSettingsModal()",
       "Шууд төлөлтийн хувь",
@@ -4664,7 +4664,7 @@ function adminHubHtml() {
     ],
     [
       "orderRetentionSettingsModal()",
-      `Захиалга хадгалах (${orderRetentionDays()} хоног)`,
+      `Захиалгын түүх хадгалах (${orderRetentionDays()} хоног)`,
       "reports",
     ],
     ["deletionLogModal()", "Устгасан бүртгэл", "inventory"],
@@ -4737,7 +4737,7 @@ function orderRetentionSettingsModal() {
   ensureSettings();
   const days = orderRetentionDays();
   box(
-    "Захиалга хадгалах хугацаа",
+    "Захиалгын түүх хадгалах",
     `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалгын түүхэнд тохируулсан хугацааны дотор системээс автоматаар устана.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
@@ -4753,7 +4753,7 @@ function saveOrderRetentionSettings(e) {
   );
   closeModal();
   render();
-  showInstallToast("Захиалга хадгалах хугацаа шинэчлэгдлээ");
+  showInstallToast("Захиалгын түүх хадгалах хугацаа шинэчлэгдлээ");
   criticalBackendSave();
 }
 function deletionLogLabel(entry) {
@@ -11474,17 +11474,37 @@ function cleanupCustomerMapInstance() {
   window.customerTileLayer = null;
   window.customerTileFallback = false;
 }
+let tomudaGeolocationPlugin = null;
 function capGeolocationPlugin() {
   const cap = window.Capacitor;
-  if (!cap?.isNativePlatform?.()) return null;
-  if (!cap.Plugins?.Geolocation && typeof cap.registerPlugin === "function") {
-    try {
-      cap.registerPlugin("Geolocation");
-    } catch (e) {
-      console.warn("Geolocation plugin register failed", e);
-    }
+  if (!cap?.isNativePlatform?.() || typeof cap.registerPlugin !== "function") {
+    return null;
   }
-  return cap.Plugins?.Geolocation || null;
+  if (tomudaGeolocationPlugin) return tomudaGeolocationPlugin;
+  if (cap.Plugins?.Geolocation) {
+    tomudaGeolocationPlugin = cap.Plugins.Geolocation;
+    return tomudaGeolocationPlugin;
+  }
+  try {
+    tomudaGeolocationPlugin = cap.registerPlugin("Geolocation", {
+      web: () => ({
+        getCurrentPosition(options = {}) {
+          return readBrowserGeolocationPromise({
+            enableHighAccuracy: true,
+            timeout: 25000,
+            maximumAge: 0,
+            ...options,
+          });
+        },
+        async requestPermissions() {
+          return { location: "prompt", coarseLocation: "prompt" };
+        },
+      }),
+    });
+  } catch (e) {
+    console.warn("Geolocation plugin register failed", e);
+  }
+  return tomudaGeolocationPlugin;
 }
 function geolocationPermissionDenied(perm = {}) {
   const loc = String(perm.location || "").toLowerCase();
@@ -11494,6 +11514,9 @@ function geolocationPermissionDenied(perm = {}) {
 function geolocationErrorMessage(err) {
   const code = err?.code;
   const msg = String(err?.message || err?.errorMessage || "").toLowerCase();
+  if (!window.isSecureContext && location.protocol !== "https:") {
+    return "Байршил авахын тулд HTTPS холболт шаардлагатай";
+  }
   if (code === 1 || msg.includes("denied") || msg.includes("permission"))
     return "Байршил авахын тулд GPS зөвшөөрөл өгнө үү (тохиргоо)";
   if (code === 2 || msg.includes("unavailable"))
@@ -11502,65 +11525,118 @@ function geolocationErrorMessage(err) {
     return "Байршил хэт удаан. Дахин оролдоно уу";
   return "Байршил авахад алдаа гарлаа";
 }
-async function requestDevicePosition(options = {}) {
+function normalizeDeviceCoords(raw = {}) {
+  const coords = raw.coords || raw;
+  const latitude = Number(coords.latitude);
+  const longitude = Number(coords.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    const err = new Error("invalid");
+    err.code = 2;
+    throw err;
+  }
+  return {
+    latitude,
+    longitude,
+    accuracy: Number(coords.accuracy) || 0,
+  };
+}
+function readBrowserGeolocation(options, onSuccess, onError) {
+  if (!navigator.geolocation) {
+    onError(Object.assign(new Error("unsupported"), { code: 0 }));
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
+}
+function readBrowserGeolocationPromise(options = {}) {
   const geoOpts = {
     enableHighAccuracy: true,
-    timeout: 20000,
+    timeout: 25000,
     maximumAge: 0,
     ...options,
   };
+  return new Promise((resolve, reject) => {
+    readBrowserGeolocation(
+      geoOpts,
+      (pos) => resolve(normalizeDeviceCoords(pos)),
+      (err) => {
+        if (err?.code === 3 || err?.code === 2) {
+          readBrowserGeolocation(
+            {
+              ...geoOpts,
+              enableHighAccuracy: false,
+              timeout: 30000,
+              maximumAge: 120000,
+            },
+            (pos) => resolve(normalizeDeviceCoords(pos)),
+            reject,
+          );
+          return;
+        }
+        reject(err);
+      },
+    );
+  });
+}
+async function requestCapacitorPosition(options = {}) {
   const capGeo = capGeolocationPlugin();
-  if (capGeo) {
-    const readPosition = () =>
-      capGeo.getCurrentPosition({
+  if (!capGeo) return null;
+  const geoOpts = {
+    enableHighAccuracy: true,
+    timeout: 25000,
+    maximumAge: 0,
+    ...options,
+  };
+  const readPosition = () =>
+    capGeo
+      .getCurrentPosition({
         enableHighAccuracy: geoOpts.enableHighAccuracy,
         timeout: geoOpts.timeout,
         maximumAge: geoOpts.maximumAge,
-      });
-    try {
-      const pos = await readPosition();
-      return {
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-      };
-    } catch (err) {
-      if (typeof capGeo.requestPermissions !== "function") throw err;
-      try {
-        const perm = await capGeo.requestPermissions();
-        if (geolocationPermissionDenied(perm)) {
-          const denied = new Error("denied");
-          denied.code = 1;
-          throw denied;
-        }
-      } catch (permErr) {
-        if (geolocationPermissionDenied(permErr)) throw permErr;
-      }
-      const pos = await readPosition();
-      return {
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-      };
+      })
+      .then((pos) => normalizeDeviceCoords(pos));
+  try {
+    return await readPosition();
+  } catch (err) {
+    if (typeof capGeo.requestPermissions !== "function") throw err;
+    const perm = await capGeo.requestPermissions().catch(() => null);
+    if (perm && geolocationPermissionDenied(perm)) {
+      const denied = new Error("denied");
+      denied.code = 1;
+      throw denied;
     }
+    return readPosition();
+  }
+}
+function requestDevicePosition(options = {}) {
+  const capGeo = capGeolocationPlugin();
+  if (capGeo) {
+    return requestCapacitorPosition(options).catch((err) => {
+      if (!navigator.geolocation) throw err;
+      return readBrowserGeolocationPromise(options);
+    });
   }
   if (!navigator.geolocation) {
-    const err = new Error("unsupported");
-    err.code = 0;
-    throw err;
+    return Promise.reject(Object.assign(new Error("unsupported"), { code: 0 }));
   }
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        }),
-      (err) => reject(err),
-      geoOpts,
-    );
-  });
+  return readBrowserGeolocationPromise(options);
+}
+function waitForCustomerMap(callback, attempt = 0) {
+  if (window.customerMap) {
+    callback();
+    return;
+  }
+  if (attempt >= 50) return;
+  setTimeout(() => waitForCustomerMap(callback, attempt + 1), 120);
+}
+function applyCustomerCoords(coords, { setPin = false, hasCustomerPin = false } = {}) {
+  const status = document.getElementById("customerMapStatus");
+  const la = coords.latitude,
+    ln = coords.longitude;
+  window.customerUserCoords = [la, ln];
+  showCustomerUserMarker(la, ln, coords.accuracy);
+  if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
+  if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
+  else if (status && !hasCustomerPin) status.textContent = "";
 }
 function setCustomerMapPoint(la, ln, label = "") {
   const latInput = document.getElementById("customerLat"),
@@ -11616,13 +11692,7 @@ function applyCustomerUserPosition({ setPin = false, hasCustomerPin = false } = 
   return requestDevicePosition()
     .then((coords) => {
       if (!window.customerMap) return;
-      const la = coords.latitude,
-        ln = coords.longitude;
-      window.customerUserCoords = [la, ln];
-      showCustomerUserMarker(la, ln, coords.accuracy);
-      if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
-      if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
-      else if (status && !hasCustomerPin) status.textContent = "";
+      applyCustomerCoords(coords, { setPin, hasCustomerPin });
     })
     .catch((err) => {
       if (status && (!hasCustomerPin || setPin))
@@ -11639,23 +11709,65 @@ function centerCustomerMapOnUser() {
   const status = document.getElementById("customerMapStatus");
   const latInput = document.getElementById("customerLat"),
     lngInput = document.getElementById("customerLng");
-  if (!window.customerMap) {
-    if (status) status.textContent = "Газрын зураг ачаалж байна...";
+  const hasPin = !!(latInput?.value && lngInput?.value);
+  const onFail = (err) => {
+    if (status) status.textContent = geolocationErrorMessage(err);
+  };
+  const onCoords = (coords) => {
+    if (!window.customerMap) {
+      waitForCustomerMap(() => {
+        if (!window.customerMap) {
+          onFail(Object.assign(new Error("map unavailable"), { code: 2 }));
+          return;
+        }
+        applyCustomerCoords(coords, { setPin: true, hasCustomerPin: hasPin });
+      });
+      return;
+    }
+    applyCustomerCoords(coords, { setPin: true, hasCustomerPin: hasPin });
+  };
+  if (!capGeolocationPlugin() && !navigator.geolocation) {
+    if (status) status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
     return;
   }
-  const hasPin = !!(latInput?.value && lngInput?.value);
   if (status) status.textContent = "Байршил татаж байна...";
-  applyCustomerUserPosition({ setPin: true, hasCustomerPin: hasPin });
+  if (navigator.geolocation && !capGeolocationPlugin()) {
+    readBrowserGeolocation(
+      { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 },
+      (pos) => onCoords(normalizeDeviceCoords(pos)),
+      (err) => {
+        if (err?.code === 3 || err?.code === 2) {
+          readBrowserGeolocation(
+            {
+              enableHighAccuracy: false,
+              timeout: 30000,
+              maximumAge: 120000,
+            },
+            (pos) => onCoords(normalizeDeviceCoords(pos)),
+            onFail,
+          );
+          return;
+        }
+        onFail(err);
+      },
+    );
+    return;
+  }
+  requestDevicePosition().then(onCoords).catch(onFail);
 }
 function bindCustomerMapLocateButton() {
   const btn = document.querySelector(".customer-map-locate");
   if (!btn || btn.dataset.geoBound) return;
   btn.dataset.geoBound = "1";
-  btn.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    centerCustomerMapOnUser();
-  });
+  btn.addEventListener(
+    "click",
+    (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      centerCustomerMapOnUser();
+    },
+    { passive: false },
+  );
 }
 function scheduleCustomerMapResize() {
   const fix = () => {
@@ -11824,7 +11936,7 @@ function customerModal(id, draft = null) {
   const cid = esc(id || "");
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" onclick="centerCustomerMapOnUser()" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
