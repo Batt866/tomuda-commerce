@@ -1732,8 +1732,9 @@ function pageToolbarSearch({
 function pageToolbarPrimaryBtn(label, onclick, extraClass = "") {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-primary ${extraClass}">${esc(label)}</button>`;
 }
-function pageActionAddBtn(label, onclick) {
-  return `<button type="button" onclick="${onclick}" class="btn page-action-add">+ ${esc(label)}</button>`;
+function pageActionAddBtn(label, onclick, variant = "") {
+  const variantClass = variant ? ` page-action-add--${variant}` : "";
+  return `<button type="button" onclick="${onclick}" class="btn page-action-add${variantClass}">+ ${esc(label)}</button>`;
 }
 function listActionToolbarHtml({
   search = "",
@@ -6627,9 +6628,12 @@ function customersView() {
       state.customers.filter((c) => customerMatchesQuery(c, q)),
     ),
     excelBtn = hasPermission("reports.view")
-      ? excelDownloadBtn("confirmCustomerExcel()")
+      ? excelDownloadBtn("confirmCustomerExcel()", {
+          label: "Харилцагчийн мэдээлэл татах",
+          shortLabel: "Мэдээлэл татах",
+        })
       : "",
-    addBtn = pageActionAddBtn("Харилцагч нэмэх", "customerModal()");
+    addBtn = pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer");
   return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel list-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Excel файл татах уу?") {
@@ -7196,7 +7200,11 @@ function productsView() {
       ? pageToolbarSecondaryBtn("Төрөл", "categoryModal()")
       : "",
     canManageProducts()
-      ? pageToolbarPrimaryBtn("Бараа нэмэх", "productModal()")
+      ? pageToolbarPrimaryBtn(
+          "Бараа нэмэх",
+          "productModal()",
+          "btn--toolbar-add-product",
+        )
       : "",
   ]
     .filter(Boolean)
