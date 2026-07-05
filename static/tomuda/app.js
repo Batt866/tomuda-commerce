@@ -4700,7 +4700,7 @@ function orderRetentionSettingsModal() {
   const days = orderRetentionDays();
   box(
     "Захиалга хадгалах хугацаа",
-    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Энэ хоногоос хуучин захиалга системээс автоматаар цэвэрлэгдэнэ. Агуулахын «Одоогийн» filter-ээс өөр — энэ нь жинхэнэ устгал.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалгын түүхэнд тохируулсан хугацааны дотор системээс автоматаар устана.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
