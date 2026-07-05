@@ -269,6 +269,8 @@ let countInputSyncing = false;
 let warehouseDateRenderPending = false;
 let warehouseDateBlurTimer = null;
 let warehouseReceiptScrollId = "";
+let whReceiptPickerDismissGuard = 0;
+let whReceiptPickerSkipAnim = false;
 let settlementRenderPending = false;
 let settlementBlurTimer = null;
 let tombudaHistoryDepth = 0;
@@ -854,9 +856,12 @@ function orderReceiptNum(o) {
 }
 function formatReceiptNumber(o) {
   const day = isoDay(o?.createdAt || o?.deliveryDate || "");
+  const seq = Number(o?.receiptSeq);
   if (day) {
     const [y, m, d] = day.split("-");
-    return `${String(y).slice(-2)}${m}-${d}`;
+    const base = `${String(y).slice(-2)}${m}-${d}`;
+    if (seq > 0) return `${base}-${seq}`;
+    return base;
   }
   return String(orderReceiptNum(o));
 }
@@ -1146,21 +1151,34 @@ function normalizeOrderReceiptNumbers() {
   const sorted = [...state.orders].sort(
     (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
   );
-  const byMonth = {};
+  const maxByMonth = {};
+  const usedByMonth = {};
+  const claimed = new Map();
+
   for (const o of sorted) {
     const month = receiptMonthKey(o);
     if (!month) continue;
     o.receiptMonth = month;
+    if (!usedByMonth[month]) usedByMonth[month] = new Set();
     const seq = Number(o.receiptSeq);
-    if (seq > 0) byMonth[month] = Math.max(byMonth[month] || 0, seq);
+    if (seq > 0 && !usedByMonth[month].has(seq)) {
+      usedByMonth[month].add(seq);
+      claimed.set(o.id, seq);
+      maxByMonth[month] = Math.max(maxByMonth[month] || 0, seq);
+    }
   }
+
   for (const o of sorted) {
     const month = receiptMonthKey(o);
     if (!month) continue;
-    if (Number(o.receiptSeq) > 0 && o.receiptMonth === month) continue;
-    byMonth[month] = (byMonth[month] || 0) + 1;
-    o.receiptSeq = byMonth[month];
-    o.receiptMonth = month;
+    if (claimed.has(o.id)) {
+      o.receiptSeq = claimed.get(o.id);
+      continue;
+    }
+    maxByMonth[month] = (maxByMonth[month] || 0) + 1;
+    o.receiptSeq = maxByMonth[month];
+    if (!usedByMonth[month]) usedByMonth[month] = new Set();
+    usedByMonth[month].add(o.receiptSeq);
   }
 }
 function nextOrderId() {
@@ -1622,6 +1640,15 @@ function employeePermissionSummary(emp) {
 function isAdmin() {
   return hasPermission("settings.view");
 }
+function canViewProductCost(emp = state.currentEmployee) {
+  const r = emp?.role || currentRole();
+  return r === "admin" || r === "warehouse";
+}
+function productCostMetaHtml(p) {
+  if (!canViewProductCost()) return "";
+  const cost = productCostPrice(p);
+  return cost ? `<span>Өртөг: <b>${fmt(cost)}</b></span>` : "";
+}
 function canManageProducts() {
   return hasPermission("products.create") || hasPermission("products.edit");
 }
@@ -1745,7 +1772,8 @@ function permissionEmployeePickerHtml() {
   const selected = idList(state.permissionEmployeeIds);
   const open = !!state.permissionEmployeePickerOpen;
   const summary = permissionEmployeeSummary(selected);
-  return `<div class="wh-receipt-picker${open ? " is-open" : ""}" data-permission-employee-picker><button type="button" class="wh-receipt-picker__trigger" onclick="togglePermissionEmployeePicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Ажилтан" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearPermissionEmployees(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="togglePermissionEmployee('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(role(e.role))}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closePermissionEmployeePicker(event)">Болсон</button></div></div>` : ""}</div>`;
+  const triggerAttrs = whReceiptPickerTriggerAttrs();
+  return `<div class="wh-receipt-picker${open ? " is-open" : ""}" data-permission-employee-picker><button type="button" class="wh-receipt-picker__trigger"${triggerAttrs} onclick="togglePermissionEmployeePicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Ажилтан" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onpointerdown="armWhReceiptPickerDismissGuard()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearPermissionEmployees(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="togglePermissionEmployee('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(role(e.role))}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closePermissionEmployeePicker(event)">Болсон</button></div></div>` : ""}</div>`;
 }
 function togglePermissionEmployeePicker(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
@@ -2125,6 +2153,38 @@ function appBackendOrigin() {
     }
   }
   return window.location.origin;
+}
+function staticAssetUrl(path) {
+  const raw = String(path || "").trim();
+  if (!raw) return raw;
+  if (/^(https?:|data:)/i.test(raw)) return raw;
+  const origin = appBackendOrigin();
+  return raw.startsWith("/") ? `${origin}${raw}` : `${origin}/${raw}`;
+}
+async function downloadBlobFile(blob, filename) {
+  const name = String(filename || "download.xlsx");
+  const type = blob.type || XLSX_MIME;
+  if (typeof navigator.share === "function" && typeof File !== "undefined") {
+    try {
+      const file = new File([blob], name, { type });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 function productMediaPathFromUrl(url) {
   const raw = String(url || "").trim();
@@ -2968,6 +3028,7 @@ function shouldDeferBackendSync() {
   if (isEditingCountQty()) return true;
   if (isWarehouseDateEditing()) return true;
   if (isEditingSettlementText()) return true;
+  if (isWhReceiptPickerOpen()) return true;
   if (
     state.currentView === "count" &&
     (state.countDone || countSessionActive())
@@ -3038,6 +3099,24 @@ function isEditingSettlementText() {
     (el.matches?.("[data-settlement-input]") ||
       el.matches?.(".worker-order-opt__input"))
   );
+}
+function isWhReceiptPickerOpen() {
+  return !!(
+    state.receiptPrintWorkerPickerOpen ||
+    state.receiptPrintDeliveryPickerOpen ||
+    state.permissionEmployeePickerOpen
+  );
+}
+function armWhReceiptPickerDismissGuard() {
+  whReceiptPickerDismissGuard += 1;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      whReceiptPickerDismissGuard = Math.max(0, whReceiptPickerDismissGuard - 1);
+    });
+  });
+}
+function whReceiptPickerTriggerAttrs() {
+  return ` onpointerdown="armWhReceiptPickerDismissGuard()"`;
 }
 function flushPendingWarehouseDateRender() {
   if (isWarehouseDateEditing()) return;
@@ -4911,7 +4990,7 @@ let receiptExcelLogoDataUri = "";
 async function getReceiptExcelLogoDataUri() {
   if (receiptExcelLogoDataUri) return receiptExcelLogoDataUri;
   try {
-    const res = await fetch(BRAND.receiptLogo);
+    const res = await fetch(staticAssetUrl(BRAND.receiptLogo));
     if (!res.ok) throw new Error("logo missing");
     const blob = await res.blob();
     receiptExcelLogoDataUri = await new Promise((resolve, reject) => {
@@ -4954,16 +5033,7 @@ function downloadReceiptExcelBlob(name, html) {
   const blob = new Blob(["\uFEFF" + html], {
     type: "application/vnd.ms-excel;charset=utf-8",
   });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.rel = "noopener";
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  void downloadBlobFile(blob, name);
 }
 function exportOrderReceiptsExcelCsv(orders) {
   const stamp = new Date().toISOString().slice(0, 10),
@@ -5422,11 +5492,11 @@ function buildReceiptWorkbookXml(orders, opts = {}) {
 }
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
-  const tpl = await fetch(RECEIPT_XLSX_TEMPLATE).then((r) => {
+  const tpl = await fetch(staticAssetUrl(RECEIPT_XLSX_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
-  const logoBuffer = await fetch(BRAND.receiptLogo)
+  const logoBuffer = await fetch(staticAssetUrl(BRAND.receiptLogo))
     .then((r) => (r.ok ? r.arrayBuffer() : null))
     .catch(() => null);
   const zip = await JSZip.loadAsync(tpl);
@@ -5462,17 +5532,15 @@ async function exportOrderReceiptsExcelXlsx(orders) {
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = receiptExcelFileName(orders);
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadBlobFile(blob, receiptExcelFileName(orders));
 }
 async function exportOrderReceiptsExcel(orders) {
-  if (!orders.length) return;
+  if (!orders.length) return alert("Захиалга олдсонгүй");
   try {
     await exportOrderReceiptsExcelXlsx(orders);
-  } catch {
+    showInstallToast("Excel файл татагдлаа");
+  } catch (xlsxErr) {
+    console.warn("Receipt xlsx export failed", xlsxErr);
     try {
       const logoSrc = await getReceiptExcelLogoDataUri();
       const html = buildReceiptExcelDocument(orders, logoSrc);
@@ -5480,23 +5548,52 @@ async function exportOrderReceiptsExcel(orders) {
         legacyExcelFileName(receiptExcelFileName(orders)),
         html,
       );
-    } catch {
+      showInstallToast("Excel файл татагдлаа");
+    } catch (htmlErr) {
+      console.warn("Receipt html export failed", htmlErr);
       exportOrderReceiptsExcelCsv(orders);
+      showInstallToast("Excel файл татагдлаа");
     }
   }
 }
+function orderReceiptExportSnapshots(
+  searchKey = "warehouseOrders",
+  employeeIds = [],
+  opts = {},
+) {
+  const filtered = orderReceiptRowsFiltered(searchKey, employeeIds, opts);
+  const selectedIds = idList(state.receiptPrintOrderIds);
+  if (selectedIds.length) {
+    const picked = filtered.filter((o) => selectedIds.includes(String(o.id)));
+    if (picked.length) return picked.map(orderReceiptSnapshot);
+  }
+  return filtered.map(orderReceiptSnapshot);
+}
 function confirmVisibleOrderReceiptsExcel(searchKey = "warehouseOrders") {
   confirmOrderReceiptsExcel(searchKey, [], receiptFilterOptions());
+}
+function confirmWarehouseReceiptsExcel(
+  searchKey = "warehouseOrders",
+  employeeIds = [],
+) {
+  confirmOrderReceiptsExcel(searchKey, employeeIds, {
+    ...receiptFilterOptions(),
+    requireWorkerScope: true,
+  });
 }
 function confirmOrderReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
   opts = {},
 ) {
-  const rows = orderReceiptRowsFiltered(searchKey, employeeIds, opts).map(
-    orderReceiptSnapshot,
-  );
-  if (!rows.length) return alert("Захиалга олдсонгүй");
+  const rows = orderReceiptExportSnapshots(searchKey, employeeIds, opts);
+  if (!rows.length) {
+    return alert(
+      idList(state.receiptPrintOrderIds).length
+        ? "Excel татах захиалга сонгоно уу"
+        : "Захиалга олдсонгүй",
+    );
+  }
   confirmDataExport("Excel татах", () => exportOrderReceiptsExcel(rows));
 }
 function confirmSingleOrderReceiptExcel(orderId) {
@@ -5592,7 +5689,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
       : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`;
   const q = state.searches[searchKey] || "",
     exportBtn = excelDownloadBtn(
-      `confirmOrderReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
+      `confirmWarehouseReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
     ),
     toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
       .map(
@@ -6102,8 +6199,9 @@ function receiptPrintWorkerSelectHtml() {
   const people = receiptSalesEmployees(),
     selected = receiptPrintWorkerIds(),
     open = !!state.receiptPrintWorkerPickerOpen,
-    summary = receiptPrintWorkerSummary(selected);
-  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Худалдааны төлөөлөгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintWorker('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
+    summary = receiptPrintWorkerSummary(selected),
+    triggerAttrs = whReceiptPickerTriggerAttrs();
+  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Худалдааны төлөөлөгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-worker-picker><button type="button" class="wh-receipt-picker__trigger"${triggerAttrs} onclick="toggleReceiptPrintWorkerPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-receipt-picker__value${selected.length ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Худалдааны төлөөлөгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onpointerdown="armWhReceiptPickerDismissGuard()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${selected.length ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintWorkers(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${people.length ? people.map((e) => `<label class="wh-receipt-picker__item${selected.includes(e.id) ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${selected.includes(e.id) ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintWorker('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role wh-receipt-picker__role--${esc(e.role)}">${receiptPrintWorkerRoleLabel(e.role)}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Ажилтан олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintWorkerPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
 function receiptPrintDeliverySummary(
   deliveryId = state.receiptPrintDeliveryId || "",
@@ -6116,8 +6214,9 @@ function receiptPrintDeliverySelectHtml() {
   const deliveries = deliveryEmployees(),
     deliveryId = state.receiptPrintDeliveryId || "",
     open = !!state.receiptPrintDeliveryPickerOpen,
-    summary = receiptPrintDeliverySummary(deliveryId);
-  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Түгээгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-delivery-picker><button type="button" class="wh-receipt-picker__trigger" onclick="toggleReceiptPrintDeliveryPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><span class="wh-receipt-picker__value${deliveryId ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Түгээгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${deliveryId ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintDelivery(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${deliveries.length ? deliveries.map((e) => `<label class="wh-receipt-picker__item${deliveryId === e.id ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${deliveryId === e.id ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintDelivery('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(e.phone || "Утасгүй")}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Түгээгч олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintDeliveryPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
+    summary = receiptPrintDeliverySummary(deliveryId),
+    triggerAttrs = whReceiptPickerTriggerAttrs();
+  return `<div class="wh-receipt-field wh-receipt-field--picker"><span class="wh-receipt-field__label">Түгээгч</span><div class="wh-receipt-picker${open ? " is-open" : ""}" data-receipt-delivery-picker><button type="button" class="wh-receipt-picker__trigger"${triggerAttrs} onclick="toggleReceiptPrintDeliveryPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="wh-receipt-picker__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><span class="wh-receipt-picker__value${deliveryId ? "" : " is-placeholder"}">${esc(summary)}</span><svg class="wh-receipt-picker__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>${open ? `<div class="wh-receipt-picker__panel" role="listbox" aria-label="Түгээгч" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onpointerdown="armWhReceiptPickerDismissGuard()"><div class="wh-receipt-picker__head"><span class="wh-receipt-picker__head-title">Сонгох</span>${deliveryId ? `<button type="button" class="wh-receipt-picker__clear" onclick="clearReceiptPrintDelivery(event)">Цэвэрлэх</button>` : ""}</div><div class="wh-receipt-picker__list">${deliveries.length ? deliveries.map((e) => `<label class="wh-receipt-picker__item${deliveryId === e.id ? " is-active" : ""}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()"><input type="checkbox"${deliveryId === e.id ? " checked" : ""} onmousedown="event.preventDefault()" onchange="toggleReceiptPrintDelivery('${esc(e.id)}', event)"><span class="wh-receipt-picker__avatar-wrap">${employeeAvatarHtml(e, "wh-receipt-picker__avatar")}</span><span class="wh-receipt-picker__meta"><span class="wh-receipt-picker__name">${esc(e.name)}</span><span class="wh-receipt-picker__role">${esc(e.phone || "Утасгүй")}</span></span></label>`).join("") : `<p class="wh-receipt-picker__empty">Түгээгч олдсонгүй</p>`}</div><div class="wh-receipt-picker__foot"><button type="button" class="btn btn--primary btn--sm btn--block" onclick="closeReceiptPrintDeliveryPicker(event)">Болсон</button></div></div>` : ""}</div></div>`;
 }
 let receiptPrintWorkerPickerDismissBound = false;
 function toggleReceiptPrintWorkerPicker(ev) {
@@ -6149,7 +6248,6 @@ function toggleReceiptPrintWorker(id, ev) {
     ? current.filter((x) => x !== id)
     : [...current, id];
   state.receiptPrintWorkerSyncKey = "";
-  state.selectedWarehouseOrderId = "";
   state.receiptPrintWorkerPickerOpen = true;
   render();
 }
@@ -6158,7 +6256,6 @@ function clearReceiptPrintWorkers(ev) {
   state.receiptPrintWorkerIds = [];
   state.receiptPrintWorkerSyncKey = "";
   state.receiptPrintOrderIds = [];
-  state.selectedWarehouseOrderId = "";
   state.receiptPrintWorkerPickerOpen = true;
   render();
 }
@@ -6167,7 +6264,6 @@ function setReceiptPrintDelivery(id) {
   if (state.receiptPrintDeliveryId === next) return;
   state.receiptPrintDeliveryId = next;
   state.receiptPrintWorkerSyncKey = "";
-  state.selectedWarehouseOrderId = "";
   render();
 }
 function toggleReceiptPrintDelivery(id, ev) {
@@ -6175,7 +6271,6 @@ function toggleReceiptPrintDelivery(id, ev) {
   const current = state.receiptPrintDeliveryId || "";
   state.receiptPrintDeliveryId = current === id ? "" : id;
   state.receiptPrintWorkerSyncKey = "";
-  state.selectedWarehouseOrderId = "";
   state.receiptPrintDeliveryPickerOpen = true;
   render();
 }
@@ -6183,41 +6278,30 @@ function clearReceiptPrintDelivery(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
   state.receiptPrintDeliveryId = "";
   state.receiptPrintWorkerSyncKey = "";
-  state.selectedWarehouseOrderId = "";
   state.receiptPrintDeliveryPickerOpen = true;
   render();
 }
 function bindReceiptPrintWorkerPickerDismiss() {
   if (receiptPrintWorkerPickerDismissBound) return;
   receiptPrintWorkerPickerDismissBound = true;
-  document.addEventListener(
-    "click",
-    (ev) => {
-      const workerOpen = state.receiptPrintWorkerPickerOpen;
-      const deliveryOpen = state.receiptPrintDeliveryPickerOpen;
-      const permOpen = state.permissionEmployeePickerOpen;
-      if (!workerOpen && !deliveryOpen && !permOpen) return;
-      const workerPicker = document.querySelector(
-        "[data-receipt-worker-picker]",
-      );
-      const deliveryPicker = document.querySelector(
-        "[data-receipt-delivery-picker]",
-      );
-      const permPicker = document.querySelector(
-        "[data-permission-employee-picker]",
-      );
-      if (workerOpen && workerPicker?.contains(ev.target)) return;
-      if (deliveryOpen && deliveryPicker?.contains(ev.target)) return;
-      if (permOpen && permPicker?.contains(ev.target)) return;
-      closeReceiptPrintPickersState();
-      if (ev.target.closest?.(".wh-date-filters")) {
-        closeReceiptPrintPickersVisual();
-        return;
-      }
-      render();
-    },
-    true,
-  );
+  document.addEventListener("click", (ev) => {
+    if (whReceiptPickerDismissGuard) return;
+    if (!isWhReceiptPickerOpen()) return;
+    const target = ev.target;
+    if (
+      target.closest?.("[data-receipt-worker-picker]") ||
+      target.closest?.("[data-receipt-delivery-picker]") ||
+      target.closest?.("[data-permission-employee-picker]")
+    ) {
+      return;
+    }
+    closeReceiptPrintPickersState();
+    if (target.closest?.(".wh-date-filters")) {
+      closeReceiptPrintPickersVisual();
+      return;
+    }
+    render();
+  });
 }
 function toggleReceiptPrintOrder(id) {
   const current = idList(state.receiptPrintOrderIds);
@@ -6378,28 +6462,30 @@ function productsExportList() {
     );
 }
 function productExcelHeaders() {
-  return [
+  const headers = [
     "№",
     "Баркод",
     "Барааны нэр",
     "Төрөл",
     "Борлуулалтын үнэ",
-    "Өртөг үнэ",
-    "Үлдэгдэл",
-    "Нэгж",
   ];
+  if (canViewProductCost()) headers.push("Өртөг үнэ");
+  headers.push("Үлдэгдэл", "Нэгж");
+  return headers;
 }
 function productExcelDataRows(products = productsExportList()) {
-  return products.map((p, i) => [
-    i + 1,
-    p.barcode || "-",
-    p.name || "",
-    p.category || "",
-    Number(p.price) || 0,
-    productCostPrice(p),
-    Number(p.stock) || 0,
-    p.unit || "ширхэг",
-  ]);
+  return products.map((p, i) => {
+    const row = [
+      i + 1,
+      p.barcode || "-",
+      p.name || "",
+      p.category || "",
+      Number(p.price) || 0,
+    ];
+    if (canViewProductCost()) row.push(productCostPrice(p));
+    row.push(Number(p.stock) || 0, p.unit || "ширхэг");
+    return row;
+  });
 }
 function productSheetDateLabel() {
   const d = new Date();
@@ -6561,12 +6647,12 @@ function productsView() {
   ]
     .filter(Boolean)
     .join("");
-  const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${isAdmin() ? " product-list--show-cost" : ""}`;
+  const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${canViewProductCost() ? " product-list--show-cost" : ""}`;
   return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = canManageProducts(),
-    showCost = isAdmin();
+    showCost = canViewProductCost();
   return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span>${showCost ? `<span class="product-list__col product-list__col--cost">Өртөг үнэ</span>` : ""}<span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
 }
 function productDetailRow(label, valueHtml) {
@@ -6594,7 +6680,7 @@ function productDetailHtml(p, id) {
   if (packSize) {
     rows.push(productDetailRow("Багц", `${packSize} ш/багц`));
   }
-  if (isAdmin()) {
+  if (canViewProductCost()) {
     const cost = productCostPrice(p);
     rows.push(
       productDetailRow(
@@ -6625,7 +6711,7 @@ function productCard(p) {
   const adminActions = canManageProducts()
     ? `<div class="product-card__actions" onclick="event.stopPropagation()">${editIconButton({ className: "product-card__action-btn product-card__action-btn--edit", attrs: `onclick="confirmEditProduct('${esc(p.id)}')"`, label: "Бараа засах" })}${deleteIconButton({ className: "product-card__action-btn product-card__action-btn--delete", attrs: `data-confirm-delete="product" data-id="${esc(p.id)}"`, label: "Бараа устгах" })}</div>`
     : "";
-  const costLine = isAdmin()
+  const costLine = canViewProductCost()
     ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
     : "";
   return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span>${costLine}<span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${adminActions}</div></article>`;
@@ -6651,14 +6737,7 @@ function inventoryView() {
     )
     .join(
       "",
-    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" ? "" : excelDownloadBtn("confirmInventoryExport()") })}<div class="inventory-categories flex flex-wrap gap-2"><button type="button" onclick="setInventoryCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх төрөл</button>${cats()
-    .map(
-      (c) =>
-        `<button type="button" onclick="setInventoryCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${c}</button>`,
-    )
-    .join(
-      "",
-    )}</div></div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockActionList(list, tab)}</div>`;
+    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockActionList(list, tab)}</div>`;
 }
 function stockInEmployees() {
   return [...state.employees].sort((a, b) =>
@@ -7232,11 +7311,7 @@ ${bodyRows}
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = legacyExcelFileName(stockInReceiptFileName(receipt));
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  void downloadBlobFile(blob, legacyExcelFileName(stockInReceiptFileName(receipt)));
 }
 function stockActionRow(p, tab) {
   const openModal =
@@ -7372,6 +7447,21 @@ function setCountCategory(cat) {
   state.filters.countCategory = cat || "all";
   render();
 }
+function categoryFilterChipBtn(label, value, active, handler) {
+  const isActive = active === value;
+  return `<button type="button" onclick="${handler}(${jsStringArg(value)})" class="picker-cat-chip${isActive ? " is-active" : ""}" aria-pressed="${isActive ? "true" : "false"}">${esc(label)}</button>`;
+}
+function categoryFilterChipsHtml({
+  active = "all",
+  allLabel = "Бүгд",
+  allValue = "all",
+  handler = "setCountCategory",
+} = {}) {
+  const chips = cats()
+    .map((c) => categoryFilterChipBtn(c, c, active, handler))
+    .join("");
+  return `<div class="inventory-categories picker-cat-chips" role="tablist" aria-label="Төрөлөөр шүүх">${categoryFilterChipBtn(allLabel, allValue, active, handler)}${chips}</div>`;
+}
 function countSessionSinceMs() {
   const t = state.countSessionStartedAt;
   if (!t) return 0;
@@ -7475,6 +7565,7 @@ function countDiffAmount(diff, p) {
   return diff * productCostPrice(p);
 }
 function countDiffAmountText(diff, p) {
+  if (!canViewProductCost()) return "-";
   const cost = productCostPrice(p);
   if (!cost) return "-";
   const amt = countDiffAmount(diff, p);
@@ -7522,9 +7613,9 @@ function refreshCountRowMeta(id) {
   if (!p || !meta) return;
   const stats = countProductStats(p);
   if (countSessionActive()) {
-    meta.innerHTML = `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
+    meta.innerHTML = `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostMetaHtml(p)}`;
   } else {
-    meta.innerHTML = `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
+    meta.innerHTML = `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostMetaHtml(p)}`;
   }
 }
 function syncCountInputsFromState() {
@@ -7553,7 +7644,7 @@ function updateCountMetricsInPlace() {
   );
   if (values[0]) values[0].textContent = String(counted);
   if (values[1]) values[1].textContent = String(list.length);
-  if (countSessionActive() && counted) {
+  if (countSessionActive() && counted && canViewProductCost()) {
     const t = countMetricsTotals(countedProducts);
     if (values[2]) values[2].textContent = fmt(t.openingValue);
     if (values[3]) values[3].textContent = fmt(t.soldValue);
@@ -7734,11 +7825,13 @@ function countView() {
           const t = countMetricsTotals(countedProducts);
           const diffTone =
             t.diffValue !== 0 ? "text-tone-danger" : "text-tone-success";
-          return `${metricsBar(
+          const qtyBar = metricsBar(
             `${card("Эхний үлдэгдэл", t.opening)}${card("Борлуулсан", t.sold)}${card("Зарлагдсан", t.expended)}${card("Эцсийн үлдэгдэл", t.final)}`,
             "4",
             "count",
-          )}${metricsBar(
+          );
+          if (!canViewProductCost()) return qtyBar;
+          return `${qtyBar}${metricsBar(
             `${card("Эхний дүн", fmt(t.openingValue))}${card("Борлуулалт", fmt(t.soldValue))}${card("Зарлага", fmt(t.expendedValue))}${card("Зөрүү дүн", fmt(t.diffValue), diffTone)}`,
             "4",
             "count count-values",
@@ -7751,6 +7844,7 @@ function countView() {
             "count",
           );
           if (!countSessionActive() || !countedProducts.length) return base;
+          if (!canViewProductCost()) return base;
           const t = countMetricsTotals(countedProducts);
           const diffTone =
             t.diffValue !== 0 ? "text-tone-danger" : "text-tone-success";
@@ -7766,14 +7860,7 @@ function countView() {
       : `<p class="count-view__hint">Тоо оруулах эсвэл «Шинэ» дарж тооллого эхлүүлнэ.</p>`;
   const countListPanel = state.countDone
     ? ""
-    : `<div class="line-panel"><div class="inventory-categories flex flex-wrap gap-2 mb-3"><button type="button" onclick="setCountCategory('all')" class="px-3 py-2 rounded text-sm ${cat === "all" ? "bg-primary text-primary-foreground" : "bg-secondary"}">Бүх бараа</button>${cats()
-        .map(
-          (c) =>
-            `<button type="button" onclick="setCountCategory('${esc(c)}')" class="px-3 py-2 rounded text-sm ${cat === c ? "bg-primary text-primary-foreground" : "bg-secondary"}">${esc(c)}</button>`,
-        )
-        .join(
-          "",
-        )}</div><input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
+    : `<div class="line-panel">${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх бараа", handler: "setCountCategory" })}<input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
   return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}${countListPanel}<div class="grid grid-cols-2 gap-2"><button onclick="confirmFinishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
@@ -7786,9 +7873,9 @@ function countRow(p) {
         ? "text-muted-foreground"
         : "count-result-table__diff--bad",
     metaHtml = countSessionActive()
-      ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`
-      : `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostPrice(p) ? `<span>Өртөг: <b>${fmt(productCostPrice(p))}</b></span>` : ""}`;
-  return `<article class="count-row"><div class="count-row__main"><div class="count-row__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="count-row__img" loading="lazy" decoding="async"><p class="count-row__title">${esc(p.name)}</p></div><div class="count-row__meta count-row__stats">${metaHtml}</div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span><span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span></div></div></div></article>`;
+      ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostMetaHtml(p)}`
+      : `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostMetaHtml(p)}`;
+  return `<article class="count-row"><div class="count-row__main"><div class="count-row__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="count-row__img" loading="lazy" decoding="async"><p class="count-row__title">${esc(p.name)}</p></div><div class="count-row__meta count-row__stats">${metaHtml}</div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span>${canViewProductCost() ? `<span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span>` : ""}</div></div></div></article>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -7823,7 +7910,8 @@ function countMismatchesForList(list) {
 function countResult(mismatches) {
   const list = countFilteredProducts().filter((p) => countValue(p.id) !== null);
   const mismatchCount = mismatches.length;
-  const headHtml = `<div class="count-result-table__head" role="row"><span class="count-result-table__head-name" role="columnheader">Бараа</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд борлуулсан">Борлуулсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд зарлагдсан">Зарлагдсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллогын эцсийн үлдэгдэл">Эцсийн үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Нэгжийн өртөг үнэ">Өртөг үнэ</span><span class="count-result-table__head-num" role="columnheader" title="Тоолсон − бүртгэл">Зөрүү</span><span class="count-result-table__head-num" role="columnheader" title="Зөрүүний дүн">Зөрүү дүн</span></div>`;
+  const showCost = canViewProductCost();
+  const headHtml = `<div class="count-result-table__head" role="row"><span class="count-result-table__head-name" role="columnheader">Бараа</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд борлуулсан">Борлуулсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд зарлагдсан">Зарлагдсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллогын эцсийн үлдэгдэл">Эцсийн үлдэгдэл</span>${showCost ? `<span class="count-result-table__head-num" role="columnheader" title="Нэгжийн өртөг үнэ">Өртөг үнэ</span>` : ""}<span class="count-result-table__head-num" role="columnheader" title="Тоолсон − бүртгэл">Зөрүү</span>${showCost ? `<span class="count-result-table__head-num" role="columnheader" title="Зөрүүний дүн">Зөрүү дүн</span>` : ""}</div>`;
   const rowHtml = list
     .map((p) => {
       const stats = countProductStats(p),
@@ -7835,7 +7923,7 @@ function countResult(mismatches) {
             : "count-result-table__diff count-result-table__diff--bad",
         diffText = countDiffQtyText(diff),
         diffAmtText = countDiffAmountText(diff, p);
-      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}" role="row"><span class="count-result-table__name" role="cell" title="${esc(p.name)}">${esc(p.name)}</span>${countResultQtyCell(stats.opening, "Эхний үлдэгдэл")}${countResultQtyCell(stats.sold, "Борлуулсан")}${countResultQtyCell(stats.expended, "Зарлагдсан")}${countResultQtyCell(stats.final, "Эцсийн үлдэгдэл")}<span class="count-result-table__num" data-label="Өртөг үнэ" title="Өртөг үнэ: ${esc(cost ? fmt(cost) : "-")}">${cost ? fmt(cost) : "-"}</span><span class="${diffClass}" data-label="Зөрүү" title="Зөрүү: ${esc(diffText)}">${diffText}</span><span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн" title="Зөрүү дүн: ${esc(diffAmtText)}">${diffAmtText}</span></div>`;
+      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}" role="row"><span class="count-result-table__name" role="cell" title="${esc(p.name)}">${esc(p.name)}</span>${countResultQtyCell(stats.opening, "Эхний үлдэгдэл")}${countResultQtyCell(stats.sold, "Борлуулсан")}${countResultQtyCell(stats.expended, "Зарлагдсан")}${countResultQtyCell(stats.final, "Эцсийн үлдэгдэл")}${showCost ? `<span class="count-result-table__num" data-label="Өртөг үнэ" title="Өртөг үнэ: ${esc(cost ? fmt(cost) : "-")}">${cost ? fmt(cost) : "-"}</span>` : ""}<span class="${diffClass}" data-label="Зөрүү" title="Зөрүү: ${esc(diffText)}">${diffText}</span>${showCost ? `<span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн" title="Зөрүү дүн: ${esc(diffAmtText)}">${diffAmtText}</span>` : ""}</div>`;
     })
     .join("");
   const badgeClass = mismatchCount
@@ -8025,6 +8113,10 @@ function buildProductSheetXml() {
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportProductsExcelXlsx() {
+  if (!canViewProductCost()) {
+    exportProductsExcelFallback();
+    return;
+  }
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
@@ -8032,7 +8124,7 @@ async function exportProductsExcelXlsx() {
   if (!products.length) return alert("Бараа байхгүй");
   const stamp = new Date().toISOString().slice(0, 10);
   const { sharedStringsXml, sheetXml } = buildProductSheetXml();
-  const tpl = await fetch(PRODUCT_SHEET_TEMPLATE).then((r) => {
+  const tpl = await fetch(staticAssetUrl(PRODUCT_SHEET_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
@@ -8044,11 +8136,7 @@ async function exportProductsExcelXlsx() {
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `baraa-${stamp}.xlsx`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadBlobFile(blob, `baraa-${stamp}.xlsx`);
 }
 function buildCountSheetXml() {
   const strings = [];
@@ -8264,7 +8352,7 @@ async function exportCountExcelXlsx() {
   if (!rows.length) return alert("Тоолсон бараа байхгүй");
   const stamp = new Date().toISOString().slice(0, 10);
   const { sharedStringsXml, sheetXml } = buildCountSheetXml();
-  const tpl = await fetch(COUNT_SHEET_TEMPLATE).then((r) => {
+  const tpl = await fetch(staticAssetUrl(COUNT_SHEET_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
@@ -8276,11 +8364,7 @@ async function exportCountExcelXlsx() {
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `toollogo-${stamp}.xlsx`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadBlobFile(blob, `toollogo-${stamp}.xlsx`);
 }
 const WAREHOUSE_PREPARE_LAST_COL = "F";
 const WAREHOUSE_PREPARE_TEMPLATE =
@@ -8467,7 +8551,7 @@ async function exportStockInExcelXlsx(receipt) {
     throw new Error("JSZip missing");
   }
   const { sharedStringsXml, sheetXml } = buildStockInSheetXml(receipt);
-  const tpl = await fetch(STOCK_IN_XLSX_TEMPLATE).then((r) => {
+  const tpl = await fetch(staticAssetUrl(STOCK_IN_XLSX_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
@@ -8480,11 +8564,7 @@ async function exportStockInExcelXlsx(receipt) {
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = stockInReceiptFileName(receipt);
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadBlobFile(blob, stockInReceiptFileName(receipt));
 }
 function warehouseDateLabel(prefix, raw = todayIso()) {
   const parts = String(raw).split("-");
@@ -8851,10 +8931,12 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     orders,
     workerIds,
   );
-  const tpl = await fetch(WAREHOUSE_PREPARE_TEMPLATE).then((r) => {
-    if (!r.ok) throw new Error("template missing");
-    return r.arrayBuffer();
-  });
+  const tpl = await fetch(staticAssetUrl(WAREHOUSE_PREPARE_TEMPLATE)).then(
+    (r) => {
+      if (!r.ok) throw new Error("template missing");
+      return r.arrayBuffer();
+    },
+  );
   const zip = await JSZip.loadAsync(tpl);
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
@@ -8864,11 +8946,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `aguulah-beldeh-${stamp}.xlsx`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadBlobFile(blob, `aguulah-beldeh-${stamp}.xlsx`);
 }
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const stamp = new Date().toISOString().slice(0, 10);
@@ -8944,9 +9022,19 @@ ${renderGroupRows(sections.regular)}${promoRows}
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
 function exportWarehousePrepareExcel(orders, workerIds) {
-  exportWarehousePrepareExcelXlsx(orders, workerIds).catch(() =>
-    exportWarehousePrepareExcelFallback(orders, workerIds),
-  );
+  return exportWarehousePrepareExcelXlsx(orders, workerIds)
+    .then(() => showInstallToast("Excel файл татагдлаа"))
+    .catch((err) => {
+      console.warn("Warehouse prepare xlsx failed", err);
+      try {
+        exportWarehousePrepareExcelFallback(orders, workerIds);
+        showInstallToast("Excel файл татагдлаа");
+      } catch (fallbackErr) {
+        console.warn("Warehouse prepare fallback failed", fallbackErr);
+        alert("Excel файл татахад алдаа гарлаа. Дахин оролдоно уу.");
+        throw fallbackErr;
+      }
+    });
 }
 function exportCountExcelFallback() {
   const rows = countExcelRows();
@@ -10794,8 +10882,8 @@ function workerChooser(orders) {
         : "Худалдааны төлөөлөгч сонгоно уу"
       : "Өнөөдрийн захиалга алга",
     pickerHtml = canPick
-      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч сонгох</span><span class="wh-worker-chooser__value${hasOrders || hasSelection ? "" : " is-placeholder"}">${esc(chooserLabel)}</span></button>`
-      : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч сонгох</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></div>`;
+      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${hasOrders || hasSelection ? "" : " is-placeholder"}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
+      : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></span></div>`;
   return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
@@ -11101,10 +11189,18 @@ function render() {
     count: countView,
   };
   const view = map[state.currentView] || workerView;
+  whReceiptPickerSkipAnim = isWhReceiptPickerOpen();
   const scrollSnap = captureRenderScroll();
   app.innerHTML = shell(view());
   lastRenderedView = state.currentView;
   restoreRenderScroll(scrollSnap);
+  if (whReceiptPickerSkipAnim) {
+    document
+      .querySelectorAll(".wh-receipt-picker.is-open .wh-receipt-picker__panel")
+      .forEach((panel) =>
+        panel.classList.add("wh-receipt-picker__panel--steady"),
+      );
+  }
   bindProductImages(app);
   if (localStateDirty()) scheduleBackendSave();
   maybeShowPwaInstallBanner();
@@ -11117,7 +11213,7 @@ function render() {
   }
   if (state.filters.worker === "orders")
     requestAnimationFrame(scrollWorkerOrdersToDate);
-  if (state.currentView === "warehouseReceipts")
+  if (state.currentView === "warehouseReceipts" && !isWhReceiptPickerOpen())
     scrollWarehouseReceiptListToActive();
   bindReceiptPrintWorkerPickerDismiss();
   if (state.currentView === "count" && !state.countDone)
@@ -13155,7 +13251,7 @@ function employeeExcel() {
         ? "Сонгосон ХТ дээр захиалга алга"
         : "Ажилтан сонгоно уу",
     );
-  exportWarehousePrepareExcel(orders, workerIds);
+  return exportWarehousePrepareExcel(orders, workerIds);
 }
 async function saveWorker() {
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
@@ -13263,10 +13359,15 @@ function initConfirmCard() {
   const overlay = document.getElementById("confirm-card-overlay");
   if (!overlay || overlay.dataset.bound) return;
   overlay.dataset.bound = "1";
-  overlay.querySelector("#confirm-card-yes")?.addEventListener("click", () => {
+  overlay.querySelector("#confirm-card-yes")?.addEventListener("click", async () => {
     const fn = pendingConfirm?.onConfirm;
     closeConfirmCard();
-    fn?.();
+    try {
+      await fn?.();
+    } catch (err) {
+      console.warn("Confirm action failed", err);
+      alert("Алдаа гарлаа. Дахин оролдоно уу.");
+    }
   });
   overlay.querySelector("#confirm-card-no")?.addEventListener("click", () => {
     const fn = pendingConfirm?.onCancel;
@@ -13532,14 +13633,10 @@ function csvRow(cells) {
     .join(",");
 }
 function csv(name, rows) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(
-    new Blob(["\uFEFF" + rows.map(csvRow).join("\n")], {
-      type: "text/csv;charset=utf-8",
-    }),
-  );
-  a.download = name;
-  a.click();
+  const blob = new Blob(["\uFEFF" + rows.map(csvRow).join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  void downloadBlobFile(blob, name);
 }
 function xlsxFileName(name) {
   const base = String(name || "excel.xlsx")
@@ -13621,11 +13718,7 @@ async function downloadRowsXlsx(name, rows, sheetName = "Sheet1") {
     type: "blob",
     mimeType: XLSX_MIME,
   });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = xlsxFileName(name);
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  await downloadBlobFile(blob, xlsxFileName(name));
 }
 function excel(name, rows) {
   downloadRowsXlsx(name, rows).catch(() =>
@@ -13664,6 +13757,7 @@ Object.assign(window, {
   confirmReportExport,
   confirmEmployeeExcel,
   confirmOrderReceiptsExcel,
+  confirmWarehouseReceiptsExcel,
   confirmVisibleOrderReceiptsExcel,
   confirmSingleOrderReceiptExcel,
   exportOrderReceiptsExcel,
@@ -13767,6 +13861,7 @@ Object.assign(window, {
   toggleReceiptPrintWorkerPicker,
   closeReceiptPrintWorkerPicker,
   clearReceiptPrintWorkers,
+  armWhReceiptPickerDismissGuard,
   toggleReceiptPrintOrder,
   printSelectedOrderReceipts,
   printOrderReceiptsNow,
