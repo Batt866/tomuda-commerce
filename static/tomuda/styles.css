@@ -342,15 +342,15 @@ textarea.text-sm,
 }
 
 .stat-card__label {
-  font-size: var(--font-xs);
+  font-size: 13px;
   color: var(--hex-muted-foreground);
-  line-height: var(--phi);
+  line-height: 1.35;
 }
 
 .stat-card__value {
-  font-size: var(--font-lg);
+  font-size: 1.125rem;
   font-weight: 600;
-  line-height: var(--phi);
+  line-height: 1.3;
   margin-top: var(--phi-neg-1);
 }
 
@@ -3040,12 +3040,12 @@ img[data-product-img],
   --space-4: var(--phi-2);
   --space-5: var(--phi-3);
   --space-6: var(--phi-4);
-  --font-xs: calc(1rem / var(--phi) / var(--phi));
-  --font-sm: calc(1rem / var(--phi));
-  --font-md: 1rem;
-  --font-lg: calc(1rem * var(--phi));
-  --font-xl: calc(1rem * var(--phi) * var(--phi));
-  --font-display: calc(1rem * var(--phi) * var(--phi) * var(--phi));
+  --font-xs: 12px;
+  --font-sm: 14px;
+  --font-md: 16px;
+  --font-lg: 18px;
+  --font-xl: 22px;
+  --font-display: 28px;
 }
 
 * {
@@ -3061,6 +3061,8 @@ body {
   margin: 0;
   background: var(--hex-background);
   color: var(--hex-foreground);
+  font-size: var(--font-md);
+  line-height: 1.5;
   font-family:
     ui-sans-serif,
     system-ui,
@@ -3087,9 +3089,9 @@ button {
   padding: 0 var(--phi-2);
   border: none;
   border-radius: var(--btn-radius);
-  font-size: var(--font-sm);
+  font-size: 15px;
   font-weight: 600;
-  line-height: var(--phi);
+  line-height: 1.3;
   color: var(--hex-foreground);
   background: var(--hex-secondary);
   cursor: pointer;
@@ -3928,9 +3930,9 @@ button:focus-visible,
   border-radius: var(--phi-0);
   background: transparent;
   color: var(--hex-muted-foreground);
-  font-size: var(--font-xs);
+  font-size: var(--font-sm);
   font-weight: 700;
-  line-height: var(--phi);
+  line-height: 1.25;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -3979,11 +3981,11 @@ button:focus-visible,
 }
 
 .mobile-stats .stat-card__label {
-  font-size: 11px !important;
+  font-size: 13px !important;
 }
 
 .mobile-stats .stat-card__value {
-  font-size: 1.02rem !important;
+  font-size: 1.125rem !important;
 }
 
 .mobile-bottom-nav__label {
@@ -6181,7 +6183,7 @@ textarea::placeholder {
   gap: var(--space-3);
   align-items: center;
   padding: var(--phi-1) var(--phi-1) var(--phi-1) 0;
-  font-size: var(--font-sm);
+  font-size: 15px;
 }
 
 .promo-qty-rule-card__body {
@@ -11325,8 +11327,8 @@ textarea::placeholder {
 
 .line-list__meta {
   margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 13px;
+  line-height: 1.4;
   color: var(--hex-muted-foreground);
 }
 
