@@ -2262,10 +2262,10 @@ a.customer-card__line .customer-card__icon {
 
 .stock-alert-row {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 64px;
-  gap: 6px;
+  grid-template-columns: var(--thumb-md) minmax(0, 1fr) 64px;
+  gap: 10px;
   align-items: center;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-radius: 8px;
   background: var(--hex-secondary);
   border: 1px solid transparent;
@@ -2273,14 +2273,14 @@ a.customer-card__line .customer-card__icon {
 }
 
 .stock-alert-thumb {
-  width: 44px;
-  height: 44px;
+  width: var(--thumb-md);
+  height: var(--thumb-md);
   border-radius: 0;
   object-fit: contain;
   object-position: center;
   padding: 4px;
   box-sizing: border-box;
-  background: var(--hex-secondary);
+  background: var(--hex-card);
   border: none;
   box-shadow: none;
 }
@@ -7535,14 +7535,14 @@ textarea::placeholder {
   }
 
   .stock-alert-row {
-    grid-template-columns: 44px minmax(0, 1fr) 56px;
-    gap: 8px;
-    padding: 6px 8px !important;
+    grid-template-columns: var(--thumb-md) minmax(0, 1fr) 56px;
+    gap: 10px;
+    padding: 8px 10px !important;
   }
 
   .stock-alert-thumb {
-    width: 40px !important;
-    height: 40px !important;
+    width: var(--thumb-md) !important;
+    height: var(--thumb-md) !important;
   }
 
   .stock-alert-row__name {

@@ -4751,7 +4751,7 @@ function stockAlertModal() {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
           const limitAttr = limit > 0 ? `value="${limit}" ` : "";
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-alert-thumb" width="44" height="44" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
@@ -6325,6 +6325,15 @@ function orderDeliveryEmployeeId(o = {}) {
     )?.id || ""
   );
 }
+function compareOrdersNewestFirst(a, b) {
+  const seqA = Number(a?.receiptSeq) || 0;
+  const seqB = Number(b?.receiptSeq) || 0;
+  if (seqB !== seqA) return seqB - seqA;
+  const at = new Date(a?.createdAt || 0).getTime();
+  const bt = new Date(b?.createdAt || 0).getTime();
+  if (Number.isFinite(bt) && Number.isFinite(at) && bt !== at) return bt - at;
+  return String(b?.id || "").localeCompare(String(a?.id || ""), "mn");
+}
 function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
   const workerRank = new Map(workerIds.map((id, idx) => [id, idx]));
   const deliveryRank = new Map(deliveryIds.map((id, idx) => [id, idx]));
@@ -6349,10 +6358,7 @@ function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
           : Number.MAX_SAFE_INTEGER;
       if (ar !== br) return ar - br;
     }
-    const at = new Date(a.createdAt || 0).getTime(),
-      bt = new Date(b.createdAt || 0).getTime();
-    if (at !== bt) return bt - at;
-    return String(b.id || "").localeCompare(String(a.id || ""), "mn");
+    return compareOrdersNewestFirst(a, b);
   });
 }
 function canPickWarehouseWorkers() {
@@ -10506,7 +10512,7 @@ function workerOrdersList() {
   if (pay === "unpaid") list = list.filter((o) => !orderIsPaid(o));
   const day = state.filters.workerDate;
   if (day) list = list.filter((o) => orderCreatedDay(o) === day);
-  return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return list.sort(compareOrdersNewestFirst);
 }
 function workerViewTabsHtml(tab) {
   return `<div class="worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Шинэ захиалга</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Захиалга харах</button></div>`;
@@ -10665,7 +10671,7 @@ function deliveryStorePickStep() {
 function deliveryOrdersForStore(customerId) {
   return deliveryRelevantOrders()
     .filter((o) => o.customerId === customerId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .sort(compareOrdersNewestFirst);
 }
 function deliveryStoreMapStep() {
   const selected = state.customers.find((c) => c.id === state.deliveryStoreId),
