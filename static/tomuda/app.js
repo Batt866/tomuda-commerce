@@ -11568,41 +11568,59 @@ function cleanupCustomerMapInstance() {
   window.customerTileFallback = false;
 }
 let tomudaGeolocationPlugin = null;
+function isCapacitorNative() {
+  return !!(window.Capacitor?.isNativePlatform?.());
+}
 function capGeolocationPlugin() {
+  if (!isCapacitorNative()) return null;
   const cap = window.Capacitor;
-  if (!cap?.isNativePlatform?.() || typeof cap.registerPlugin !== "function") {
-    return null;
-  }
   if (tomudaGeolocationPlugin) return tomudaGeolocationPlugin;
   if (cap.Plugins?.Geolocation) {
     tomudaGeolocationPlugin = cap.Plugins.Geolocation;
     return tomudaGeolocationPlugin;
   }
-  try {
-    tomudaGeolocationPlugin = cap.registerPlugin("Geolocation", {
-      web: () => ({
-        getCurrentPosition(options = {}) {
-          return readBrowserGeolocationPromise({
-            enableHighAccuracy: true,
-            timeout: 25000,
-            maximumAge: 0,
-            ...options,
-          });
-        },
-        async requestPermissions() {
-          return { location: "prompt", coarseLocation: "prompt" };
-        },
-      }),
-    });
-  } catch (e) {
-    console.warn("Geolocation plugin register failed", e);
+  return null;
+}
+async function waitForCapGeolocationPlugin(attempts = 25) {
+  for (let i = 0; i < attempts; i++) {
+    const plugin = capGeolocationPlugin();
+    if (plugin) return plugin;
+    await new Promise((resolve) => setTimeout(resolve, 80));
   }
-  return tomudaGeolocationPlugin;
+  return null;
+}
+function geolocationPermissionGranted(perm = {}) {
+  const ok = (value) => {
+    const state = String(value || "").toLowerCase();
+    return state === "granted" || state === "limited";
+  };
+  return ok(perm.location) || ok(perm.coarseLocation);
 }
 function geolocationPermissionDenied(perm = {}) {
+  if (geolocationPermissionGranted(perm)) return false;
   const loc = String(perm.location || "").toLowerCase();
   const coarse = String(perm.coarseLocation || "").toLowerCase();
-  return loc === "denied" && coarse === "denied";
+  return loc === "denied" || coarse === "denied";
+}
+function normalizeGeolocationError(err) {
+  if (!err) return Object.assign(new Error("geolocation"), { code: 2 });
+  const msg = String(err.message || err.errorMessage || "").toLowerCase();
+  const normalized =
+    err instanceof Error ? err : new Error(msg || "geolocation error");
+  if (normalized.code == null) {
+    if (msg.includes("denied") || msg.includes("permission")) normalized.code = 1;
+    else if (
+      msg.includes("disabled") ||
+      msg.includes("not enabled") ||
+      msg.includes("unavailable") ||
+      msg.includes("provider")
+    )
+      normalized.code = 2;
+    else if (msg.includes("timeout")) normalized.code = 3;
+    else if (msg.includes("unsupported")) normalized.code = 0;
+    else normalized.code = 2;
+  }
+  return normalized;
 }
 function isAndroidDevice() {
   const cap = window.Capacitor;
@@ -11649,9 +11667,11 @@ function geolocationErrorDetail(err) {
       offerSettings: isAndroidDevice(),
     };
   }
-  if (code === 0 || msg.includes("unsupported")) {
+  if (code === 0 || msg.includes("unsupported") || msg.includes("plugin missing")) {
     return {
-      text: "Энэ төхөөрөмж GPS дэмжихгүй байна",
+      text: isCapacitorNative()
+        ? "GPS plugin олдсонгүй. App-аа шинэчилж (APK) дахин суулгана уу."
+        : "Энэ төхөөрөмж GPS дэмжихгүй байна",
       offerSettings: false,
     };
   }
@@ -11808,43 +11828,61 @@ function readBrowserGeolocationPromise(options = {}) {
     );
   });
 }
+async function ensureCapacitorGeolocationPermission(capGeo) {
+  if (!capGeo) return;
+  if (typeof capGeo.checkPermissions === "function") {
+    const current = await capGeo.checkPermissions().catch(() => null);
+    if (current && geolocationPermissionGranted(current)) return;
+  }
+  if (typeof capGeo.requestPermissions !== "function") return;
+  const perm = await capGeo.requestPermissions().catch(() => null);
+  if (perm && geolocationPermissionDenied(perm)) {
+    const denied = new Error("denied");
+    denied.code = 1;
+    throw denied;
+  }
+}
 async function requestCapacitorPosition(options = {}) {
-  const capGeo = capGeolocationPlugin();
-  if (!capGeo) return null;
-  const geoOpts = {
-    enableHighAccuracy: true,
-    timeout: 25000,
-    maximumAge: 0,
-    ...options,
-  };
-  const readPosition = () =>
-    capGeo
-      .getCurrentPosition({
+  const capGeo = await waitForCapGeolocationPlugin();
+  if (!capGeo) {
+    const missing = new Error("Capacitor Geolocation plugin missing");
+    missing.code = 0;
+    throw missing;
+  }
+  await ensureCapacitorGeolocationPermission(capGeo);
+  const attempts = [
+    {
+      enableHighAccuracy: true,
+      timeout: 35000,
+      maximumAge: 0,
+      ...options,
+    },
+    {
+      enableHighAccuracy: false,
+      timeout: 45000,
+      maximumAge: 120000,
+      ...options,
+    },
+  ];
+  let lastErr = null;
+  for (const geoOpts of attempts) {
+    try {
+      const pos = await capGeo.getCurrentPosition({
         enableHighAccuracy: geoOpts.enableHighAccuracy,
         timeout: geoOpts.timeout,
         maximumAge: geoOpts.maximumAge,
-      })
-      .then((pos) => normalizeDeviceCoords(pos));
-  try {
-    return await readPosition();
-  } catch (err) {
-    if (typeof capGeo.requestPermissions !== "function") throw err;
-    const perm = await capGeo.requestPermissions().catch(() => null);
-    if (perm && geolocationPermissionDenied(perm)) {
-      const denied = new Error("denied");
-      denied.code = 1;
-      throw denied;
+      });
+      return normalizeDeviceCoords(pos);
+    } catch (err) {
+      lastErr = normalizeGeolocationError(err);
+      if (lastErr.code === 1) throw lastErr;
     }
-    return readPosition();
   }
+  throw lastErr || Object.assign(new Error("timeout"), { code: 3 });
 }
 function requestDevicePosition(options = {}) {
-  const capGeo = capGeolocationPlugin();
-  if (capGeo) {
-    return requestCapacitorPosition(options).catch((err) => {
-      if (!navigator.geolocation) throw err;
-      return readBrowserGeolocationPromise(options);
-    });
+  if (isCapacitorNative()) {
+    return requestCapacitorPosition(options);
   }
   if (!navigator.geolocation) {
     return Promise.reject(Object.assign(new Error("unsupported"), { code: 0 }));
@@ -11916,7 +11954,7 @@ function applyCustomerUserPosition({ setPin = false, hasCustomerPin = false } = 
     if (status) status.textContent = "Газрын зураг ачаалж байна...";
     return Promise.resolve();
   }
-  if (!capGeolocationPlugin() && !navigator.geolocation) {
+  if (!isCapacitorNative() && !navigator.geolocation) {
     if (status && (!hasCustomerPin || setPin))
       status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
     return Promise.resolve();
@@ -11927,8 +11965,10 @@ function applyCustomerUserPosition({ setPin = false, hasCustomerPin = false } = 
       applyCustomerCoords(coords, { setPin, hasCustomerPin });
     })
     .catch((err) => {
+      const normalized = normalizeGeolocationError(err);
       if (status && (!hasCustomerPin || setPin))
-        status.textContent = geolocationErrorMessage(err);
+        status.textContent = geolocationErrorMessage(normalized);
+      if (setPin) showCustomerLocationFailure(normalized);
     });
 }
 async function showCustomerUserLocation(
@@ -11943,7 +11983,7 @@ function centerCustomerMapOnUser() {
     lngInput = document.getElementById("customerLng");
   const hasPin = !!(latInput?.value && lngInput?.value);
   const onFail = (err) => {
-    showCustomerLocationFailure(err);
+    showCustomerLocationFailure(normalizeGeolocationError(err));
   };
   const onCoords = (coords) => {
     const apply = () => {
@@ -11962,51 +12002,22 @@ function centerCustomerMapOnUser() {
     }
     apply();
   };
-  if (!navigator.geolocation && !capGeolocationPlugin()) {
+  if (!isCapacitorNative() && !navigator.geolocation) {
     if (status) status.textContent = "Энэ төхөөрөмж GPS дэмжихгүй байна";
     return;
   }
   if (status) status.textContent = "Байршил татаж байна...";
-  const tryCapacitor = () => {
-    requestDevicePosition()
+  const run = () => {
+    requestDevicePosition({
+      enableHighAccuracy: true,
+      timeout: 35000,
+      maximumAge: 0,
+    })
       .then(onCoords)
       .catch(onFail);
   };
-  const tryBrowser = (opts, next) => {
-    if (!navigator.geolocation) {
-      next();
-      return;
-    }
-    readBrowserGeolocationWithWatch(
-      opts,
-      (pos) => onCoords(normalizeDeviceCoords(pos)),
-      (err) => {
-        if ((err?.code === 3 || err?.code === 2) && opts.enableHighAccuracy) {
-          tryBrowser(
-            {
-              enableHighAccuracy: false,
-              timeout: 30000,
-              maximumAge: 120000,
-            },
-            next,
-          );
-          return;
-        }
-        next(err);
-      },
-    );
-  };
-  tryBrowser(
-    { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 },
-    (err) => {
-      if (capGeolocationPlugin()) {
-        tryCapacitor();
-        return;
-      }
-      if (err) onFail(err);
-      else if (status) status.textContent = "Байршил авахад алдаа гарлаа";
-    },
-  );
+  if (!window.customerMap) waitForCustomerMap(run);
+  else run();
 }
 function bindCustomerMapLocateButton() {
   const btn = document.querySelector(".customer-map-locate");
