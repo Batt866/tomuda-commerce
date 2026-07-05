@@ -4298,6 +4298,7 @@ function dismissPwaInstall(remember = true) {
 function scheduleBackendSave() {
   persistOrderSnapshot();
   if (!backendReady) return;
+  if (!state.isLoggedIn || !state.currentEmployee?.id) return;
   clearTimeout(backendSaveTimer);
   backendSaveTimer = setTimeout(saveBackendState, 350);
 }
@@ -4354,6 +4355,7 @@ function warehouseLiveFilterBannerHtml() {
 }
 async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
+  if (!state.isLoggedIn || !state.currentEmployee?.id) return;
   if (importLoading) {
     scheduleBackendSave();
     return;
@@ -4440,7 +4442,9 @@ async function saveBackendState(retry = 0) {
       }
       persistOrderSnapshot();
       markBackendSaveFailed(msg);
-      alertModal("Хадгалах амжилтгүй", msg);
+      if (state.isLoggedIn && state.currentEmployee?.id) {
+        alertModal("Хадгалах амжилтгүй", msg);
+      }
     } else {
       persistOrderSnapshot();
       markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
@@ -13516,12 +13520,21 @@ function confirmLogout() {
   );
 }
 function logout() {
-  state.currentEmployee = null;
-  state.isLoggedIn = false;
-  state.mobileOpen = false;
-  localStorage.removeItem(AUTH_SESSION_KEY);
   closeModal();
-  render();
+  const finishLogout = () => {
+    clearTimeout(backendSaveTimer);
+    backendSaveTimer = null;
+    state.currentEmployee = null;
+    state.isLoggedIn = false;
+    state.mobileOpen = false;
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    render();
+  };
+  if (backendReady && localStateDirty() && state.currentEmployee?.id) {
+    flushBackendSave().finally(finishLogout);
+    return;
+  }
+  finishLogout();
 }
 function saveEmployee(e) {
   e.preventDefault();
