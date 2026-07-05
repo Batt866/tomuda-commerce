@@ -1388,6 +1388,15 @@ a.customer-card__line .customer-card__icon {
 
 .list-action-toolbar__tools .btn--toolbar-excel {
   flex: 0 0 auto;
+  background: #e8f5ec;
+  color: #107c41;
+  border-color: #9fd4b3;
+}
+
+.list-action-toolbar__tools .btn--toolbar-excel:hover:not(:disabled) {
+  background: #d4eddf;
+  border-color: #7bc499;
+  color: #0d6635;
 }
 
 .page-action-add {
