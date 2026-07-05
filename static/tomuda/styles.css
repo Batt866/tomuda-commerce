@@ -4770,6 +4770,31 @@ textarea::placeholder {
   opacity: 0.85;
 }
 
+.customer-map-settings-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hex-warning) 14%, var(--hex-card));
+  border: 1px solid color-mix(in srgb, var(--hex-warning) 45%, var(--hex-border));
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hex-warning-text);
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.customer-map-settings-btn.hidden,
+.customer-map-settings-btn[hidden] {
+  display: none !important;
+}
+
+.customer-map-settings-btn:active {
+  opacity: 0.85;
+}
+
 .customer-map {
   height: 360px !important;
   min-height: 360px !important;

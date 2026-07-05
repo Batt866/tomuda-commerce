@@ -11604,19 +11604,132 @@ function geolocationPermissionDenied(perm = {}) {
   const coarse = String(perm.coarseLocation || "").toLowerCase();
   return loc === "denied" && coarse === "denied";
 }
-function geolocationErrorMessage(err) {
+function isAndroidDevice() {
+  const cap = window.Capacitor;
+  if (cap?.getPlatform?.() === "android") return true;
+  return /android/i.test(navigator.userAgent || "");
+}
+function isSamsungDevice() {
+  return /samsung|sm-/i.test(navigator.userAgent || "");
+}
+function geolocationErrorDetail(err) {
   const code = err?.code;
   const msg = String(err?.message || err?.errorMessage || "").toLowerCase();
   if (!window.isSecureContext && location.protocol !== "https:") {
-    return "Байршил авахын тулд HTTPS холболт шаардлагатай";
+    return {
+      text: "Байршил авахын тулд HTTPS холболт шаардлагатай",
+      offerSettings: false,
+    };
   }
-  if (code === 1 || msg.includes("denied") || msg.includes("permission"))
-    return "Байршил авахын тулд GPS зөвшөөрөл өгнө үү (тохиргоо)";
-  if (code === 2 || msg.includes("unavailable"))
-    return "GPS дохио олдсонгүй. Гадаа эсвэл цонхны ойрт ороорой";
-  if (code === 3 || msg.includes("timeout"))
-    return "Байршил хэт удаан. Дахин оролдоно уу";
-  return "Байршил авахад алдаа гарлаа";
+  if (
+    code === 2 ||
+    msg.includes("disabled") ||
+    msg.includes("location service") ||
+    msg.includes("location provider") ||
+    msg.includes("turn on")
+  ) {
+    return {
+      text: isSamsungDevice()
+        ? "Samsung-ийн Байршил (Location) унтраалттай байна. Тохиргооноос асаана уу."
+        : "Утасны GPS/Байршил унтраалттай байна. Тохиргооноос асаана уу.",
+      offerSettings: isAndroidDevice(),
+    };
+  }
+  if (code === 1 || msg.includes("denied") || msg.includes("permission")) {
+    return {
+      text: isSamsungDevice()
+        ? "Байршил авах зөвшөөрөл байхгүй. Тохиргоо → Байршил → Асаах, мөн app-д зөвшөөрнө үү."
+        : "Байршил авахын тулд GPS зөвшөөрөл өгнө үү (тохиргоо).",
+      offerSettings: isAndroidDevice(),
+    };
+  }
+  if (code === 3 || msg.includes("timeout")) {
+    return {
+      text: "Байршил хэт удаан. GPS-ийг идэвхтэй эсэхийг шалгаад дахин оролдоно уу.",
+      offerSettings: isAndroidDevice(),
+    };
+  }
+  if (code === 0 || msg.includes("unsupported")) {
+    return {
+      text: "Энэ төхөөрөмж GPS дэмжихгүй байна",
+      offerSettings: false,
+    };
+  }
+  return {
+    text: "Байршил авахад алдаа гарлаа",
+    offerSettings: isAndroidDevice(),
+  };
+}
+function geolocationErrorMessage(err) {
+  return geolocationErrorDetail(err).text;
+}
+function tryAndroidLocationSettingsIntent() {
+  const intents = [
+    "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end",
+    "intent:#Intent;action=android.settings.LOCATION_SETTINGS;end",
+  ];
+  if (isSamsungDevice()) {
+    intents.unshift(
+      "intent:#Intent;package=com.android.settings;component=com.android.settings/com.samsung.android.settings.location.LocationSettings;end",
+    );
+  }
+  for (const href of intents) {
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) {
+        window.location.href = href;
+        return true;
+      }
+      const link = document.createElement("a");
+      link.href = href;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => link.remove(), 500);
+      return true;
+    } catch (e) {}
+  }
+  return false;
+}
+function openDeviceLocationSettings() {
+  if (isAndroidDevice() && tryAndroidLocationSettingsIntent()) return;
+  alertModal(
+    "Байршил асаах",
+    isSamsungDevice()
+      ? `<p>Samsung дээр дараах байдлаар байршилаа асаана уу:</p><ol class="list-decimal pl-5 space-y-1 text-sm mt-2"><li><b>Тохиргоо</b> (Settings) нээнэ</li><li><b>Байршил</b> (Location) сонгоно</li><li><b>Асаах</b> (On) болгоно</li><li>ТОМУДА app-д <b>Зөвшөөрөх</b> сонгоно</li><li>App руу буцаж <b>Миний байршил</b> дарна</li></ol>`
+      : `<p>Утасныхаа <b>Тохиргоо → Байршил</b> хэсэгт GPS-ээ асаагаад app-д зөвшөөрөл өгнө үү.</p>`,
+  );
+}
+function showCustomerLocationFailure(err) {
+  const status = document.getElementById("customerMapStatus");
+  const settingsBtn = document.getElementById("customerMapSettingsBtn");
+  const detail = geolocationErrorDetail(err);
+  if (status) status.textContent = detail.text;
+  if (settingsBtn) {
+    settingsBtn.hidden = !detail.offerSettings;
+    settingsBtn.classList.toggle("hidden", !detail.offerSettings);
+  }
+  if (detail.offerSettings) {
+    confirmModal(
+      "Байршил асаах",
+      `<p>${detail.text}</p><p class="text-sm text-muted-foreground mt-2">${isSamsungDevice() ? "Samsung" : "Android"}-ийн <b>Тохиргоо → Байршил</b> хэсэг рүү шилжиж GPS-ээ асаана уу.</p>`,
+      {
+        confirmLabel: "Тохиргоо нээх",
+        cancelLabel: "Болих",
+        closable: true,
+        onConfirm: () => {
+          closeConfirmCard();
+          openDeviceLocationSettings();
+        },
+      },
+    );
+  }
+}
+function hideCustomerLocationSettingsPrompt() {
+  const settingsBtn = document.getElementById("customerMapSettingsBtn");
+  if (settingsBtn) {
+    settingsBtn.hidden = true;
+    settingsBtn.classList.add("hidden");
+  }
 }
 function normalizeDeviceCoords(raw = {}) {
   const coords = raw.coords || raw;
@@ -11755,6 +11868,7 @@ function applyCustomerCoords(coords, { setPin = false, hasCustomerPin = false } 
   if (!hasCustomerPin || setPin) window.customerMap.setView([la, ln], 16);
   if (setPin) setCustomerMapPoint(la, ln, "Таны байршил");
   else if (status && !hasCustomerPin) status.textContent = "";
+  hideCustomerLocationSettingsPrompt();
 }
 function setCustomerMapPoint(la, ln, label = "") {
   const latInput = document.getElementById("customerLat"),
@@ -11829,7 +11943,7 @@ function centerCustomerMapOnUser() {
     lngInput = document.getElementById("customerLng");
   const hasPin = !!(latInput?.value && lngInput?.value);
   const onFail = (err) => {
-    if (status) status.textContent = geolocationErrorMessage(err);
+    showCustomerLocationFailure(err);
   };
   const onCoords = (coords) => {
     const apply = () => {
@@ -11904,6 +12018,20 @@ function bindCustomerMapLocateButton() {
       ev.preventDefault();
       ev.stopPropagation();
       centerCustomerMapOnUser();
+    },
+    { passive: false },
+  );
+}
+function bindCustomerMapSettingsButton() {
+  const btn = document.getElementById("customerMapSettingsBtn");
+  if (!btn || btn.dataset.geoBound) return;
+  btn.dataset.geoBound = "1";
+  btn.addEventListener(
+    "click",
+    (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openDeviceLocationSettings();
     },
     { passive: false },
   );
@@ -12075,7 +12203,7 @@ function customerModal(id, draft = null) {
   const cid = esc(id || "");
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -12083,7 +12211,10 @@ function customerModal(id, draft = null) {
     window.customerMapInitTimer = null;
     initCustomerMap(c.latitude, c.longitude);
   }, 120);
-  requestAnimationFrame(bindCustomerMapLocateButton);
+  requestAnimationFrame(() => {
+    bindCustomerMapLocateButton();
+    bindCustomerMapSettingsButton();
+  });
   loadMnLocations().then(() => {
     if (modal.querySelector("form[data-customer-form]"))
       initCustomerAddressFields(c);
@@ -14173,6 +14304,7 @@ Object.assign(window, {
   selectDeliveryEmployee,
   clearDeliveryEmployee,
   centerCustomerMapOnUser,
+  openDeviceLocationSettings,
   saveCustomer,
   customerDetail,
   productDetail,
