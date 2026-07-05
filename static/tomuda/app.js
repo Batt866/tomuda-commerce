@@ -1400,7 +1400,10 @@ function applyImportPayload(kind, payload) {
   }
   if (kind === "products" && Array.isArray(payload.products)) {
     state.products = payload.products;
-    if ((report.success || 0) > 0) state.searches.products = "";
+    if ((report.success || 0) > 0) {
+      state.searches.products = "";
+      state.filters.category = "all";
+    }
     return true;
   }
   return false;

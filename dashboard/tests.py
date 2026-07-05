@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import json
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -229,3 +231,105 @@ class OrderRetentionTests(TestCase):
         self.assertEqual(response.json()["purgedOrders"], 1)
         row = AppState.objects.get(key="main")
         self.assertEqual(row.data["orders"], [])
+
+
+class ProductExcelImportTests(TestCase):
+    def test_template_headers_exclude_cost_and_image(self):
+        from dashboard.excel_import import PRODUCT_HEADERS, build_product_template_bytes
+
+        self.assertNotIn("Үйлдвэрлэсэн үнэ", PRODUCT_HEADERS)
+        self.assertNotIn("Зураг URL", PRODUCT_HEADERS)
+        content = build_product_template_bytes()
+        self.assertTrue(content.startswith(b"PK"))
+
+    def test_import_skips_template_example_and_creates_new_rows(self):
+        from dashboard.excel_import import import_products_into_state
+
+        state = default_state()
+        state["products"] = []
+        rows = [
+            ["Barcode", "Барааны нэр", "Хэмжих нэгж", "Борлуулалтын үнэ", "Үйлдвэрлэсэн улс"],
+            ["6977236071316", "Жишээ бараа", "ширхэг", "15000", "Монгол"],
+            ["1111111111111", "Шинэ бараа", "ширхэг", "12000", "Монгол"],
+        ]
+        next_state, report = import_products_into_state(state, rows)
+        self.assertEqual(report["success"], 1)
+        self.assertEqual(report["created"], 1)
+        self.assertEqual(len(next_state["products"]), 1)
+        self.assertEqual(next_state["products"][0]["name"], "Шинэ бараа")
+
+    def test_import_updates_existing_barcode_with_create_permission(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from dashboard.excel_import import import_products_into_state
+        from dashboard.permissions import validate_state_mutation
+
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "prod-1",
+                "barcode": "8888888888888",
+                "name": "Хуучин",
+                "category": "Бусад",
+                "unit": "ширхэг",
+                "price": 100,
+                "costPrice": 0,
+                "stock": 0,
+                "minStock": 0,
+                "country": "Монгол",
+                "boxQuantity": 1,
+                "image": "",
+            }
+        ]
+        state["employees"] = [
+            {
+                "id": "emp-1",
+                "email": "sales@test.mn",
+                "name": "Sales",
+                "role": "sales",
+                "password": "x",
+                "permissions": ["products.create"],
+            }
+        ]
+        AppState.objects.update_or_create(key="main", defaults={"data": state})
+
+        rows = [
+            ["Barcode", "Барааны нэр", "Хэмжих нэгж", "Борлуулалтын үнэ", "Үйлдвэрлэсэн улс"],
+            ["8888888888888", "Шинэчлэгдсэн", "ширхэг", "20000", "Монгол"],
+            ["9999999999999", "Шинээр", "ширхэг", "30000", "Монгол"],
+        ]
+        current = AppState.objects.get(key="main").data
+        next_state, report = import_products_into_state(current, rows)
+        actor = {"id": "emp-1", "email": "sales@test.mn"}
+        ok, message = validate_state_mutation(
+            current, next_state, actor, import_kind="products"
+        )
+        self.assertTrue(ok, message)
+        self.assertEqual(report["created"], 1)
+        self.assertEqual(report["updated"], 1)
+
+        actor_json = json.dumps(actor)
+        buf = io.BytesIO()
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        for r_idx, row in enumerate(rows, start=1):
+            for c_idx, value in enumerate(row, start=1):
+                ws.cell(row=r_idx, column=c_idx, value=value)
+        wb.save(buf)
+        upload = SimpleUploadedFile(
+            "products.xlsx",
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response = self.client.post(
+            "/api/import/products",
+            {"file": upload, "actor": actor_json},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["report"]["success"], 2)
+        names = {p["name"] for p in payload["products"]}
+        self.assertIn("Шинэчлэгдсэн", names)
+        self.assertIn("Шинээр", names)

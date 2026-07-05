@@ -318,7 +318,9 @@ def import_customers(request, file: UploadedFile = File(...), actor: str = Form(
             next_state, report = import_customers_into_state(current, rows)
         except ValueError as exc:
             raise HttpError(400, str(exc)) from exc
-        ok, message = validate_state_mutation(current, next_state, actor_data)
+        ok, message = validate_state_mutation(
+            current, next_state, actor_data, import_kind="customers"
+        )
         if not ok:
             raise HttpError(403, message or "Эрх хүрэлцэхгүй")
         _append_import_log(next_state, kind="customers", actor=actor_data, report=report)
@@ -363,7 +365,9 @@ def import_products(request, file: UploadedFile = File(...), actor: str = Form("
             product_ids=product_ids,
         )
         report.update(image_report)
-        ok, message = validate_state_mutation(current, next_state, actor_data)
+        ok, message = validate_state_mutation(
+            current, next_state, actor_data, import_kind="products"
+        )
         if not ok:
             raise HttpError(403, message or "Эрх хүрэлцэхгүй")
         _append_import_log(next_state, kind="products", actor=actor_data, report=report)

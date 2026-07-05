@@ -251,6 +251,8 @@ def validate_state_mutation(
     old_state: dict[str, Any],
     new_state: dict[str, Any],
     actor: dict[str, Any] | None,
+    *,
+    import_kind: str | None = None,
 ) -> tuple[bool, str]:
     if old_state == new_state:
         return True, ""
@@ -322,8 +324,14 @@ def validate_state_mutation(
                     created_order_stock.get(item_id, 0),
                 )
             }
-        if updated and not _has_any_permission(perms, *edit_keys):
-            return False, f"{key} засах эрхгүй"
+        if updated:
+            edit_perm_keys = edit_keys
+            if import_kind and key == import_kind:
+                edit_perm_keys = tuple(
+                    dict.fromkeys((*edit_keys, f"{key}.create"))
+                )
+            if not _has_any_permission(perms, *edit_perm_keys):
+                return False, f"{key} засах эрхгүй"
 
     deleted_orders = set(old_orders) - set(new_orders)
     retention_days = _order_retention_days(new_state)

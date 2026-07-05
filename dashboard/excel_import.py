@@ -28,9 +28,7 @@ PRODUCT_HEADERS = [
     "Барааны нэр",
     "Хэмжих нэгж",
     "Борлуулалтын үнэ",
-    "Үйлдвэрлэсэн үнэ",
     "Үйлдвэрлэсэн улс",
-    "Зураг URL",
 ]
 
 CUSTOMER_HEADER_ALIASES: dict[str, str] = {
@@ -190,6 +188,19 @@ def _is_template_example_customer(name: str, reg_raw: str) -> bool:
         return True
     reg_digits = _registration_digits(reg_raw)
     return normalized == "жишээ ххк" or reg_digits == "1234567"
+
+
+def _is_template_example_product(barcode: str, name: str) -> bool:
+    normalized = _normalize_header(name)
+    if normalized in {"жишээ бараа", "жишээ", "example", "sample"}:
+        return True
+    digits = re.sub(r"\D", "", barcode or "")
+    return digits == "6977236071316" and normalized in {
+        "жишээ бараа",
+        "жишээ",
+        "example",
+        "sample",
+    }
 
 
 def _load_rows_xlsx(data: bytes) -> list[list[str]]:
@@ -435,16 +446,15 @@ def build_product_template_bytes() -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Бараа"
-    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, 10000, "Монгол", ""]
+    example = ["6977236071316", "Жишээ бараа", "ширхэг", 15000, "Монгол"]
     _format_import_worksheet(
         ws,
         PRODUCT_HEADERS,
         example,
-        text_columns={1, 7},
-        min_col_widths=[18, 26, 20, 30, 30, 22, 42],
+        text_columns={1},
+        min_col_widths=[18, 26, 20, 30, 22],
     )
-    for col_idx in (4, 5):
-        ws.cell(row=2, column=col_idx).number_format = "#,##0"
+    ws.cell(row=2, column=4).number_format = "#,##0"
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -622,10 +632,12 @@ def import_products_into_state(
     for offset, row in enumerate(data_rows, start=header_idx + 2):
         if _row_is_empty(row):
             continue
-        total += 1
         data = _row_dict(row, header_map)
         barcode = re.sub(r"\D", "", _cell_text(data.get("barcode")))
         name = _cell_text(data.get("name"))
+        if _is_template_example_product(barcode, name):
+            continue
+        total += 1
         unit_raw = _cell_text(data.get("unit"))
         price, price_err = _parse_number(data.get("price"), allow_empty=False)
         cost, cost_err = _parse_number(data.get("costPrice"), allow_empty=True)
@@ -643,24 +655,33 @@ def import_products_into_state(
             errors.append({"row": offset, "message": "Үнэ тоон утга биш байна."})
             continue
         if cost_err:
-            errors.append({"row": offset, "message": "Үйлдвэрлэсэн үнэ тоон утга биш байна."})
+            errors.append({"row": offset, "message": "Өртөг үнэ тоон утга биш байна."})
             continue
         unit, unit_err = _normalize_unit(unit_raw)
         if unit_err:
-            errors.append({"row": offset, "message": "Хэмжих нэгж буруу байна."})
-            continue
-
-        if barcode in existing_by_barcode:
-            errors.append(
-                {
-                    "row": offset,
-                    "message": "Али хэдийн бүртгэгдсэн product байна.",
-                }
-            )
+            errors.append({"row": offset, "message": unit_err})
             continue
 
         country = _cell_text(data.get("country")) or "Монгол"
         image_source = _image_url_text(data.get("image"))
+
+        existing = existing_by_barcode.get(barcode)
+        if existing:
+            existing["name"] = name
+            existing["unit"] = unit or "ширхэг"
+            existing["price"] = int(price or 0)
+            if cost is not None:
+                existing["costPrice"] = int(cost or 0)
+            existing["country"] = country
+            if image_source:
+                existing["image"] = image_source
+                pid = str(existing.get("id") or "").strip()
+                if pid:
+                    touched_product_ids.append(pid)
+            updated += 1
+            batch_barcodes.add(barcode)
+            success += 1
+            continue
 
         now += 1
         pid = str(now)
