@@ -1405,8 +1405,8 @@ a.customer-card__line .customer-card__icon {
   padding: 0 16px;
   border: none;
   border-radius: 12px;
-  background: var(--hex-primary);
-  color: var(--hex-primary-foreground);
+  background: #22c55e;
+  color: #fff;
   font-size: 15px;
   font-weight: 800;
   line-height: 1.2;
@@ -1423,11 +1423,11 @@ a.customer-card__line .customer-card__icon {
 }
 
 .page-action-add:hover:not(:disabled) {
-  background: var(--hex-primary-dark);
+  background: #16a34a;
 }
 
 .page-action-add:active:not(:disabled) {
-  background: var(--hex-primary-dark);
+  background: #15803d;
   transform: translateY(1px);
 }
 

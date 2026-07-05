@@ -268,6 +268,9 @@ let countFocusedProductId = "";
 let countInputSyncing = false;
 let warehouseDateRenderPending = false;
 let warehouseDateBlurTimer = null;
+let warehouseDatePickerActiveUntil = 0;
+let receiptStatusSelectActiveUntil = 0;
+let receiptStatusFilterPending = false;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -2133,11 +2136,6 @@ function currentPageTitle(nav) {
     const c = state.customers.find((x) => x.id === state.workerCustomer);
     if (c?.name) return c.name;
   }
-  const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
-  if (hit) return hit[1];
-  if (state.currentView === "promotions" && state.filters.promotionDetail) {
-    return promotionTypeLabel(state.filters.promotionDetail);
-  }
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрх үүсгэх",
@@ -2147,7 +2145,13 @@ function currentPageTitle(nav) {
     warehouseReceipts: "Баримтууд",
     delivery: "Хүргэлт",
   };
-  return extra[state.currentView] || "ТОМУДА";
+  if (extra[state.currentView]) return extra[state.currentView];
+  const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
+  if (hit) return hit[1];
+  if (state.currentView === "promotions" && state.filters.promotionDetail) {
+    return promotionTypeLabel(state.filters.promotionDetail);
+  }
+  return "ТОМУДА";
 }
 const PRODUCT_IMAGE_FALLBACK =
   "/static/tomuda/icons/icon-192.png?v=20260630-logo";
@@ -3101,8 +3105,14 @@ function isEditingCountQty() {
   );
 }
 function isWarehouseDateEditing() {
+  if (Date.now() < warehouseDatePickerActiveUntil) return true;
   const el = document.activeElement;
   return el?.matches?.(".wh-date-filters__native");
+}
+function isReceiptStatusSelecting() {
+  if (Date.now() < receiptStatusSelectActiveUntil) return true;
+  const el = document.activeElement;
+  return el?.matches?.(".wh-receipts__filter");
 }
 function isEditingSettlementText() {
   const el = document.activeElement;
@@ -3145,10 +3155,33 @@ function flushPendingWarehouseDateRender() {
 function warehouseDateFocus() {
   closeReceiptPrintPickersState();
   closeReceiptPrintPickersVisual();
+  warehouseDatePickerActiveUntil = Date.now() + 60000;
 }
 function warehouseDateBlur() {
   clearTimeout(warehouseDateBlurTimer);
-  warehouseDateBlurTimer = setTimeout(flushPendingWarehouseDateRender, 150);
+  warehouseDateBlurTimer = setTimeout(() => {
+    warehouseDatePickerActiveUntil = 0;
+    flushPendingWarehouseDateRender();
+  }, 400);
+}
+function receiptStatusFilterFocus() {
+  receiptStatusSelectActiveUntil = Date.now() + 60000;
+}
+function receiptStatusFilterBlur() {
+  setTimeout(() => {
+    receiptStatusSelectActiveUntil = 0;
+    if (receiptStatusFilterPending) {
+      receiptStatusFilterPending = false;
+      render();
+    }
+  }, 300);
+}
+function setReceiptOrderStatusFilter(value) {
+  state.filters.order = value || "all";
+  state.selectedWarehouseOrderId = "";
+  receiptStatusSelectActiveUntil = 0;
+  receiptStatusFilterPending = false;
+  render();
 }
 function closeReceiptPrintPickersVisual() {
   document.querySelectorAll(".wh-receipt-picker.is-open").forEach((picker) => {
@@ -3172,9 +3205,14 @@ function safeRender() {
     warehouseDateRenderPending = true;
     return;
   }
+  if (isReceiptStatusSelecting()) {
+    receiptStatusFilterPending = true;
+    return;
+  }
   if (isEditingSettlementText()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
+  receiptStatusFilterPending = false;
   render();
 }
 function flushPendingCountRender() {
@@ -4621,7 +4659,7 @@ function adminHubHtml() {
     ["stockAlertModal()", "ҮЛДЭГДЭЛ САНУУЛАХ", "stock"],
     [
       "percentDiscountSettingsModal()",
-      `Шууд төлөлтийн хувь (${percentDiscountRate()}%)`,
+      "Шууд төлөлтийн хувь",
       "employees",
     ],
     [
