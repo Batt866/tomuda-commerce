@@ -3041,6 +3041,7 @@ function localStateDirty() {
   return backendStateSnapshot() !== backendLastSaved;
 }
 function shouldDeferBackendSync() {
+  if (isEditingLoginForm()) return true;
   if (isEditingCountQty()) return true;
   if (isWarehouseDateEditing()) return true;
   if (isEditingSettlementText()) return true;
@@ -3121,6 +3122,14 @@ function isEditingSettlementText() {
     (el.matches?.("[data-settlement-input]") ||
       el.matches?.(".worker-order-opt__input"))
   );
+}
+function isEditingLoginForm() {
+  const el = document.activeElement;
+  return !!el?.closest?.(".auth-form");
+}
+function mountLoginView(force = false) {
+  if (!force && app.querySelector(".auth-screen")) return;
+  app.innerHTML = loginView();
 }
 function isWhReceiptPickerOpen() {
   return !!(
@@ -10586,7 +10595,7 @@ function loginView() {
   const installBtn = isNativeApp()
     ? ""
     : `<button type="button" onclick="installAppOnPhone()" class="btn btn--secondary btn--block">${pwaInstallLabel()}</button>`;
-  return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Импорт, түгээлт удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" autofocus placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
+  return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Импорт, түгээлт удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
 }
 function workerOrdersList() {
   let list = state.orders.filter((o) => o.status !== "cancelled");
@@ -11251,11 +11260,12 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
+  if (!state.isLoggedIn && isEditingLoginForm()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
   settlementRenderPending = false;
   if (!state.isLoggedIn) {
-    app.innerHTML = loginView();
+    mountLoginView();
     return;
   }
   syncCurrentEmployeeFromState();
@@ -13749,7 +13759,8 @@ function logout() {
     state.isLoggedIn = false;
     state.mobileOpen = false;
     localStorage.removeItem(AUTH_SESSION_KEY);
-    render();
+    mountLoginView(true);
+    return;
   };
   if (backendReady && localStateDirty() && state.currentEmployee?.id) {
     flushBackendSave().finally(finishLogout);
