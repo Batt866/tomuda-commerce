@@ -7294,14 +7294,17 @@ function inventoryView() {
     )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}</div>`;
 }
 function inventoryEmployees() {
-  return [...state.employees].sort((a, b) =>
-    (a.name || "").localeCompare(b.name || "", "mn"),
-  );
+  return state.employees
+    .filter((e) => e.role === "warehouse")
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "mn"));
 }
 function defaultInventoryEmployeeId() {
-  const warehouseStaff = inventoryEmployees().filter((e) => e.role === "warehouse");
-  if (warehouseStaff.length) return warehouseStaff[0].id;
-  return state.currentEmployee?.id || "";
+  return inventoryEmployees()[0]?.id || "";
+}
+function normalizeInventoryEmployeeId(currentId) {
+  const ids = new Set(inventoryEmployees().map((e) => e.id));
+  if (currentId && ids.has(currentId)) return currentId;
+  return defaultInventoryEmployeeId();
 }
 function inventoryEmployeeName(employeeId) {
   return state.employees.find((e) => e.id === employeeId)?.name || "-";
@@ -7330,11 +7333,19 @@ function ensureStockInSession() {
   }
   if (!state.stockInEmployeeId) {
     state.stockInEmployeeId = defaultInventoryEmployeeId();
+  } else {
+    state.stockInEmployeeId = normalizeInventoryEmployeeId(
+      state.stockInEmployeeId,
+    );
   }
 }
 function ensureStockOutSession() {
   if (!state.stockOutEmployeeId) {
     state.stockOutEmployeeId = defaultInventoryEmployeeId();
+  } else {
+    state.stockOutEmployeeId = normalizeInventoryEmployeeId(
+      state.stockOutEmployeeId,
+    );
   }
 }
 function stockInSessionActive() {
