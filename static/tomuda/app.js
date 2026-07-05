@@ -270,6 +270,7 @@ let warehouseDateRenderPending = false;
 let warehouseDateBlurTimer = null;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
+let whReceiptPickerSuppressDismissUntil = 0;
 let whReceiptPickerSkipAnim = false;
 let settlementRenderPending = false;
 let settlementBlurTimer = null;
@@ -3126,6 +3127,12 @@ function armWhReceiptPickerDismissGuard() {
     });
   });
 }
+function suppressWhReceiptPickerDismiss(ms = 360) {
+  whReceiptPickerSuppressDismissUntil = Date.now() + ms;
+}
+function shouldSuppressWhReceiptPickerDismiss() {
+  return Date.now() < whReceiptPickerSuppressDismissUntil;
+}
 function whReceiptPickerTriggerAttrs() {
   return ` onpointerdown="armWhReceiptPickerDismissGuard()"`;
 }
@@ -5666,16 +5673,18 @@ function warehouseReceiptPrintListItem(o) {
     checked = idList(state.receiptPrintOrderIds).includes(o.id);
   return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)}</span></span></button></div>`;
 }
-function warehouseReceiptStatusOptions() {
-  return ["pending", "confirmed", "delivered", "cancelled"];
+function warehouseReceiptStatusOptions(includeDelivered = true) {
+  const opts = ["pending", "confirmed", "delivered", "cancelled"];
+  return includeDelivered ? opts : opts.filter((s) => s !== "delivered");
 }
 function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
-  if (
-    !["all", ...warehouseReceiptStatusOptions()].includes(state.filters.order)
-  )
+  const statusOptions = warehouseReceiptStatusOptions(false);
+  if (!["all", ...statusOptions].includes(state.filters.order))
     state.filters.order = "all";
+  if (state.filters.order === "delivered") state.filters.order = "all";
   const workerIds = receiptPrintWorkerIds(),
-    displayRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows;
+    sourceRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows,
+    displayRows = sourceRows.filter((o) => o.status !== "delivered");
   if (workerIds.length) syncReceiptPrintSelection(displayRows);
   else {
     state.receiptPrintOrderIds = [];
@@ -5708,13 +5717,13 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     exportBtn = excelDownloadBtn(
       `confirmWarehouseReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
     ),
-    toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${warehouseReceiptStatusOptions()
+    toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="state.filters.order=this.value;render()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${statusOptions
       .map(
         (s) =>
           `<option value="${s}" ${state.filters.order === s ? "selected" : ""}>${status(s)}</option>`,
       )
       .join("")}</select>`;
-  return `<section class="wh-receipts"><header class="wh-receipts__head"><div class="wh-receipts__head-main">${canPageBack() ? pageBackBtnHtml() : ""}<h2 class="wh-receipts__title">${title}</h2></div><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header>${warehouseLiveFilterBannerHtml()}<div class="wh-receipts__filters">${pageToolbarHtml({ filters: toolbarFilters, actions: exportBtn })}</div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
+  return `<section class="wh-receipts"><header class="wh-receipts__head"><div class="wh-receipts__head-main">${canPageBack() ? pageBackBtnHtml() : ""}<h2 class="wh-receipts__title">${title}</h2></div><div class="wh-receipts__head-filters">${receiptPrintWorkerSelectHtml()}${receiptPrintDeliverySelectHtml()}</div></header><div class="wh-receipts__filters">${pageToolbarHtml({ filters: toolbarFilters, actions: exportBtn })}</div><div class="wh-receipts__layout"><div class="wh-receipt-list">${listHtml}</div><div class="wh-receipt-detail-wrap">${detailHtml}</div></div></section>`;
 }
 function warehouseOrderDetail(o) {
   const actions = warehouseOrderStatusActions(o),
@@ -5736,7 +5745,7 @@ function warehouseOrderDetail(o) {
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div><span class="wh-receipt-detail__pill ${badge(o.status)}">${status(o.status)}</span></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}', event)" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Бэлнээр" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}', event)" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
@@ -6245,6 +6254,7 @@ function toggleReceiptPrintWorkerPicker(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
   state.receiptPrintDeliveryPickerOpen = false;
   state.receiptPrintWorkerPickerOpen = !state.receiptPrintWorkerPickerOpen;
+  if (state.receiptPrintWorkerPickerOpen) suppressWhReceiptPickerDismiss();
   render();
 }
 function closeReceiptPrintWorkerPicker(ev) {
@@ -6256,6 +6266,7 @@ function toggleReceiptPrintDeliveryPicker(ev) {
   if (ev?.stopPropagation) ev.stopPropagation();
   state.receiptPrintWorkerPickerOpen = false;
   state.receiptPrintDeliveryPickerOpen = !state.receiptPrintDeliveryPickerOpen;
+  if (state.receiptPrintDeliveryPickerOpen) suppressWhReceiptPickerDismiss();
   render();
 }
 function closeReceiptPrintDeliveryPicker(ev) {
@@ -6308,6 +6319,7 @@ function bindReceiptPrintWorkerPickerDismiss() {
   receiptPrintWorkerPickerDismissBound = true;
   document.addEventListener("click", (ev) => {
     if (whReceiptPickerDismissGuard) return;
+    if (shouldSuppressWhReceiptPickerDismiss()) return;
     if (!isWhReceiptPickerOpen()) return;
     const target = ev.target;
     if (
@@ -9208,9 +9220,10 @@ function reportOrdersFiltered() {
 }
 function reportDateFiltersHtml() {
   const day = state.filters.reportDate || "",
-    today = todayIso(),
-    hint = day ? `Захиалга: ${dte(day)}` : "Бүх захиалга";
-  const filters = `<button type="button" onclick="clearReportDate()" class="page-toolbar__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="setReportDate('${today}')" class="page-toolbar__chip${day === today ? " is-active" : ""}">Өнөөдөр</button><input type="date" value="${day}" onchange="setReportDate(this.value)" class="page-toolbar__date app-input" aria-label="Огноо сонгох"><span class="page-toolbar__hint">${hint}</span>`;
+    live = !day,
+    pickerDay = day || todayIso(),
+    display = warehouseDateDisplayText(day);
+  const filters = `<div class="wh-date-filters wh-date-filters--reports"><button type="button" onclick="clearReportDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Бүгд</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setReportDate(this.value)" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Бүх захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
   return pageToolbarHtml({
     filters,
     actions: excelDownloadBtn("confirmReportExport()"),
