@@ -9,7 +9,7 @@
   "plugins": {
     "Geolocation": {
       "permissions": {
-        "location": "always"
+        "location": "whenInUse"
       }
     }
   }

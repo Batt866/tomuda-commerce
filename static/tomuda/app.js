@@ -11573,19 +11573,23 @@ function isCapacitorNative() {
 }
 function capGeolocationPlugin() {
   if (!isCapacitorNative()) return null;
-  const cap = window.Capacitor;
   if (tomudaGeolocationPlugin) return tomudaGeolocationPlugin;
-  if (cap.Plugins?.Geolocation) {
+  if (window.TomudaGeolocation) {
+    tomudaGeolocationPlugin = window.TomudaGeolocation;
+    return tomudaGeolocationPlugin;
+  }
+  const cap = window.Capacitor;
+  if (cap?.Plugins?.Geolocation) {
     tomudaGeolocationPlugin = cap.Plugins.Geolocation;
     return tomudaGeolocationPlugin;
   }
   return null;
 }
-async function waitForCapGeolocationPlugin(attempts = 25) {
+async function waitForCapGeolocationPlugin(attempts = 40) {
   for (let i = 0; i < attempts; i++) {
     const plugin = capGeolocationPlugin();
     if (plugin) return plugin;
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return null;
 }
@@ -11685,6 +11689,7 @@ function geolocationErrorMessage(err) {
 }
 function tryAndroidLocationSettingsIntent() {
   const intents = [
+    "intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;scheme=package;package=mn.tomuda.commerce;end",
     "intent:#Intent;action=android.settings.LOCATION_SOURCE_SETTINGS;end",
     "intent:#Intent;action=android.settings.LOCATION_SETTINGS;end",
   ];
@@ -11877,14 +11882,13 @@ async function ensureCapacitorGeolocationPermission(capGeo) {
     throw denied;
   }
 }
-async function requestCapacitorPosition(options = {}) {
-  const capGeo = await waitForCapGeolocationPlugin();
-  if (!capGeo) {
+async function readCapacitorPosition(capGeo, options = {}) {
+  const geo = capGeo || (await waitForCapGeolocationPlugin());
+  if (!geo) {
     const missing = new Error("Capacitor Geolocation plugin missing");
     missing.code = 0;
     throw missing;
   }
-  await ensureCapacitorGeolocationPermission(capGeo);
   const attempts = [
     {
       enableHighAccuracy: true,
@@ -11902,7 +11906,7 @@ async function requestCapacitorPosition(options = {}) {
   let lastErr = null;
   for (const geoOpts of attempts) {
     try {
-      const pos = await capGeo.getCurrentPosition({
+      const pos = await geo.getCurrentPosition({
         enableHighAccuracy: geoOpts.enableHighAccuracy,
         timeout: geoOpts.timeout,
         maximumAge: geoOpts.maximumAge,
@@ -11915,18 +11919,50 @@ async function requestCapacitorPosition(options = {}) {
   }
   throw lastErr || Object.assign(new Error("timeout"), { code: 3 });
 }
-function requestDevicePosition(options = {}) {
-  if (isCapacitorNative()) {
-    return requestCapacitorPosition(options).catch((err) => {
-      const normalized = normalizeGeolocationError(err);
-      if (normalized.code === 1 || !navigator.geolocation) throw normalized;
-      return readBrowserGeolocationForDevice(options);
+async function requestCapacitorPosition(options = {}) {
+  const capGeo = await waitForCapGeolocationPlugin();
+  if (!capGeo) {
+    const missing = new Error("Capacitor Geolocation plugin missing");
+    missing.code = 0;
+    throw missing;
+  }
+  await ensureCapacitorGeolocationPermission(capGeo);
+  return readCapacitorPosition(capGeo, options);
+}
+async function requestDevicePosition(options = {}) {
+  const capGeo = isCapacitorNative() ? await waitForCapGeolocationPlugin() : null;
+  if (capGeo) {
+    await ensureCapacitorGeolocationPermission(capGeo).catch((err) => {
+      throw normalizeGeolocationError(err);
     });
   }
+
+  let lastErr = null;
+
+  // iPhone шиг эхлээд browser GPS (iOS WebView дээр сайн ажилладаг)
+  if (navigator.geolocation) {
+    try {
+      return await readBrowserGeolocationForDevice(options);
+    } catch (err) {
+      lastErr = normalizeGeolocationError(err);
+      if (lastErr.code === 1 && !capGeo) throw lastErr;
+    }
+  }
+
+  // Android app дээр native Capacitor GPS (registerPlugin-ээр холбогдсон)
+  if (capGeo) {
+    try {
+      return await readCapacitorPosition(capGeo, options);
+    } catch (err) {
+      lastErr = normalizeGeolocationError(err);
+      throw lastErr;
+    }
+  }
+
   if (!navigator.geolocation) {
     return Promise.reject(Object.assign(new Error("unsupported"), { code: 0 }));
   }
-  return readBrowserGeolocationForDevice(options);
+  throw lastErr || Object.assign(new Error("timeout"), { code: 3 });
 }
 function waitForCustomerMap(callback, attempt = 0) {
   if (window.customerMap) {
