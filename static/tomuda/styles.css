@@ -12187,6 +12187,27 @@ body.image-lightbox-open {
   background: color-mix(in srgb, var(--hex-primary) 6%, transparent);
 }
 
+.import-file-host {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  z-index: -1;
+}
+
+.import-file-host__input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0.001;
+  overflow: hidden;
+}
+
 .import-loading-overlay {
   position: fixed;
   inset: 0;

@@ -1256,9 +1256,31 @@ function excelImportToolbar(kind) {
   const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return "";
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
-  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" data-import-download="${esc(kind)}" onclick="downloadImportTemplate('${kind}')" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><button type="button" data-import-upload="${esc(kind)}" onclick="triggerImportUpload('${kind}')" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></button><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="excel-import-toolbar__file" data-import-file="${esc(kind)}" hidden aria-label="${esc(label)} Excel upload"></div>`;
+  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" data-import-download="${esc(kind)}" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><button type="button" data-import-upload="${esc(kind)}" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></button></div>`;
 }
 let importLoading = false;
+let importUploadOpening = false;
+const IMPORT_FILE_ACCEPT =
+  ".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel";
+function ensureGlobalImportFileInputs() {
+  let host = document.getElementById("import-file-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "import-file-host";
+    host.className = "import-file-host";
+    document.body.appendChild(host);
+  }
+  for (const kind of ["products", "customers"]) {
+    if (host.querySelector(`[data-import-file="${kind}"]`)) continue;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = IMPORT_FILE_ACCEPT;
+    input.className = "import-file-host__input";
+    input.setAttribute("data-import-file", kind);
+    input.setAttribute("aria-label", `${importKindLabel(kind)} Excel upload`);
+    host.appendChild(input);
+  }
+}
 function setImportLoading(active, message = "Excel импорт хийж байна...") {
   importLoading = !!active;
   let overlay = document.getElementById("importLoadingOverlay");
@@ -1311,50 +1333,68 @@ function importKindLabel(kind) {
   return kind === "customers" ? "Харилцагч" : "Бараа";
 }
 function importFileInput(kind) {
-  return (
-    document.querySelector(
-      `[data-import-dropzone="${kind}"] [data-import-file="${kind}"]`,
-    ) || document.querySelector(`[data-import-file="${kind}"]`)
-  );
+  ensureGlobalImportFileInputs();
+  return document.querySelector(`#import-file-host [data-import-file="${kind}"]`);
 }
 async function downloadImportTemplate(kind) {
   const perm = kind === "customers" ? "customers.create" : "products.create";
   if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
   const path = importTemplatePath(kind);
   const filename = importTemplateFilename(kind);
+  const url = new URL(`${API_BASE}${path}`, appBackendOrigin()).href;
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(url, {
       method: "GET",
       cache: "no-store",
       credentials: "same-origin",
     });
     if (!res.ok) throw new Error(`template failed (${res.status})`);
     const blob = await res.blob();
-    await downloadBlobFile(new Blob([blob], { type: XLSX_MIME }), filename);
+    await downloadBlobFile(new Blob([blob], { type: XLSX_MIME }), filename, {
+      skipShare: true,
+    });
     showAppToast(`${importKindLabel(kind)} формат татагдлаа`, "success");
   } catch (error) {
     console.warn("Import template download failed", error);
-    alertModal(
-      "Алдаа",
-      `${importKindLabel(kind)} формат файл татахад алдаа гарлаа. Дахин оролдоно уу.`,
-    );
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showAppToast(`${importKindLabel(kind)} формат татагдлаа`, "success");
+    } catch (fallbackError) {
+      console.warn("Import template fallback download failed", fallbackError);
+      alertModal(
+        "Алдаа",
+        `${importKindLabel(kind)} формат файл татахад алдаа гарлаа. Дахин оролдоно уу.`,
+      );
+    }
   }
 }
 function triggerImportUpload(kind) {
+  if (importUploadOpening) return;
   const input = importFileInput(kind);
   if (!input) {
     alertModal("Алдаа", "Excel сонгох талбар олдсонгүй. Хуудсыг дахин ачаална уу.");
     return;
   }
+  importUploadOpening = true;
   input.value = "";
-  setTimeout(() => {
-    try {
-      input.click();
-    } catch (error) {
-      console.warn("Import file picker failed", error);
-      alertModal("Алдаа", "Файл сонгох цонх нээгдсэнгүй.");
-    }
-  }, 0);
+  try {
+    input.click();
+  } catch (error) {
+    importUploadOpening = false;
+    console.warn("Import file picker failed", error);
+    alertModal("Алдаа", "Файл сонгох цонх нээгдсэнгүй.");
+    return;
+  }
+  window.setTimeout(() => {
+    importUploadOpening = false;
+  }, 700);
 }
 function importApiDetail(payload, fallback = "Импорт амжилтгүй") {
   const detail = payload?.detail ?? payload?.message;
@@ -1543,12 +1583,14 @@ function onImportFileSelected(input) {
 function initExcelImportHandlers() {
   if (initExcelImportHandlers._bound) return;
   initExcelImportHandlers._bound = true;
+  ensureGlobalImportFileInputs();
   document.addEventListener(
     "click",
     (e) => {
       const downloadBtn = e.target.closest?.("[data-import-download]");
       if (downloadBtn) {
         e.preventDefault();
+        e.stopPropagation();
         downloadImportTemplate(
           downloadBtn.getAttribute("data-import-download") || "",
         );
@@ -1557,6 +1599,7 @@ function initExcelImportHandlers() {
       const uploadBtn = e.target.closest?.("[data-import-upload]");
       if (uploadBtn) {
         e.preventDefault();
+        e.stopPropagation();
         triggerImportUpload(uploadBtn.getAttribute("data-import-upload") || "");
       }
     },
@@ -2262,10 +2305,15 @@ function staticAssetUrl(path) {
   const origin = appBackendOrigin();
   return raw.startsWith("/") ? `${origin}${raw}` : `${origin}/${raw}`;
 }
-async function downloadBlobFile(blob, filename) {
+async function downloadBlobFile(blob, filename, opts = {}) {
+  const { skipShare = false } = opts;
   const name = String(filename || "download.xlsx");
   const type = blob.type || XLSX_MIME;
-  if (typeof navigator.share === "function" && typeof File !== "undefined") {
+  if (
+    !skipShare &&
+    typeof navigator.share === "function" &&
+    typeof File !== "undefined"
+  ) {
     try {
       const file = new File([blob], name, { type });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
@@ -2273,7 +2321,9 @@ async function downloadBlobFile(blob, filename) {
         return;
       }
     } catch (err) {
-      if (err?.name === "AbortError") return;
+      if (err?.name === "AbortError") {
+        /* fall through to direct download */
+      }
     }
   }
   const url = URL.createObjectURL(blob);
@@ -2944,6 +2994,26 @@ function dedupePromotionRuleList(list = []) {
 function mergeRuleArrays(remote = [], local = []) {
   return dedupePromotionRuleList([...(remote || []), ...(local || [])]);
 }
+function mergePromotionRuleKind(remoteList = [], localList = []) {
+  const remote = remoteList || [];
+  const local = localList || [];
+  if (!canDelete()) return mergeRuleArrays(remote, local);
+  const localFp = new Set(local.map(promotionRuleFingerprint));
+  const remoteFp = new Set(remote.map(promotionRuleFingerprint));
+  const removedCount = [...remoteFp].filter((fp) => !localFp.has(fp)).length;
+  const addedCount = [...localFp].filter((fp) => !remoteFp.has(fp)).length;
+  if (removedCount > 0 && addedCount === 0) {
+    return dedupePromotionRuleList(local);
+  }
+  return mergeRuleArrays(remote, local);
+}
+function mergePromotionRules(remote = {}, local = {}) {
+  return {
+    quantity: mergePromotionRuleKind(remote.quantity, local.quantity),
+    price: mergePromotionRuleKind(remote.price, local.price),
+    payment: mergePromotionRuleKind(remote.payment, local.payment),
+  };
+}
 function appendPromotionRule(kind, rule) {
   if (!state.promotionRules || typeof state.promotionRules !== "object") {
     state.promotionRules = { quantity: [], price: [], payment: [] };
@@ -3031,13 +3101,10 @@ function mergePersistentStates(remote = {}, local = {}) {
       continue;
     }
     if (key === "promotionRules") {
-      const remoteRules = remote.promotionRules || {};
-      const localRules = local.promotionRules || {};
-      merged.promotionRules = {
-        quantity: mergeRuleArrays(remoteRules.quantity, localRules.quantity),
-        price: mergeRuleArrays(remoteRules.price, localRules.price),
-        payment: mergeRuleArrays(remoteRules.payment, localRules.payment),
-      };
+      merged.promotionRules = mergePromotionRules(
+        remote.promotionRules,
+        local.promotionRules,
+      );
       continue;
     }
     if (key === "settings") {
@@ -3113,30 +3180,32 @@ function protectAccidentalDeletions(data) {
       if (restored.length) protectedData[key] = [...current, ...restored];
     }
   }
-  const baseRules = baseline.promotionRules || {
-    quantity: [],
-    price: [],
-    payment: [],
-  };
-  const nextRules = protectedData.promotionRules || {
-    quantity: [],
-    price: [],
-    payment: [],
-  };
-  protectedData.promotionRules = {
-    quantity:
-      (nextRules.quantity || []).length < (baseRules.quantity || []).length
-        ? [...(baseRules.quantity || [])]
-        : [...(nextRules.quantity || [])],
-    price:
-      (nextRules.price || []).length < (baseRules.price || []).length
-        ? [...(baseRules.price || [])]
-        : [...(nextRules.price || [])],
-    payment:
-      (nextRules.payment || []).length < (baseRules.payment || []).length
-        ? [...(baseRules.payment || [])]
-        : [...(nextRules.payment || [])],
-  };
+  if (!canDelete()) {
+    const baseRules = baseline.promotionRules || {
+      quantity: [],
+      price: [],
+      payment: [],
+    };
+    const nextRules = protectedData.promotionRules || {
+      quantity: [],
+      price: [],
+      payment: [],
+    };
+    protectedData.promotionRules = {
+      quantity:
+        (nextRules.quantity || []).length < (baseRules.quantity || []).length
+          ? [...(baseRules.quantity || [])]
+          : [...(nextRules.quantity || [])],
+      price:
+        (nextRules.price || []).length < (baseRules.price || []).length
+          ? [...(baseRules.price || [])]
+          : [...(nextRules.price || [])],
+      payment:
+        (nextRules.payment || []).length < (baseRules.payment || []).length
+          ? [...(baseRules.payment || [])]
+          : [...(nextRules.payment || [])],
+    };
+  }
   if (baseline.orders && protectedData.orders) {
     const baseMap = Object.fromEntries(baseline.orders.map((o) => [o.id, o]));
     protectedData.orders = protectedData.orders.map((o) => {
@@ -10720,7 +10789,9 @@ function removePromotionRule(type, index) {
   if (!requireAdminDelete()) return;
   if (!Array.isArray(state.promotionRules[type]))
     state.promotionRules[type] = [];
+  if (index < 0 || index >= state.promotionRules[type].length) return;
   state.promotionRules[type].splice(index, 1);
+  state.promotionRules[type] = dedupePromotionRuleList(state.promotionRules[type]);
   render();
   criticalBackendSave();
 }
