@@ -4439,6 +4439,7 @@ function captureRenderScroll() {
     sameView: lastRenderedView === state.currentView,
     mainTop: main?.scrollTop ?? 0,
     pickerLists: {},
+    receiptListTop: null,
   };
   document.querySelectorAll(".wh-receipt-picker.is-open").forEach((picker) => {
     const key = picker.hasAttribute("data-permission-employee-picker")
@@ -4452,6 +4453,8 @@ function captureRenderScroll() {
     const list = picker.querySelector(".wh-receipt-picker__list");
     if (list) snap.pickerLists[key] = list.scrollTop;
   });
+  const receiptList = document.querySelector(".wh-receipt-list");
+  if (receiptList) snap.receiptListTop = receiptList.scrollTop;
   return snap;
 }
 function restoreRenderScroll(snap) {
@@ -4468,6 +4471,10 @@ function restoreRenderScroll(snap) {
       if (snap.pickerLists[key] == null) continue;
       const list = document.querySelector(`${sel} .wh-receipt-picker__list`);
       if (list) list.scrollTop = snap.pickerLists[key];
+    }
+    if (snap.receiptListTop != null) {
+      const receiptList = document.querySelector(".wh-receipt-list");
+      if (receiptList) receiptList.scrollTop = snap.receiptListTop;
     }
   });
 }
@@ -5563,8 +5570,10 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   if (
     displayRows.length &&
     !displayRows.some((o) => o.id === state.selectedWarehouseOrderId)
-  )
+  ) {
     state.selectedWarehouseOrderId = displayRows[0].id;
+    warehouseReceiptScrollId = "";
+  }
   if (!displayRows.length) state.selectedWarehouseOrderId = "";
   const selected = displayRows.find(
       (o) => o.id === state.selectedWarehouseOrderId,
@@ -10463,13 +10472,19 @@ function scrollWarehouseReceiptListToActive() {
   if (!activeId || warehouseReceiptScrollId === activeId) return;
   warehouseReceiptScrollId = activeId;
   requestAnimationFrame(() => {
-    document
-      .querySelector(".wh-receipt-list__item.is-active")
-      ?.scrollIntoView({
-        behavior: "auto",
-        inline: "nearest",
-        block: "nearest",
-      });
+    const list = document.querySelector(".wh-receipt-list");
+    const item = list?.querySelector(".wh-receipt-list__item.is-active");
+    if (!list || !item) return;
+    const edge = 6;
+    const visibleTop = list.scrollTop;
+    const visibleBottom = visibleTop + list.clientHeight;
+    const itemTop = item.offsetTop;
+    const itemBottom = itemTop + item.offsetHeight;
+    if (itemTop < visibleTop + edge) {
+      list.scrollTop = Math.max(0, itemTop - edge);
+    } else if (itemBottom > visibleBottom - edge) {
+      list.scrollTop = itemBottom - list.clientHeight + edge;
+    }
   });
 }
 function warehouseView() {
@@ -13076,7 +13091,7 @@ function toggleWorker(id) {
 }
 function selectWarehouseOrder(id) {
   state.selectedWarehouseOrderId = id;
-  warehouseReceiptScrollId = "";
+  warehouseReceiptScrollId = id;
   render();
 }
 function workerSelectModal() {
