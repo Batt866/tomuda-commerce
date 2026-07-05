@@ -1424,11 +1424,12 @@ a.customer-card__line .customer-card__icon {
 }
 
 .page-action-add:hover:not(:disabled) {
-  background: #1eb3c7;
+  background: color-mix(in srgb, #000 10%, var(--hex-primary));
+  box-shadow: 0 3px 12px rgba(104, 115, 134, 0.32);
 }
 
 .page-action-add:active:not(:disabled) {
-  background: var(--hex-primary-dark);
+  background: color-mix(in srgb, #000 16%, var(--hex-primary));
   transform: translateY(1px);
 }
 
@@ -1649,14 +1650,15 @@ label.excel-import-toolbar__upload {
 }
 
 .btn--toolbar-add-product:hover:not(:disabled) {
-  background: #1eb3c7;
-  border-color: #1eb3c7;
+  background: color-mix(in srgb, #000 10%, var(--hex-primary));
+  border-color: color-mix(in srgb, #000 10%, var(--hex-primary));
   color: #fff;
+  box-shadow: 0 3px 12px rgba(104, 115, 134, 0.32);
 }
 
 .btn--toolbar-add-product:active:not(:disabled) {
-  background: var(--hex-primary-dark);
-  border-color: var(--hex-primary-dark);
+  background: color-mix(in srgb, #000 16%, var(--hex-primary));
+  border-color: color-mix(in srgb, #000 16%, var(--hex-primary));
   color: #fff;
 }
 
