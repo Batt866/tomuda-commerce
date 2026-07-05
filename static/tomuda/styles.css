@@ -1428,8 +1428,8 @@ a.customer-card__line .customer-card__icon {
 }
 
 .list-action-toolbar .excel-import-toolbar__btn {
-  min-height: 42px;
-  height: 42px;
+  min-height: var(--field-h);
+  height: var(--field-h);
   background: var(--hex-card);
   color: var(--hex-foreground);
   border: 1.5px solid var(--hex-border);
@@ -1834,7 +1834,7 @@ a.customer-card__line .customer-card__icon {
   flex-direction: column;
   gap: 0;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 10px 0;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -1851,7 +1851,7 @@ a.customer-card__line .customer-card__icon {
   grid-template-areas:
     "img title"
     "img meta";
-  column-gap: 12px;
+  column-gap: 8px;
   row-gap: 6px;
   align-items: start;
   min-width: 0;
@@ -1868,12 +1868,13 @@ a.customer-card__line .customer-card__icon {
   flex-shrink: 0;
   border-radius: 0;
   object-fit: contain;
-  object-position: center;
-  padding: 3px;
+  object-position: left center;
+  padding: 0;
   box-sizing: border-box;
   border: none;
   box-shadow: none;
-  background: #fff;
+  background: transparent;
+  justify-self: start;
 }
 
 .product-card__title {
@@ -1957,7 +1958,7 @@ a.customer-card__line .customer-card__icon {
   grid-template-areas:
     "img title actions"
     "img meta actions";
-  column-gap: 10px;
+  column-gap: 8px;
 }
 
 .product-card__main:has(.product-card__actions) .product-card__title {
@@ -1972,13 +1973,14 @@ a.customer-card__line .customer-card__icon {
 .product-card__actions {
   grid-area: actions;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  gap: 8px;
   width: auto;
   margin: 0;
   padding: 0;
   border-top: none;
   align-self: center;
+  justify-self: end;
   flex-shrink: 0;
 }
 
@@ -1987,13 +1989,13 @@ a.customer-card__line .customer-card__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  width: 36px;
-  min-height: 36px;
-  height: 36px;
+  min-width: var(--field-h);
+  width: var(--field-h);
+  min-height: var(--field-h);
+  height: var(--field-h);
   padding: 0;
-  border: none;
-  border-radius: 10px;
+  border: 1.5px solid var(--hex-border);
+  border-radius: var(--btn-radius);
   font-size: 0;
   font-weight: 700;
   line-height: 1;
@@ -2004,19 +2006,20 @@ a.customer-card__line .customer-card__icon {
 }
 
 .product-card__action-btn .ui-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .product-card__action-btn--edit {
   background: var(--hex-secondary);
   color: var(--hex-foreground);
+  border-color: var(--hex-border);
 }
 
 .product-card__action-btn--delete {
   background: var(--hex-card);
   color: var(--hex-foreground);
-  border: 1px solid var(--hex-border);
+  border-color: var(--hex-border);
 }
 
 @media (min-width: 1024px) {
@@ -5181,6 +5184,12 @@ textarea::placeholder {
   box-shadow: none;
 }
 
+.detail-row .product-thumb {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
 .product-thumb--preview {
   width: 88px;
   height: 88px;
@@ -7771,6 +7780,11 @@ textarea::placeholder {
     width: 48px;
     height: 48px;
     border-radius: 0;
+  }
+
+  .detail-row .product-thumb {
+    width: 64px;
+    height: 64px;
   }
 
   .worker-add-plus--compact {
@@ -11926,18 +11940,19 @@ body.image-lightbox-open {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  padding: 0 16px 12px;
+  padding: 0 0 12px;
+  width: 100%;
 }
 
 .excel-import-toolbar__btn {
   min-width: 0;
   width: 100%;
-  min-height: 40px;
-  height: 40px;
-  padding: 0 10px;
-  font-size: 12px;
+  min-height: var(--field-h);
+  height: var(--field-h);
+  padding: 0 12px;
+  font-size: 13px;
   font-weight: 600;
-  gap: 5px;
+  gap: 6px;
 }
 
 .excel-import-toolbar__label {
