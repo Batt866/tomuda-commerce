@@ -1351,14 +1351,14 @@ a.customer-card__line .customer-card__icon {
 
 .list-panel--customers .customer-card__avatar,
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 42px;
-  height: 42px;
-  min-width: 42px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
   border-radius: 0;
 }
 
 .list-panel--customers .customer-card__avatar {
-  font-size: 17px;
+  font-size: 20px;
 }
 
 .list-panel--customers .customer-card__avatar-img {
