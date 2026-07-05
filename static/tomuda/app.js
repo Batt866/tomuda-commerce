@@ -13147,7 +13147,7 @@ function confirmDeleteCategory(name) {
     return;
   }
   confirmModal(
-    "Төрөл устгах уu?",
+    "Төрөл устгах үү?",
     `<strong>${esc(name)}</strong> төрлийг устгах гэж байна.`,
     {
       confirmLabel: "Устгах",

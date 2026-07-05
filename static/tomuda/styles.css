@@ -2577,6 +2577,17 @@ img[data-product-img],
   color: var(--hex-muted-foreground);
 }
 
+.category-row__meta--empty {
+  opacity: 0.75;
+}
+
+.category-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .category-row__delete {
   flex-shrink: 0;
   display: inline-flex;

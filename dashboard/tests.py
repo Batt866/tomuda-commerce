@@ -333,3 +333,64 @@ class ProductExcelImportTests(TestCase):
         names = {p["name"] for p in payload["products"]}
         self.assertIn("Шинэчлэгдсэн", names)
         self.assertIn("Шинээр", names)
+
+
+class CustomerExcelImportTests(TestCase):
+    def test_template_includes_latitude_longitude(self):
+        from dashboard.excel_import import CUSTOMER_HEADERS, build_customer_template_bytes
+
+        self.assertIn("Уртраг", CUSTOMER_HEADERS)
+        self.assertIn("Өргөрөг", CUSTOMER_HEADERS)
+        content = build_customer_template_bytes()
+        self.assertTrue(content.startswith(b"PK"))
+
+    def test_import_reads_customer_coordinates(self):
+        from dashboard.excel_import import import_customers_into_state
+
+        state = default_state()
+        state["customers"] = []
+        rows = [
+            [
+                "Нэр",
+                "Регистр",
+                "Утас 1",
+                "Утас 2",
+                "Аймаг / Хот",
+                "Дүүрэг",
+                "Хороо",
+                "Дэлгэрэнгүй хаяг",
+                "Уртраг",
+                "Өргөрөг",
+            ],
+            [
+                "Жишээ ХХК",
+                "1234567",
+                "99112233",
+                "",
+                "Улаанбаатар",
+                "Баянзүрх",
+                "1",
+                "1-р хороо",
+                "47.916935",
+                "106.951798",
+            ],
+            [
+                "GPS ХХК",
+                "7654321",
+                "88112233",
+                "",
+                "Улаанбаатар",
+                "Сүхбаатар",
+                "2",
+                "2-р хороо",
+                "47.925309",
+                "106.930147",
+            ],
+        ]
+        next_state, report = import_customers_into_state(state, rows)
+        self.assertEqual(report["success"], 1)
+        self.assertEqual(len(next_state["customers"]), 1)
+        customer = next_state["customers"][0]
+        self.assertEqual(customer["name"], "GPS ХХК")
+        self.assertEqual(customer["latitude"], "47.925309")
+        self.assertEqual(customer["longitude"], "106.930147")

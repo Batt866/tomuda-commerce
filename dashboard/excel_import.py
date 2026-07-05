@@ -21,6 +21,8 @@ CUSTOMER_HEADERS = [
     "Дүүрэг",
     "Хороо",
     "Дэлгэрэнгүй хаяг",
+    "Уртраг",
+    "Өргөрөг",
 ]
 
 PRODUCT_HEADERS = [
@@ -67,6 +69,13 @@ CUSTOMER_HEADER_ALIASES: dict[str, str] = {
     "дэлгэрэнгүй хаяг": "address",
     "хаяг": "address",
     "address": "address",
+    "уртраг": "latitude",
+    "latitude": "latitude",
+    "lat": "latitude",
+    "өргөрөг": "longitude",
+    "longitude": "longitude",
+    "lng": "longitude",
+    "lon": "longitude",
 }
 
 PRODUCT_HEADER_ALIASES: dict[str, str] = {
@@ -157,6 +166,53 @@ def _parse_number(value: Any, *, allow_empty: bool = False) -> tuple[float | Non
     if number < 0:
         return None, "сөрөг утга зөвшөөрөгдөхгүй"
     return number, None
+
+
+def _parse_latitude(value: Any) -> tuple[str, str | None]:
+    text = _cell_text(value)
+    if not text:
+        return "", None
+    cleaned = text.replace(" ", "").replace(",", "")
+    try:
+        number = float(cleaned)
+    except ValueError:
+        return "", "Уртраг тоон утга биш байна"
+    if not -90 <= number <= 90:
+        return "", "Уртраг буруу байна"
+    return f"{number:.6f}".rstrip("0").rstrip("."), None
+
+
+def _parse_longitude(value: Any) -> tuple[str, str | None]:
+    text = _cell_text(value)
+    if not text:
+        return "", None
+    cleaned = text.replace(" ", "").replace(",", "")
+    try:
+        number = float(cleaned)
+    except ValueError:
+        return "", "Өргөрөг тоон утга биш байна"
+    if not -180 <= number <= 180:
+        return "", "Өргөрөг буруу байна"
+    return f"{number:.6f}".rstrip("0").rstrip("."), None
+
+
+def _customer_coords_from_row(
+    data: dict[str, str],
+    header_map: dict[str, int],
+) -> tuple[str, str, str | None]:
+    latitude = ""
+    longitude = ""
+    if "latitude" in header_map:
+        latitude, lat_err = _parse_latitude(data.get("latitude"))
+        if lat_err:
+            return "", "", lat_err
+    if "longitude" in header_map:
+        longitude, lng_err = _parse_longitude(data.get("longitude"))
+        if lng_err:
+            return "", "", lng_err
+    if (latitude and not longitude) or (longitude and not latitude):
+        return "", "", "Уртраг, өргөрөг хоёуланг нь оруулна уу"
+    return latitude, longitude, None
 
 
 def _normalize_unit(value: str) -> tuple[str | None, str | None]:
@@ -429,14 +485,18 @@ def build_customer_template_bytes() -> bytes:
         "Баянзүрх",
         "1",
         "1-р хороо, 10-р байр",
+        47.916935,
+        106.951798,
     ]
     _format_import_worksheet(
         ws,
         CUSTOMER_HEADERS,
         example,
         text_columns={2, 3, 4},
-        min_col_widths=[18, 14, 14, 14, 20, 16, 12, 34],
+        min_col_widths=[18, 14, 14, 14, 20, 16, 12, 34, 14, 14],
     )
+    for col_idx in (9, 10):
+        ws.cell(row=2, column=col_idx).number_format = "0.000000"
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -536,6 +596,11 @@ def import_customers_into_state(
             errors.append({"row": offset, "message": "Утас 2 формат буруу байна."})
             continue
 
+        latitude, longitude, coord_err = _customer_coords_from_row(data, header_map)
+        if coord_err:
+            errors.append({"row": offset, "message": coord_err})
+            continue
+
         existing = existing_by_reg.get(reg_digits) if reg_digits else None
         if existing:
             # Excel-ээр давтан оруулахад давхар бичлэг үүсгэхгүй, байгаа харилцагчийг шинэчилнэ.
@@ -548,6 +613,10 @@ def import_customers_into_state(
             existing["district"] = _cell_text(data.get("district"))
             existing["khoroo"] = _cell_text(data.get("khoroo"))
             existing["address"] = _cell_text(data.get("address"))
+            if "latitude" in header_map:
+                existing["latitude"] = latitude
+            if "longitude" in header_map:
+                existing["longitude"] = longitude
             updated += 1
         else:
             now += 1
@@ -562,8 +631,8 @@ def import_customers_into_state(
                 "district": _cell_text(data.get("district")),
                 "khoroo": _cell_text(data.get("khoroo")),
                 "address": _cell_text(data.get("address")),
-                "latitude": "",
-                "longitude": "",
+                "latitude": latitude,
+                "longitude": longitude,
                 "locationText": "",
                 "image": "",
             }
