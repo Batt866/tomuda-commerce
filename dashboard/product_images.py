@@ -268,6 +268,11 @@ def persist_imported_product_images(
     previous_state: dict | None = None,
     product_ids: list[str] | set[str] | tuple[str, ...] | None = None,
 ) -> dict:
+    # When product_ids is provided (even as an empty list) restrict processing
+    # to exactly those ids. An empty set must mean "no products", not "all";
+    # relying on truthiness here reprocessed the whole catalog and silently
+    # cleared images for products whose media file is missing on prod.
+    restrict_to_ids = product_ids is not None
     ids = {str(pid) for pid in product_ids or [] if str(pid or "").strip()}
     previous_images = {
         str(p.get("id")): str(p.get("image") or "").strip()
@@ -281,7 +286,7 @@ def persist_imported_product_images(
         if not isinstance(product, dict):
             continue
         pid = str(product.get("id") or "").strip()
-        if not pid or (ids and pid not in ids):
+        if not pid or (restrict_to_ids and pid not in ids):
             continue
         source = str(product.get("image") or "").strip()
         if not source:
