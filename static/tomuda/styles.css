@@ -1929,15 +1929,23 @@ img[data-product-img],
 
 .product-card__main {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   grid-template-areas:
     "img title"
-    "img meta"
-    "img barcode";
-  column-gap: 8px;
-  row-gap: 6px;
+    "img barcode"
+    "img meta";
+  column-gap: 10px;
+  row-gap: 4px;
   align-items: start;
   min-width: 0;
+}
+
+.product-card__main:has(.product-card__cost) {
+  grid-template-areas:
+    "img title"
+    "img barcode"
+    "img cost"
+    "img meta";
 }
 
 .product-card__lead {
@@ -1946,8 +1954,8 @@ img[data-product-img],
 
 .product-card__img {
   grid-area: img;
-  width: 80px;
-  height: 80px;
+  width: 96px;
+  height: 96px;
   flex-shrink: 0;
   border-radius: 0;
   object-position: center;
@@ -1961,10 +1969,10 @@ img[data-product-img],
   grid-area: title;
   margin: 0;
   min-width: 0;
-  align-self: center;
+  align-self: start;
   font-weight: 700;
-  font-size: 15px;
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 1.3;
   text-align: left;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1982,15 +1990,14 @@ img[data-product-img],
   grid-area: barcode;
   display: block;
   align-self: start;
-  font-size: 12px;
-  line-height: 1.2;
+  font-size: 13px;
+  line-height: 1.25;
   color: var(--hex-muted-foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-top: 1px;
 }
 
 .product-card__meta {
@@ -1998,30 +2005,35 @@ img[data-product-img],
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 6px 12px;
   min-width: 0;
   padding-left: 0;
+  padding-top: 2px;
 }
 
 .product-card__price {
   font-weight: 700;
   color: var(--hex-primary);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .product-card__cost {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.2;
+  grid-area: cost;
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
   color: var(--hex-muted-foreground);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .product-card__badge {
-  font-size: 11px;
-  padding: 3px 8px;
+  font-size: 12px;
+  padding: 4px 9px;
   border-radius: 999px;
   background: var(--hex-secondary);
   white-space: nowrap;
@@ -2048,12 +2060,20 @@ img[data-product-img],
 }
 
 .product-card__main:has(.product-card__actions) {
-  grid-template-columns: 80px minmax(0, 1fr) auto;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
   grid-template-areas:
     "img title actions"
-    "img meta actions"
-    "img barcode actions";
-  column-gap: 8px;
+    "img barcode actions"
+    "img meta actions";
+  column-gap: 10px;
+}
+
+.product-card__main:has(.product-card__actions):has(.product-card__cost) {
+  grid-template-areas:
+    "img title actions"
+    "img barcode actions"
+    "img cost actions"
+    "img meta actions";
 }
 
 .product-card__main:has(.product-card__actions) .product-card__title {
@@ -2069,7 +2089,7 @@ img[data-product-img],
   grid-area: actions;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   width: auto;
   margin: 0;
   padding: 0;
@@ -2084,10 +2104,10 @@ img[data-product-img],
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--field-h);
-  width: var(--field-h);
-  min-height: var(--field-h);
-  height: var(--field-h);
+  min-width: 40px;
+  width: 40px;
+  min-height: 40px;
+  height: 40px;
   padding: 0;
   border: 1.5px solid var(--hex-border);
   border-radius: var(--btn-radius);
@@ -2101,8 +2121,8 @@ img[data-product-img],
 }
 
 .product-card__action-btn .ui-icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .product-card__action-btn--edit {
@@ -2234,7 +2254,13 @@ img[data-product-img],
     justify-self: start;
   }
 
+  .product-card__cost {
+    display: none;
+    grid-area: auto;
+  }
+
   .product-list--show-cost .product-card__cost {
+    display: block;
     grid-column: 4;
     font-size: 13px;
     font-weight: 600;
@@ -2253,6 +2279,7 @@ img[data-product-img],
 
   .product-card__barcode {
     display: block;
+    grid-area: auto;
     grid-column: 5;
     font-size: 12px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -4724,7 +4751,7 @@ main {
   }
 
   .product-card__title {
-    font-size: 16px;
+    font-size: 17px;
   }
 }
 
@@ -5269,7 +5296,7 @@ textarea::placeholder {
 }
 
 .product-card__cost {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--hex-muted-foreground);
 }
