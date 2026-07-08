@@ -6142,41 +6142,24 @@ async function exportOrderReceiptsExcelXlsx(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Numbers (macOS) заримдаа манай custom XLSX generator-ын үүсгэсэн файлыг
-  // нээж чаддаггүй (zip/xml таарахгүй гэх мэт тохиолдол). Тиймээс macOS дээр
-  // шууд legacy HTML -> .xls форматаар гаргана.
-  const forceLegacyOnMac = /Macintosh|Mac OS X/i.test(
-    navigator.userAgent || "",
-  );
-  if (forceLegacyOnMac && !isMobileExcelExportDevice()) {
-    try {
-      const logoSrc = await getReceiptExcelLogoDataUri();
-      const html = buildReceiptExcelDocument(orders, logoSrc);
-      downloadReceiptExcelBlob(
-        legacyExcelFileName(receiptExcelFileName(orders)),
-        html,
-      );
-      showInstallToast("Excel файл татагдлаа");
-      return;
-    } catch {
-      // legacy ч бүтэхгүй бол доорх normal flow-р хамгийн сүүлчийн CSV fallback ажиллана.
-    }
-  }
   try {
-    await exportOrderReceiptsExcelXlsx(orders);
+    // Print дээр гарч буй layout-тай (receiptPageHtml доторх table) яг ижил
+    // HTML-г ашиглаад Excel-д нийцтэй байдлаар legacy `.xls` болгон татна.
+    const logoSrc = await getReceiptExcelLogoDataUri();
+    const html = buildReceiptExcelDocument(orders, logoSrc);
+    downloadReceiptExcelBlob(
+      legacyExcelFileName(receiptExcelFileName(orders)),
+      html,
+    );
     showInstallToast("Excel файл татагдлаа");
+    return;
   } catch (xlsxErr) {
-    console.warn("Receipt xlsx export failed", xlsxErr);
+    console.warn("Receipt legacy excel export failed", xlsxErr);
     try {
-      const logoSrc = await getReceiptExcelLogoDataUri();
-      const html = buildReceiptExcelDocument(orders, logoSrc);
-      downloadReceiptExcelBlob(
-        legacyExcelFileName(receiptExcelFileName(orders)),
-        html,
-      );
+      await exportOrderReceiptsExcelXlsx(orders);
       showInstallToast("Excel файл татагдлаа");
-    } catch (htmlErr) {
-      console.warn("Receipt html export failed", htmlErr);
+    } catch (xlsxErr2) {
+      console.warn("Receipt xlsx export failed", xlsxErr2);
       exportOrderReceiptsExcelCsv(orders);
       showInstallToast("Excel файл татагдлаа");
     }
