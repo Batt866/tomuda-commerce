@@ -7682,15 +7682,15 @@ function confirmFinishStockIn() {
 }
 function confirmStockInReceiptExport(receipt) {
   if (!receipt?.lines?.length) return;
-  const summary = `<p>Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(receipt.employeeName)}</b> · ${receipt.lines.length} бараа · ${fmtExcelMoney(receipt.totalAmount)}</p>`;
+  const saved = applyStockInReceipt(receipt);
+  startStockInSession();
+  render();
+  const summary = `<p>Орлого хадгалагдлаа. Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(saved.employeeName)}</b> · ${saved.lines.length} бараа · ${fmtExcelMoney(saved.totalAmount)}</p>`;
   confirmModal("Орлогын баримт", summary, {
     confirmLabel: "Татах",
-    onConfirm: () => {
-      const saved = applyStockInReceipt(receipt);
-      startStockInSession();
-      render();
-      exportStockInExcel(saved);
-    },
+    cancelLabel: "Үгүй",
+    onConfirm: () => exportStockInExcel(saved),
+    onCancel: () => {},
   });
 }
 function confirmNewStockIn() {
@@ -10461,13 +10461,13 @@ function addPromoPickProduct(pickKey, id) {
   state.promoPick = { ...pick, [pickKey]: [...ids, idStr] };
   const searchKey = promoPickSearchKey(pickKey);
   if (searchKey) state.searches[searchKey] = "";
-  refreshPromoModal();
+  refreshPromoModal({ focusPickKey: pickKey });
 }
 function removePromoPickProduct(pickKey, id) {
   const pick = state.promoPick || {},
     ids = promotionPickIds(pick, pickKey).filter((x) => x !== id);
   state.promoPick = { ...pick, [pickKey]: ids };
-  refreshPromoModal();
+  refreshPromoModal({ focusPickKey: pickKey });
 }
 function addPromoBuyProduct(id) {
   addPromoPickProduct("buyProductIds", id);
@@ -10490,9 +10490,7 @@ function refreshPromoModal(opts = {}) {
   else promotionQtyModal();
   requestAnimationFrame(() => {
     const nextScroll = modal.querySelector(".modal-scroll");
-    if (nextScroll && scrollSnap.top > 0) {
-      nextScroll.scrollTop = scrollSnap.top;
-    }
+    if (nextScroll) nextScroll.scrollTop = scrollSnap.top;
     if (scrollSnap.pickKey) {
       const el = document.querySelector(
         `[data-promo-pick="${scrollSnap.pickKey}"]`,
@@ -10754,15 +10752,26 @@ function savePromotionQty(e) {
     const f = new FormData(form),
       buyProductIds = f.getAll("buyProductIds").filter(Boolean),
       freeProductIds = f.getAll("freeProductIds").filter(Boolean);
-    if (!buyProductIds.length || !freeProductIds.length) {
+    // DOM refresh/scroll үед hidden inputs түр зуур хоосон уншигдах боломжтой.
+    // Тийм үед state.promoPick-оос fallback хийж зөв хадгална.
+    const pick = state.promoPick || {};
+    const fallbackBuy = promotionPickIds(pick, "buyProductIds");
+    const fallbackFree = promotionPickIds(pick, "freeProductIds");
+    const finalBuyProductIds = buyProductIds.length
+      ? buyProductIds
+      : fallbackBuy;
+    const finalFreeProductIds = freeProductIds.length
+      ? freeProductIds
+      : fallbackFree;
+    if (!finalBuyProductIds.length || !finalFreeProductIds.length) {
       alert("Авах болон урамшууллын бараа сонгоно уу");
       return;
     }
     const added = appendPromotionRule("quantity", {
-      buyProductIds,
+      buyProductIds: finalBuyProductIds,
       buyQty: Number(f.get("buyQty")),
-      freeProductIds,
-      freeProductId: freeProductIds[0],
+      freeProductIds: finalFreeProductIds,
+      freeProductId: finalFreeProductIds[0],
       freeQty: Number(f.get("freeQty")) || 1,
     });
     if (!added) return;
