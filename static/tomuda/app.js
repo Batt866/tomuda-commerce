@@ -400,7 +400,7 @@ const RECEIPT_COMPANY_ADDRESS =
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
-    delivery = resolveOrderDelivery(o),
+    delivery = resolveOrderDelivery(o, receiptPrintDeliveryOpts()),
     paid = o.paymentTerm === "cash" || o.isPaid,
     bank = o.paymentTerm === "credit" && !o.isPaid,
     addr =
@@ -1793,7 +1793,11 @@ function deliveryEmployees() {
   return state.employees.filter((e) => e.role === "delivery");
 }
 function ensureDeliverySelection() {
-  if (!state.selectedDeliveryId) return;
+  if (!state.selectedDeliveryId) {
+    state.deliveryName = "";
+    state.deliveryPhone = "";
+    return;
+  }
   const emp = state.employees.find((e) => e.id === state.selectedDeliveryId);
   if (emp?.role === "delivery") {
     state.deliveryName = emp.name;
@@ -1801,22 +1805,57 @@ function ensureDeliverySelection() {
     return;
   }
   state.selectedDeliveryId = "";
+  state.deliveryName = "";
+  state.deliveryPhone = "";
 }
-function resolveOrderDelivery(o = {}) {
-  const id = o.deliveryEmployeeId || state.selectedDeliveryId || "",
-    emp = id ? state.employees.find((e) => e.id === id) : null;
-  return {
-    deliveryEmployeeId: id,
-    deliveryName: o.deliveryName || emp?.name || state.deliveryName || "-",
-    deliveryPhone: o.deliveryPhone || emp?.phone || state.deliveryPhone || "-",
-  };
+function receiptPrintDeliveryOpts() {
+  const id = state.receiptPrintDeliveryId || "";
+  if (!id || state.currentView !== "warehouseReceipts") return {};
+  return { printDeliveryId: id };
+}
+function resolveOrderDelivery(o = {}, opts = {}) {
+  const printId = opts.printDeliveryId || "";
+  const sessionId =
+    opts.useSessionFallback === false ? "" : state.selectedDeliveryId || "";
+  const id = printId || o.deliveryEmployeeId || sessionId || "";
+  const emp = id ? state.employees.find((e) => e.id === id) : null;
+  if (emp) {
+    return {
+      deliveryEmployeeId: emp.id,
+      deliveryName: emp.name || "-",
+      deliveryPhone: emp.phone || "-",
+    };
+  }
+  const storedName = String(o.deliveryName || "").trim();
+  if (storedName) {
+    return {
+      deliveryEmployeeId: o.deliveryEmployeeId || "",
+      deliveryName: storedName,
+      deliveryPhone: o.deliveryPhone || "-",
+    };
+  }
+  if (opts.useSessionFallback !== false && state.deliveryName) {
+    return {
+      deliveryEmployeeId: sessionId,
+      deliveryName: state.deliveryName,
+      deliveryPhone: state.deliveryPhone || "-",
+    };
+  }
+  return { deliveryEmployeeId: "", deliveryName: "-", deliveryPhone: "-" };
 }
 function deliveryFieldsForNewOrder() {
-  const d = resolveOrderDelivery();
+  ensureDeliverySelection();
+  const id = state.selectedDeliveryId || "";
+  const emp = id
+    ? state.employees.find((e) => e.id === id && e.role === "delivery")
+    : null;
+  if (!emp) {
+    return { deliveryEmployeeId: "", deliveryName: "", deliveryPhone: "" };
+  }
   return {
-    deliveryEmployeeId: state.selectedDeliveryId || "",
-    deliveryName: d.deliveryName === "-" ? "" : d.deliveryName,
-    deliveryPhone: d.deliveryPhone === "-" ? "" : d.deliveryPhone,
+    deliveryEmployeeId: emp.id,
+    deliveryName: emp.name || "",
+    deliveryPhone: emp.phone || "",
   };
 }
 function currentRole() {
@@ -3451,7 +3490,7 @@ function applyBootBackendPayload(payload) {
   if (!payload?.state) return false;
   const merged = mergeBootState(payload.state);
   applyPersistentState(merged);
-  syncBackendSaveMarker(payload.state);
+  syncBackendSaveMarker();
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   if (!localStateDirty()) clearOrderPersistenceCache();
   return true;
@@ -3694,7 +3733,8 @@ function applyRemoteState(payload) {
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
   if (JSON.stringify(stateForBackendSave()) !== JSON.stringify(payload.state)) {
-    scheduleBackendSave();
+    if (canAutoSaveBackendState()) scheduleBackendSave();
+    else syncBackendSaveMarker();
   } else {
     syncBackendSaveMarker();
   }
@@ -3768,6 +3808,7 @@ function completeBootUiInit(options = {}) {
   normalizeOrderTotals();
   state.workerQty = {};
   restoreAuthSession();
+  syncBackendSaveMarker();
   initNoZoom();
   initNestedScrollChain();
   initScrollRenderGuard();
@@ -4832,8 +4873,41 @@ function scheduleBackendSave() {
   persistOrderSnapshot();
   if (!backendReady) return;
   if (!state.isLoggedIn || !state.currentEmployee?.id) return;
+  if (!canAutoSaveBackendState()) return;
   clearTimeout(backendSaveTimer);
   backendSaveTimer = setTimeout(saveBackendState, 350);
+}
+function canAutoSaveBackendState() {
+  if (
+    hasPermission("orders.edit") ||
+    hasPermission("orders.create") ||
+    hasPermission("products.edit") ||
+    hasPermission("products.create") ||
+    hasPermission("customers.edit") ||
+    hasPermission("customers.create") ||
+    hasPermission("warehouse.edit") ||
+    hasPermission("employees.edit") ||
+    hasPermission("employees.create") ||
+    hasPermission("settings.view")
+  ) {
+    return true;
+  }
+  return !localStateDirty();
+}
+async function revertBackendStateFromServer() {
+  try {
+    const latest = await fetchBackendPayload();
+    if (!latest?.state) return false;
+    const session = captureSessionSnapshot();
+    applyPersistentState(latest.state);
+    restoreSessionSnapshot(session);
+    syncBackendSaveMarker();
+    if (latest.updatedAt) serverUpdatedAt = latest.updatedAt;
+    return true;
+  } catch (error) {
+    console.warn("Backend state revert failed", error);
+    return false;
+  }
 }
 async function flushBackendSave() {
   if (!backendReady) return false;
@@ -4975,9 +5049,8 @@ async function saveBackendState(retry = 0) {
       }
       persistOrderSnapshot();
       markBackendSaveFailed(msg);
-      if (state.isLoggedIn && state.currentEmployee?.id) {
-        alertModal("Хадгалах амжилтгүй", msg);
-      }
+      await revertBackendStateFromServer();
+      if (!shouldDeferBackendSync()) safeRender();
     } else {
       persistOrderSnapshot();
       markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
@@ -5403,7 +5476,7 @@ function orderReceiptRowsFiltered(
 function buildOrderReceiptExcelRows(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
-    delivery = resolveOrderDelivery(o),
+    delivery = resolveOrderDelivery(o, receiptPrintDeliveryOpts()),
     addr = customerAddress(c),
     gross = orderGrossTotal(o),
     discount = orderDiscountAmount(o),
@@ -5468,10 +5541,19 @@ function buildOrderReceiptExcelRows(o) {
   return rows;
 }
 function orderReceiptSnapshot(o) {
-  return {
+  const snap = {
     ...o,
     items: orderItemsWithPromos(o).map(enrichPromoLineForReceipt),
   };
+  const delivery = resolveOrderDelivery(o, receiptPrintDeliveryOpts());
+  if (delivery.deliveryEmployeeId) {
+    snap.deliveryEmployeeId = delivery.deliveryEmployeeId;
+    snap.deliveryName =
+      delivery.deliveryName === "-" ? "" : delivery.deliveryName;
+    snap.deliveryPhone =
+      delivery.deliveryPhone === "-" ? "" : delivery.deliveryPhone;
+  }
+  return snap;
 }
 function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptPageHtml(o, logoSrc)}</div></div>`;
@@ -6230,7 +6312,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
 function warehouseOrderDetail(o) {
   const actions = warehouseOrderStatusActions(o),
     c = state.customers.find((x) => x.id === o.customerId) || {},
-    delivery = resolveOrderDelivery(o),
+    delivery = resolveOrderDelivery(o, receiptPrintDeliveryOpts()),
     addr = customerAddress(c),
     gross = orderGrossTotal(o),
     discount = orderDiscountAmount(o),
@@ -7713,9 +7795,10 @@ function stockInEntryRow(p) {
   const cost = stockInLineCost(p);
   const hasEntry = qty > 0;
   const entryMeta = hasEntry
-    ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">${fmt(cost)}</span>` : ""}</span>`
+    ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">Өртөг ${fmt(cost)}</span>` : ""}</span>`
     : `<span class="stock-in-entry-row__hint">Тоо, өртөг оруулах</span>`;
-  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div>${entryMeta}</button>`;
+  const salesPrice = productSalesPrice(p);
+  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
 }
 function stockInPackDerivedPieces(packs, packSize) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
@@ -7775,9 +7858,10 @@ function stockInEntryModal(id) {
       ? esc(String(d.costPrice))
       : esc(String(productCostPrice(p) || ""));
   const qtyFields = stockInPackQtyFieldsHtml(p, d);
+  const salesPrice = productSalesPrice(p);
   box(
     "Орлого оруулах",
-    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ</span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" step="1" value="${costVal}" required class="field-input app-input" aria-label="Өртөг үнэ"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ</span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" step="1" value="${costVal}" required class="field-input app-input" aria-label="Өртөг үнэ"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -8207,6 +8291,9 @@ function countBookDiff(stats) {
 }
 function productCostPrice(p) {
   return Number(p?.costPrice) || 0;
+}
+function productSalesPrice(p) {
+  return Number(p?.price) || 0;
 }
 function countQtyAmount(qty, p) {
   return Number(qty || 0) * productCostPrice(p);
@@ -11257,6 +11344,7 @@ function restoreAuthSession() {
       data.selectedDeliveryId || state.selectedDeliveryId || "";
     state.deliveryName = data.deliveryName || state.deliveryName || "";
     state.deliveryPhone = data.deliveryPhone || state.deliveryPhone || "";
+    ensureDeliverySelection();
     state.deliveryStoreId = data.deliveryStoreId || "";
     state.deliveryStoreReady =
       !!data.deliveryStoreReady && !!state.deliveryStoreId;

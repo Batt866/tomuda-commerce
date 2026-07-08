@@ -5284,6 +5284,17 @@ textarea::placeholder {
   font-size: 13px;
 }
 
+.inventory-stock-modal__price {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--hex-primary-dark);
+}
+
+.inventory-stock-modal__price b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
 .inventory-stock-row__thumb {
   width: 80px;
   height: 80px;
@@ -5311,6 +5322,18 @@ textarea::placeholder {
   border-radius: 6px;
   background: var(--hex-secondary);
   font-size: 12px;
+}
+
+.inventory-stock-row__price {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--hex-primary-dark);
+}
+
+.inventory-stock-row__price b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (min-width: 768px) {
