@@ -302,6 +302,8 @@ const LOCAL_BACKEND_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 const MAX_INLINE_IMAGE_CHARS = 180000;
 const PRODUCT_IMAGE_UPLOAD_MAX_BYTES = 150000;
 let productImageCompressTask = null;
+let customerImageCompressTask = null;
+let employeeImageCompressTask = null;
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -2851,8 +2853,8 @@ async function uploadCustomerImage(customerId, dataUrl) {
 async function persistProfileImageToMedia(entity, profileKind) {
   const entityId = String(entity?.id || "").trim();
   const image = String(entity?.image || "").trim();
-  if (!entityId || !image) return;
-  if (!image.startsWith("data:image/")) return;
+  if (!entityId || !image) return "";
+  if (!image.startsWith("data:image/")) return image;
   try {
     const url =
       profileKind === "employee"
@@ -2866,10 +2868,11 @@ async function persistProfileImageToMedia(entity, profileKind) {
         state.currentEmployee.image = url;
         saveAuthSession();
       }
-      render();
     }
+    return url || "";
   } catch (error) {
     console.warn("Profile image upload failed", error);
+    return "";
   }
 }
 function storedEntityImage(item) {
@@ -6139,6 +6142,26 @@ async function exportOrderReceiptsExcelXlsx(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
+  // Numbers (macOS) заримдаа манай custom XLSX generator-ын үүсгэсэн файлыг
+  // нээж чаддаггүй (zip/xml таарахгүй гэх мэт тохиолдол). Тиймээс macOS дээр
+  // шууд legacy HTML -> .xls форматаар гаргана.
+  const forceLegacyOnMac = /Macintosh|Mac OS X/i.test(
+    navigator.userAgent || "",
+  );
+  if (forceLegacyOnMac && !isMobileExcelExportDevice()) {
+    try {
+      const logoSrc = await getReceiptExcelLogoDataUri();
+      const html = buildReceiptExcelDocument(orders, logoSrc);
+      downloadReceiptExcelBlob(
+        legacyExcelFileName(receiptExcelFileName(orders)),
+        html,
+      );
+      showInstallToast("Excel файл татагдлаа");
+      return;
+    } catch {
+      // legacy ч бүтэхгүй бол доорх normal flow-р хамгийн сүүлчийн CSV fallback ажиллана.
+    }
+  }
   try {
     await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Excel файл татагдлаа");
@@ -6409,7 +6432,7 @@ function compressProductImageFile(file) {
 function handleCustomerImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  compressImageFile(file)
+  customerImageCompressTask = compressImageFile(file)
     .then((dataUrl) => {
       const value = document.getElementById("customerImageValue"),
         preview = document.getElementById("customerImagePreview");
@@ -6430,6 +6453,9 @@ function handleCustomerImage(input) {
     .catch((error) => {
       console.warn("Customer image compress failed", error);
       alert("Зураг уншиж чадсангүй");
+    })
+    .finally(() => {
+      customerImageCompressTask = null;
     });
 }
 function clearCustomerImage() {
@@ -11151,7 +11177,7 @@ function initEmployeeImageField(e = {}) {
 function handleEmployeeImage(input) {
   const file = input.files?.[0];
   if (!file) return;
-  compressImageFile(file)
+  employeeImageCompressTask = compressImageFile(file)
     .then((dataUrl) => {
       const value = document.getElementById("employeeImageValue"),
         preview = document.getElementById("employeeImagePreview");
@@ -11172,6 +11198,9 @@ function handleEmployeeImage(input) {
     .catch((error) => {
       console.warn("Employee image compress failed", error);
       alert("Зураг уншиж чадсангүй");
+    })
+    .finally(() => {
+      employeeImageCompressTask = null;
     });
 }
 function clearEmployeeImage() {
@@ -13204,14 +13233,21 @@ async function applyCustomerSave(data, id) {
     state.customers.push(customer);
   }
   if (customer) {
-    void persistProfileImageToMedia(customer, "customer");
+    await persistProfileImageToMedia(customer, "customer");
   }
   closeModal();
   render();
-  criticalBackendSave();
+  await criticalBackendSave();
 }
-function saveCustomer(e, id) {
+async function saveCustomer(e, id) {
   e.preventDefault();
+  if (customerImageCompressTask) {
+    try {
+      await customerImageCompressTask;
+    } catch {
+      return;
+    }
+  }
   const data = Object.fromEntries(new FormData(e.target));
   const image = readCustomerImageFromForm(e.target);
   if (image) data.image = image;
@@ -13245,7 +13281,7 @@ function saveCustomer(e, id) {
     );
     return;
   }
-  applyCustomerSave(data, id);
+  await applyCustomerSave(data, id);
 }
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
@@ -13515,18 +13551,19 @@ function buildProductDataFromForm(form) {
 async function persistProductImageToMedia(product) {
   const productId = String(product?.id || "").trim();
   const image = String(product?.image || "").trim();
-  if (!productId || !image) return;
+  if (!productId || !image) return "";
   if (image.startsWith("data:image/")) {
     try {
       const url = await uploadProductImage(productId, image);
       if (url) {
         product.image = url;
-        render();
       }
+      return url || "";
     } catch (error) {
       console.warn("Product image upload failed", error);
+      return "";
     }
-    return;
+    return "";
   }
   if (
     (image.startsWith("http://") || image.startsWith("https://")) &&
@@ -13536,18 +13573,20 @@ async function persistProductImageToMedia(product) {
       const url = await mirrorProductImage(productId, image);
       if (url) {
         product.image = url;
-        render();
       }
+      return url || "";
     } catch (error) {
       console.warn("Product image mirror failed", error);
       try {
         product.image = await fetchImageAsDataUrl(image);
-        render();
+        return product.image;
       } catch (fallbackError) {
         console.warn("Product image browser fetch failed", fallbackError);
+        return "";
       }
     }
   }
+  return image;
 }
 async function applyProductSave(data, id) {
   const incomingImage = String(data.image || "").trim();
@@ -13575,11 +13614,11 @@ async function applyProductSave(data, id) {
   }
   const product = state.products.find((p) => p.id === productId);
   if (product) {
-    void persistProductImageToMedia(product);
+    await persistProductImageToMedia(product);
   }
   closeModal();
   render();
-  flushBackendSave().catch((error) =>
+  await flushBackendSave().catch((error) =>
     console.warn("Product backend save failed", error),
   );
 }
@@ -13853,11 +13892,11 @@ async function applyEmployeeSave(data, editId = "") {
     showInstallToast("Ажилтан нэмэгдлээ");
   }
   if (employee) {
-    void persistProfileImageToMedia(employee, "employee");
+    await persistProfileImageToMedia(employee, "employee");
   }
   closeModal();
   render();
-  criticalBackendSave();
+  await criticalBackendSave();
 }
 function orderModal() {
   box(
@@ -14934,8 +14973,15 @@ function logout() {
   }
   finishLogout();
 }
-function saveEmployee(e) {
+async function saveEmployee(e) {
   e.preventDefault();
+  if (employeeImageCompressTask) {
+    try {
+      await employeeImageCompressTask;
+    } catch {
+      return;
+    }
+  }
   const form = e.target?.closest?.("[data-employee-form]");
   if (!form) return;
   const editId = form.getAttribute("data-employee-id") || "";
@@ -14949,7 +14995,7 @@ function saveEmployee(e) {
   }
   const built = buildEmployeeDataFromForm(form, editId);
   if (built.error) return alert(built.error);
-  applyEmployeeSave(built.data, editId);
+  await applyEmployeeSave(built.data, editId);
 }
 function confirmDelete(type, id) {
   if (!canDelete()) {
