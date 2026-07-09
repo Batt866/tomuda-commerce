@@ -5754,9 +5754,9 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  const logoEmu = Math.round((18 / 25.4) * 914400);
-  const pad = 28575;
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="receipt-logo.png"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const padX = 91440;
+  const padY = 45720;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${padX}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>${padY}</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="receipt-logo.png"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -5837,13 +5837,13 @@ function buildReceiptSheetXml(
     !orderInWarehouseLiveSession(o)
       ? `Өдөртөө тооцоог хийгээгүй тохиолдолд (${percentDiscountRate()}%) -н хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
-  pushRow(20.25, [
+  pushRow(24, [
     xlsxCellXml("C1", 1, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml("K1", 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(1, "A", "B"),
     ...emptyCells(1, "G", "J"),
   ]);
-  pushRow(27, [
+  pushRow(30, [
     xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
     xlsxCellXml("K2", 6, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(2, "A", "B"),
@@ -5956,7 +5956,7 @@ function buildReceiptSheetXml(
     ...emptyCells(headerRow, "G", "G"),
     ...emptyCells(headerRow, "I", "I"),
   ]);
-  const itemSlots = Math.max(20, items.length);
+  const itemSlots = items.length;
   Array.from({ length: itemSlots }).forEach((_, index) => {
     const item = items[index];
     const p = item
@@ -7544,6 +7544,22 @@ function stockInLineCost(p) {
   if (Number.isFinite(draftCost) && draftCost > 0) return draftCost;
   return productCostPrice(p) || 0;
 }
+function stockInCostExceedsSalesPrice(costPrice, p) {
+  const cost = Number(costPrice);
+  const sales = productSalesPrice(p);
+  return Number.isFinite(cost) && cost > 0 && sales > 0 && cost > sales;
+}
+function stockInCostPriceWarn(el, salesPrice) {
+  const warn = el?.closest?.("form")?.querySelector("[data-stock-in-cost-warn]");
+  if (!warn) return;
+  const cost = Number(el.value || 0);
+  const show =
+    Number.isFinite(cost) &&
+    cost > 0 &&
+    salesPrice > 0 &&
+    cost > salesPrice;
+  warn.classList.toggle("hidden", !show);
+}
 function stockInReceiptLineUnitPrice(line) {
   const unitPrice = Number(line?.unitPrice ?? line?.costPrice);
   return Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0;
@@ -7759,16 +7775,6 @@ function confirmFinishStockIn() {
   }
   if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
   if (!stockInHasEntries()) return alert("Орлого оруулна уу");
-  for (const p of state.products) {
-    const qty = stockInLineQty(p);
-    if (qty <= 0) continue;
-    if (!stockInLineCost(p)) {
-      alert(
-        `${p.name}: Барааны өртөг үнэ тохируулаагүй байна. Бараа цэснээс өртөг үнэ оруулна уу.`,
-      );
-      return;
-    }
-  }
   const receipt = buildStockInReceiptSnapshot();
   if (!receipt?.lines?.length) return;
   const normalized = normalizeStockInReceiptTotals(receipt);
@@ -7841,10 +7847,7 @@ function findProductByBarcode(code) {
     null
   );
 }
-function applyStockInBarcode(
-  code,
-  { qtyDelta = 1, openModalIfNoCost = true } = {},
-) {
+function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
   ensureStockInSession();
   const product = findProductByBarcode(code);
   if (!product) {
@@ -7864,9 +7867,6 @@ function applyStockInBarcode(
   const cost = productCostPrice(product);
   if (cost > 0) {
     entry.costPrice = String(Math.floor(cost));
-  } else if (!Number(entry.costPrice) && openModalIfNoCost) {
-    stockInEntryModal(product.id);
-    return true;
   }
   state.stockInDone = false;
   state.stockInReceipt = null;
@@ -7905,7 +7905,7 @@ function stockInEntryRow(p) {
   const hasEntry = qty > 0;
   const entryMeta = hasEntry
     ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">Өртөг ${fmt(cost)}</span>` : ""}</span>`
-    : `<span class="stock-in-entry-row__hint">Тоо, өртөг оруулах</span>`;
+    : `<span class="stock-in-entry-row__hint">Тоо ширхэг оруулах</span>`;
   const salesPrice = productSalesPrice(p);
   const displayStock = (Number(p.stock) || 0) + (hasEntry ? qty : 0);
   return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
@@ -7966,12 +7966,13 @@ function stockInEntryModal(id) {
   const costVal =
     d.costPrice != null && d.costPrice !== ""
       ? esc(String(d.costPrice))
-      : esc(String(productCostPrice(p) || ""));
+      : "";
   const qtyFields = stockInPackQtyFieldsHtml(p, d);
   const salesPrice = productSalesPrice(p);
+  const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
   box(
     "Орлого оруулах",
-    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ</span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" step="1" value="${costVal}" required class="field-input app-input" aria-label="Өртөг үнэ"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -7993,8 +7994,8 @@ function applyStockInEntryModal(e, id) {
     return;
   }
   const costPrice = Number(formData.get("costPrice") || 0);
-  if (!Number.isFinite(costPrice) || costPrice <= 0) {
-    alert("Өртөг үнэ оруулна уу");
+  if (stockInCostExceedsSalesPrice(costPrice, p)) {
+    alert("Өртөг үнэ Борлуулалтын үнээс давсан байна");
     return;
   }
   const entry = stockInDraftEntry(id);
@@ -8007,7 +8008,11 @@ function applyStockInEntryModal(e, id) {
     entry.qty = String(pieces);
     delete entry.packs;
   }
-  entry.costPrice = String(Math.floor(costPrice));
+  if (Number.isFinite(costPrice) && costPrice > 0) {
+    entry.costPrice = String(Math.floor(costPrice));
+  } else {
+    delete entry.costPrice;
+  }
   state.stockInDone = false;
   state.stockInReceipt = null;
   closeModal();
@@ -8033,7 +8038,7 @@ function stockInEntryList(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Баркод scan эсвэл бараа дээр дарж тоо, өртөг үнэ оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Баркод scan эсвэл бараа дээр дарж тоо ширхэг оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
