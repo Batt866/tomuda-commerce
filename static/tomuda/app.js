@@ -809,6 +809,26 @@ const isoDay = (d) => {
   const day = String(x.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
+function normalizeIsoDateInput(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    const dt = new Date(y, mo - 1, d);
+    if (
+      dt.getFullYear() === y &&
+      dt.getMonth() === mo - 1 &&
+      dt.getDate() === d
+    ) {
+      return `${m[1]}-${m[2]}-${m[3]}`;
+    }
+    return "";
+  }
+  return isoDay(text);
+}
 const todayIso = () => isoDay(new Date());
 const isDayBeforeToday = (day) => !!(day && day < todayIso());
 const tomorrowIso = () => {
@@ -841,9 +861,10 @@ function orderInWarehouseLiveSession(o) {
   return orderDay(o) === today;
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
-  if (!day) return orderInWarehouseLiveSession(o);
+  const targetDay = normalizeIsoDateInput(day);
+  if (!targetDay) return orderInWarehouseLiveSession(o);
   // Warehouse/receipt date filters should follow delivery day shown on receipts.
-  return orderDay(o) === day;
+  return normalizeIsoDateInput(orderDay(o)) === targetDay;
 }
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
@@ -7144,11 +7165,11 @@ function warehouseActiveWorkerIds(orders) {
   return warehouseScopeWorkerIds().filter((id) => hasOrder.has(id));
 }
 function warehouseDateDisplayText(day = state.filters.warehouseDate || "") {
-  const iso = day || todayIso();
+  const iso = normalizeIsoDateInput(day) || todayIso();
   return iso.replace(/-/g, ".");
 }
 function warehouseDateFiltersHtml() {
-  const day = state.filters.warehouseDate || "",
+  const day = normalizeIsoDateInput(state.filters.warehouseDate) || "",
     live = !day,
     pickerDay = day || todayIso(),
     display = warehouseDateDisplayText(day);
@@ -7160,7 +7181,7 @@ function clearWarehouseDate() {
   render();
 }
 function setWarehouseDate(day) {
-  state.filters.warehouseDate = day || "";
+  state.filters.warehouseDate = normalizeIsoDateInput(day);
   state.selectedWarehouseOrderId = "";
   render();
 }
