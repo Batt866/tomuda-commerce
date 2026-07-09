@@ -7702,9 +7702,18 @@ function confirmFinishStockIn() {
       return;
     }
   }
-  confirmStockInReceiptExport(buildStockInReceiptSnapshot());
+  const receipt = buildStockInReceiptSnapshot();
+  if (!receipt?.lines?.length) return;
+  const normalized = normalizeStockInReceiptTotals(receipt);
+  const summary = `<p>Хадгалах үед Excel файл татагдана.</p><p class="text-sm text-muted-foreground mt-2">Excel татахгүй бол «Үгүй» дарна уу. Аль ч тохиолдолд орлого хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
+  confirmModal("Орлогын баримт", summary, {
+    confirmLabel: "Хадгалах",
+    cancelLabel: "Үгүй",
+    onConfirm: () => void finishStockInReceipt(receipt, { downloadExcel: true }),
+    onCancel: () => void finishStockInReceipt(receipt, { downloadExcel: false }),
+  });
 }
-async function confirmStockInReceiptExport(receipt) {
+async function finishStockInReceipt(receipt, { downloadExcel = false } = {}) {
   if (!receipt?.lines?.length) return;
   const saved = applyStockInReceipt(receipt);
   startStockInSession();
@@ -7719,13 +7728,7 @@ async function confirmStockInReceiptExport(receipt) {
     return;
   }
   showAppToast("Орлого хадгалагдлаа", "success");
-  const summary = `<p>Орлого хадгалагдлаа. Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(saved.employeeName)}</b> · ${saved.lines.length} бараа · ${fmtExcelMoney(saved.totalAmount)}</p>`;
-  confirmModal("Орлогын баримт", summary, {
-    confirmLabel: "Татах",
-    cancelLabel: "Үгүй",
-    onConfirm: () => exportStockInExcel(saved),
-    onCancel: () => {},
-  });
+  if (downloadExcel) exportStockInExcel(saved);
 }
 function confirmNewStockIn() {
   const hasData = stockInHasEntries();
