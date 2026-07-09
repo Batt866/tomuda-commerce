@@ -13,6 +13,7 @@ from dashboard.models import AppState, ProductImage
 from dashboard.product_images import (
     find_stored_product_image_url,
     hydrate_product_images,
+    persist_imported_product_images,
     save_product_image_bytes,
 )
 from dashboard.profile_images import (
@@ -80,6 +81,34 @@ class ProductImageStorageTests(TestCase):
                 image = ProductImage.objects.get(product_id="old-prod")
                 self.assertEqual(bytes(image.image), raw)
                 self.assertEqual(image.content_type, "image/jpeg")
+
+    def test_persist_with_empty_product_ids_leaves_other_images_untouched(self):
+        # Importing rows that only update existing products (e.g. a price-only
+        # Excel) produces an empty product_ids list. That must NOT reprocess the
+        # whole catalog and clear images whose media file is missing on prod.
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                state = {
+                    "products": [
+                        {
+                            "id": "untouched-prod",
+                            "name": "Untouched",
+                            "image": "/media/products/untouched-prod.jpg?v=1",
+                        }
+                    ]
+                }
+
+                report = persist_imported_product_images(
+                    state,
+                    previous_state=state,
+                    product_ids=[],
+                )
+
+                self.assertEqual(report["imageSkipped"], 0)
+                self.assertEqual(
+                    state["products"][0]["image"],
+                    "/media/products/untouched-prod.jpg?v=1",
+                )
 
     def test_employee_image_serves_from_db_when_media_file_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

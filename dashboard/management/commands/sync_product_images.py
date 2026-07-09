@@ -7,6 +7,7 @@ from dashboard.product_images import (
     find_stored_product_image_url,
     lookup_openfoodfacts_image,
     mirror_product_image,
+    product_media_path_from_url,
 )
 from dashboard.seed_data import default_state
 
@@ -31,6 +32,12 @@ class Command(BaseCommand):
             action="store_true",
             help="Re-download even when a local media image already exists.",
         )
+        parser.add_argument(
+            "--timeout",
+            type=int,
+            default=8,
+            help="Seconds to wait for each external image request.",
+        )
 
     def handle(self, *args, **options):
         row, _ = AppState.objects.get_or_create(
@@ -43,6 +50,7 @@ class Command(BaseCommand):
         dry_run = bool(options.get("dry_run"))
         force = bool(options.get("force"))
         limit = max(0, int(options.get("limit") or 0))
+        timeout = max(1, int(options.get("timeout") or 8))
 
         total = 0
         mirrored = 0
@@ -62,12 +70,20 @@ class Command(BaseCommand):
 
             existing_local = find_stored_product_image_url(pid)
             if existing_local and not force:
+                if str(product.get("image") or "").strip() != existing_local:
+                    product["image"] = existing_local
+                    changed = True
                 skipped_existing += 1
                 continue
 
             image_url = str(product.get("image") or "").strip()
+            if product_media_path_from_url(image_url):
+                image_url = ""
             if not image_url.startswith(("http://", "https://")):
-                image_url = lookup_openfoodfacts_image(product.get("barcode"))
+                image_url = lookup_openfoodfacts_image(
+                    product.get("barcode"),
+                    timeout=timeout,
+                )
             if not image_url:
                 skipped_no_source += 1
                 continue
@@ -78,7 +94,7 @@ class Command(BaseCommand):
                 continue
 
             try:
-                local_url = mirror_product_image(pid, image_url)
+                local_url = mirror_product_image(pid, image_url, timeout=timeout)
             except ValueError as exc:
                 errors += 1
                 self.stdout.write(self.style.WARNING(f"{pid}: {exc}"))

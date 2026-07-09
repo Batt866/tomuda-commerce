@@ -116,7 +116,7 @@ def save_product_image(product_id: str, data_url: str) -> str:
     return save_product_image_bytes(product_id, raw, ext)
 
 
-def fetch_image_bytes(url: str) -> tuple[bytes, str]:
+def fetch_image_bytes(url: str, *, timeout: int = 20) -> tuple[bytes, str]:
     source = str(url or "").strip()
     if not source.startswith(("http://", "https://")):
         raise ValueError("Зурагны холбоос буруу байна")
@@ -128,14 +128,14 @@ def fetch_image_bytes(url: str) -> tuple[bytes, str]:
         },
     )
     try:
-        with urlopen(req, timeout=20) as response:
+        with urlopen(req, timeout=max(1, int(timeout or 20))) as response:
             content_type = str(response.headers.get("Content-Type") or "")
             mime = content_type.split(";", 1)[0].strip().lower()
             ext = IMAGE_MIME_TO_EXT.get(mime, "")
             if not ext:
                 raise ValueError("Зурагны формат буруу байна")
             raw = response.read(MAX_IMAGE_BYTES + 1)
-    except (HTTPError, URLError):
+    except (HTTPError, TimeoutError, URLError):
         raise ValueError("Зураг татаж чадсангүй")
     if len(raw) > MAX_IMAGE_BYTES:
         raise ValueError("Зураг хэт том байна")
@@ -144,12 +144,17 @@ def fetch_image_bytes(url: str) -> tuple[bytes, str]:
     return raw, ext
 
 
-def mirror_product_image(product_id: str, source_url: str) -> str:
-    raw, ext = fetch_image_bytes(source_url)
+def mirror_product_image(
+    product_id: str,
+    source_url: str,
+    *,
+    timeout: int = 20,
+) -> str:
+    raw, ext = fetch_image_bytes(source_url, timeout=timeout)
     return save_product_image_bytes(product_id, raw, ext)
 
 
-def lookup_openfoodfacts_image(barcode: str) -> str:
+def lookup_openfoodfacts_image(barcode: str, *, timeout: int = 20) -> str:
     digits = re.sub(r"\D", "", str(barcode or ""))
     if not digits:
         return ""
@@ -162,9 +167,9 @@ def lookup_openfoodfacts_image(barcode: str) -> str:
         headers={"Accept": "application/json", "User-Agent": "tomuda-image-sync/1.0"},
     )
     try:
-        with urlopen(req, timeout=20) as response:
+        with urlopen(req, timeout=max(1, int(timeout or 20))) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, json.JSONDecodeError):
+    except (HTTPError, TimeoutError, URLError, json.JSONDecodeError):
         return ""
     product = payload.get("product") if isinstance(payload, dict) else {}
     image_url = str((product or {}).get("image_url") or "").strip()
@@ -263,6 +268,11 @@ def persist_imported_product_images(
     previous_state: dict | None = None,
     product_ids: list[str] | set[str] | tuple[str, ...] | None = None,
 ) -> dict:
+    # When product_ids is provided (even as an empty list) restrict processing
+    # to exactly those ids. An empty set must mean "no products", not "all";
+    # relying on truthiness here reprocessed the whole catalog and silently
+    # cleared images for products whose media file is missing on prod.
+    restrict_to_ids = product_ids is not None
     ids = {str(pid) for pid in product_ids or [] if str(pid or "").strip()}
     previous_images = {
         str(p.get("id")): str(p.get("image") or "").strip()
@@ -276,7 +286,7 @@ def persist_imported_product_images(
         if not isinstance(product, dict):
             continue
         pid = str(product.get("id") or "").strip()
-        if not pid or (ids and pid not in ids):
+        if not pid or (restrict_to_ids and pid not in ids):
             continue
         source = str(product.get("image") or "").strip()
         if not source:
