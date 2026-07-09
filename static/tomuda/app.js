@@ -6152,36 +6152,43 @@ function buildReceiptWorkbookXml(orders, opts = {}) {
 }
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
-  const logoBuffer = !isMobileExcelExportDevice()
-    ? await fetch(staticAssetUrl(BRAND.receiptLogo))
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .catch(() => null)
-    : null;
-  const hasLogo = !!logoBuffer;
-  const built = buildReceiptWorkbookXml(orders, { hasLogo });
-  const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
-  await downloadBlobFile(blob, receiptExcelFileName(orders));
+  const filename = receiptExcelFileName(orders);
+  if (orders.length === 1) {
+    const ctx = createReceiptStringContext();
+    const built = buildReceiptSheetXml(orders[0], ctx, { hasLogo: false });
+    const tpl = await fetch(staticAssetUrl(RECEIPT_XLSX_TEMPLATE)).then((r) => {
+      if (!r.ok) throw new Error("template missing");
+      return r.arrayBuffer();
+    });
+    const zip = await JSZip.loadAsync(tpl);
+    zip.file("xl/sharedStrings.xml", built.sharedStringsXml);
+    zip.file("xl/worksheets/sheet1.xml", built.sheetXml);
+    zip.file("xl/styles.xml", receiptXlsxStylesXml());
+    zip.remove("xl/drawings/drawing1.xml");
+    zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
+    zip.remove("xl/printerSettings/printerSettings1.bin");
+    const blob = await zip.generateAsync({ type: "blob", mimeType: XLSX_MIME });
+    await downloadBlobFile(blob, filename, { skipShare: true });
+    return;
+  }
+  const built = buildReceiptWorkbookXml(orders, { hasLogo: false });
+  const blob = await assembleStyledXlsxZip(built, {
+    hasLogo: false,
+    logoBuffer: null,
+  });
+  await downloadBlobFile(blob, filename, { skipShare: true });
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
   try {
     await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Excel файл татагдлаа");
-  } catch (xlsxErr) {
-    console.warn("Receipt xlsx export failed", xlsxErr);
-    try {
-      const logoSrc = await getReceiptExcelLogoDataUri();
-      const html = buildReceiptExcelDocument(orders, logoSrc);
-      downloadReceiptExcelBlob(
-        legacyExcelFileName(receiptExcelFileName(orders)),
-        html,
-      );
-      showInstallToast("Excel файл татагдлаа");
-    } catch (legacyErr) {
-      console.warn("Receipt legacy excel export failed", legacyErr);
-      exportOrderReceiptsExcelCsv(orders);
-      showInstallToast("Excel файл татагдлаа");
-    }
+  } catch (err) {
+    console.error("Receipt xlsx export failed", err);
+    alertModal(
+      "Excel татах амжилтгүй",
+      "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+    );
   }
 }
 function orderReceiptExportSnapshots(

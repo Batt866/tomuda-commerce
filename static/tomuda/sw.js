@@ -1,10 +1,11 @@
-const CACHE = "tomuda-v165";
+const CACHE = "tomuda-v166";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
   "/static/tomuda/vendor/jszip.min.js",
   "/static/tomuda/vendor/tailwindcdn.js",
   "/static/tomuda/templates/warehouse-prepare-template.xls",
+  "/static/tomuda/templates/receipt-template.xls",
   "/manifest.webmanifest",
   "/static/tomuda/icons/icon-192.png?v=20260630-logo",
   "/static/tomuda/icons/icon-512.png?v=20260630-logo",
