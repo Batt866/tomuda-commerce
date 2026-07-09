@@ -1139,6 +1139,26 @@ function customerUnpaidOrders(customerId) {
     .filter((o) => o.customerId === customerId && !orderIsPaid(o))
     .sort(compareOrdersNewestFirst);
 }
+function customerReceivableTotal(customerId) {
+  return customerUnpaidOrders(customerId).reduce(
+    (sum, o) => sum + orderAmount(o),
+    0,
+  );
+}
+function customerEditReceivableSectionHtml(customerId) {
+  const orders = customerUnpaidOrders(customerId);
+  if (!orders.length) return "";
+  const total = customerReceivableTotal(customerId);
+  const list = workerReceivableHtml(customerId, { withPayActions: true });
+  return `<div class="customer-edit-receivable rounded-lg border border-border bg-secondary/40 p-4 space-y-3" data-customer-receivable><div class="flex items-center justify-between gap-3"><div><p class="text-sm font-semibold m-0">Тооцоо</p><p class="text-xs text-muted-foreground m-0 mt-0.5">${orders.length} баримт · төлөөгүй</p></div><p class="text-base font-bold text-tone-danger m-0">${fmt(total)}</p></div>${list}</div>`;
+}
+function refreshCustomerEditReceivable(customerId) {
+  const form = modal.querySelector("form[data-customer-form]");
+  if (!form || form.dataset.customerId !== String(customerId || "")) return;
+  const host = form.querySelector("[data-customer-receivable-host]");
+  if (!host) return;
+  host.innerHTML = customerEditReceivableSectionHtml(customerId);
+}
 function workerReceivableItemHtml(o, opts = {}) {
   const { actions = "" } = opts;
   return `<div class="worker-receivable__item"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span>${actions}</div>`;
@@ -13194,9 +13214,12 @@ function customerModal(id, draft = null) {
   else state.customerFormDraft = null;
   const c = customerFromDraft(id, useDraft);
   const cid = esc(id || "");
+  const receivableHost = id
+    ? `<div data-customer-receivable-host>${customerEditReceivableSectionHtml(id)}</div>`
+    : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -15277,8 +15300,10 @@ function setOrder(id, s) {
 function setPaid(id, isPaid) {
   const o = state.orders.find((order) => order.id === id);
   if (!o) return;
+  const customerId = o.customerId;
   o.isPaid = isPaid;
   render();
+  if (customerId) refreshCustomerEditReceivable(customerId);
   criticalBackendSave();
 }
 function csvRow(cells) {
