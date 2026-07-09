@@ -5718,6 +5718,13 @@ function exportOrderReceiptsExcelCsv(orders) {
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
+const RECEIPT_XLSX_COL_WIDTHS = [3.4, 9.2, 9.5, 4.3, 11.8, 10.8, 6.6, 5.6, 4.3, 10.8, 11.0];
+function receiptXlsxColsXml() {
+  return RECEIPT_XLSX_COL_WIDTHS.map(
+    (width, index) =>
+      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+  ).join("");
+}
 function excelSerialFromDate(value) {
   const d = value ? new Date(value) : new Date();
   if (Number.isNaN(d.getTime())) return excelSerialFromDate(new Date());
@@ -5763,7 +5770,7 @@ function buildReceiptSheetXml(
   opts = {},
 ) {
   const { strings, si } = ctx;
-  const merges = ["A1:B2", "C1:F1", "C2:J2", "C3:J3"];
+  const merges = ["A1:B2", "C1:F1", "G1:J1", "C2:H2", "I2:J2", "C3:J3"];
   const rows = [];
   let rowNum = 1;
   const pushRow = (height, cells) => {
@@ -5784,16 +5791,30 @@ function buildReceiptSheetXml(
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
-  const metaPairRow = (row, leftLabel, leftValue, rightLabel, rightValue) => [
-    xlsxCellXml(`B${row}`, 3, si(leftLabel), "s"),
-    xlsxCellXml(`D${row}`, 4, si(leftValue), "s"),
-    xlsxCellXml(`F${row}`, 3, si(rightLabel), "s"),
-    xlsxCellXml(`I${row}`, 4, si(rightValue), "s"),
-    ...emptyCells(row, "A", "A"),
-    ...emptyCells(row, "E", "E"),
-    ...emptyCells(row, "G", "H"),
-    ...emptyCells(row, "J", RECEIPT_XLSX_LAST_COL),
-  ];
+  const pushMetaPairRow = (
+    leftLabel,
+    leftValue,
+    rightLabel = "",
+    rightValue = "",
+  ) => {
+    const row = rowNum;
+    merges.push(
+      `B${row}:C${row}`,
+      `D${row}:E${row}`,
+      `F${row}:H${row}`,
+      `I${row}:K${row}`,
+    );
+    pushRow(14.25, [
+      xlsxCellXml(`A${row}`, 1, null, "empty"),
+      xlsxCellXml(`B${row}`, 5, si(leftLabel), "s"),
+      xlsxCellXml(`D${row}`, 4, si(leftValue), "s"),
+      xlsxCellXml(`F${row}`, 5, si(rightLabel), "s"),
+      xlsxCellXml(`I${row}`, 4, si(rightValue), "s"),
+      ...emptyCells(row, "E", "E"),
+      ...emptyCells(row, "G", "H"),
+      ...emptyCells(row, "J", RECEIPT_XLSX_LAST_COL),
+    ]);
+  };
   const f = receiptPartyFields(o);
   const receiptNo = formatReceiptNumber(o);
   const items = (o.items || []).filter((i) => !i.isPromoFree);
@@ -5817,124 +5838,120 @@ function buildReceiptSheetXml(
       ? `Өдөртөө тооцоог хийгээгүй тохиолдолд (${percentDiscountRate()}%) -н хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
   pushRow(20.25, [
-    xlsxCellXml("C1", 14, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml("C1", 1, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml("K1", 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(1, "A", "B"),
-    ...emptyCells(1, "D", "J"),
+    ...emptyCells(1, "G", "J"),
   ]);
   pushRow(27, [
     xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
     xlsxCellXml("K2", 6, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(2, "A", "B"),
-    ...emptyCells(2, "L", RECEIPT_XLSX_LAST_COL),
+    ...emptyCells(2, "I", "J"),
   ]);
   pushRow(31.5, [
     xlsxCellXml("C3", 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
     ...emptyCells(3, "A", "B"),
-    ...emptyCells(3, "K", RECEIPT_XLSX_LAST_COL, 13),
+    ...emptyCells(3, "K", RECEIPT_XLSX_LAST_COL),
   ]);
-  pushRow(
-    14.25,
-    metaPairRow(
-      rowNum,
-      "Худалдааны төлөөлөгч:",
-      f.salesName,
-      "Харилцагч:",
-      f.customerName,
-    ),
+  pushMetaPairRow(
+    "Худалдааны төлөөлөгч:",
+    f.salesName,
+    "Харилцагч:",
+    f.customerName,
   );
-  pushRow(
-    14.25,
-    metaPairRow(
-      rowNum,
-      "Худалдааны төлөөлөгчийн утас:",
-      f.salesPhone,
-      "Регистерийн дугаар:",
-      f.customerReg,
-    ),
+  pushMetaPairRow(
+    "Худалдааны төлөөлөгчийн утас:",
+    f.salesPhone,
+    "Регистерийн дугаар:",
+    f.customerReg,
   );
-  pushRow(
-    14.25,
-    metaPairRow(
-      rowNum,
-      "Түгээгчийн нэр:",
-      f.deliveryName,
-      "Компаний нэр:",
-      f.companyName,
-    ),
+  pushMetaPairRow(
+    "Түгээгчийн нэр:",
+    f.deliveryName,
+    "Компаний нэр:",
+    f.companyName,
   );
-  pushRow(
-    14.25,
-    metaPairRow(
-      rowNum,
-      "Түгээгчийн утас:",
-      f.deliveryPhone,
-      "Утасны дугаар:",
-      f.customerPhone,
-    ),
+  pushMetaPairRow(
+    "Түгээгчийн утас:",
+    f.deliveryPhone,
+    "Утасны дугаар:",
+    f.customerPhone,
   );
   pushRow(14.25, emptyCells(rowNum));
   const bankNameRow = rowNum;
-  pushRow(14.25, [
-    xlsxCellXml(`B${bankNameRow}`, 3, si("Дансны нэр:"), "s"),
-    xlsxCellXml(`D${bankNameRow}`, 4, si("ТОМУДА групп"), "s"),
-    xlsxCellXml(`F${bankNameRow}`, 3, si("Хүргэлтийн хаяг:"), "s"),
-    ...emptyCells(bankNameRow, "A", "A"),
-    ...emptyCells(bankNameRow, "E", "E"),
-    ...emptyCells(bankNameRow, "G", RECEIPT_XLSX_LAST_COL),
-  ]);
   merges.push(
     `B${bankNameRow}:C${bankNameRow}`,
     `D${bankNameRow}:E${bankNameRow}`,
+    `F${bankNameRow}:H${bankNameRow}`,
   );
-  const bankRegRow = rowNum;
   pushRow(14.25, [
-    xlsxCellXml(`B${bankRegRow}`, 3, si("Регистерийн дугаар:"), "s"),
+    xlsxCellXml(`A${bankNameRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankNameRow}`, 5, si("Дансны нэр:"), "s"),
+    xlsxCellXml(`D${bankNameRow}`, 4, si("ТОМУДА групп"), "s"),
+    xlsxCellXml(`F${bankNameRow}`, 5, si("Хүргэлтийн хаяг:"), "s"),
+    ...emptyCells(bankNameRow, "E", "E"),
+    ...emptyCells(bankNameRow, "I", RECEIPT_XLSX_LAST_COL),
+  ]);
+  const bankRegRow = rowNum;
+  merges.push(
+    `B${bankRegRow}:C${bankRegRow}`,
+    `D${bankRegRow}:E${bankRegRow}`,
+    `F${bankRegRow}:K${bankRegRow}`,
+  );
+  pushRow(14.25, [
+    xlsxCellXml(`A${bankRegRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankRegRow}`, 5, si("Регистерийн дугаар:"), "s"),
     xlsxCellXml(`D${bankRegRow}`, 4, si("5397987"), "s"),
     xlsxCellXml(`F${bankRegRow}`, 4, si(f.address), "s"),
-    ...emptyCells(bankRegRow, "A", "A"),
     ...emptyCells(bankRegRow, "E", "E"),
-    ...emptyCells(bankRegRow, "G", RECEIPT_XLSX_LAST_COL),
   ]);
-  merges.push(`D${bankRegRow}:E${bankRegRow}`, `F${bankRegRow}:K${bankRegRow}`);
   const bankTitleRow = rowNum;
+  merges.push(
+    `B${bankTitleRow}:C${bankTitleRow}`,
+    `D${bankTitleRow}:E${bankTitleRow}`,
+  );
   pushRow(14.25, [
-    xlsxCellXml(`B${bankTitleRow}`, 3, si("Банкны нэр:"), "s"),
+    xlsxCellXml(`A${bankTitleRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankTitleRow}`, 5, si("Банкны нэр:"), "s"),
     xlsxCellXml(`D${bankTitleRow}`, 4, si("Хаан банк"), "s"),
-    ...emptyCells(bankTitleRow, "A", "A"),
     ...emptyCells(bankTitleRow, "E", RECEIPT_XLSX_LAST_COL),
   ]);
-  merges.push(`D${bankTitleRow}:E${bankTitleRow}`);
   const bankAcctRow = rowNum;
+  merges.push(
+    `B${bankAcctRow}:C${bankAcctRow}`,
+    `D${bankAcctRow}:E${bankAcctRow}`,
+  );
   pushRow(14.25, [
+    xlsxCellXml(`A${bankAcctRow}`, 1, null, "empty"),
     xlsxCellXml(
       `B${bankAcctRow}`,
-      3,
+      5,
       si("Дансны дугаар:                     IBAN:      "),
       "s",
     ),
     xlsxCellXml(`D${bankAcctRow}`, 4, si("60000500"), "s"),
-    ...emptyCells(bankAcctRow, "A", "A"),
     ...emptyCells(bankAcctRow, "E", RECEIPT_XLSX_LAST_COL),
   ]);
-  merges.push(`D${bankAcctRow}:E${bankAcctRow}`);
   const bankAcctRow2 = rowNum;
+  merges.push(`D${bankAcctRow2}:E${bankAcctRow2}`);
   pushRow(14.25, [
+    xlsxCellXml(`A${bankAcctRow2}`, 1, null, "empty"),
+    ...emptyCells(bankAcctRow2, "B", "C"),
     xlsxCellXml(`D${bankAcctRow2}`, 4, si("5133333307"), "s"),
-    ...emptyCells(bankAcctRow2, "A", "C"),
     ...emptyCells(bankAcctRow2, "E", RECEIPT_XLSX_LAST_COL),
   ]);
-  merges.push(`D${bankAcctRow2}:E${bankAcctRow2}`);
   pushRow(14.25, emptyCells(rowNum));
   const headerRow = rowNum;
+  merges.push(`B${headerRow}:D${headerRow}`, `F${headerRow}:G${headerRow}`, `H${headerRow}:I${headerRow}`);
   pushRow(14.25, [
+    xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
     xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
-    ...emptyCells(headerRow, "A", "A"),
     ...emptyCells(headerRow, "C", "D"),
     ...emptyCells(headerRow, "G", "G"),
     ...emptyCells(headerRow, "I", "I"),
@@ -6129,7 +6146,7 @@ function buildReceiptSheetXml(
     .map((ref) => `<mergeCell ref="${ref}"/>`)
     .join("");
   const drawingXml = opts.hasLogo ? `<drawing r:id="rId1"/>` : "";
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="3" customWidth="1"/><col min="2" max="2" width="6.25" customWidth="1"/><col min="3" max="3" width="17.38" customWidth="1"/><col min="4" max="4" width="3.88" customWidth="1"/><col min="5" max="5" width="10.38" customWidth="1"/><col min="6" max="6" width="9.62" customWidth="1"/><col min="7" max="7" width="5.62" customWidth="1"/><col min="8" max="8" width="4.88" customWidth="1"/><col min="9" max="9" width="3.75" customWidth="1"/><col min="10" max="10" width="9.25" customWidth="1"/><col min="11" max="11" width="9.5" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells>${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells>${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return {
     sharedStringsXml: xlsxSharedStringsXml(strings),
     sheetXml,
