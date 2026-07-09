@@ -6165,23 +6165,20 @@ async function exportOrderReceiptsExcelXlsx(orders) {
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
   try {
-    // Print дээр гарч буй layout-тай (receiptPageHtml доторх table) яг ижил
-    // HTML-г ашиглаад Excel-д нийцтэй байдлаар legacy `.xls` болгон татна.
-    const logoSrc = await getReceiptExcelLogoDataUri();
-    const html = buildReceiptExcelDocument(orders, logoSrc);
-    downloadReceiptExcelBlob(
-      legacyExcelFileName(receiptExcelFileName(orders)),
-      html,
-    );
+    await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Excel файл татагдлаа");
-    return;
   } catch (xlsxErr) {
-    console.warn("Receipt legacy excel export failed", xlsxErr);
+    console.warn("Receipt xlsx export failed", xlsxErr);
     try {
-      await exportOrderReceiptsExcelXlsx(orders);
+      const logoSrc = await getReceiptExcelLogoDataUri();
+      const html = buildReceiptExcelDocument(orders, logoSrc);
+      downloadReceiptExcelBlob(
+        legacyExcelFileName(receiptExcelFileName(orders)),
+        html,
+      );
       showInstallToast("Excel файл татагдлаа");
-    } catch (xlsxErr2) {
-      console.warn("Receipt xlsx export failed", xlsxErr2);
+    } catch (legacyErr) {
+      console.warn("Receipt legacy excel export failed", legacyErr);
       exportOrderReceiptsExcelCsv(orders);
       showInstallToast("Excel файл татагдлаа");
     }
