@@ -1693,6 +1693,13 @@ label.excel-import-toolbar__upload {
   border-bottom: none;
 }
 
+.wh-receipts__filters > .page-toolbar .page-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .bg-card > .px-3 > .page-toolbar,
 .bg-card.rounded.p-3 > .page-toolbar {
   padding-top: 0;
@@ -5421,6 +5428,12 @@ textarea::placeholder {
   border-radius: 6px;
   background: var(--hex-secondary);
   font-size: 12px;
+}
+
+.inventory-stock-row__pending {
+  margin-left: 4px;
+  color: var(--hex-primary);
+  font-weight: 600;
 }
 
 .inventory-stock-row__price {

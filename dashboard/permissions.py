@@ -223,6 +223,29 @@ def _created_order_stock_usage(
     return usage
 
 
+def _stock_in_receipt_usage(
+    old_state: dict[str, Any],
+    new_state: dict[str, Any],
+) -> dict[str, float]:
+    old_receipts = _by_id(old_state.get("stockInReceipts") or [])
+    new_receipts = _by_id(new_state.get("stockInReceipts") or [])
+    usage: dict[str, float] = {}
+    for receipt_id, receipt in new_receipts.items():
+        if receipt_id in old_receipts:
+            continue
+        for line in receipt.get("lines") or []:
+            product_id = str(line.get("productId") or "")
+            if not product_id:
+                continue
+            try:
+                qty = float(line.get("quantity") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty > 0:
+                usage[product_id] = usage.get(product_id, 0) + qty
+    return usage
+
+
 def _is_order_stock_update(
     old_product: dict[str, Any],
     new_product: dict[str, Any],
@@ -241,6 +264,28 @@ def _is_order_stock_update(
         and allowed_decrease > 0
         and abs((old_stock - new_stock) - allowed_decrease) <= 0.0001
     )
+
+
+def _is_stock_in_product_update(
+    old_product: dict[str, Any],
+    new_product: dict[str, Any],
+    allowed_increase: float,
+) -> bool:
+    if allowed_increase <= 0:
+        return False
+    old_copy = dict(old_product)
+    new_copy = dict(new_product)
+    try:
+        old_stock = float(old_copy.get("stock") or 0)
+        new_stock = float(new_copy.get("stock") or 0)
+    except (TypeError, ValueError):
+        return False
+    stock_increase = new_stock - old_stock
+    if stock_increase <= 0 or abs(stock_increase - allowed_increase) > 0.0001:
+        return False
+    old_copy["stock"] = new_copy["stock"]
+    old_copy["costPrice"] = new_copy.get("costPrice")
+    return old_copy == new_copy
 
 
 def _has_any_permission(perms: set[str], *keys: str) -> bool:
@@ -269,12 +314,14 @@ def validate_state_mutation(
     old_orders = _by_id(old_state.get("orders") or [])
     new_orders = _by_id(new_state.get("orders") or [])
     created_order_stock = _created_order_stock_usage(old_orders, new_orders)
+    stock_in_usage = _stock_in_receipt_usage(old_state, new_state)
+    has_new_stock_in_receipts = bool(stock_in_usage)
 
     if _settings_changed(old_state, new_state) and "settings.view" not in perms:
         return False, "Тохиргоо өөрчлөх эрхгүй"
 
     if _promotion_rules_changed(old_state, new_state) and "settings.view" not in perms:
-        return False, "Урамшууллын тохиргоо өөрчлөх эрхгүй"
+        return False, "Урамшуулалын тохиргоо өөрчлөх эрхгүй"
 
     entity_rules = {
         "employees": (
@@ -323,6 +370,11 @@ def validate_state_mutation(
                     new_product_map[item_id],
                     created_order_stock.get(item_id, 0),
                 )
+                and not _is_stock_in_product_update(
+                    old_product_map[item_id],
+                    new_product_map[item_id],
+                    stock_in_usage.get(item_id, 0),
+                )
             }
         if updated:
             edit_perm_keys = edit_keys
@@ -365,16 +417,36 @@ def validate_state_mutation(
                 new_stock = float(new_product.get("stock") or 0)
             except (TypeError, ValueError):
                 return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
-            allowed_decrease = created_order_stock.get(product_id, 0)
-            actual_decrease = old_stock - new_stock
-            if actual_decrease < 0 or abs(actual_decrease - allowed_decrease) > 0.0001:
-                return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
-        if old_product.get("costPrice") != new_product.get("costPrice") and "warehouse.edit" not in perms:
-            return False, "Өртөг үнэ өөрчлөх эрхгүй"
+            allowed_increase = stock_in_usage.get(product_id, 0)
+            stock_increase = new_stock - old_stock
+            if (
+                allowed_increase > 0
+                and stock_increase > 0
+                and abs(stock_increase - allowed_increase) <= 0.0001
+            ):
+                pass
+            else:
+                allowed_decrease = created_order_stock.get(product_id, 0)
+                actual_decrease = old_stock - new_stock
+                if actual_decrease < 0 or abs(actual_decrease - allowed_decrease) > 0.0001:
+                    return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+        if (
+            old_product.get("costPrice") != new_product.get("costPrice")
+            and "warehouse.edit" not in perms
+        ):
+            if not (
+                has_new_stock_in_receipts
+                and stock_in_usage.get(product_id, 0) > 0
+            ):
+                return False, "Өртөг үнэ өөрчлөх эрхгүй"
 
     old_logs = old_state.get("inventoryLogs") or []
     new_logs = new_state.get("inventoryLogs") or []
     if len(new_logs) > len(old_logs) and "warehouse.edit" not in perms:
-        return False, "Агуулахын орлого/зарлага бүртгэх эрхгүй"
+        if not (
+            has_new_stock_in_receipts
+            and all(str(log.get("type") or "") == "in" for log in new_logs[len(old_logs) :])
+        ):
+            return False, "Агуулахын орлого/зарлага бүртгэх эрхгүй"
 
     return True, ""

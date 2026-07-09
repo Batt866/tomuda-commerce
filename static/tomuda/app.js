@@ -278,6 +278,7 @@ let toolbarSelectRenderPending = false;
 let userScrollActiveUntil = 0;
 let searchRenderTimer = null;
 let promotionSaveLock = false;
+let orderSubmitLock = false;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -5559,7 +5560,7 @@ function orderReceiptSnapshot(o) {
   return snap;
 }
 function receiptExcelPage(o, logoSrc) {
-  return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptPageHtml(o, logoSrc)}</div></div>`;
+  return `<div class="receipt-excel-sheet">${receiptPrintPageHtml(o, logoSrc)}</div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
 body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
@@ -6181,6 +6182,15 @@ function orderReceiptExportSnapshots(
 function confirmVisibleOrderReceiptsExcel(searchKey = "warehouseOrders") {
   confirmOrderReceiptsExcel(searchKey, [], receiptFilterOptions());
 }
+function warehouseReceiptToolbarActionsHtml(exportOnclick) {
+  const workerIds = receiptPrintWorkerIds(),
+    selectedCount = idList(state.receiptPrintOrderIds).length,
+    deliveryReady = !!state.receiptPrintDeliveryId,
+    printBtn = workerIds.length
+      ? `<button type="button" onclick="printSelectedOrderReceipts()" class="btn btn--secondary btn--toolbar wh-receipts__print"${selectedCount ? "" : " disabled"} aria-label="Баримт хэвлэх"><span class="btn--toolbar__label btn--toolbar__label--full">Хэвлэх</span><span class="btn--toolbar__label btn--toolbar__label--short">Хэвлэх</span></button>`
+      : "";
+  return `${printBtn}${excelDownloadBtn(exportOnclick, { disabled: !deliveryReady, extraClass: "wh-receipts__export" })}`;
+}
 function confirmWarehouseReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
@@ -6303,9 +6313,8 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
       ? warehouseOrderDetail(selected)
       : `<div class="wh-receipt-detail wh-receipt-detail--empty"><p>Баримт сонгоно уу</p></div>`;
   const q = state.searches[searchKey] || "",
-    exportBtn = excelDownloadBtn(
+    exportBtn = warehouseReceiptToolbarActionsHtml(
       `confirmWarehouseReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
-      { disabled: !state.receiptPrintDeliveryId },
     ),
     toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="setOrderStatusFilter(this.value)" onfocus="receiptStatusFilterFocus()" onblur="receiptStatusFilterBlur()" ontouchstart="receiptStatusFilterFocus()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${statusOptions
       .map(
@@ -6332,10 +6341,10 @@ function warehouseOrderDetail(o) {
     itemRows = displayItems
       .map((i) => {
         const isPromo = !!i.isPromoFree;
-        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">Үнэгүй</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
+        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Шууд төлөх" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--sm">Хэвлэх</button><button type="button" onclick="downloadOrderReceiptExcel('${esc(o.id)}', event)" class="btn btn--primary btn--sm">${EXCEL_FILE_DOWNLOAD}</button></div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Шууд төлөх" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}</div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
@@ -7638,30 +7647,31 @@ function buildStockInReceiptSnapshot() {
 function applyStockInReceipt(receipt) {
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
   const saved = finalizeStockInReceipt(normalizeStockInReceiptTotals(receipt));
-  if (!state.stockInReceipts.some((r) => r.id === saved.id)) {
-    state.stockInReceipts.push({
-      id: saved.id,
-      receiptNumber: saved.receiptNumber,
-      receiptSeq: saved.receiptSeq,
-      monthKey: saved.monthKey,
-      createdAt: saved.createdAt,
-      employeeId: saved.employeeId,
-      employeeName: saved.employeeName,
-      lines: saved.lines,
-      totalAmount: saved.totalAmount,
-    });
-  }
+  if (state.stockInReceipts.some((r) => r.id === saved.id)) return saved;
+  state.stockInReceipts.push({
+    id: saved.id,
+    receiptNumber: saved.receiptNumber,
+    receiptSeq: saved.receiptSeq,
+    monthKey: saved.monthKey,
+    createdAt: saved.createdAt,
+    employeeId: saved.employeeId,
+    employeeName: saved.employeeName,
+    lines: saved.lines,
+    totalAmount: saved.totalAmount,
+  });
   for (const line of saved.lines) {
     const p = state.products.find((x) => x.id === line.productId);
     if (!p) continue;
+    const qty = Number(line.quantity) || 0;
+    if (qty <= 0) continue;
     if (line.costPrice > 0) p.costPrice = line.costPrice;
-    stock(line.productId, line.quantity, "in");
+    stock(line.productId, qty, "in");
     state.inventoryLogs.push({
       id: nextInventoryLogId(),
       productId: line.productId,
       productName: line.productName,
       type: "in",
-      quantity: line.quantity,
+      quantity: qty,
       costPrice: line.costPrice,
       packs: line.packs,
       date: saved.createdAt,
@@ -7670,11 +7680,16 @@ function applyStockInReceipt(receipt) {
       receiptNumber: saved.receiptNumber,
     });
   }
-  criticalBackendSave();
   return saved;
 }
 function confirmFinishStockIn() {
   ensureStockInSession();
+  if (!hasPermission("warehouse.edit")) {
+    return alertModal(
+      "Эрхгүй",
+      "Орлого бүртгэх эрхгүй. Агуулах засах эрх шаардлагатай.",
+    );
+  }
   if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
   if (!stockInHasEntries()) return alert("Орлого оруулна уу");
   for (const p of state.products) {
@@ -7689,11 +7704,21 @@ function confirmFinishStockIn() {
   }
   confirmStockInReceiptExport(buildStockInReceiptSnapshot());
 }
-function confirmStockInReceiptExport(receipt) {
+async function confirmStockInReceiptExport(receipt) {
   if (!receipt?.lines?.length) return;
   const saved = applyStockInReceipt(receipt);
   startStockInSession();
   render();
+  const ok = await criticalBackendSave();
+  if (!ok) {
+    const msg =
+      backendSaveFailedMessage ||
+      "Орлого түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
+    showAppToast(msg, "error");
+    alertModal("Хадгалах амжилтгүй", esc(msg));
+    return;
+  }
+  showAppToast("Орлого хадгалагдлаа", "success");
   const summary = `<p>Орлого хадгалагдлаа. Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(saved.employeeName)}</b> · ${saved.lines.length} бараа · ${fmtExcelMoney(saved.totalAmount)}</p>`;
   confirmModal("Орлогын баримт", summary, {
     confirmLabel: "Татах",
@@ -7807,7 +7832,8 @@ function stockInEntryRow(p) {
     ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">Өртөг ${fmt(cost)}</span>` : ""}</span>`
     : `<span class="stock-in-entry-row__hint">Тоо, өртөг оруулах</span>`;
   const salesPrice = productSalesPrice(p);
-  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
+  const displayStock = (Number(p.stock) || 0) + (hasEntry ? qty : 0);
+  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
 }
 function stockInPackDerivedPieces(packs, packSize) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
@@ -9697,7 +9723,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
     pushRow(27.75, [
-      xlsxCellXml(`A${promoHeadRow}`, 15, si("Урамшууллын бараа"), "s"),
+      xlsxCellXml(`A${promoHeadRow}`, 15, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
     ]);
     pushPrepareGroups(sections.promo);
@@ -9826,7 +9852,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
       })
       .join("");
   const promoRows = sections.promo.length
-    ? `<tr><td colspan="6" class="cat promo-head">Урамшууллын бараа</td></tr>${renderGroupRows(sections.promo)}`
+    ? `<tr><td colspan="6" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
@@ -10090,9 +10116,12 @@ function confirmSetPaid(id) {
     onConfirm: () => setPaid(id, true),
   });
 }
-const PROMO_PRODUCT_LABEL = "Урамшууллын бараа";
+const PROMO_PRODUCT_LABEL = "Урамшуулалын бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
 const PROMO_PAYMENT_LABEL = "Шууд төлбөрийн урамшуулал";
+function promoProductQtyLabel(qty) {
+  return `${Number(qty) || 1} ш · ${PROMO_PRODUCT_LABEL}`;
+}
 function promotionTypeLabel(type) {
   return (
     {
@@ -10108,7 +10137,7 @@ function promotionMenuHtml() {
     ["quantity", "Багцын хөнгөлөлт"],
     ["payment", PROMO_PAYMENT_LABEL],
   ];
-  return `<nav class="admin-menu promo-type-menu" aria-label="Урамшууллын төрөл">${items
+  return `<nav class="admin-menu promo-type-menu" aria-label="Урамшуулалын төрөл">${items
     .map(([id, label]) => {
       const count = (state.promotionRules[id] || []).length;
       const badge = count
@@ -10298,7 +10327,7 @@ function promotionProductPickerBlock(
   return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block"><input type="hidden" name="${fieldName}" id="promo-${fieldName}" value="${esc(selectedId)}" required>${head}${inputRow}${promoCategoryFilterHtml(fieldName)}${warn}${selectedHtml}${listHtml}</div></div>`;
 }
 function promoSectionArrow() {
-  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">үнэгүй өгнө</span></div>`;
+  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">${PROMO_PRODUCT_LABEL}</span></div>`;
 }
 function promotionQtyField(name, label, defaultValue, inline = false) {
   const draftVal = promoFormDraftVal(name, "");
@@ -10520,12 +10549,12 @@ function promotionQtyRuleText(r) {
   if (buyIds.length && freeIds.length) {
     const buyNames = promotionProductLabels(buyIds),
       freeNames = promotionProductLabels(freeIds);
-    return `${buyNames}-аас нийт ${r.buyQty} ш авахад → ${freeNames} ${r.freeQty || 1} ш үнэгүй`;
+    return `${buyNames}-аас нийт ${r.buyQty} ш авахад → ${freeNames} ${promoProductQtyLabel(r.freeQty)}`;
   }
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцад хамаарах урамшууллын бараа сонгох</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Багцын хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцад хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Багцын хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -10563,7 +10592,7 @@ function promotionQtyRuleCard(r, i) {
           `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
-  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${r.freeQty || 1} ш үнэгүй</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
+  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${promoProductQtyLabel(r.freeQty)}</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -10579,13 +10608,13 @@ function promotionPriceRuleText(r) {
     return `${range} · ${r.discountPercent}% хөнгөлөлт`;
   }
   const freeNames = promotionProductLabels(promotionFreeProductIds(r));
-  return `${range} · ${freeNames || "-"} ${r.freeQty || 1} ш үнэгүй`;
+  return `${range} · ${freeNames || "-"} ${promoProductQtyLabel(r.freeQty)}`;
 }
 function promotionPricePanel(rows) {
   const sorted = [...rows].sort(
     (a, b) => (Number(a.minAmount) || 0) - (Number(b.minAmount) || 0),
   );
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд урамшууллын бараа эсвэл хувийн хөнгөлөлт олгон.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">Нийт үнийн дүнгийн хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд ${PROMO_PRODUCT_LABEL} эсвэл хувийн хөнгөлөлт олгон.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">Нийт үнийн дүнгийн хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionPaymentRuleText(r) {
   const term = r.paymentTerm === "credit" ? "Зээлээр" : "Шууд төлөх",
@@ -10598,10 +10627,10 @@ function promotionPaymentRuleText(r) {
     return `${term}${minText} · ${r.discountPercent}% хөнгөлөлт`;
   }
   const freeNames = promotionProductLabels(promotionFreeProductIds(r));
-  return `${term}${minText} · ${freeNames || "-"} ${r.freeQty || 1} ш үнэгүй`;
+  return `${term}${minText} · ${freeNames || "-"} ${promoProductQtyLabel(r.freeQty)}`;
 }
 function promotionPaymentPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн нөхцлөөс хамаарах урамшууллын бараа сонгох</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Шууд төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн нөхцлөөс хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Шууд төлбөрийн урамшуулалын дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionPaymentRuleCard(r, i) {
   return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('payment',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
@@ -11946,7 +11975,7 @@ function workerStorePickStep() {
       ? state.customers.find((c) => c.id === state.workerCustomer)
       : null;
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}${workerReceivableHtml(selected.id)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
   return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" aria-label="Харилцагч хайх"></div>${selectedBanner}${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
 }
@@ -11982,7 +12011,7 @@ function workerNew(cart) {
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">Урамшуулал · үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${PROMO_PRODUCT_LABEL}</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
@@ -11996,11 +12025,8 @@ function workerOrderOptionsHtml(cart) {
     settlementBody = state.settlementAgreed
       ? `<div class="worker-order-opt__body"><div class="worker-order-opt__fields"><textarea rows="1" class="app-input worker-order-opt__input" data-settlement-input aria-label="Тэмдэглэл" placeholder="Тайлбар" oninput="applySettlementTextInput(this.value);growSettlementInput(this)" onfocus="settlementInputFocus()" onblur="settlementInputBlur()">${esc(settlementText)}</textarea></div></div>`
       : "",
-    pctBody = workerPercentDiscountActive()
-      ? `<div class="worker-order-opt__body"><div class="worker-order-discount-preview"><span>Хөнгөлөлт</span><strong>${fmt(cart.employeeDiscount)}</strong><span class="worker-order-discount-preview__sep">·</span><span>Төлөх</span><strong class="worker-order-discount-preview__total">${fmt(cart.total)}</strong></div></div>`
-      : "",
     pctRow = pctAllowed
-      ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label>${pctBody}</div>`
+      ? `<div class="worker-order-opt${workerPercentDiscountActive() ? " is-open" : ""}${cashOnly ? "" : " worker-order-opt--disabled"}" aria-expanded="${workerPercentDiscountActive() ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${workerPercentDiscountActive() ? "checked" : ""}${cashOnly ? "" : " disabled"} onchange="state.applyPercentDiscount=this.checked;render()" aria-label="Хувь тооцох идэвхжүүлэх"><span class="worker-order-opt__title">Хувь тооцох</span><span class="worker-order-opt__badge${cashOnly ? "" : " worker-order-opt__badge--muted"}" aria-hidden="true">${pct}%</span></label></div>`
       : "";
   return `<div class="worker-order-options" role="group" aria-label="Захиалгын нэмэлт сонголт"><div class="worker-order-opt${state.settlementAgreed ? " is-open" : ""}" aria-expanded="${state.settlementAgreed ? "true" : "false"}"><label class="worker-order-opt__head"><input type="checkbox" ${state.settlementAgreed ? "checked" : ""} onchange="state.settlementAgreed=this.checked;state.settlementText='';state.settlementMonth='';state.settlementDay='';render()" aria-label="Тэмдэглэл идэвхжүүлэх"><span class="worker-order-opt__title">Тэмдэглэл</span></label>${settlementBody}</div>${pctRow}</div>`;
 }
@@ -12015,7 +12041,6 @@ function workerOrderStatsHtml(cart) {
   return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
 }
 function workerNewOrderStep(cart) {
-  state.deliveryDate = todayIso();
   ensureOrderEmployeeSelection();
   const customer = state.customers.find((c) => c.id === state.workerCustomer),
     showAgentPicker = shouldShowOrderAgentPicker(),
@@ -12029,11 +12054,13 @@ function workerNewOrderStep(cart) {
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
       : "";
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0">Солих</button></header><div class="worker-order-card__body">${hasItems ? workerOrderStatsHtml(cart) : ""}<div class="worker-order-card__tools">${receivableHtml}${agentMetaHtml}<button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems ? "" : " is-disabled"}" ${hasItems ? "" : "disabled"}>Хадгалах</button></footer></section>`;
+  const saving = orderSubmitLock;
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button></header><div class="worker-order-card__body">${hasItems ? workerOrderStatsHtml(cart) : ""}<div class="worker-order-card__tools">${receivableHtml}${agentMetaHtml}<button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saving ? "Хадгалж байна..." : "Хадгалах"}</button></footer></section>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(p.name)}</p><p class="worker-row-meta text-xs text-muted-foreground">${esc(p.category)} · ${fmt(p.price)} · Үлд ${p.stock - p.qty}</p><p class="worker-row-compact text-sm font-semibold text-primary">${fmt(p.price * p.qty)}</p></div>${workerOrderQtyHtml(p, p.qty)}</div>`;
+  const remain = Math.max(0, (Number(p.stock) || 0) - p.qty);
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(p.name)}</p><p class="worker-row-meta text-xs text-muted-foreground">${esc(p.category)} · ${fmt(p.price)} × ${p.qty} = <b class="text-primary">${fmt(p.price * p.qty)}</b> · Үлд ${remain}</p></div>${workerOrderQtyHtml(p, p.qty)}</div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
@@ -13896,34 +13923,38 @@ function orderModal() {
 }
 function saveOrder(e) {
   e.preventDefault();
+  if (orderSubmitLock) return;
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
   const f = new FormData(e.target),
-    c = state.customers.find((x) => x.id === f.get("customerId")),
-    emp = state.currentEmployee || {},
-    items = state.products
-      .map((p) => {
-        const q = Number(f.get(p.id) || 0);
-        return q
-          ? {
-              productId: p.id,
-              productName: p.name,
-              quantity: q,
-              price: p.price,
-              total: p.price * q,
-            }
-          : null;
-      })
-      .filter(Boolean);
+    c = state.customers.find((x) => x.id === f.get("customerId"));
+  if (!c) return alert("Харилцагч сонгоно уу");
+  const emp = orderActor();
+  if (!emp?.id) return alert("Худалдааны төлөөлөгч сонгоно уу");
+  const items = state.products
+    .map((p) => {
+      const q = Math.floor(Number(f.get(p.id) || 0));
+      if (!Number.isFinite(q) || q < 1) return null;
+      return {
+        productId: p.id,
+        productName: p.name,
+        quantity: q,
+        price: p.price,
+        total: p.price * q,
+      };
+    })
+    .filter(Boolean);
   if (!items.length) return alert("Бараа сонгоно уу");
+  if (alertOrderStockIssues(orderStockIssues(items))) return;
+  orderSubmitLock = true;
   state.orders.push(
     buildNewOrder({
       customerId: c.id,
-      customerName: c.companyName,
+      customerName: c.name,
       items,
       total: items.reduce((s, i) => s + i.total, 0),
       status: "pending",
-      employeeId: emp.id || "",
-      employeeName: emp.name || "",
+      employeeId: emp.id,
+      employeeName: emp.name,
       employeePhone: emp.phone || "",
       ...orderEmailFields(emp),
       paymentTerm: "credit",
@@ -13931,13 +13962,27 @@ function saveOrder(e) {
       ...deliveryFieldsForNewOrder(),
     }),
   );
-  items.forEach((i) => stock(i.productId, i.quantity, "out"));
+  applyOrderStock(items);
   persistOrderSnapshot();
   closeModal();
   render();
-  flushBackendSave().catch((error) =>
-    console.warn("Order backend save failed", error),
-  );
+  orderSubmitLock = false;
+  flushBackendSave()
+    .then((ok) => {
+      if (!ok) {
+        showAppToast(
+          "Захиалга хадгалагдлаа, серверт илгээхэд алдаа гарлаа",
+          "error",
+        );
+      }
+    })
+    .catch((error) => {
+      console.warn("Order backend save failed", error);
+      showAppToast(
+        "Захиалга хадгалагдлаа, серверт илгээхэд алдаа гарлаа",
+        "error",
+      );
+    });
 }
 function clearReceiptEdit() {
   state.receiptEditOrderId = "";
@@ -14143,7 +14188,7 @@ async function downloadOrderReceiptExcelNow(id) {
     !hadChanges && state.receiptEditOrderId === id && state.receiptEditItems
       ? receiptEditDraftOrder()
       : o;
-  await exportOrderReceiptsExcel([exportOrder || o]);
+  await exportOrderReceiptsExcel([orderReceiptSnapshot(exportOrder || o)]);
   showInstallToast("Excel файл татагдлаа");
 }
 function downloadOrderReceiptExcel(id, ev) {
@@ -14246,6 +14291,43 @@ function stock(id, qty, type) {
   const current = Number(p.stock) || 0;
   const q = Number(qty) || 0;
   p.stock = type === "in" ? current + q : Math.max(0, current - q);
+}
+function orderStockIssues(items) {
+  const need = {};
+  (items || []).forEach((item) => {
+    const id = String(item.productId || "");
+    if (!id) return;
+    need[id] = (need[id] || 0) + (Number(item.quantity) || 0);
+  });
+  const issues = [];
+  Object.entries(need).forEach(([id, qty]) => {
+    const p = state.products.find((x) => x.id === id);
+    const have = Number(p?.stock) || 0;
+    if (!p || qty > have) {
+      issues.push({
+        id,
+        name: p?.name || itemNameFromOrderItems(items, id) || "Бараа",
+        need: qty,
+        have,
+      });
+    }
+  });
+  return issues;
+}
+function itemNameFromOrderItems(items, productId) {
+  const line = (items || []).find((i) => String(i.productId) === String(productId));
+  return line?.productName || "";
+}
+function alertOrderStockIssues(issues) {
+  if (!issues.length) return false;
+  const detail = issues
+    .map((i) => `${i.name}: ${i.have} үлдсэн, ${i.need} ш хэрэгтэй`)
+    .join("\n");
+  alert(`Үлдэгдэл хүрэлцэхгүй байна.\n${detail}`);
+  return true;
+}
+function applyOrderStock(items) {
+  (items || []).forEach((i) => stock(i.productId, i.quantity, "out"));
 }
 function applyStock(id, type, qty, costPrice) {
   const p = state.products.find((x) => x.id === id);
@@ -14368,21 +14450,21 @@ function applyPickerBarcode(value, scanned = false) {
   const code = String(value || "").trim();
   if (!code) return;
   state.filters.workerCategory = "";
-  const product =
-    state.products.find((p) => String(p.barcode) === code) ||
-    state.products.find((p) => String(p.barcode).includes(code));
+  const product = state.products.find(
+    (p) => String(p.barcode || "").trim() === code,
+  );
   if (product) {
-    const current = state.workerQty[product.id] || 0;
-    if (current < product.stock) {
-      state.workerQty[product.id] = current + 1;
+    const current = getWorkerQty(product.id);
+    if (current < (Number(product.stock) || 0)) {
+      setWorkerQty(product.id, current + 1);
       state.pickerActiveId = product.id;
+      return;
     }
+    showStockLimitToast();
+  } else if (scanned) {
+    showAppToast("Баркод олдсонгүй", "error");
   }
   if (scanned) stopBarcodeScan();
-  scheduleBackendSave();
-  if (pickerOpen() && refreshPickerList()) return;
-  render();
-  if (pickerOpen()) pickerModal();
 }
 function clearPickerFilter() {
   state.searches.workerProduct = "";
@@ -14701,10 +14783,13 @@ function employeeExcel() {
   return exportWarehousePrepareExcel(orders, workerIds);
 }
 async function saveWorker() {
+  if (orderSubmitLock) return;
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
-  const c = state.customers.find((x) => x.id === state.workerCustomer),
-    e = orderActor(),
-    cart = workerCartSummary();
+  const c = state.customers.find((x) => x.id === state.workerCustomer);
+  if (!c) return alert("Харилцагч сонгоно уу");
+  const e = orderActor();
+  if (!e?.id) return alert("Худалдааны төлөөлөгч сонгоно уу");
+  const cart = workerCartSummary();
   if (!cart.paid.length) return alert("Бараа сонгоно уу");
   if (state.applyPercentDiscount && !workerPercentDiscountActive())
     state.applyPercentDiscount = false;
@@ -14715,61 +14800,79 @@ async function saveWorker() {
     : "";
   if (state.settlementAgreed && !settlementText)
     return alert("Тайлбар оруулна уу");
-  const order = buildNewOrder({
-    customerId: c.id,
-    customerName: c.name,
-    items,
-    grossTotal: cart.gross,
-    applyPercentDiscount: workerPercentDiscountActive(),
-    percentDiscount,
-    discountAmount: cart.discount,
-    total: cart.total,
-    settlementAgreed: !!settlementText,
-    settlementText,
-    settlementMonth: "",
-    settlementDay: "",
-    status: "pending",
-    employeeId: e.id,
-    employeeName: e.name,
-    employeePhone: e.phone || "",
-    ...orderEmailFields(e),
-    isPaid: paidFromPaymentTerm(state.paymentTerm),
-    paymentTerm: state.paymentTerm,
-    deliveryDate: todayIso(),
-    ...deliveryFieldsForNewOrder(),
-  });
-  state.orders.push(order);
-  items.forEach((i) => stock(i.productId, i.quantity, "out"));
-  resetWorkerCart();
-  state.workerStoreReady = false;
-  state.workerCustomer = "";
-  state.deliveryDate = "";
-  state.settlementAgreed = false;
-  state.settlementText = "";
-  state.settlementMonth = "";
-  state.settlementDay = "";
-  state.applyPercentDiscount = false;
-  state.filters.worker = "orders";
-  state.workerOrdersArrived = true;
-  state.workerHighlightOrderId = order.id;
-  persistOrderSnapshot();
+  const stockIssues = orderStockIssues(items);
+  if (alertOrderStockIssues(stockIssues)) return;
+  orderSubmitLock = true;
   render();
-  flushBackendSave().catch((error) =>
-    console.warn("Order backend save failed", error),
-  );
-  pushAppHistory();
-  requestAnimationFrame(() => {
-    document
-      .querySelector(`[data-order-id="${order.id}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  });
-  setTimeout(() => {
-    if (!state.workerOrdersArrived) return;
-    state.workerOrdersArrived = false;
-    if (state.currentView === "worker" && state.filters.worker === "orders") {
-      render();
+  try {
+    const order = buildNewOrder({
+      customerId: c.id,
+      customerName: c.name,
+      items,
+      grossTotal: cart.gross,
+      applyPercentDiscount: workerPercentDiscountActive(),
+      percentDiscount,
+      discountAmount: cart.discount,
+      total: cart.total,
+      settlementAgreed: !!settlementText,
+      settlementText,
+      settlementMonth: "",
+      settlementDay: "",
+      status: "pending",
+      employeeId: e.id,
+      employeeName: e.name,
+      employeePhone: e.phone || "",
+      ...orderEmailFields(e),
+      isPaid: paidFromPaymentTerm(state.paymentTerm),
+      paymentTerm: state.paymentTerm,
+      deliveryDate: todayIso(),
+      ...deliveryFieldsForNewOrder(),
+    });
+    state.orders.push(order);
+    applyOrderStock(items);
+    resetWorkerCart();
+    state.workerStoreReady = false;
+    state.workerCustomer = "";
+    state.deliveryDate = "";
+    state.settlementAgreed = false;
+    state.settlementText = "";
+    state.settlementMonth = "";
+    state.settlementDay = "";
+    state.applyPercentDiscount = false;
+    state.filters.worker = "orders";
+    state.workerOrdersArrived = true;
+    state.workerHighlightOrderId = order.id;
+    persistOrderSnapshot();
+    render();
+    pushAppHistory();
+    const saved = await flushBackendSave();
+    if (saved) {
+      showAppToast("Захиалга хадгалагдлаа", "success");
+    } else {
+      showAppToast(
+        "Захиалга хадгалагдлаа, серверт илгээхэд алдаа гарлаа",
+        "error",
+      );
     }
-  }, 1300);
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-order-id="${order.id}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    setTimeout(() => {
+      if (!state.workerOrdersArrived) return;
+      state.workerOrdersArrived = false;
+      if (state.currentView === "worker" && state.filters.worker === "orders") {
+        render();
+      }
+    }, 1300);
+  } catch (error) {
+    console.warn("Order save failed", error);
+    alert("Захиалга хадгалахад алдаа гарлаа");
+  } finally {
+    orderSubmitLock = false;
+    render();
+  }
 }
 function login(e) {
   e.preventDefault();

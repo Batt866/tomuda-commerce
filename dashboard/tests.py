@@ -481,3 +481,165 @@ class CustomerExcelImportTests(TestCase):
         self.assertEqual(payload["report"]["success"], 1)
         self.assertEqual(len(payload["customers"]), 1)
         self.assertEqual(payload["customers"][0]["name"], "GPS ХХК")
+
+
+class StockInPermissionTests(TestCase):
+    def test_warehouse_role_can_save_stock_in_without_products_edit(self):
+        from dashboard.permissions import validate_state_mutation
+
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "prod-1",
+                "barcode": "111",
+                "name": "Test",
+                "category": "Бусад",
+                "unit": "ширхэг",
+                "price": 1000,
+                "costPrice": 0,
+                "stock": 10,
+                "minStock": 0,
+                "country": "Монгол",
+                "boxQuantity": 1,
+                "image": "",
+            }
+        ]
+        state["employees"] = [
+            {
+                "id": "wh-1",
+                "email": "wh@test.mn",
+                "name": "Warehouse",
+                "role": "warehouse",
+                "password": "x",
+            }
+        ]
+        state["stockInReceipts"] = []
+        state["inventoryLogs"] = []
+
+        next_state = json.loads(json.dumps(state))
+        next_state["stockInReceipts"] = [
+            {
+                "id": "sir-1",
+                "receiptNumber": "OR-202607-001",
+                "receiptSeq": 1,
+                "monthKey": "202607",
+                "createdAt": "2026-07-09T00:00:00",
+                "employeeId": "wh-1",
+                "employeeName": "Warehouse",
+                "lines": [
+                    {
+                        "productId": "prod-1",
+                        "productName": "Test",
+                        "quantity": 5,
+                        "costPrice": 800,
+                        "packs": 0,
+                    }
+                ],
+                "totalAmount": 4000,
+            }
+        ]
+        next_state["products"][0]["stock"] = 15
+        next_state["products"][0]["costPrice"] = 800
+        next_state["inventoryLogs"] = [
+            {
+                "id": "log-1",
+                "productId": "prod-1",
+                "productName": "Test",
+                "type": "in",
+                "quantity": 5,
+                "costPrice": 800,
+                "packs": 0,
+                "date": "2026-07-09T00:00:00",
+                "employeeName": "Warehouse",
+                "receiptId": "sir-1",
+                "receiptNumber": "OR-202607-001",
+            }
+        ]
+
+        actor = {"id": "wh-1", "email": "wh@test.mn"}
+        ok, message = validate_state_mutation(state, next_state, actor)
+        self.assertTrue(ok, message)
+
+    def test_stock_in_api_persists_for_warehouse_role(self):
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "prod-1",
+                "barcode": "111",
+                "name": "Test",
+                "category": "Бусад",
+                "unit": "ширхэг",
+                "price": 1000,
+                "costPrice": 0,
+                "stock": 10,
+                "minStock": 0,
+                "country": "Монгол",
+                "boxQuantity": 1,
+                "image": "",
+            }
+        ]
+        state["employees"] = [
+            {
+                "id": "wh-1",
+                "email": "wh@test.mn",
+                "name": "Warehouse",
+                "role": "warehouse",
+                "password": "x",
+            }
+        ]
+        state["stockInReceipts"] = []
+        state["inventoryLogs"] = []
+        AppState.objects.update_or_create(key="main", defaults={"data": state})
+
+        next_state = json.loads(json.dumps(state))
+        next_state["stockInReceipts"] = [
+            {
+                "id": "sir-1",
+                "receiptNumber": "OR-202607-001",
+                "receiptSeq": 1,
+                "monthKey": "202607",
+                "createdAt": "2026-07-09T00:00:00",
+                "employeeId": "wh-1",
+                "employeeName": "Warehouse",
+                "lines": [
+                    {
+                        "productId": "prod-1",
+                        "productName": "Test",
+                        "quantity": 5,
+                        "costPrice": 800,
+                        "packs": 0,
+                    }
+                ],
+                "totalAmount": 4000,
+            }
+        ]
+        next_state["products"][0]["stock"] = 15
+        next_state["products"][0]["costPrice"] = 800
+        next_state["inventoryLogs"] = [
+            {
+                "id": "log-1",
+                "productId": "prod-1",
+                "productName": "Test",
+                "type": "in",
+                "quantity": 5,
+                "costPrice": 800,
+                "packs": 0,
+                "date": "2026-07-09T00:00:00",
+                "employeeName": "Warehouse",
+                "receiptId": "sir-1",
+                "receiptNumber": "OR-202607-001",
+            }
+        ]
+
+        response = self.client.post(
+            "/api/state",
+            {
+                "state": next_state,
+                "actor": {"id": "wh-1", "email": "wh@test.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        saved = AppState.objects.get(key="main").data
+        self.assertEqual(saved["products"][0]["stock"], 15)
+        self.assertEqual(len(saved["stockInReceipts"]), 1)
