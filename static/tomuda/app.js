@@ -279,6 +279,7 @@ let userScrollActiveUntil = 0;
 let searchRenderTimer = null;
 let promotionSaveLock = false;
 let orderSubmitLock = false;
+let stockInSaveLock = false;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -2655,6 +2656,10 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
+    if (opts.entityKind === "products" && prev && !localStateDirty()) {
+      merged.stock = Number(prev.stock) || 0;
+      if (prev.costPrice != null) merged.costPrice = prev.costPrice;
+    }
     map.set(id, merged);
   });
   const tombstones = opts.deletionLog || [];
@@ -3073,11 +3078,14 @@ function mergedDeletionLog(remote = {}, local = {}) {
   ]);
 }
 function mergeArrayById(remote = [], local = [], opts = {}) {
+  const preferRemote = !!opts.preferRemote && !localStateDirty();
   const map = new Map();
-  (remote || []).forEach((item) => {
+  const first = preferRemote ? local : remote;
+  const second = preferRemote ? remote : local;
+  (first || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), item);
   });
-  (local || []).forEach((item) => {
+  (second || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), item);
   });
   const tombstones = opts.deletionLog || [];
@@ -3216,6 +3224,8 @@ function mergePersistentStates(remote = {}, local = {}) {
       deletionType: DELETION_GUARDED_KEYS.includes(key)
         ? deletionKeyForCollection(key)
         : "",
+      entityKind: key,
+      preferRemote: true,
     });
     if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
@@ -3258,6 +3268,7 @@ function mergePersistentStates(remote = {}, local = {}) {
       merged.inventoryLogs = mergeArrayById(
         remote.inventoryLogs,
         local.inventoryLogs,
+        { preferRemote: true },
       );
       continue;
     }
@@ -3265,6 +3276,7 @@ function mergePersistentStates(remote = {}, local = {}) {
       merged.stockInReceipts = mergeArrayById(
         remote.stockInReceipts,
         local.stockInReceipts,
+        { preferRemote: true },
       );
       continue;
     }
@@ -3411,6 +3423,8 @@ function shouldDeferBackendSync() {
   ) {
     return true;
   }
+  if (stockInSaveLock) return true;
+  if (stockInSessionActive() && stockInHasEntries()) return true;
   return false;
 }
 function isUserScrolling() {
@@ -3761,7 +3775,13 @@ async function fetchBackendPayload() {
   return res.json();
 }
 async function pollBackendState() {
-  if (!backendReady || backendSaving || backendSaveTimer || importLoading)
+  if (
+    !backendReady ||
+    backendSaving ||
+    backendSaveTimer ||
+    importLoading ||
+    stockInSaveLock
+  )
     return;
   if (shouldDeferBackendSync()) return;
   try {
@@ -4903,7 +4923,8 @@ async function revertBackendStateFromServer() {
     const latest = await fetchBackendPayload();
     if (!latest?.state) return false;
     const session = captureSessionSnapshot();
-    applyPersistentState(latest.state);
+    const merged = mergePersistentStates(latest.state, persistentState());
+    applyPersistentState(merged);
     restoreSessionSnapshot(session);
     syncBackendSaveMarker();
     if (latest.updatedAt) serverUpdatedAt = latest.updatedAt;
@@ -5038,7 +5059,7 @@ async function saveBackendState(retry = 0) {
         restoreSessionSnapshot(session);
         appliedServerState = backendStateSnapshot() !== beforeSnapshot;
       }
-      syncBackendSaveMarker(payload?.state || null);
+      syncBackendSaveMarker();
       clearOrderPersistenceCache();
       clearBackendSaveFailed();
       if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
@@ -7714,21 +7735,26 @@ function confirmFinishStockIn() {
   });
 }
 async function finishStockInReceipt(receipt, { downloadExcel = false } = {}) {
-  if (!receipt?.lines?.length) return;
-  const saved = applyStockInReceipt(receipt);
-  startStockInSession();
-  render();
-  const ok = await criticalBackendSave();
-  if (!ok) {
-    const msg =
-      backendSaveFailedMessage ||
-      "Орлого түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
-    showAppToast(msg, "error");
-    alertModal("Хадгалах амжилтгүй", esc(msg));
-    return;
+  if (!receipt?.lines?.length || stockInSaveLock) return;
+  stockInSaveLock = true;
+  try {
+    const saved = applyStockInReceipt(receipt);
+    startStockInSession();
+    render();
+    const ok = await criticalBackendSave();
+    if (!ok) {
+      const msg =
+        backendSaveFailedMessage ||
+        "Орлого түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
+      showAppToast(msg, "error");
+      alertModal("Хадгалах амжилтгүй", esc(msg));
+      return;
+    }
+    showAppToast("Орлого хадгалагдлаа", "success");
+    if (downloadExcel) exportStockInExcel(saved);
+  } finally {
+    stockInSaveLock = false;
   }
-  showAppToast("Орлого хадгалагдлаа", "success");
-  if (downloadExcel) exportStockInExcel(saved);
 }
 function confirmNewStockIn() {
   const hasData = stockInHasEntries();
