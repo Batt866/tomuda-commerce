@@ -321,7 +321,7 @@ def validate_state_mutation(
         return False, "Тохиргоо өөрчлөх эрхгүй"
 
     if _promotion_rules_changed(old_state, new_state) and "settings.view" not in perms:
-        return False, "Урамшуулалын тохиргоо өөрчлөх эрхгүй"
+        return False, "Урамшууллын тохиргоо өөрчлөх эрхгүй"
 
     entity_rules = {
         "employees": (

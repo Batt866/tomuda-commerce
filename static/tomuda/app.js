@@ -77,6 +77,7 @@ const state = {
   stockInSessionStartedAt: null,
   stockInReceipts: [],
   stockInHighlightId: "",
+  customerHighlightId: "",
   stockOutEmployeeId: "",
   settings: {
     stockAlertEnabled: true,
@@ -280,6 +281,7 @@ let searchRenderTimer = null;
 let promotionSaveLock = false;
 let orderSubmitLock = false;
 let stockInSaveLock = false;
+let customerSaveLock = false;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -6807,7 +6809,25 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(c.name)}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(c.name)}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+}
+function focusSavedCustomer(customerId, customerName) {
+  if (!customerId) return;
+  state.currentView = "customers";
+  state.searches.customers = "";
+  state.customerHighlightId = customerId;
+  render();
+  showAppToast(`${customerName} хадгалагдлаа`, "success");
+  requestAnimationFrame(() => {
+    document
+      .querySelector(`[data-customer-id="${customerId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  setTimeout(() => {
+    if (state.customerHighlightId !== customerId) return;
+    state.customerHighlightId = "";
+    if (state.currentView === "customers") render();
+  }, 2200);
 }
 function customersView() {
   const q = state.searches.customers || "",
@@ -7356,6 +7376,7 @@ function customerRow(c) {
   return customerListRow(
     c,
     `${viewIconButton({ className: "customer-card__icon-btn", attrs: `onclick="customerDetail('${id}')"`, label: "Харах" })}${editIconButton({ className: "customer-card__icon-btn", attrs: `onclick="confirmEditCustomer('${id}')"`, label: "Харилцагч засах" })}${deleteBtn}`,
+    state.customerHighlightId === c.id,
   );
 }
 function workerPickCard(c) {
@@ -10216,7 +10237,7 @@ function confirmSetPaid(id) {
     onConfirm: () => setPaid(id, true),
   });
 }
-const PROMO_PRODUCT_LABEL = "Урамшуулалын бараа";
+const PROMO_PRODUCT_LABEL = "Урамшууллын бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
 const PROMO_PAYMENT_LABEL = "Шууд төлбөрийн урамшуулал";
 function promoProductQtyLabel(qty) {
@@ -10237,7 +10258,7 @@ function promotionMenuHtml() {
     ["quantity", "Багцын хөнгөлөлт"],
     ["payment", PROMO_PAYMENT_LABEL],
   ];
-  return `<nav class="admin-menu promo-type-menu" aria-label="Урамшуулалын төрөл">${items
+  return `<nav class="admin-menu promo-type-menu" aria-label="Урамшууллын төрөл">${items
     .map(([id, label]) => {
       const count = (state.promotionRules[id] || []).length;
       const badge = count
@@ -10730,7 +10751,7 @@ function promotionPaymentRuleText(r) {
   return `${term}${minText} · ${freeNames || "-"} ${promoProductQtyLabel(r.freeQty)}`;
 }
 function promotionPaymentPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн нөхцлөөс хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Шууд төлбөрийн урамшуулалын дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн нөхцлөөс хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Шууд төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionPaymentRuleCard(r, i) {
   return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('payment',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
@@ -13348,12 +13369,30 @@ async function applyCustomerSave(data, id) {
   if (customer) {
     await persistProfileImageToMedia(customer, "customer");
   }
+  const customerId = customer?.id || "";
+  const customerName =
+    customer?.name || customer?.companyName || "Харилцагч";
   closeModal();
-  render();
-  await criticalBackendSave();
+  focusSavedCustomer(customerId, customerName);
+  const saved = await criticalBackendSave();
+  if (!saved) {
+    showAppToast(
+      `${customerName} хадгалагдлаа, серверт илгээхэд алдаа гарлаа`,
+      "error",
+    );
+  }
 }
 async function saveCustomer(e, id) {
   e.preventDefault();
+  if (customerSaveLock) return;
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const setSaving = (on) => {
+    customerSaveLock = on;
+    if (!submitBtn) return;
+    submitBtn.disabled = on;
+    submitBtn.textContent = on ? "Хадгалагдаж байна..." : "Хадгалах";
+  };
   if (customerImageCompressTask) {
     try {
       await customerImageCompressTask;
@@ -13389,12 +13428,24 @@ async function saveCustomer(e, id) {
         confirmLabel: "Хадгалах",
         cancelLabel: "Үгүй",
         closable: true,
-        onConfirm: () => applyCustomerSave(data, id),
+        onConfirm: async () => {
+          setSaving(true);
+          try {
+            await applyCustomerSave(data, id);
+          } finally {
+            setSaving(false);
+          }
+        },
       },
     );
     return;
   }
-  await applyCustomerSave(data, id);
+  setSaving(true);
+  try {
+    await applyCustomerSave(data, id);
+  } finally {
+    setSaving(false);
+  }
 }
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
