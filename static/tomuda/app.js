@@ -842,7 +842,8 @@ function orderInWarehouseLiveSession(o) {
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
   if (!day) return orderInWarehouseLiveSession(o);
-  return orderCreatedDay(o) === day;
+  // Warehouse/receipt date filters should follow delivery day shown on receipts.
+  return orderDay(o) === day;
 }
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
