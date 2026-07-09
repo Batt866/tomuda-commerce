@@ -5614,7 +5614,7 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__promo-title { border-left: none !important; font-weight: 700; text-align: center; vertical-align: middle; }
 .receipt-grid__promo-settle { text-align: center; font-size: 9pt; white-space: normal; line-height: 1.25; background: #fff2cc; font-weight: 700; }
 .receipt-grid__logo-cell { vertical-align: top; padding: 0; }
-.receipt-logo { width: 48px; height: 48px; object-fit: contain; display: block; }
+.receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
 .receipt-grid__address { font-size: 8pt; line-height: 1.25; vertical-align: top; white-space: normal; }
 .receipt-grid__date-label, .receipt-grid__date { font-size: 9pt; text-align: center; white-space: nowrap; vertical-align: middle; }
@@ -5747,7 +5747,9 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="tomuda-logo.png"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  const logoEmu = Math.round((18 / 25.4) * 914400);
+  const pad = 28575;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="receipt-logo.png"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -5815,19 +5817,19 @@ function buildReceiptSheetXml(
       ? `Өдөртөө тооцоог хийгээгүй тохиолдолд (${percentDiscountRate()}%) -н хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
   pushRow(20.25, [
-    xlsxCellXml("C1", 13, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml("C1", 14, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml("K1", 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(1, "A", "B"),
     ...emptyCells(1, "D", "J"),
   ]);
   pushRow(27, [
     xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
-    xlsxCellXml("K2", 18, excelSerialFromDate(o.createdAt), "n"),
+    xlsxCellXml("K2", 6, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(2, "A", "B"),
     ...emptyCells(2, "L", RECEIPT_XLSX_LAST_COL),
   ]);
   pushRow(31.5, [
-    xlsxCellXml("C3", 13, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    xlsxCellXml("C3", 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
     ...emptyCells(3, "A", "B"),
     ...emptyCells(3, "K", RECEIPT_XLSX_LAST_COL, 13),
   ]);
@@ -6150,12 +6152,39 @@ function buildReceiptWorkbookXml(orders, opts = {}) {
     workbookXml,
   };
 }
+async function loadReceiptExcelLogoBuffer() {
+  try {
+    const res = await fetch(staticAssetUrl(BRAND.receiptLogo));
+    if (!res.ok) return null;
+    return await res.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
+  const drawingPath = `xl/drawings/drawing${sheetId}.xml`;
+  const drawingRelsPath = `xl/drawings/_rels/drawing${sheetId}.xml.rels`;
+  const sheetRelsPath = `xl/worksheets/_rels/sheet${sheetId}.xml.rels`;
+  if (!hasLogo || !logoBuffer) {
+    zip.remove(drawingPath);
+    zip.remove(drawingRelsPath);
+    zip.remove(sheetRelsPath);
+    if (sheetId === 1) zip.remove("xl/media/receipt-logo.png");
+    return;
+  }
+  zip.file(drawingPath, receiptDrawingXml());
+  zip.file(drawingRelsPath, receiptDrawingRelsXml());
+  zip.file(sheetRelsPath, receiptSheetRelsXml(sheetId));
+  zip.file("xl/media/receipt-logo.png", logoBuffer);
+}
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const filename = receiptExcelFileName(orders);
+  const logoBuffer = await loadReceiptExcelLogoBuffer();
+  const hasLogo = !!logoBuffer;
   if (orders.length === 1) {
     const ctx = createReceiptStringContext();
-    const built = buildReceiptSheetXml(orders[0], ctx, { hasLogo: false });
+    const built = buildReceiptSheetXml(orders[0], ctx, { hasLogo });
     const tpl = await fetch(staticAssetUrl(RECEIPT_XLSX_TEMPLATE)).then((r) => {
       if (!r.ok) throw new Error("template missing");
       return r.arrayBuffer();
@@ -6164,18 +6193,14 @@ async function exportOrderReceiptsExcelXlsx(orders) {
     zip.file("xl/sharedStrings.xml", built.sharedStringsXml);
     zip.file("xl/worksheets/sheet1.xml", built.sheetXml);
     zip.file("xl/styles.xml", receiptXlsxStylesXml());
-    zip.remove("xl/drawings/drawing1.xml");
-    zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
     zip.remove("xl/printerSettings/printerSettings1.bin");
+    applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId: 1 });
     const blob = await zip.generateAsync({ type: "blob", mimeType: XLSX_MIME });
     await downloadBlobFile(blob, filename, { skipShare: true });
     return;
   }
-  const built = buildReceiptWorkbookXml(orders, { hasLogo: false });
-  const blob = await assembleStyledXlsxZip(built, {
-    hasLogo: false,
-    logoBuffer: null,
-  });
+  const built = buildReceiptWorkbookXml(orders, { hasLogo });
+  const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
   await downloadBlobFile(blob, filename, { skipShare: true });
 }
 async function exportOrderReceiptsExcel(orders) {
@@ -14288,7 +14313,7 @@ function printOrderReceiptsNow(ids) {
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   .receipt-page { width: 100%; max-width: none; padding: 0; font-size: 9pt; }
-  .receipt-logo { width: 12mm; height: 12mm; }
+  .receipt-logo { width: 18mm; height: 18mm; }
   .receipt-grid__brand { font-size: 11pt; }
   .receipt-title { font-size: 14pt; }
 }
