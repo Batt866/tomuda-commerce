@@ -5798,9 +5798,10 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
+  const logoEmu = Math.round((18 / 25.4) * 914400);
   const padX = 91440;
   const padY = 45720;
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${padX}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>${padY}</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="receipt-logo.png"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${padX}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>${padY}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="receipt-logo.png"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -5881,13 +5882,13 @@ function buildReceiptSheetXml(
     !orderInWarehouseLiveSession(o)
       ? `Өдөртөө тооцоог хийгээгүй тохиолдолд (${percentDiscountRate()}%) -н хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
-  pushRow(24, [
+  pushRow(28, [
     xlsxCellXml("C1", 1, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml("K1", 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(1, "A", "B"),
     ...emptyCells(1, "G", "J"),
   ]);
-  pushRow(30, [
+  pushRow(32, [
     xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
     xlsxCellXml("K2", 6, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(2, "A", "B"),
