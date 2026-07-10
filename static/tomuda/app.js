@@ -5944,6 +5944,51 @@ function receiptDrawingRelsXml() {
 function receiptSheetRelsXml(sheetId) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${sheetId}.xml"/></Relationships>`;
 }
+function xlsxParseCellRef(ref) {
+  const m = String(ref || "").match(/^([A-Z]+)(\d+)$/i);
+  if (!m) return null;
+  const colLetters = m[1].toUpperCase();
+  let col = 0;
+  for (const ch of colLetters) col = col * 26 + (ch.charCodeAt(0) - 64);
+  return { col, row: Number(m[2]), ref: `${colLetters}${m[2]}` };
+}
+function xlsxMergeNonAnchorCells(mergeRefs) {
+  const covered = new Set();
+  for (const mergeRef of mergeRefs || []) {
+    const [startRef, endRef] = String(mergeRef).split(":");
+    if (!endRef) continue;
+    const start = xlsxParseCellRef(startRef);
+    const end = xlsxParseCellRef(endRef);
+    if (!start || !end) continue;
+    for (let row = start.row; row <= end.row; row += 1) {
+      for (let col = start.col; col <= end.col; col += 1) {
+        const cell = `${xlsxColName(col)}${row}`;
+        if (cell !== start.ref) covered.add(cell);
+      }
+    }
+  }
+  return covered;
+}
+function xlsxSafeSheetName(name, fallback = "Sheet1") {
+  const cleaned = String(name || fallback)
+    .replace(/[\\/*?:\[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 31);
+  return cleaned || fallback;
+}
+function filterXlsxCellsOutsideMerges(cells, mergeRefs) {
+  const covered = xlsxMergeNonAnchorCells(mergeRefs);
+  const seen = new Set();
+  const out = [];
+  for (const cell of cells || []) {
+    const ref = String(cell).match(/\br="([A-Z]+\d+)"/i)?.[1]?.toUpperCase();
+    if (!ref || covered.has(ref) || seen.has(ref)) continue;
+    seen.add(ref);
+    out.push(cell);
+  }
+  return out;
+}
 function buildReceiptSheetXml(
   o,
   ctx = createReceiptStringContext(),
@@ -5954,7 +5999,8 @@ function buildReceiptSheetXml(
   const rows = [];
   let rowNum = 1;
   const pushRow = (height, cells) => {
-    rows.push(xlsxRowXml(rowNum, height, cells, RECEIPT_XLSX_LAST_COL));
+    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
+    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
     rowNum += 1;
   };
   const emptyCells = (
@@ -6322,25 +6368,38 @@ function buildReceiptSheetXml(
   pushRow(14.25, emptyCells(rowNum));
   pushRow(14.25, emptyCells(rowNum));
   const lastRow = rowNum - 1;
-  const mergeXml = [...new Set(merges)]
+  const uniqueMerges = [...new Set(merges)];
+  const mergeXml = uniqueMerges
     .map((ref) => `<mergeCell ref="${ref}"/>`)
     .join("");
+  const mergeCellsXml = uniqueMerges.length
+    ? `<mergeCells count="${uniqueMerges.length}">${mergeXml}</mergeCells>`
+    : "";
   const drawingXml = opts.hasLogo ? `<drawing r:id="rId1"/>` : "";
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${new Set(merges).size}">${mergeXml}</mergeCells>${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return {
     sharedStringsXml: xlsxSharedStringsXml(strings),
     sheetXml,
-    sheetName: opts.sheetName || `Баримт ${receiptNo}`.slice(0, 31),
+    sheetName: xlsxSafeSheetName(
+      opts.sheetName || `Баримт ${receiptNo}`,
+      "Баримт",
+    ),
   };
 }
 function buildReceiptWorkbookXml(orders, opts = {}) {
   const ctx = createReceiptStringContext();
+  const usedNames = new Set();
   const sheets = orders.map((order, index) => {
     const built = buildReceiptSheetXml(order, ctx, {
       sheetName: `Баримт ${index + 1}`,
       hasLogo: opts.hasLogo,
     });
-    return { id: index + 1, name: built.sheetName, sheetXml: built.sheetXml };
+    let name = xlsxSafeSheetName(built.sheetName, `Sheet${index + 1}`);
+    if (usedNames.has(name)) {
+      name = xlsxSafeSheetName(`${name} ${index + 1}`, `Sheet${index + 1}`);
+    }
+    usedNames.add(name);
+    return { id: index + 1, name, sheetXml: built.sheetXml };
   });
   const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s) => `<sheet name="${xlsxXmlEsc(s.name)}" sheetId="${s.id}" r:id="rId${s.id}"/>`).join("")}</sheets></workbook>`;
   return {
@@ -6379,22 +6438,8 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   const filename = receiptExcelFileName(orders);
   const logoBuffer = await loadReceiptExcelLogoBuffer();
   const hasLogo = !!logoBuffer;
-  if (orders.length === 1) {
-    const ctx = createReceiptStringContext();
-    const built = buildReceiptSheetXml(orders[0], ctx, { hasLogo });
-    const tpl = await fetch(staticAssetUrl(RECEIPT_XLSX_TEMPLATE)).then((r) => {
-      if (!r.ok) throw new Error("template missing");
-      return r.arrayBuffer();
-    });
-    const zip = await JSZip.loadAsync(tpl);
-    zip.file("xl/sharedStrings.xml", built.sharedStringsXml);
-    zip.file("xl/worksheets/sheet1.xml", built.sheetXml);
-    zip.file("xl/styles.xml", receiptXlsxStylesXml());
-    zip.remove("xl/printerSettings/printerSettings1.bin");
-    applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId: 1 });
-    const blob = await zip.generateAsync({ type: "blob", mimeType: XLSX_MIME });
-    return downloadBlobFile(blob, filename, { skipShare: true });
-  }
+  // Always build a complete package. Patching the old template left broken
+  // Content_Types / drawing relationships that Excel Mobile refuses to open.
   const built = buildReceiptWorkbookXml(orders, { hasLogo });
   const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
   return downloadBlobFile(blob, filename, { skipShare: true });
@@ -9148,7 +9193,12 @@ async function assembleStyledXlsxZip(built, { hasLogo = false, logoBuffer = null
   if (hasLogo && logoBuffer) {
     zip.file("xl/media/receipt-logo.png", logoBuffer);
   }
-  return zip.generateAsync({ type: "blob", mimeType: XLSX_MIME });
+  return zip.generateAsync({
+    type: "blob",
+    mimeType: XLSX_MIME,
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
 }
 function xlsxColName(n) {
   let s = "";
