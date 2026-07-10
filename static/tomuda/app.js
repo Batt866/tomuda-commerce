@@ -7355,14 +7355,14 @@ function customerExcel() {
       "Дүүрэг/Сум",
       "Хороо",
       "Дэлгэрэнгүй хаяг",
-      "Бүрэн хаяг",
+      "Уртраг",
+      "Өргөрөг",
     ],
     ...[...state.customers]
       .sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""), "mn"),
       )
       .map((c, i) => {
-        const fullAddr = customerAddress(c);
         return [
           i + 1,
           c.name || "",
@@ -7374,7 +7374,8 @@ function customerExcel() {
           c.district || "",
           c.khoroo || "",
           c.address || "",
-          fullAddr === "-" ? "" : fullAddr,
+          c.latitude ?? "",
+          c.longitude ?? "",
         ];
       }),
   ];
