@@ -12,36 +12,67 @@ PERM_ACTIONS: list[dict[str, str]] = [
     {"id": "delete", "label": "Устгах"},
 ]
 
-PERM_MODULES: list[dict[str, Any]] = [
+CRUD: list[str] = ["view", "create", "edit", "delete"]
+
+PERM_GROUPS: list[dict[str, Any]] = [
+    {
+        "id": "general",
+        "label": "Ерөнхий эрх",
+        "modules": [
+            {"id": "customers", "label": "Харилцагч", "actions": CRUD},
+            {"id": "products", "label": "Бараа", "actions": CRUD},
+            {"id": "warehouse", "label": "Агуулах", "actions": CRUD},
+            {"id": "employees", "label": "Ажилтан", "actions": CRUD},
+        ],
+    },
+    {
+        "id": "internal",
+        "label": "Дотоод эрх",
+        "modules": [
+            {"id": "count", "label": "Тооллого", "actions": CRUD},
+            {"id": "customerAdd", "label": "Харилцагч нэмэх", "actions": CRUD},
+            {"id": "productAdd", "label": "Бараа нэмэх", "actions": CRUD},
+            {"id": "categoryAdd", "label": "Төрөл нэмэх", "actions": CRUD},
+            {"id": "employeeAdd", "label": "Ажилтан нэмэх", "actions": CRUD},
+            {"id": "stockIn", "label": "Орлого", "actions": CRUD},
+            {"id": "stockOut", "label": "Зарлага", "actions": CRUD},
+            {"id": "reports", "label": "Тайлан", "actions": CRUD},
+            {"id": "receipts", "label": "Баримтууд", "actions": CRUD},
+            {"id": "promotions", "label": "Урамшуулал", "actions": CRUD},
+            {"id": "stockAlert", "label": "Үлдэгдлийн мэдэгдэл", "actions": CRUD},
+            {"id": "permissions", "label": "Эрх үүсгэх", "actions": CRUD},
+            {
+                "id": "percentDiscount",
+                "label": "Шууд төлөлтийн хувь оруулах",
+                "actions": CRUD,
+            },
+            {
+                "id": "orderHistory",
+                "label": "Захиалгын түүх шалгах",
+                "actions": CRUD,
+            },
+        ],
+    },
+    {
+        "id": "system",
+        "label": "Системийн эрх",
+        "modules": [
+            {"id": "excelExport", "label": "Excel файл татах", "actions": CRUD},
+            {"id": "excelImport", "label": "Excel файл оруулах", "actions": CRUD},
+            {"id": "excelTemplate", "label": "Формат татах", "actions": CRUD},
+        ],
+    },
+]
+
+HIDDEN_MODULES: list[dict[str, Any]] = [
     {"id": "dashboard", "label": "Админ самбар", "actions": ["view"]},
-    {
-        "id": "products",
-        "label": "Бараа",
-        "actions": ["view", "create", "edit", "delete"],
-    },
-    {
-        "id": "customers",
-        "label": "Харилцагч",
-        "actions": ["view", "create", "edit", "delete"],
-    },
-    {"id": "warehouse", "label": "Агуулах", "actions": ["view", "edit"]},
-    {
-        "id": "orders",
-        "label": "Баримт",
-        "actions": ["view", "create", "edit", "delete"],
-    },
-    {"id": "reports", "label": "Тайлан", "actions": ["view"]},
-    {
-        "id": "employees",
-        "label": "Ажилтан",
-        "actions": ["view", "create", "edit", "delete"],
-    },
-    {
-        "id": "permissions",
-        "label": "Эрх",
-        "actions": ["view", "create", "edit", "delete"],
-    },
+    {"id": "orders", "label": "Захиалга", "actions": CRUD},
     {"id": "settings", "label": "Тохиргоо", "actions": ["view"]},
+]
+
+PERM_MODULES: list[dict[str, Any]] = [
+    *(mod for group in PERM_GROUPS for mod in group["modules"]),
+    *HIDDEN_MODULES,
 ]
 
 ACTION_LABELS: dict[str, str] = {
@@ -79,6 +110,117 @@ PERMISSION_CATALOG: list[dict[str, Any]] = [
 ALL_PERMISSION_KEYS: list[str] = [
     p["key"] for cat in PERMISSION_CATALOG for p in cat["permissions"]
 ]
+ALL_PERMISSION_KEY_SET: set[str] = set(ALL_PERMISSION_KEYS)
+
+PERMISSION_FALLBACKS: dict[str, list[str]] = {
+    "count.view": ["warehouse.edit"],
+    "count.create": ["warehouse.edit"],
+    "count.edit": ["warehouse.edit"],
+    "count.delete": ["warehouse.edit"],
+    "customerAdd.view": ["customers.create"],
+    "customerAdd.create": ["customers.create"],
+    "customerAdd.edit": ["customers.create", "customers.edit"],
+    "customerAdd.delete": ["customers.create"],
+    "productAdd.view": ["products.create"],
+    "productAdd.create": ["products.create"],
+    "productAdd.edit": ["products.create", "products.edit"],
+    "productAdd.delete": ["products.create"],
+    "categoryAdd.view": ["products.create", "products.edit"],
+    "categoryAdd.create": ["products.create", "products.edit"],
+    "categoryAdd.edit": ["products.edit"],
+    "categoryAdd.delete": ["products.edit", "products.delete"],
+    "employeeAdd.view": ["employees.create"],
+    "employeeAdd.create": ["employees.create"],
+    "employeeAdd.edit": ["employees.create", "employees.edit"],
+    "employeeAdd.delete": ["employees.create"],
+    "stockIn.view": ["warehouse.edit", "warehouse.view"],
+    "stockIn.create": ["warehouse.edit"],
+    "stockIn.edit": ["warehouse.edit"],
+    "stockIn.delete": ["warehouse.edit"],
+    "stockOut.view": ["warehouse.edit", "warehouse.view"],
+    "stockOut.create": ["warehouse.edit"],
+    "stockOut.edit": ["warehouse.edit"],
+    "stockOut.delete": ["warehouse.edit"],
+    "receipts.view": ["warehouse.view"],
+    "receipts.create": ["warehouse.view", "warehouse.edit"],
+    "receipts.edit": ["warehouse.edit"],
+    "receipts.delete": ["warehouse.edit"],
+    "promotions.view": ["settings.view"],
+    "promotions.create": ["settings.view"],
+    "promotions.edit": ["settings.view"],
+    "promotions.delete": ["settings.view"],
+    "stockAlert.view": ["settings.view"],
+    "stockAlert.create": ["settings.view"],
+    "stockAlert.edit": ["settings.view"],
+    "stockAlert.delete": ["settings.view"],
+    "percentDiscount.view": ["settings.view"],
+    "percentDiscount.create": ["settings.view"],
+    "percentDiscount.edit": ["settings.view"],
+    "percentDiscount.delete": ["settings.view"],
+    "orderHistory.view": ["settings.view"],
+    "orderHistory.create": ["settings.view"],
+    "orderHistory.edit": ["settings.view"],
+    "orderHistory.delete": ["settings.view"],
+    "excelExport.view": ["reports.view"],
+    "excelExport.create": ["reports.view"],
+    "excelExport.edit": ["reports.view"],
+    "excelExport.delete": ["reports.view"],
+    "excelImport.view": ["products.create", "customers.create"],
+    "excelImport.create": ["products.create", "customers.create"],
+    "excelImport.edit": ["products.create", "customers.create"],
+    "excelImport.delete": ["products.create", "customers.create"],
+    "excelTemplate.view": ["products.create", "customers.create"],
+    "excelTemplate.create": ["products.create", "customers.create"],
+    "excelTemplate.edit": ["products.create", "customers.create"],
+    "excelTemplate.delete": ["products.create", "customers.create"],
+    "customers.create": ["customerAdd.create", "customerAdd.view"],
+    "products.create": ["productAdd.create", "productAdd.view"],
+    "employees.create": ["employeeAdd.create", "employeeAdd.view"],
+    "dashboard.view": ["settings.view", "permissions.view"],
+}
+
+
+def _add_crud(target: set[str], module_id: str) -> None:
+    for action in CRUD:
+        key = permission_key(module_id, action)
+        if key in ALL_PERMISSION_KEY_SET:
+            target.add(key)
+
+
+def expand_legacy_permissions(raw: list[str]) -> list[str]:
+    keys = set(raw)
+    if "settings.view" in keys:
+        for module_id in (
+            "promotions",
+            "stockAlert",
+            "percentDiscount",
+            "orderHistory",
+            "dashboard",
+        ):
+            _add_crud(keys, module_id)
+        if "settings.view" in ALL_PERMISSION_KEY_SET:
+            keys.add("settings.view")
+    if "warehouse.edit" in keys:
+        for module_id in ("count", "stockIn", "stockOut"):
+            _add_crud(keys, module_id)
+    if "warehouse.view" in keys:
+        _add_crud(keys, "receipts")
+    if "customers.create" in keys:
+        _add_crud(keys, "customerAdd")
+    if "products.create" in keys:
+        _add_crud(keys, "productAdd")
+        _add_crud(keys, "categoryAdd")
+    if "products.edit" in keys:
+        _add_crud(keys, "categoryAdd")
+    if "employees.create" in keys:
+        _add_crud(keys, "employeeAdd")
+    if "reports.view" in keys:
+        _add_crud(keys, "excelExport")
+    if "products.create" in keys or "customers.create" in keys:
+        _add_crud(keys, "excelImport")
+        _add_crud(keys, "excelTemplate")
+    return [k for k in keys if k in ALL_PERMISSION_KEY_SET]
+
 
 ROLE_TEMPLATES: dict[str, list[str]] = {
     "admin": list(ALL_PERMISSION_KEYS),
@@ -90,10 +232,28 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "customers.view",
         "customers.create",
         "customers.edit",
+        "customerAdd.view",
+        "customerAdd.create",
         "products.view",
         "warehouse.view",
+        "excelExport.view",
+        "excelExport.create",
     ],
-    "warehouse": ["warehouse.view", "warehouse.edit", "products.view"],
+    "warehouse": [
+        "warehouse.view",
+        "warehouse.edit",
+        "products.view",
+        "stockIn.view",
+        "stockIn.create",
+        "stockIn.edit",
+        "stockOut.view",
+        "stockOut.create",
+        "stockOut.edit",
+        "count.view",
+        "count.create",
+        "count.edit",
+        "receipts.view",
+    ],
     "delivery": ["orders.view"],
 }
 
@@ -101,7 +261,7 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
 def normalize_permissions(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
-    return [k for k in raw if k in ALL_PERMISSION_KEYS]
+    return expand_legacy_permissions([k for k in raw if isinstance(k, str)])
 
 
 def resolve_permissions(employee: dict[str, Any] | None) -> set[str]:
@@ -115,7 +275,10 @@ def resolve_permissions(employee: dict[str, Any] | None) -> set[str]:
 
 
 def has_permission(employee: dict[str, Any] | None, key: str) -> bool:
-    return key in resolve_permissions(employee)
+    perms = resolve_permissions(employee)
+    if key in perms:
+        return True
+    return any(alt in perms for alt in PERMISSION_FALLBACKS.get(key, []))
 
 
 def find_employee(state: dict[str, Any], actor: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -289,7 +452,40 @@ def _is_stock_in_product_update(
 
 
 def _has_any_permission(perms: set[str], *keys: str) -> bool:
-    return any(k in perms for k in keys)
+    for key in keys:
+        if key in perms:
+            return True
+        if any(alt in perms for alt in PERMISSION_FALLBACKS.get(key, [])):
+            return True
+    return False
+
+
+def _can_manage_settings(perms: set[str]) -> bool:
+    return _has_any_permission(
+        perms,
+        "settings.view",
+        "promotions.edit",
+        "promotions.view",
+        "stockAlert.edit",
+        "stockAlert.view",
+        "percentDiscount.edit",
+        "percentDiscount.view",
+        "orderHistory.edit",
+        "orderHistory.view",
+    )
+
+
+def _can_edit_warehouse(perms: set[str]) -> bool:
+    return _has_any_permission(
+        perms,
+        "warehouse.edit",
+        "stockIn.create",
+        "stockIn.edit",
+        "stockOut.create",
+        "stockOut.edit",
+        "count.edit",
+        "count.create",
+    )
 
 
 def validate_state_mutation(
@@ -317,27 +513,29 @@ def validate_state_mutation(
     stock_in_usage = _stock_in_receipt_usage(old_state, new_state)
     has_new_stock_in_receipts = bool(stock_in_usage)
 
-    if _settings_changed(old_state, new_state) and "settings.view" not in perms:
+    if _settings_changed(old_state, new_state) and not _can_manage_settings(perms):
         return False, "Тохиргоо өөрчлөх эрхгүй"
 
-    if _promotion_rules_changed(old_state, new_state) and "settings.view" not in perms:
+    if _promotion_rules_changed(old_state, new_state) and not _has_any_permission(
+        perms, "promotions.edit", "promotions.view", "settings.view"
+    ):
         return False, "Урамшууллын тохиргоо өөрчлөх эрхгүй"
 
     entity_rules = {
         "employees": (
-            ("employees.create",),
-            ("employees.edit", "employees.delete"),
-            ("employees.delete", "employees.edit"),
+            ("employees.create", "employeeAdd.create", "employeeAdd.view"),
+            ("employees.edit", "employees.delete", "employeeAdd.edit"),
+            ("employees.delete", "employees.edit", "employeeAdd.delete"),
         ),
         "products": (
-            ("products.create",),
-            ("products.edit", "products.delete"),
-            ("products.delete", "products.edit"),
+            ("products.create", "productAdd.create", "productAdd.view"),
+            ("products.edit", "products.delete", "productAdd.edit", "categoryAdd.edit"),
+            ("products.delete", "products.edit", "productAdd.delete", "categoryAdd.delete"),
         ),
         "customers": (
-            ("customers.create",),
-            ("customers.edit", "customers.delete"),
-            ("customers.delete", "customers.edit", "customers.create"),
+            ("customers.create", "customerAdd.create", "customerAdd.view"),
+            ("customers.edit", "customers.delete", "customerAdd.edit"),
+            ("customers.delete", "customers.edit", "customers.create", "customerAdd.delete"),
         ),
     }
 
@@ -411,7 +609,9 @@ def validate_state_mutation(
         old_product = old_products.get(product_id)
         if not old_product:
             continue
-        if old_product.get("stock") != new_product.get("stock") and "warehouse.edit" not in perms:
+        if old_product.get("stock") != new_product.get("stock") and not _can_edit_warehouse(
+            perms
+        ):
             try:
                 old_stock = float(old_product.get("stock") or 0)
                 new_stock = float(new_product.get("stock") or 0)
@@ -432,7 +632,7 @@ def validate_state_mutation(
                     return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
         if (
             old_product.get("costPrice") != new_product.get("costPrice")
-            and "warehouse.edit" not in perms
+            and not _can_edit_warehouse(perms)
         ):
             if not (
                 has_new_stock_in_receipts
@@ -442,7 +642,7 @@ def validate_state_mutation(
 
     old_logs = old_state.get("inventoryLogs") or []
     new_logs = new_state.get("inventoryLogs") or []
-    if len(new_logs) > len(old_logs) and "warehouse.edit" not in perms:
+    if len(new_logs) > len(old_logs) and not _can_edit_warehouse(perms):
         if not (
             has_new_stock_in_receipts
             and all(str(log.get("type") or "") == "in" for log in new_logs[len(old_logs) :])

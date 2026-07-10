@@ -11779,16 +11779,20 @@ textarea::placeholder {
 }
 
 .perm-group {
-  margin: 0 0 12px;
-  padding: 10px 12px;
+  margin: 0 0 14px;
+  padding: 12px;
   border: 1px solid var(--hex-border);
-  border-radius: 10px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--hex-secondary) 45%, var(--hex-card));
+}
+
+.perm-group:last-child {
+  margin-bottom: 0;
 }
 
 .perm-group__title {
   padding: 0;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 12px;
   font-weight: 700;
   color: var(--hex-muted-foreground);
@@ -11799,6 +11803,11 @@ textarea::placeholder {
 .perm-group__items {
   display: grid;
   gap: 6px;
+}
+
+.perm-group .perm-matrix-wrap {
+  margin: 0;
+  background: var(--hex-card);
 }
 
 .perm-check {

@@ -1359,12 +1359,19 @@ function excelDownloadBtn(onclick, opts = {}) {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-excel ${extraClass}"${disabled ? " disabled" : ""} aria-label="${esc(label)}">${excelIconHtml()}<span class="btn--toolbar__label btn--toolbar__label--full">${esc(label)}</span><span class="btn--toolbar__label btn--toolbar__label--short">${esc(shortLabel)}</span></button>`;
 }
 function excelImportToolbar(kind) {
-  const perm = kind === "customers" ? "customers.create" : "products.create";
-  if (!hasPermission(perm)) return "";
+  if (!canImportExcel() && !canDownloadExcelTemplate()) return "";
+  const canImport = canImportExcel();
+  const canTemplate = canDownloadExcelTemplate();
   ensureGlobalImportFileInputs();
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
   const inputId = `import-file-${kind}`;
-  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт"><button type="button" data-import-download="${esc(kind)}" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button><label for="${inputId}" data-import-upload="${esc(kind)}" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn excel-import-toolbar__upload" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></label></div>`;
+  const templateBtn = canTemplate
+    ? `<button type="button" data-import-download="${esc(kind)}" class="btn btn--toolbar btn--toolbar-excel excel-import-toolbar__btn" aria-label="Формат татах">${excelIconHtml()}<span class="excel-import-toolbar__label">Формат татах</span></button>`
+    : "";
+  const uploadBtn = canImport
+    ? `<label for="${inputId}" data-import-upload="${esc(kind)}" class="btn btn--toolbar btn--toolbar-secondary excel-import-toolbar__btn excel-import-toolbar__upload" aria-label="Excel оруулах">${importUploadIconHtml()}<span class="excel-import-toolbar__label">Excel оруулах</span></label>`
+    : "";
+  return `<div class="excel-import-toolbar" data-import-kind="${esc(kind)}" data-import-dropzone="${esc(kind)}" role="group" aria-label="${esc(label)} Excel импорт">${templateBtn}${uploadBtn}</div>`;
 }
 let importLoading = false;
 const IMPORT_FILE_ACCEPT =
@@ -1481,8 +1488,8 @@ function importFileInput(kind) {
   return document.getElementById(`import-file-${kind}`);
 }
 async function downloadImportTemplate(kind) {
-  const perm = kind === "customers" ? "customers.create" : "products.create";
-  if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
+  if (!canDownloadExcelTemplate())
+    return alertModal("Эрхгүй", "Формат татах эрхгүй.");
   const path = importTemplatePath(kind);
   const filename = importTemplateFilename(kind);
   const url = new URL(`${API_BASE}${path}`, appBackendOrigin()).href;
@@ -1634,8 +1641,7 @@ function finishImportSuccess(kind, payload, report) {
   showImportReportModal(report, kind);
 }
 async function handleImportFile(kind, file) {
-  const perm = kind === "customers" ? "customers.create" : "products.create";
-  if (!hasPermission(perm)) return alertModal("Эрхгүй", "Импорт хийх эрхгүй.");
+  if (!canImportExcel()) return alertModal("Эрхгүй", "Excel оруулах эрхгүй.");
   if (!file) return;
   if (!(await importFileLooksLikeExcel(file))) {
     return alertModal("Алдаа", IMPORT_FILE_FORMAT_HINT);
@@ -1950,7 +1956,11 @@ function employeePermissionSummary(emp) {
   return count ? `${count} эрх` : "Эрхгүй";
 }
 function isAdmin() {
-  return hasPermission("settings.view");
+  return (
+    hasPermission("dashboard.view") ||
+    hasPermission("settings.view") ||
+    hasPermission("permissions.view")
+  );
 }
 function canViewProductCost(emp = state.currentEmployee) {
   const r = emp?.role || currentRole();
@@ -1962,19 +1972,115 @@ function productCostMetaHtml(p) {
   return cost ? `<span>Өртөг: <b>${fmt(cost)}</b></span>` : "";
 }
 function canManageProducts() {
-  return hasPermission("products.create") || hasPermission("products.edit");
+  return (
+    hasPermission("products.create") ||
+    hasPermission("products.edit") ||
+    hasPermission("productAdd.create") ||
+    hasPermission("productAdd.view")
+  );
 }
 function canManageProductCategories() {
-  return canManageProducts();
+  return (
+    hasPermission("categoryAdd.view") ||
+    hasPermission("categoryAdd.create") ||
+    hasPermission("categoryAdd.edit") ||
+    canManageProducts()
+  );
 }
 function canManageEmployees() {
-  return hasPermission("employees.create") || hasPermission("employees.edit");
+  return (
+    hasPermission("employees.create") ||
+    hasPermission("employees.edit") ||
+    hasPermission("employeeAdd.create") ||
+    hasPermission("employeeAdd.view")
+  );
 }
 function canManageEmployeePermissions(emp = state.currentEmployee) {
   return (
     hasPermission("permissions.view", emp) ||
     hasPermission("permissions.edit", emp) ||
+    hasPermission("permissions.create", emp) ||
     hasPermission("employees.edit", emp)
+  );
+}
+function canExportExcel() {
+  return (
+    hasPermission("excelExport.view") ||
+    hasPermission("excelExport.create") ||
+    hasPermission("reports.view")
+  );
+}
+function canImportExcel() {
+  return (
+    hasPermission("excelImport.view") ||
+    hasPermission("excelImport.create") ||
+    hasPermission("products.create") ||
+    hasPermission("customers.create")
+  );
+}
+function canDownloadExcelTemplate() {
+  return (
+    hasPermission("excelTemplate.view") ||
+    hasPermission("excelTemplate.create") ||
+    canImportExcel()
+  );
+}
+function canManageStockIn() {
+  return (
+    hasPermission("stockIn.view") ||
+    hasPermission("stockIn.create") ||
+    hasPermission("stockIn.edit") ||
+    hasPermission("warehouse.edit")
+  );
+}
+function canManageStockOut() {
+  return (
+    hasPermission("stockOut.view") ||
+    hasPermission("stockOut.create") ||
+    hasPermission("stockOut.edit") ||
+    hasPermission("warehouse.edit")
+  );
+}
+function canManageCount() {
+  return (
+    hasPermission("count.view") ||
+    hasPermission("count.create") ||
+    hasPermission("count.edit") ||
+    hasPermission("warehouse.edit")
+  );
+}
+function canManageReceipts() {
+  return (
+    hasPermission("receipts.view") ||
+    hasPermission("warehouse.view")
+  );
+}
+function canManagePromotions() {
+  return (
+    hasPermission("promotions.view") ||
+    hasPermission("promotions.edit") ||
+    hasPermission("settings.view")
+  );
+}
+function canManageStockAlert() {
+  return (
+    hasPermission("stockAlert.view") ||
+    hasPermission("stockAlert.edit") ||
+    hasPermission("settings.view")
+  );
+}
+function canManagePercentDiscountSettings() {
+  return (
+    hasPermission("percentDiscount.view") ||
+    hasPermission("percentDiscount.edit") ||
+    hasPermission("settings.view")
+  );
+}
+function canManageOrderHistorySettings() {
+  return (
+    hasPermission("orderHistory.view") ||
+    hasPermission("orderHistory.edit") ||
+    hasPermission("settings.view")
   );
 }
 function canDelete() {
@@ -5306,29 +5412,39 @@ function adminHubHtml() {
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["inventory", "Нярав", "inventory", "warehouse.view"],
     ["reports", "Тайлан", "reports", "reports.view"],
-    ["promotions", "Урамшуулал", "promotions", "settings.view"],
-    ["warehouseReceipts", "Баримтууд", "stock", "warehouse.view"],
-    ["count", "Тооллого", "count", "warehouse.edit"],
+    ["promotions", "Урамшуулал", "promotions", "promotions.view"],
+    ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
+    ["count", "Тооллого", "count", "count.view"],
     ["employeePermissions", "Эрх үүсгэх", "employees", "__permissions__"],
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
+    if (id === "promotions") return canManagePromotions();
+    if (id === "warehouseReceipts") return canManageReceipts();
+    if (id === "count") return canManageCount();
     return hasPermission(perm);
   });
-  const settings = [
-    ["stockAlertModal()", "Үлдэгдэл сануулах", "stock"],
-    [
+  const settings = [];
+  if (canManageStockAlert()) {
+    settings.push(["stockAlertModal()", "Үлдэгдэл сануулах", "stock"]);
+  }
+  if (canManagePercentDiscountSettings()) {
+    settings.push([
       "percentDiscountSettingsModal()",
       "Шууд төлөлтийн хувь",
       "employees",
-    ],
-    [
+    ]);
+  }
+  if (canManageOrderHistorySettings()) {
+    settings.push([
       "orderRetentionSettingsModal()",
       `Захиалгын түүх хадгалах (${orderRetentionDays()} хоног)`,
       "reports",
-    ],
-    ["deletionLogModal()", "Устгасан бүртгэл", "inventory"],
-  ];
-  const settingsHtml = hasPermission("settings.view")
+    ]);
+  }
+  if (canManageStockAlert() || canManageOrderHistorySettings()) {
+    settings.push(["deletionLogModal()", "Устгасан бүртгэл", "inventory"]);
+  }
+  const settingsHtml = settings.length
     ? `<h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div>`
     : "";
   if (!main.length && !settingsHtml) {
@@ -5367,7 +5483,7 @@ function adminView() {
   return `<div class="admin-page space-y-4">${pageHead("Админ")}${metrics}${adminHubHtml()}</div>`;
 }
 function percentDiscountSettingsModal() {
-  if (!isAdmin()) return;
+  if (!canManagePercentDiscountSettings()) return;
   ensureSettings();
   const rate = percentDiscountRate();
   box(
@@ -5392,7 +5508,7 @@ function savePercentDiscountSettings(e) {
   criticalBackendSave();
 }
 function orderRetentionSettingsModal() {
-  if (!isAdmin()) return;
+  if (!canManageOrderHistorySettings()) return;
   ensureSettings();
   const days = orderRetentionDays();
   box(
@@ -5452,7 +5568,7 @@ function deletionLogModal() {
   );
 }
 function stockAlertModal() {
-  if (!isAdmin()) return;
+  if (!canManageStockAlert()) return;
   ensureSettings();
   const q = (state.searches.stockAlert || "").toLowerCase().trim();
   const alertOn = state.settings.stockAlertEnabled !== false;
@@ -6879,13 +6995,18 @@ function customersView() {
     rows = sortCustomersByName(
       state.customers.filter((c) => customerMatchesQuery(c, q)),
     ),
-    excelBtn = hasPermission("reports.view")
+    excelBtn = canExportExcel()
       ? excelDownloadBtn("confirmCustomerExcel()", {
           label: "Харилцагчийн мэдээлэл татах",
           shortLabel: "Мэдээлэл татах",
         })
       : "",
-    addBtn = pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer");
+    addBtn =
+      hasPermission("customers.create") ||
+      hasPermission("customerAdd.create") ||
+      hasPermission("customerAdd.view")
+        ? pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer")
+        : "";
   return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel list-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Excel файл татах уу?") {
@@ -7244,11 +7365,12 @@ function receiptPeopleFiltersHtml() {
   return `<div class="receipt-people-filters">${clearAll}${receiptFilterGroup("delivery", "Түгээгч", deliveries, deliveryIds)}</div>`;
 }
 function confirmCustomerExcel() {
-  if (!hasPermission("reports.view")) return;
+  if (!canExportExcel()) return;
   if (!state.customers.length) return alert("Харилцагч байхгүй");
   confirmDataExport("Excel татах", customerExcel);
 }
 function confirmProductsExport() {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
   if (!productsExportList().length) return alert("Бараа байхгүй");
   confirmDataExport("Excel татах", exportProductsExcel);
 }
@@ -7331,6 +7453,7 @@ function exportProductsExcelFallback() {
   ]);
 }
 function confirmInventoryExport() {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
   confirmDataExport("Excel татах", () => {
     excel(
       "inventory.xlsx",
@@ -7345,6 +7468,7 @@ function confirmInventoryExport() {
   });
 }
 function confirmReportExport() {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
   confirmDataExport("Excel татах", () => {
     const orders = reportOrdersFiltered(),
       total = orders.reduce((s, o) => s + orderAmount(o), 0),
@@ -7358,13 +7482,14 @@ function confirmReportExport() {
   });
 }
 function confirmEmployeeExcel() {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
   if (canPickWarehouseWorkers() && !state.selectedWorkers.length)
     return alert("Ажилтан сонгоно уу");
   if (!warehouseScopeWorkerIds().length) return alert("Ажилтан сонгоно уу");
   confirmDataExport("Excel татах", employeeExcel);
 }
 function customerExcel() {
-  if (!hasPermission("reports.view")) return;
+  if (!canExportExcel()) return;
   if (!state.customers.length) return alert("Харилцагч байхгүй");
   const rows = [
     [
@@ -7449,8 +7574,8 @@ function productsView() {
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join("")}</select>`;
   const toolbarActions = [
-    excelDownloadBtn("confirmProductsExport()"),
-    canManageProducts()
+    canExportExcel() ? excelDownloadBtn("confirmProductsExport()") : "",
+    canManageProductCategories()
       ? pageToolbarSecondaryBtn("Төрөл", "categoryModal()")
       : "",
     canManageProducts()
@@ -7854,10 +7979,10 @@ function applyStockInReceipt(receipt) {
 }
 function confirmFinishStockIn() {
   ensureStockInSession();
-  if (!hasPermission("warehouse.edit")) {
+  if (!canManageStockIn()) {
     return alertModal(
       "Эрхгүй",
-      "Орлого бүртгэх эрхгүй. Агуулах засах эрх шаардлагатай.",
+      "Орлого бүртгэх эрхгүй.",
     );
   }
   if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
@@ -11422,7 +11547,7 @@ function employeeRow(e) {
   return `<article class="employee-card"><header class="employee-card__head">${employeeAvatarHtml(e)}<div class="employee-card__identity"><h3 class="employee-card__name">${esc(e.name)}</h3><p class="employee-card__sub">${esc(meta)}</p></div></header><p class="employee-card__meta">${esc(meta)}</p><footer class="employee-card__actions">${editBtn}${deleteBtn}</footer></article>`;
 }
 function employeesView() {
-  const addBtn = hasPermission("employees.create")
+  const addBtn = canManageEmployees()
     ? `<button onclick="employeeModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`
     : "";
   const headActions = addBtn;
