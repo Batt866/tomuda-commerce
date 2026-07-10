@@ -2480,37 +2480,56 @@ function staticAssetUrl(path) {
   const origin = appBackendOrigin();
   return raw.startsWith("/") ? `${origin}${raw}` : `${origin}/${raw}`;
 }
+function prefersMobileExcelShare() {
+  return isSamsungDevice() || isAndroidDevice() || isIosDevice();
+}
 async function downloadBlobFile(blob, filename, opts = {}) {
   const { skipShare = false } = opts;
   const name = String(filename || "download.xlsx");
   const type = blob.type || XLSX_MIME;
+  const useShare = !skipShare || prefersMobileExcelShare();
   if (
-    !skipShare &&
+    useShare &&
     typeof navigator.share === "function" &&
     typeof File !== "undefined"
   ) {
     try {
       const file = new File([blob], name, { type });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        return;
+        await navigator.share({ files: [file], title: name });
+        return true;
       }
     } catch (err) {
-      if (err?.name === "AbortError") {
-        /* fall through to direct download */
-      }
+      if (err?.name === "AbortError") return false;
     }
   }
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.rel = "noopener";
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 15000);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.rel = "noopener";
+    if (prefersMobileExcelShare()) a.target = "_blank";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    if (prefersMobileExcelShare()) {
+      window.setTimeout(() => {
+        try {
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch {
+          /* ignore */
+        }
+      }, 120);
+    }
+  } finally {
+    setTimeout(
+      () => URL.revokeObjectURL(url),
+      prefersMobileExcelShare() ? 120000 : 15000,
+    );
+  }
+  return true;
 }
 function productMediaPathFromUrl(url) {
   const raw = String(url || "").trim();
@@ -6258,23 +6277,29 @@ async function exportOrderReceiptsExcelXlsx(orders) {
     zip.remove("xl/printerSettings/printerSettings1.bin");
     applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId: 1 });
     const blob = await zip.generateAsync({ type: "blob", mimeType: XLSX_MIME });
-    await downloadBlobFile(blob, filename, { skipShare: true });
-    return;
+    return downloadBlobFile(blob, filename, { skipShare: true });
   }
   const built = buildReceiptWorkbookXml(orders, { hasLogo });
   const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
-  await downloadBlobFile(blob, filename, { skipShare: true });
+  return downloadBlobFile(blob, filename, { skipShare: true });
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
   try {
-    await exportOrderReceiptsExcelXlsx(orders);
-    showInstallToast("Excel файл татагдлаа");
+    const ok = await exportOrderReceiptsExcelXlsx(orders);
+    if (ok === false) return;
+    showInstallToast(
+      prefersMobileExcelShare()
+        ? "Excel файл бэлэн — хадгалах цонхоос сонгоно уу"
+        : "Excel файл татагдлаа",
+    );
   } catch (err) {
     console.error("Receipt xlsx export failed", err);
     alertModal(
       "Excel татах амжилтгүй",
-      "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+      prefersMobileExcelShare()
+        ? "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Дахин оролдож, гарч ирсэн цонхоос «Файл» эсвэл «Drive»-д хадгална уу."
+        : "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
     );
   }
 }
@@ -6294,22 +6319,18 @@ function orderReceiptExportSnapshots(
 function confirmVisibleOrderReceiptsExcel(searchKey = "warehouseOrders") {
   confirmOrderReceiptsExcel(searchKey, [], receiptFilterOptions());
 }
-function warehouseReceiptToolbarActionsHtml(exportOnclick) {
+function warehouseReceiptToolbarActionsHtml(exportOnclick, { hasOrders = true } = {}) {
   const workerIds = receiptPrintWorkerIds(),
     selectedCount = idList(state.receiptPrintOrderIds).length,
-    deliveryReady = !!state.receiptPrintDeliveryId,
     printBtn = workerIds.length
       ? `<button type="button" onclick="printSelectedOrderReceipts()" class="btn btn--secondary btn--toolbar wh-receipts__print"${selectedCount ? "" : " disabled"} aria-label="Баримт хэвлэх"><span class="btn--toolbar__label btn--toolbar__label--full">Хэвлэх</span><span class="btn--toolbar__label btn--toolbar__label--short">Хэвлэх</span></button>`
       : "";
-  return `${printBtn}${excelDownloadBtn(exportOnclick, { disabled: !deliveryReady, extraClass: "wh-receipts__export" })}`;
+  return `${printBtn}${excelDownloadBtn(exportOnclick, { disabled: !hasOrders, extraClass: "wh-receipts__export" })}`;
 }
 function confirmWarehouseReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
 ) {
-  if (!state.receiptPrintDeliveryId) {
-    return alert("Excel татахын өмнө түгээгч сонгоно уу");
-  }
   confirmOrderReceiptsExcel(searchKey, employeeIds, {
     workerIds: receiptPrintWorkerIds(),
     deliveryIds: receiptPrintDeliveryIds(),
@@ -6427,6 +6448,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   const q = state.searches[searchKey] || "",
     exportBtn = warehouseReceiptToolbarActionsHtml(
       `confirmWarehouseReceiptsExcel('${esc(searchKey)}', ${JSON.stringify(employeeIds)})`,
+      { hasOrders: displayRows.length > 0 },
     ),
     toolbarFilters = `${pageToolbarSearch({ focusKey: searchKey, value: q, placeholder: "Хайх..." })}${warehouseDateFiltersHtml()}<select onchange="setOrderStatusFilter(this.value)" onfocus="receiptStatusFilterFocus()" onblur="receiptStatusFilterBlur()" ontouchstart="receiptStatusFilterFocus()" class="page-toolbar__select wh-receipts__filter app-input"><option value="all">Бүгд</option>${statusOptions
       .map(
@@ -11940,7 +11962,8 @@ function showDeliveryUserLocation(hasStorePin) {
 }
 function warehouseReceiptsView() {
   const employeeIds = warehouseScopeWorkerIds();
-  return `<div class="space-y-4">${orderReceiptsPanel({ compact: true, employeeIds, requireWorkerScope: true })}</div>`;
+  const requireWorkerScope = state.currentEmployee?.role === "sales";
+  return `<div class="space-y-4">${orderReceiptsPanel({ compact: true, employeeIds, requireWorkerScope })}</div>`;
 }
 function workerChooser(orders) {
   const qty = orders
@@ -14367,7 +14390,6 @@ async function downloadOrderReceiptExcelNow(id) {
       ? receiptEditDraftOrder()
       : o;
   await exportOrderReceiptsExcel([orderReceiptSnapshot(exportOrder || o)]);
-  showInstallToast("Excel файл татагдлаа");
 }
 function downloadOrderReceiptExcel(id, ev) {
   if (ev) {
