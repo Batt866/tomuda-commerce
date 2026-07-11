@@ -2589,18 +2589,40 @@ function staticAssetUrl(path) {
 function prefersMobileExcelShare() {
   return isSamsungDevice() || isAndroidDevice() || isIosDevice();
 }
+function zipFileOptions(extra = {}) {
+  return { binary: true, createFolders: false, ...extra };
+}
+async function zipToExcelBlob(zip) {
+  // Rebuild without directory stubs — Excel Mobile treats empty folder
+  // entries as corrupt package content.
+  const clean = new JSZip();
+  const paths = Object.keys(zip.files || {}).filter((path) => !zip.files[path]?.dir);
+  for (const path of paths) {
+    const data = await zip.files[path].async("uint8array");
+    clean.file(path, data, zipFileOptions());
+  }
+  const bytes = await clean.generateAsync({
+    type: "uint8array",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+  return new Blob([bytes], { type: XLSX_MIME });
+}
 async function downloadBlobFile(blob, filename, opts = {}) {
   const { skipShare = false } = opts;
   const name = String(filename || "download.xlsx");
   const type = blob.type || XLSX_MIME;
-  const useShare = !skipShare || prefersMobileExcelShare();
+  // Keep the original ArrayBuffer so Android share does not get a detached/streamed blob.
+  const buffer = await blob.arrayBuffer();
+  const shareBlob = new Blob([buffer], { type });
+  const useShare = prefersMobileExcelShare() || !skipShare;
   if (
     useShare &&
     typeof navigator.share === "function" &&
     typeof File !== "undefined"
   ) {
     try {
-      const file = new File([blob], name, { type });
+      const file = new File([shareBlob], name, { type });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: name });
         return true;
@@ -2609,31 +2631,18 @@ async function downloadBlobFile(blob, filename, opts = {}) {
       if (err?.name === "AbortError") return false;
     }
   }
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(shareBlob);
   try {
     const a = document.createElement("a");
     a.href = url;
     a.download = name;
     a.rel = "noopener";
-    if (prefersMobileExcelShare()) a.target = "_blank";
     a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    if (prefersMobileExcelShare()) {
-      window.setTimeout(() => {
-        try {
-          window.open(url, "_blank", "noopener,noreferrer");
-        } catch {
-          /* ignore */
-        }
-      }, 120);
-    }
   } finally {
-    setTimeout(
-      () => URL.revokeObjectURL(url),
-      prefersMobileExcelShare() ? 120000 : 15000,
-    );
+    setTimeout(() => URL.revokeObjectURL(url), prefersMobileExcelShare() ? 60000 : 15000);
   }
   return true;
 }
@@ -5987,7 +5996,17 @@ function filterXlsxCellsOutsideMerges(cells, mergeRefs) {
     seen.add(ref);
     out.push(cell);
   }
+  out.sort((a, b) => {
+    const ra = xlsxParseCellRef(String(a).match(/\br="([A-Z]+\d+)"/i)?.[1] || "");
+    const rb = xlsxParseCellRef(String(b).match(/\br="([A-Z]+\d+)"/i)?.[1] || "");
+    if (!ra || !rb) return 0;
+    return ra.col - rb.col;
+  });
   return out;
+}
+function xlsxSafeNumber(value) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 function buildReceiptSheetXml(
   o,
@@ -6401,7 +6420,7 @@ function buildReceiptWorkbookXml(orders, opts = {}) {
     usedNames.add(name);
     return { id: index + 1, name, sheetXml: built.sheetXml };
   });
-  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s) => `<sheet name="${xlsxXmlEsc(s.name)}" sheetId="${s.id}" r:id="rId${s.id}"/>`).join("")}</sheets></workbook>`;
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView windowWidth="18000" windowHeight="12000"/></bookViews><sheets>${sheets.map((s) => `<sheet name="${xlsxXmlEsc(s.name)}" sheetId="${s.id}" r:id="rId${s.id}"/>`).join("")}</sheets></workbook>`;
   return {
     sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
     sheets,
@@ -6436,10 +6455,11 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const filename = receiptExcelFileName(orders);
-  const logoBuffer = await loadReceiptExcelLogoBuffer();
+  // Samsung/Android Excel is very strict about drawings; skip logo there so the
+  // workbook opens without the "repair content" dialog.
+  const embedLogo = !prefersMobileExcelShare();
+  const logoBuffer = embedLogo ? await loadReceiptExcelLogoBuffer() : null;
   const hasLogo = !!logoBuffer;
-  // Always build a complete package. Patching the old template left broken
-  // Content_Types / drawing relationships that Excel Mobile refuses to open.
   const built = buildReceiptWorkbookXml(orders, { hasLogo });
   const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
   return downloadBlobFile(blob, filename, { skipShare: true });
@@ -9168,37 +9188,35 @@ function styledContentTypesXml(sheetIds, { hasLogo = false } = {}) {
 async function assembleStyledXlsxZip(built, { hasLogo = false, logoBuffer = null } = {}) {
   const zip = new JSZip();
   const sheetIds = built.sheets.map((s) => s.id);
-  zip.file("[Content_Types].xml", styledContentTypesXml(sheetIds, { hasLogo }));
-  zip.file("_rels/.rels", xlsxPackageRootRelsXml());
-  zip.file("docProps/core.xml", xlsxPackageCoreXml());
-  zip.file("docProps/app.xml", xlsxPackageAppXml(sheetIds.length));
-  zip.file("xl/workbook.xml", built.workbookXml);
-  zip.file("xl/_rels/workbook.xml.rels", styledWorkbookRelsXml(sheetIds.length));
-  zip.file("xl/styles.xml", receiptXlsxStylesXml());
-  zip.file("xl/sharedStrings.xml", built.sharedStringsXml);
+  const opt = zipFileOptions({ binary: false });
+  zip.file("[Content_Types].xml", styledContentTypesXml(sheetIds, { hasLogo }), opt);
+  zip.file("_rels/.rels", xlsxPackageRootRelsXml(), opt);
+  zip.file("docProps/core.xml", xlsxPackageCoreXml(), opt);
+  zip.file("docProps/app.xml", xlsxPackageAppXml(sheetIds.length), opt);
+  zip.file("xl/workbook.xml", built.workbookXml, opt);
+  zip.file("xl/_rels/workbook.xml.rels", styledWorkbookRelsXml(sheetIds.length), opt);
+  zip.file("xl/styles.xml", receiptXlsxStylesXml(), opt);
+  zip.file("xl/sharedStrings.xml", built.sharedStringsXml, opt);
   built.sheets.forEach((sheet) => {
-    zip.file(`xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
+    zip.file(`xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml, opt);
     if (hasLogo) {
       zip.file(
         `xl/worksheets/_rels/sheet${sheet.id}.xml.rels`,
         receiptSheetRelsXml(sheet.id),
+        opt,
       );
-      zip.file(`xl/drawings/drawing${sheet.id}.xml`, receiptDrawingXml());
+      zip.file(`xl/drawings/drawing${sheet.id}.xml`, receiptDrawingXml(), opt);
       zip.file(
         `xl/drawings/_rels/drawing${sheet.id}.xml.rels`,
         receiptDrawingRelsXml(),
+        opt,
       );
     }
   });
   if (hasLogo && logoBuffer) {
-    zip.file("xl/media/receipt-logo.png", logoBuffer);
+    zip.file("xl/media/receipt-logo.png", logoBuffer, zipFileOptions());
   }
-  return zip.generateAsync({
-    type: "blob",
-    mimeType: XLSX_MIME,
-    compression: "DEFLATE",
-    compressionOptions: { level: 6 },
-  });
+  return zipToExcelBlob(zip);
 }
 function xlsxColName(n) {
   let s = "";
@@ -9223,7 +9241,7 @@ function xlsxSharedStringsXml(strings) {
 }
 function xlsxCellXml(ref, styleId, value, kind) {
   if (kind === "n") {
-    return `<c r="${ref}" s="${styleId}"><v>${value}</v></c>`;
+    return `<c r="${ref}" s="${styleId}"><v>${xlsxSafeNumber(value)}</v></c>`;
   }
   if (kind === "s") {
     return `<c r="${ref}" s="${styleId}" t="s"><v>${value}</v></c>`;
@@ -9347,11 +9365,7 @@ async function exportProductsExcelXlsx() {
   const zip = await JSZip.loadAsync(tpl);
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  const blob = await zip.generateAsync({
-    type: "blob",
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `baraa-${stamp}.xlsx`);
 }
 function buildCountSheetXml() {
@@ -9575,11 +9589,7 @@ async function exportCountExcelXlsx() {
   const zip = await JSZip.loadAsync(tpl);
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  const blob = await zip.generateAsync({
-    type: "blob",
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `toollogo-${stamp}.xlsx`);
 }
 const WAREHOUSE_PREPARE_LAST_COL = "F";
@@ -9775,11 +9785,7 @@ async function exportStockInExcelXlsx(receipt) {
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
   zip.file("xl/styles.xml", warehousePrepareStylesXml());
-  const blob = await zip.generateAsync({
-    type: "blob",
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
 }
 function warehouseDateLabel(prefix, raw = todayIso()) {
@@ -10157,11 +10163,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
   zip.file("xl/styles.xml", warehousePrepareStylesXml());
-  const blob = await zip.generateAsync({
-    type: "blob",
-    mimeType:
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `aguulah-beldeh-${stamp}.xlsx`);
 }
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
@@ -15659,16 +15661,14 @@ async function downloadRowsXlsx(name, rows, sheetName = "Sheet1") {
   };
   const safeSheetName = xlsxSheetTitle(sheetName);
   const zip = new JSZip();
-  zip.file("[Content_Types].xml", simpleContentTypesXml());
-  zip.file("_rels/.rels", simpleRootRelsXml());
-  zip.file("xl/workbook.xml", simpleWorkbookXml(safeSheetName));
-  zip.file("xl/_rels/workbook.xml.rels", simpleWorkbookRelsXml());
-  zip.file("xl/worksheets/sheet1.xml", simpleSheetXml(rows, si));
-  zip.file("xl/sharedStrings.xml", xlsxSharedStringsXml(strings));
-  const blob = await zip.generateAsync({
-    type: "blob",
-    mimeType: XLSX_MIME,
-  });
+  const opt = zipFileOptions({ binary: false });
+  zip.file("[Content_Types].xml", simpleContentTypesXml(), opt);
+  zip.file("_rels/.rels", simpleRootRelsXml(), opt);
+  zip.file("xl/workbook.xml", simpleWorkbookXml(safeSheetName), opt);
+  zip.file("xl/_rels/workbook.xml.rels", simpleWorkbookRelsXml(), opt);
+  zip.file("xl/worksheets/sheet1.xml", simpleSheetXml(rows, si), opt);
+  zip.file("xl/sharedStrings.xml", xlsxSharedStringsXml(strings), opt);
+  const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, xlsxFileName(name));
 }
 function excel(name, rows) {
