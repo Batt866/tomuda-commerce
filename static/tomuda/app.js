@@ -1149,7 +1149,7 @@ function paidFromPaymentTerm(term) {
   return term === "cash";
 }
 function paymentTermLabel(term) {
-  return term === "credit" ? "Зээлээр" : "Шууд төлөх";
+  return term === "credit" ? "Зээлээр" : "Бэлнээр";
 }
 function orderIsPaid(o) {
   if (!o) return false;
@@ -1216,23 +1216,8 @@ function reportCustomerReceivableRow(customerName, unpaidOrders) {
 function reportPaymentListHtml(orders) {
   if (!orders.length)
     return `<div class="line-panel__empty">Захиалга байхгүй</div>`;
-  const output = [],
-    emittedUnpaidCustomers = new Set();
-  for (const o of orders) {
-    if (orderIsPaid(o)) {
-      output.push(paymentRow(o));
-      continue;
-    }
-    const key = o.customerId || o.customerName;
-    if (emittedUnpaidCustomers.has(key)) continue;
-    emittedUnpaidCustomers.add(key);
-    const group = orders.filter(
-      (x) =>
-        !orderIsPaid(x) && (x.customerId || x.customerName) === key,
-    );
-    output.push(reportCustomerReceivableRow(o.customerName, group));
-  }
-  return output.join("");
+  // One row per order so credit unpaid always shows «Тооцоо дууссан».
+  return orders.map((o) => paymentRow(o)).join("");
 }
 function normalizeOrderPayments() {
   if (!Array.isArray(state.orders)) return;
@@ -6674,7 +6659,7 @@ function warehouseOrderDetail(o) {
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Шууд төлөх" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paymentTermLabel(o.paymentTerm)}${paid && o.paymentTerm === "credit" ? " · Тооцоо дууссан" : ""}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
@@ -7645,10 +7630,9 @@ function workerPickCard(c) {
   const sub = customerSubtitle(c);
   const phone = (c.phone1 || "").trim();
   const reg = customerRegistrationDisplay(c);
-  const initial = deliveryInitial(c.name);
   const id = esc(c.id);
   const line2 = sub || reg || phone;
-  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}"><span class="worker-pick-card__avatar">${esc(initial)}</span><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
+  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
 function productsView() {
   const q = state.searches.products || "",
@@ -7738,14 +7722,16 @@ function productDetail(id) {
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
 function productCard(p) {
-  const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "-";
+  const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "—";
   const adminActions = canManageProducts()
     ? `<div class="product-card__actions" onclick="event.stopPropagation()">${editIconButton({ className: "product-card__action-btn product-card__action-btn--edit", attrs: `onclick="confirmEditProduct('${esc(p.id)}')"`, label: "Бараа засах" })}${deleteIconButton({ className: "product-card__action-btn product-card__action-btn--delete", attrs: `data-confirm-delete="product" data-id="${esc(p.id)}"`, label: "Бараа устгах" })}</div>`
     : "";
-  const costLine = canViewProductCost()
-    ? `<span class="product-card__cost">Өртөг: ${productCostPrice(p) ? fmt(productCostPrice(p)) : "-"}</span>`
+  const costCell = canViewProductCost()
+    ? `<span class="product-card__cost" title="Өртөг үнэ">${productCostPrice(p) ? fmt(productCostPrice(p)) : "—"}</span>`
     : "";
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__main"><div class="product-card__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async"><p class="product-card__title">${esc(p.name)}</p></div><span class="product-card__barcode">${esc(p.barcode || "-")}</span>${costLine}<p class="product-card__cat">${esc(catLine)}</p><div class="product-card__meta"><span class="product-card__price">${fmt(p.price)}</span><span class="product-card__badge ${isLowStock(p) ? "product-card__badge--low" : ""}">Үлд: ${p.stock ?? 0}</span></div>${adminActions}</div></article>`;
+  const low = isLowStock(p);
+  const stock = p.stock ?? 0;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__hint"><span class="product-card__hint-cat">${esc(catLine)}</span><span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-code">${esc(p.barcode || "—")}</span></p></div></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__facts"><span class="product-card__price">${fmt(p.price)}</span>${costCell}<span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл">Үлд ${stock}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
