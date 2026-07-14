@@ -6616,11 +6616,13 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     state.receiptPrintOrderIds = [];
     state.receiptPrintWorkerSyncKey = "";
   }
+  // Keep the user's selected receipt; never auto-jump to another one
+  // (e.g. after delete). Invalid/missing selection shows empty detail.
   if (
-    displayRows.length &&
+    state.selectedWarehouseOrderId &&
     !displayRows.some((o) => o.id === state.selectedWarehouseOrderId)
   ) {
-    state.selectedWarehouseOrderId = displayRows[0].id;
+    state.selectedWarehouseOrderId = "";
     warehouseReceiptScrollId = "";
   }
   if (!displayRows.length) state.selectedWarehouseOrderId = "";
@@ -7195,8 +7197,8 @@ function syncReceiptPrintSelection(orders) {
   const key = receiptPrintWorkerSyncToken();
   if (state.receiptPrintWorkerSyncKey !== key) {
     state.receiptPrintWorkerSyncKey = key;
-    const pick = orders.length > 10 ? orders.slice(0, 10) : orders;
-    state.receiptPrintOrderIds = pick.map((o) => o.id);
+    // Default: nothing checked — user picks what to print/export.
+    state.receiptPrintOrderIds = [];
     return;
   }
   const valid = new Set(orders.map((o) => o.id));
@@ -15672,7 +15674,10 @@ function deleteReceiptNow(id) {
   }
   recordDeletion("order", id);
   state.orders = state.orders.filter((x) => x.id !== id);
-  if (state.selectedWarehouseOrderId === id) state.selectedWarehouseOrderId = "";
+  if (state.selectedWarehouseOrderId === id) {
+    state.selectedWarehouseOrderId = "";
+    warehouseReceiptScrollId = "";
+  }
   state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
     (x) => x !== id,
   );
