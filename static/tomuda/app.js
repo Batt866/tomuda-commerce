@@ -66,6 +66,7 @@ const state = {
   extraCategories: [],
   inventoryLogs: [],
   deletionLog: [],
+  promotionDeletionLog: [],
   countQty: {},
   countDone: false,
   countOpeningStock: {},
@@ -242,6 +243,7 @@ const persistKeys = [
   "inventoryLogs",
   "stockInReceipts",
   "deletionLog",
+  "promotionDeletionLog",
   "countQty",
   "countDone",
   "countOpeningStock",
@@ -3410,27 +3412,94 @@ function dedupePromotionRuleList(list = []) {
   }
   return merged;
 }
+function promotionDeletionKey(kind, ruleOrFingerprint) {
+  const fp =
+    typeof ruleOrFingerprint === "string"
+      ? ruleOrFingerprint
+      : promotionRuleFingerprint(ruleOrFingerprint);
+  return `${kind}:${fp}`;
+}
+function normalizePromotionDeletionLog(log = []) {
+  if (!Array.isArray(log)) return [];
+  const seen = new Set();
+  return log
+    .filter((entry) => entry?.kind && entry?.fingerprint)
+    .map((entry) => ({
+      kind: String(entry.kind),
+      fingerprint: String(entry.fingerprint),
+      deletedBy: String(entry.deletedBy || ""),
+      deletedAt: entry.deletedAt || "",
+    }))
+    .filter((entry) => {
+      const key = promotionDeletionKey(entry.kind, entry.fingerprint);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(-500);
+}
+function mergedPromotionDeletionLog(remote = {}, local = {}) {
+  return normalizePromotionDeletionLog([
+    ...(remote.promotionDeletionLog || []),
+    ...(local.promotionDeletionLog || []),
+  ]);
+}
+function promotionDeletionLogHas(log = [], kind, rule) {
+  const key = promotionDeletionKey(kind, rule);
+  return normalizePromotionDeletionLog(log).some(
+    (entry) => promotionDeletionKey(entry.kind, entry.fingerprint) === key,
+  );
+}
+function recordPromotionDeletion(kind, rule) {
+  if (!kind || !rule) return;
+  state.promotionDeletionLog = normalizePromotionDeletionLog([
+    ...(state.promotionDeletionLog || []),
+    {
+      kind,
+      fingerprint: promotionRuleFingerprint(rule),
+      deletedBy: state.currentEmployee?.id || "",
+      deletedAt: new Date().toISOString(),
+    },
+  ]);
+}
+function clearPromotionDeletion(kind, rule) {
+  const key = promotionDeletionKey(kind, rule);
+  state.promotionDeletionLog = normalizePromotionDeletionLog(
+    state.promotionDeletionLog || [],
+  ).filter(
+    (entry) => promotionDeletionKey(entry.kind, entry.fingerprint) !== key,
+  );
+}
 function mergeRuleArrays(remote = [], local = []) {
   return dedupePromotionRuleList([...(remote || []), ...(local || [])]);
 }
-function mergePromotionRuleKind(remoteList = [], localList = []) {
+function mergePromotionRuleKind(
+  kind,
+  remoteList = [],
+  localList = [],
+  deletionLog = [],
+) {
   const remote = remoteList || [];
   const local = localList || [];
-  if (!canDelete()) return mergeRuleArrays(remote, local);
-  const localFp = new Set(local.map(promotionRuleFingerprint));
-  const remoteFp = new Set(remote.map(promotionRuleFingerprint));
-  const removedCount = [...remoteFp].filter((fp) => !localFp.has(fp)).length;
-  const addedCount = [...localFp].filter((fp) => !remoteFp.has(fp)).length;
-  if (removedCount > 0 && addedCount === 0) {
-    return dedupePromotionRuleList(local);
-  }
-  return mergeRuleArrays(remote, local);
+  return mergeRuleArrays(remote, local).filter(
+    (rule) => !promotionDeletionLogHas(deletionLog, kind, rule),
+  );
 }
-function mergePromotionRules(remote = {}, local = {}) {
+function mergePromotionRules(remote = {}, local = {}, deletionLog = []) {
   return {
-    quantity: mergePromotionRuleKind(remote.quantity, local.quantity),
-    price: mergePromotionRuleKind(remote.price, local.price),
-    payment: mergePromotionRuleKind(remote.payment, local.payment),
+    quantity: mergePromotionRuleKind(
+      "quantity",
+      remote.quantity,
+      local.quantity,
+      deletionLog,
+    ),
+    price: mergePromotionRuleKind("price", remote.price, local.price, deletionLog),
+    payment: mergePromotionRuleKind(
+      "payment",
+      remote.payment,
+      local.payment,
+      deletionLog,
+    ),
   };
 }
 function appendPromotionRule(kind, rule) {
@@ -3446,6 +3515,7 @@ function appendPromotionRule(kind, rule) {
   ) {
     return false;
   }
+  clearPromotionDeletion(kind, rule);
   state.promotionRules[kind].push(rule);
   state.promotionRules[kind] = dedupePromotionRuleList(state.promotionRules[kind]);
   return true;
@@ -3504,6 +3574,7 @@ function applyCountSessionMerge(remote, local, merged) {
 function mergePersistentStates(remote = {}, local = {}) {
   const merged = {};
   const deletionLog = mergedDeletionLog(remote, local);
+  const promotionDeletionLog = mergedPromotionDeletionLog(remote, local);
   for (const key of MERGE_BY_ID_KEYS) {
     const mergeFn =
       key === "products" || key === "customers" || key === "employees"
@@ -3520,6 +3591,7 @@ function mergePersistentStates(remote = {}, local = {}) {
     if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
   merged.deletionLog = deletionLog;
+  merged.promotionDeletionLog = promotionDeletionLog;
   applyCountSessionMerge(remote, local, merged);
   for (const key of persistKeys) {
     if (MERGE_BY_ID_KEYS.includes(key)) continue;
@@ -3535,6 +3607,7 @@ function mergePersistentStates(remote = {}, local = {}) {
       merged.promotionRules = mergePromotionRules(
         remote.promotionRules,
         local.promotionRules,
+        promotionDeletionLog,
       );
       continue;
     }
@@ -3570,7 +3643,7 @@ function mergePersistentStates(remote = {}, local = {}) {
       );
       continue;
     }
-    if (key === "deletionLog") continue;
+    if (key === "deletionLog" || key === "promotionDeletionLog") continue;
     merged[key] =
       local[key] !== undefined && local[key] !== null
         ? local[key]
@@ -3592,6 +3665,16 @@ function protectAccidentalDeletions(data) {
     ...(protectedData.deletionLog || []),
   ]);
   protectedData.deletionLog = deletionLog;
+  const promotionDeletionLog = normalizePromotionDeletionLog([
+    ...(baseline.promotionDeletionLog || []),
+    ...(protectedData.promotionDeletionLog || []),
+  ]);
+  protectedData.promotionDeletionLog = promotionDeletionLog;
+  protectedData.promotionRules = mergePromotionRules(
+    baseline.promotionRules,
+    protectedData.promotionRules,
+    promotionDeletionLog,
+  );
   for (const key of DELETION_GUARDED_KEYS) {
     const current = protectedData[key] || [];
     const base = baseline[key] || [];
@@ -3612,32 +3695,6 @@ function protectAccidentalDeletions(data) {
       const restored = base.filter((x) => !currentIds.has(x.id));
       if (restored.length) protectedData[key] = [...current, ...restored];
     }
-  }
-  if (!canDelete()) {
-    const baseRules = baseline.promotionRules || {
-      quantity: [],
-      price: [],
-      payment: [],
-    };
-    const nextRules = protectedData.promotionRules || {
-      quantity: [],
-      price: [],
-      payment: [],
-    };
-    protectedData.promotionRules = {
-      quantity:
-        (nextRules.quantity || []).length < (baseRules.quantity || []).length
-          ? [...(baseRules.quantity || [])]
-          : [...(nextRules.quantity || [])],
-      price:
-        (nextRules.price || []).length < (baseRules.price || []).length
-          ? [...(baseRules.price || [])]
-          : [...(nextRules.price || [])],
-      payment:
-        (nextRules.payment || []).length < (baseRules.payment || []).length
-          ? [...(baseRules.payment || [])]
-          : [...(nextRules.payment || [])],
-    };
   }
   if (baseline.orders && protectedData.orders) {
     const baseMap = Object.fromEntries(baseline.orders.map((o) => [o.id, o]));
@@ -3676,6 +3733,8 @@ function applyPersistentState(data) {
     for (const kind of ["quantity", "price", "payment"]) {
       state.promotionRules[kind] = dedupePromotionRuleList(
         state.promotionRules[kind],
+      ).filter(
+        (rule) => !promotionDeletionLogHas(state.promotionDeletionLog, kind, rule),
       );
     }
   }
@@ -3683,6 +3742,9 @@ function applyPersistentState(data) {
     state.workerQty = {};
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
   state.deletionLog = normalizeDeletionLog(state.deletionLog);
+  state.promotionDeletionLog = normalizePromotionDeletionLog(
+    state.promotionDeletionLog,
+  );
   ensureSettings();
   ensureEmployeePercentDiscount();
   ensureEmployeePermissions();
@@ -10202,67 +10264,32 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   }
   pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-  const sign1 = rowNum;
-  merges.push(`C${sign1}:F${sign1}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтан:"), "s"),
-    xlsxCellXml(`B${sign1}`, 18, si("Нэр"), "s"),
-    xlsxCellXml(
-      `C${sign1}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    xlsxCellXml(`D${sign1}`, 18, null, "empty"),
-    xlsxCellXml(`E${sign1}`, 18, null, "empty"),
-    xlsxCellXml(`F${sign1}`, 18, null, "empty"),
-  ]);
-  const sign2 = rowNum;
-  merges.push(`C${sign2}:F${sign2}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign2}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign2}`, 6, si("Гарын үсэг"), "s"),
-    xlsxCellXml(
-      `C${sign2}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    xlsxCellXml(`D${sign2}`, 18, null, "empty"),
-    xlsxCellXml(`E${sign2}`, 18, null, "empty"),
-    xlsxCellXml(`F${sign2}`, 18, null, "empty"),
-  ]);
+  const pushWarehousePrepareSignatureBlock = (role) => {
+    const nameRow = rowNum;
+    merges.push(`C${nameRow}:F${nameRow}`);
+    pushRow(18, [
+      xlsxCellXml(`A${nameRow}`, 3, si(role), "s"),
+      xlsxCellXml(`B${nameRow}`, 4, si("Нэр"), "s"),
+      xlsxCellXml(`C${nameRow}`, 17, null, "empty"),
+      xlsxCellXml(`D${nameRow}`, 17, null, "empty"),
+      xlsxCellXml(`E${nameRow}`, 17, null, "empty"),
+      xlsxCellXml(`F${nameRow}`, 17, null, "empty"),
+    ]);
+    pushRow(8.25, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
+    const signRow = rowNum;
+    merges.push(`C${signRow}:F${signRow}`);
+    pushRow(18, [
+      xlsxCellXml(`A${signRow}`, 12, null, "empty"),
+      xlsxCellXml(`B${signRow}`, 4, si("Гарын үсэг"), "s"),
+      xlsxCellXml(`C${signRow}`, 17, null, "empty"),
+      xlsxCellXml(`D${signRow}`, 17, null, "empty"),
+      xlsxCellXml(`E${signRow}`, 17, null, "empty"),
+      xlsxCellXml(`F${signRow}`, 17, null, "empty"),
+    ]);
+  };
+  pushWarehousePrepareSignatureBlock("Хүлээлгэн өгсөн ажилтан:");
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-  const sign3 = rowNum;
-  merges.push(`C${sign3}:F${sign3}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан ажилтан:"), "s"),
-    xlsxCellXml(`B${sign3}`, 18, si("Нэр"), "s"),
-    xlsxCellXml(
-      `C${sign3}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    xlsxCellXml(`D${sign3}`, 18, null, "empty"),
-    xlsxCellXml(`E${sign3}`, 18, null, "empty"),
-    xlsxCellXml(`F${sign3}`, 18, null, "empty"),
-  ]);
-  const sign4 = rowNum;
-  merges.push(`C${sign4}:F${sign4}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign4}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign4}`, 6, si("Гарын үсэг"), "s"),
-    xlsxCellXml(
-      `C${sign4}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    xlsxCellXml(`D${sign4}`, 18, null, "empty"),
-    xlsxCellXml(`E${sign4}`, 18, null, "empty"),
-    xlsxCellXml(`F${sign4}`, 18, null, "empty"),
-  ]);
+  pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.125" customWidth="1"/><col min="2" max="2" width="12.75" customWidth="1"/><col min="3" max="3" width="13.75" customWidth="1"/><col min="4" max="4" width="7.375" customWidth="1"/><col min="5" max="5" width="8.125" customWidth="1"/><col min="6" max="6" width="14.625" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
@@ -10345,8 +10372,10 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .num { text-align: right; }
 .spacer td { height: 88px; }
 .sign-label { text-align: right; font-weight: 700; }
-.sign-line { text-align: center; }
-.sign-hint { text-align: center; font-size: 14px; border-top: none !important; }
+.sign-line { border-bottom: 2px solid #000 !important; }
+.sign-hint { text-align: left; font-size: 14px; border-top: none !important; }
+.sign-gap td { height: 10px; border: none !important; }
+.sign-block-gap td { height: 22px; border: none !important; }
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
 <tr><td colspan="6" class="title">Бараа бэлдэх хуудас</td></tr>
@@ -10356,10 +10385,13 @@ ${workerRows}
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line">....................................................</td></tr>
-<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line">....................................................</td></tr>
-<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line">....................................................</td></tr>
-<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line">....................................................</td></tr>
+<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line"></td></tr>
+<tr class="sign-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line"></td></tr>
+<tr class="sign-block-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line"></td></tr>
+<tr class="sign-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line"></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
@@ -11684,6 +11716,7 @@ function removePromotionRule(type, index) {
   if (!Array.isArray(state.promotionRules[type]))
     state.promotionRules[type] = [];
   if (index < 0 || index >= state.promotionRules[type].length) return;
+  recordPromotionDeletion(type, state.promotionRules[type][index]);
   state.promotionRules[type].splice(index, 1);
   state.promotionRules[type] = dedupePromotionRuleList(state.promotionRules[type]);
   render();
