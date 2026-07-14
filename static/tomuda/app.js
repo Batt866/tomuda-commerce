@@ -2094,7 +2094,16 @@ function canDelete() {
     hasPermission("customers.edit") ||
     hasPermission("customers.create") ||
     hasPermission("orders.delete") ||
-    hasPermission("orders.edit")
+    hasPermission("orders.edit") ||
+    hasPermission("receipts.delete")
+  );
+}
+function canDeleteReceipt() {
+  if (!state.isLoggedIn) return false;
+  return (
+    hasPermission("receipts.delete") ||
+    hasPermission("orders.delete") ||
+    canDelete()
   );
 }
 function requireAdminDelete() {
@@ -3223,12 +3232,13 @@ function mergeBootPersistentState(backendState, pendingState, ordersBackup) {
   return merged;
 }
 const MERGE_BY_ID_KEYS = ["customers", "products", "employees", "orders"];
-const DELETION_GUARDED_KEYS = ["customers", "products", "employees"];
+const DELETION_GUARDED_KEYS = ["customers", "products", "employees", "orders"];
 
 function deletionKeyForCollection(collectionKey) {
   if (collectionKey === "customers") return "customer";
   if (collectionKey === "products") return "product";
   if (collectionKey === "employees") return "employee";
+  if (collectionKey === "orders") return "order";
   return collectionKey;
 }
 function normalizeDeletionLog(log = []) {
@@ -5550,7 +5560,9 @@ function deletionLogLabel(entry) {
         ? "Харилцагч"
         : entry.type === "employee"
           ? "Ажилтан"
-          : String(entry.type || "-");
+          : entry.type === "order"
+            ? "Баримт / захиалга"
+            : String(entry.type || "-");
   const actor =
     state.employees.find((e) => e.id === entry.actorId)?.name ||
     entry.actorId ||
@@ -6660,10 +6672,10 @@ function warehouseOrderDetail(o) {
         return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Шууд төлөх" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}</div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paid ? "Шууд төлөх" : "Дансаар"}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
 }
 function orderRow(o) {
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}</div></td></tr>`;
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
 }
 function customerAvatarHtml(c, className = "customer-card__avatar") {
   const src = entityImageSrc(c?.image);
@@ -15620,8 +15632,58 @@ function cancelOrderNow(id) {
   if (!canDelete()) return;
   setOrder(id, "cancelled");
 }
+function confirmDeleteReceipt(id) {
+  if (!canDeleteReceipt()) {
+    return alertModal("Эрхгүй", "Баримт устгах эрхгүй.");
+  }
+  const o = state.orders.find((x) => x.id === id);
+  if (!o) return;
+  const label = `${formatReceiptNumber(o)} · ${o.customerName || "Захиалга"}`;
+  confirmModal(
+    "Баримт устгах уу?",
+    `<p><b>${esc(label)}</b> баримтыг устгах гэж байна.</p><p class="text-sm text-muted-foreground mt-2">Баримт устгавал холбоотой захиалга мөн устана. Цуцлагдаагүй бол барааны үлдэгдэл буцааж нэмэгдэнэ.</p>`,
+    {
+      confirmLabel: "Тийм",
+      danger: true,
+      onConfirm: () => {
+        confirmModal(
+          "Баталгаажуулах",
+          `<p><b>${esc(label)}</b>-г бүрмөсөн устгахдаа итгэлтэй байна уу? Энэ үйлдлийг буцаах боломжгүй.</p>`,
+          {
+            confirmLabel: "Устгах",
+            danger: true,
+            closable: true,
+            onConfirm: () => deleteReceiptNow(id),
+          },
+        );
+      },
+    },
+  );
+}
+function deleteReceiptNow(id) {
+  if (!canDeleteReceipt()) return;
+  const o = state.orders.find((x) => x.id === id);
+  if (!o) return;
+  const receiptLabel = formatReceiptNumber(o);
+  if (o.status !== "cancelled") {
+    (o.items || []).forEach((i) => {
+      if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
+    });
+  }
+  recordDeletion("order", id);
+  state.orders = state.orders.filter((x) => x.id !== id);
+  if (state.selectedWarehouseOrderId === id) state.selectedWarehouseOrderId = "";
+  state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
+    (x) => x !== id,
+  );
+  if (state.receiptEditOrderId === id) clearReceiptEdit();
+  closeModal();
+  render();
+  showAppToast(`Баримт ${receiptLabel} устгагдлаа`, "success");
+  criticalBackendSave();
+}
 function recordDeletion(type, id) {
-  if (!["product", "customer", "employee"].includes(type) || !id) return;
+  if (!["product", "customer", "employee", "order"].includes(type) || !id) return;
   state.deletionLog = normalizeDeletionLog([
     ...(state.deletionLog || []),
     {
@@ -15980,6 +16042,8 @@ Object.assign(window, {
   confirmDelete,
   confirmCancelOrder,
   cancelOrderNow,
+  confirmDeleteReceipt,
+  deleteReceiptNow,
   deleteNow,
   delEmployee,
   delProduct,

@@ -584,14 +584,18 @@ def validate_state_mutation(
                 return False, f"{key} засах эрхгүй"
 
     deleted_orders = set(old_orders) - set(new_orders)
-    retention_days = _order_retention_days(new_state)
-    protected_deleted_orders = [
-        order_id
-        for order_id in deleted_orders
-        if _order_within_retention(old_orders[order_id], retention_days=retention_days)
-    ]
-    if protected_deleted_orders:
-        return False, "1 сарын доторх захиалга устгах боломжгүй"
+    if deleted_orders:
+        if not _has_any_permission(
+            perms, "orders.delete", "receipts.delete", "orders.edit"
+        ):
+            return False, "Захиалга/баримт устгах эрхгүй"
+        missing_log = [
+            order_id
+            for order_id in deleted_orders
+            if not _deletion_log_has(new_state, "order", order_id)
+        ]
+        if missing_log:
+            return False, "Захиалга устгах баталгаажуулалт дутуу"
     for order_id, new_order in new_orders.items():
         old_order = old_orders.get(order_id)
         if old_order is None:
@@ -605,6 +609,15 @@ def validate_state_mutation(
 
     old_products = _by_id(old_state.get("products") or [])
     new_products = _by_id(new_state.get("products") or [])
+    allow_delete_stock_restore = bool(deleted_orders) and _has_any_permission(
+        perms,
+        "orders.delete",
+        "receipts.delete",
+        "orders.edit",
+        "warehouse.edit",
+        "stockOut.edit",
+        "stockOut.create",
+    )
     for product_id, new_product in new_products.items():
         old_product = old_products.get(product_id)
         if not old_product:
@@ -612,6 +625,8 @@ def validate_state_mutation(
         if old_product.get("stock") != new_product.get("stock") and not _can_edit_warehouse(
             perms
         ):
+            if allow_delete_stock_restore:
+                continue
             try:
                 old_stock = float(old_product.get("stock") or 0)
                 new_stock = float(new_product.get("stock") or 0)
