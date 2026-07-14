@@ -3352,6 +3352,7 @@ function resetPromotionModalDraft(kind) {
   state.promoPick = null;
   state.promoFormDraft = null;
   state.promoModalKind = "";
+  resetPromoPickListScroll();
   if (kind === "quantity" || kind === "all") {
     state.searches.promo_buyProductIds = "";
     state.searches.promo_freeProductIds = "";
@@ -10607,7 +10608,7 @@ function promoCategoryFilterHtml(pickKey) {
     .map((cat) => btn(cat, cat))
     .join("")}</div>`;
 }
-function promoProductSearchListHtml({
+function promoProductSearchListInnerHtml({
   pickKey,
   selectedIds = [],
   excludeIds = [],
@@ -10621,7 +10622,7 @@ function promoProductSearchListHtml({
   if (!shown.length) {
     return `<p class="promo-product-empty">Бараа олдсонгүй</p>`;
   }
-  return `<div class="promo-product-list promo-product-list--search">${shown
+  return `<div class="promo-product-list promo-product-list--search" data-promo-pick-list="${esc(pickKey)}">${shown
     .map((p) => {
       const onclick =
         addAction === "select"
@@ -10632,6 +10633,87 @@ function promoProductSearchListHtml({
     .join(
       "",
     )}${more ? `<p class="promo-product-more">+${more} бараа. Хайлтаа нарийсгана уу.</p>` : ""}</div>`;
+}
+function promoProductSearchListHtml(opts) {
+  const pickKey = opts.pickKey,
+    addAction = opts.addAction === "select" ? "select" : "add";
+  return `<div data-promo-pick-list-mount="${esc(pickKey)}" data-promo-pick-action="${addAction}">${promoProductSearchListInnerHtml(opts)}</div>`;
+}
+function capturePromoPickListScroll() {
+  const map = { ...(state.promoPickListScroll || {}) };
+  document.querySelectorAll("[data-promo-pick-list]").forEach((el) => {
+    const key = el.getAttribute("data-promo-pick-list");
+    if (key) map[key] = el.scrollTop;
+  });
+  state.promoPickListScroll = map;
+  return map;
+}
+function restorePromoPickListScroll(map, defer = true) {
+  const snap = map || state.promoPickListScroll || {};
+  const apply = () => {
+    Object.entries(snap).forEach(([key, top]) => {
+      if (top == null) return;
+      const el = document.querySelector(`[data-promo-pick-list="${key}"]`);
+      if (el) el.scrollTop = top;
+    });
+  };
+  if (defer) requestAnimationFrame(apply);
+  else apply();
+}
+function resetPromoPickListScroll(pickKey = "") {
+  if (!pickKey) {
+    state.promoPickListScroll = {};
+    return;
+  }
+  state.promoPickListScroll = {
+    ...(state.promoPickListScroll || {}),
+    [pickKey]: 0,
+  };
+}
+function patchPromoPickSearchList(pickKey, opts = {}) {
+  const mount = document.querySelector(
+    `[data-promo-pick-list-mount="${pickKey}"]`,
+  );
+  if (!mount) return false;
+  const addAction =
+    mount.getAttribute("data-promo-pick-action") === "select"
+      ? "select"
+      : "add";
+  const pick = state.promoPick || {};
+  const selectedIds = promotionPickIds(pick, pickKey);
+  let selectedId = "";
+  if (addAction === "select") {
+    selectedId =
+      document.querySelector(`#promo-${pickKey}`)?.value ||
+      selectedIds[0] ||
+      "";
+  }
+  const prevList = mount.querySelector("[data-promo-pick-list]");
+  const prevScroll =
+    opts.scrollTop != null
+      ? opts.scrollTop
+      : (prevList?.scrollTop ?? state.promoPickListScroll?.[pickKey] ?? 0);
+  mount.innerHTML = promoProductSearchListInnerHtml({
+    pickKey,
+    selectedIds,
+    excludeIds: [],
+    addAction,
+    selectedId,
+  });
+  if (opts.preserveScroll !== false) {
+    const next = mount.querySelector("[data-promo-pick-list]");
+    if (next) next.scrollTop = prevScroll;
+    state.promoPickListScroll = {
+      ...(state.promoPickListScroll || {}),
+      [pickKey]: prevScroll,
+    };
+  } else {
+    state.promoPickListScroll = {
+      ...(state.promoPickListScroll || {}),
+      [pickKey]: 0,
+    };
+  }
+  return true;
 }
 function promotionProductPickerBlock(
   fieldName,
@@ -10659,7 +10741,7 @@ function promotionProductPickerBlock(
       addAction: "select",
       selectedId,
     }),
-    searchInput = `<input data-promo-search="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
+    searchInput = `<input data-promo-pick="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
     inputRow = promotionSearchQtyRow(searchInput, opts?.qty || null),
     badge = variant === "buy" ? "1" : variant === "free" ? "2" : "",
     head = badge
@@ -10809,19 +10891,14 @@ function promoPickSearch(pickKey, value) {
   const key = promoPickSearchKey(pickKey);
   if (!key) return;
   state.searches[key] = value;
-  refreshPromoModal({ focusPickKey: value.trim() ? pickKey : "" });
-  if (value.trim()) {
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-promo-pick="${pickKey}"]`);
-      if (el) {
-        el.focus({ preventScroll: true });
-        el.setSelectionRange(el.value.length, el.value.length);
-      }
-    });
+  // Update only the product list so the search input keeps focus / keyboard.
+  if (!patchPromoPickSearchList(pickKey, { preserveScroll: false })) {
+    refreshPromoModal({ focusPickKey: pickKey });
   }
 }
 function setPromoPickCategory(pickKey, category) {
   state.searches[promoPickCategoryKey(pickKey)] = category || "all";
+  resetPromoPickListScroll(pickKey);
   refreshPromoModal();
 }
 function promoBuyProductSearch(value) {
@@ -10862,9 +10939,11 @@ function promoProductSearch(fieldName, value) {
 }
 function refreshPromoModal(opts = {}) {
   const scrollEl = modal.querySelector(".modal-scroll");
+  const listScroll = capturePromoPickListScroll();
   const scrollSnap = {
     top: scrollEl?.scrollTop ?? 0,
     pickKey: opts.focusPickKey || "",
+    listScroll,
   };
   capturePromoFormDraft();
   if (state.promoModalKind === "price") promotionPriceModal();
@@ -10873,6 +10952,7 @@ function refreshPromoModal(opts = {}) {
   requestAnimationFrame(() => {
     const nextScroll = modal.querySelector(".modal-scroll");
     if (nextScroll) nextScroll.scrollTop = scrollSnap.top;
+    restorePromoPickListScroll(scrollSnap.listScroll, false);
     if (scrollSnap.pickKey) {
       const el = document.querySelector(
         `[data-promo-pick="${scrollSnap.pickKey}"]`,
@@ -10986,6 +11066,7 @@ function openPromotionQtyModal() {
   state.promoModalKind = "qty";
   state.promoPick = { buyProductIds: [], freeProductIds: [] };
   state.promoFormDraft = {};
+  resetPromoPickListScroll();
   state.searches.promo_buyProductIds = "";
   state.searches.promo_freeProductIds = "";
   state.searches.promo_buyProductIds_category = "all";
@@ -11022,6 +11103,7 @@ function openPromotionPriceModal() {
   state.promoPriceRuleType = "free";
   state.promoPick = { priceFreeProductIds: [] };
   state.promoFormDraft = {};
+  resetPromoPickListScroll();
   state.searches.promo_priceFreeProductIds = "";
   state.searches.promo_priceFreeProductIds_category = "all";
   promotionPriceModal();
@@ -11072,6 +11154,7 @@ function openPromotionPaymentModal() {
   state.promoPaymentTerm = "cash";
   state.promoPick = { paymentFreeProductIds: [] };
   state.promoFormDraft = {};
+  resetPromoPickListScroll();
   state.searches.promo_paymentFreeProductIds = "";
   state.searches.promo_paymentFreeProductIds_category = "all";
   promotionPaymentModal();
