@@ -3369,9 +3369,18 @@ function resetPromotionModalDraft(kind) {
   }
 }
 function finishPromotionSave(kind) {
+  const msg =
+    kind === "quantity"
+      ? "Багцын хөнгөлөлт хадгалагдлаа"
+      : kind === "price"
+        ? "Үнийн урамшуулал хадгалагдлаа"
+        : kind === "payment"
+          ? "Төлбөрийн урамшуулал хадгалагдлаа"
+          : "Урамшуулал хадгалагдлаа";
   resetPromotionModalDraft(kind);
   closeModal();
   render();
+  showAppToast(msg, "success");
   criticalBackendSave();
 }
 
@@ -4894,19 +4903,10 @@ function isNativeApp() {
   return isStandalonePwa() || !!window.Capacitor;
 }
 function showInstallToast(msg) {
-  document.querySelector(".install-toast")?.remove();
-  const el = document.createElement("div");
-  el.className = "install-toast";
-  el.textContent = msg;
-  document.body.appendChild(el);
-  requestAnimationFrame(() => el.classList.add("install-toast--visible"));
-  setTimeout(() => {
-    el.classList.remove("install-toast--visible");
-    setTimeout(() => el.remove(), 300);
-  }, 4500);
+  showAppToast(msg, "success");
 }
 function showStockLimitToast() {
-  showInstallToast("Үлдэгдэл хүрэхгүй байна");
+  showAppToast("Үлдэгдэл хүрэхгүй байна", "error");
 }
 async function triggerNativeInstallPrompt() {
   if (!pwaInstallPrompt) return false;
@@ -7045,23 +7045,33 @@ function focusSavedCustomer(customerId, customerName) {
   state.customerHighlightId = customerId;
   render();
   showAppToast(`${customerName} хадгалагдлаа`, "success");
-  requestAnimationFrame(() => {
-    document
-      .querySelector(`[data-customer-id="${customerId}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  });
+  const scrollToSaved = () => {
+    const card = document.querySelector(`[data-customer-id="${customerId}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  requestAnimationFrame(() => requestAnimationFrame(scrollToSaved));
+  setTimeout(scrollToSaved, 280);
   setTimeout(() => {
     if (state.customerHighlightId !== customerId) return;
     state.customerHighlightId = "";
     if (state.currentView === "customers") render();
-  }, 2200);
+  }, 5000);
 }
 function customersView() {
-  const q = state.searches.customers || "",
-    rows = sortCustomersByName(
-      state.customers.filter((c) => customerMatchesQuery(c, q)),
-    ),
-    excelBtn = canExportExcel()
+  const q = state.searches.customers || "";
+  let rows = sortCustomersByName(
+    state.customers.filter((c) => customerMatchesQuery(c, q)),
+  );
+  const highlightId = state.customerHighlightId || "";
+  if (highlightId) {
+    const hi = rows.findIndex((c) => c.id === highlightId);
+    if (hi > 0) {
+      const [hit] = rows.splice(hi, 1);
+      rows = [hit, ...rows];
+    }
+  }
+  const excelBtn = canExportExcel()
       ? excelDownloadBtn("confirmCustomerExcel()", {
           label: "Харилцагчийн мэдээлэл татах",
           shortLabel: "Мэдээлэл татах",
@@ -10349,6 +10359,7 @@ function finishCount() {
   }
   state.countDone = true;
   render();
+  showAppToast("Тооллого хадгалагдлаа", "success");
   criticalBackendSave();
   window.setTimeout(() => {
     if (state.currentView === "count" && state.countDone) pollBackendState();
@@ -11563,6 +11574,7 @@ function removePromotionRule(type, index) {
   state.promotionRules[type].splice(index, 1);
   state.promotionRules[type] = dedupePromotionRuleList(state.promotionRules[type]);
   render();
+  showAppToast(`${promotionTypeLabel(type)} дүрэм устгагдлаа`, "success");
   criticalBackendSave();
 }
 function confirmRemovePromotionRule(type, index) {
@@ -14089,6 +14101,12 @@ async function applyProductSave(data, id) {
   }
   closeModal();
   render();
+  showAppToast(
+    id
+      ? `${product?.name || "Бараа"} хадгалагдлаа`
+      : `${product?.name || "Бараа"} нэмэгдлээ`,
+    "success",
+  );
   await flushBackendSave().catch((error) =>
     console.warn("Product backend save failed", error),
   );
@@ -14826,6 +14844,12 @@ function applyStock(id, type, qty, costPrice) {
         : state.currentEmployee?.name || "",
   });
   render();
+  showAppToast(
+    type === "in"
+      ? `${p.name} · +${q} ш орлого`
+      : `${p.name} · −${q} ш зарлага`,
+    "success",
+  );
   criticalBackendSave();
   return true;
 }
@@ -15610,6 +15634,14 @@ function recordDeletion(type, id) {
 }
 function deleteNow(type, id) {
   if (!canDelete()) return;
+  const label =
+    type === "product"
+      ? "Бараа"
+      : type === "employee"
+        ? "Ажилтан"
+        : type === "customer"
+          ? "Харилцагч"
+          : "Мөр";
   if (type === "product") {
     recordDeletion("product", id);
     state.products = state.products.filter((p) => p.id !== id);
@@ -15633,6 +15665,7 @@ function deleteNow(type, id) {
   }
   closeModal();
   render();
+  showAppToast(`${label} устгагдлаа`, "success");
   criticalBackendSave();
 }
 function delEmployee(id) {
