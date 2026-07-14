@@ -475,12 +475,18 @@ function receiptHeaderRows(logoSrc, o) {
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
 }
-const RECEIPT_FIRST_PAGE_ITEM_LIMIT = 10;
+/** Max paid lines alone on one A4 body (header/info already take space). */
+const RECEIPT_PAGE_PAID_MAX = 26;
+/** Soft capacity for paid + upper footer before promo/summary/signatures. */
+const RECEIPT_PAGE_SOFT_MAX = 20;
 function receiptPaidItems(o) {
   return (o.items || []).filter((i) => !i.isPromoFree);
 }
 function receiptPromoItems(o) {
   return (o.items || []).filter((i) => i.isPromoFree);
+}
+function receiptHasPromoSection(o) {
+  return receiptPromoItems(o).length > 0 || !!receiptPromoSettleNote(o);
 }
 function receiptItemsHeadRow() {
   return `<tr class="receipt-grid__items-head"><td class="receipt-grid__num"></td><td colspan="3" class="receipt-grid__head">Барааны нэр</td><td class="receipt-grid__head">Хэмжих нэгж</td><td colspan="2" class="receipt-grid__head">Баркод</td><td colspan="2" class="receipt-grid__head">Тоо/ш</td><td class="receipt-grid__head">Нэгж үнэ</td><td class="receipt-grid__head">Нийт үнэ</td></tr>`;
@@ -605,20 +611,15 @@ function receiptSettleNoteText(o) {
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   const settleNote = receiptPromoSettleNote(o);
-  const slots = Math.max(2, promoItems.length);
-  const head = settleNote
-    ? `<tr class="receipt-grid__promo-note"><td></td><td></td><td colspan="2" class="receipt-grid__promo-title">Урамшуулал</td><td colspan="7" class="receipt-grid__promo-settle">${esc(settleNote)}</td></tr>`
-    : "";
-  const itemRows = Array.from({ length: slots }, (_, idx) => {
-    const i = promoItems[idx];
-    const promoLead = settleNote
-      ? `<td colspan="3"></td>`
-      : idx === 0
-        ? `<td colspan="3" rowspan="${slots}" class="receipt-grid__promo-title">Урамшуулал</td>`
-        : "";
-    return `<tr class="receipt-grid__promo"><td></td>${promoLead}<td colspan="3" class="receipt-grid__name">${i ? esc(i.productName) : ""}</td><td colspan="2" class="receipt-grid__qty">${i ? i.quantity : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoDisplayPrice(i)) : ""}</td><td class="receipt-grid__money">${i ? receiptMoney(receiptPromoDisplayTotal(i)) : ""}</td></tr>`;
-  }).join("");
-  return head + itemRows;
+  if (!promoItems.length && !settleNote) return "";
+  const banner = `<tr class="receipt-grid__promo-note"><td></td><td colspan="10" class="receipt-grid__promo-banner"><span class="receipt-grid__promo-title">Урамшуулал</span>${settleNote ? `<span class="receipt-grid__promo-settle">${esc(settleNote)}</span>` : ""}</td></tr>`;
+  const itemRows = promoItems
+    .map((i) => {
+      const p = productForReceiptLine(i);
+      return `<tr class="receipt-grid__promo"><td class="receipt-grid__num"></td><td colspan="3" class="receipt-grid__name">${esc(i.productName)}</td><td class="receipt-grid__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-grid__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-grid__qty">${i.quantity}</td><td class="receipt-grid__money">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-grid__money">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+    })
+    .join("");
+  return banner + itemRows;
 }
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
@@ -681,8 +682,13 @@ function documentSignatureBlockHtml(opts = {}) {
     `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" rowspan="2" class="doc-sign__role">${esc(role)}</td><td class="doc-sign__hint">Нэр</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr><tr class="${rowClass}">${padCell}<td class="doc-sign__hint">Гарын үсэг</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
   return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
 }
-function receiptSignatureRowsHtml() {
-  return `<tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__spacer"><td colspan="11"></td></tr><tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
+function receiptSignatureRowsHtml(opts = {}) {
+  const pushDown = !!opts.pushDown;
+  const fill = pushDown
+    ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
+    : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
+  const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
+  return `${fill}<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>${gap}<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
 }
 function stockInSignatureRowsHtml() {
   return documentSignatureBlockHtml({
@@ -692,17 +698,27 @@ function stockInSignatureRowsHtml() {
     rowClass: "doc-sign__row",
   });
 }
-function receiptFooterRows(o) {
-  const f = receiptPartyFields(o);
+function receiptUpperFooterRows(o) {
   const gross = orderGrossTotal(o);
+  const grossRow = receiptShouldShowGross(o)
+    ? `<tr class="receipt-grid__gross"><td></td><td colspan="9" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`
+    : "";
+  return `<tr class="receipt-grid__return"><td></td><td colspan="2" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr>${grossRow}`;
+}
+function receiptLowerFooterRows(o, opts = {}) {
+  const f = receiptPartyFields(o);
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
   const payTerm = receiptPaymentTermText(f, o);
-  const grossRow = receiptShouldShowGross(o)
-    ? `<tr class="receipt-grid__gross"><td></td><td colspan="9" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`
-    : "";
-  return `<tr class="receipt-grid__return"><td></td><td colspan="2" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr>${grossRow}${receiptPromoRowsHtml(o)}${receiptSummaryRowsHtml(sub, vat, payable, payTerm, o)}${receiptWarningRowsHtml()}${receiptSignatureRowsHtml()}`;
+  return `${receiptPromoRowsHtml(o)}${receiptSummaryRowsHtml(sub, vat, payable, payTerm, o)}${receiptWarningRowsHtml()}${receiptSignatureRowsHtml(opts)}`;
+}
+function receiptFooterRows(o, opts = {}) {
+  const mode = opts.footerMode || "full";
+  if (mode === "none") return "";
+  if (mode === "upper") return receiptUpperFooterRows(o);
+  if (mode === "lower") return receiptLowerFooterRows(o, opts);
+  return `${receiptUpperFooterRows(o)}${receiptLowerFooterRows(o, opts)}`;
 }
 function receiptTotalsBlockHtml(o) {
   return receiptFooterRows(o);
@@ -713,13 +729,17 @@ function receiptSheetHtml(o, logoSrc, opts = {}) {
   const withHeader = opts.withHeader !== false;
   const withInfo = opts.withInfo !== false;
   const withItemsHead = opts.withItemsHead !== false;
-  const withFooter = opts.withFooter !== false;
+  let footerMode = opts.footerMode;
+  if (!footerMode) {
+    if (opts.withFooter === false) footerMode = "none";
+    else footerMode = "full";
+  }
   const rows = [
     withHeader ? receiptHeaderRows(logoSrc, o) : "",
     withInfo ? receiptInfoRows(o) : "",
     withItemsHead ? receiptItemsHeadRow() : "",
     receiptTableRowsHtml(o, items, startIndex),
-    withFooter ? receiptFooterRows(o) : "",
+    receiptFooterRows(o, { footerMode, pushDown: opts.pushDown }),
   ].join("");
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${rows}</table>`;
 }
@@ -728,12 +748,99 @@ function receiptPageHtml(o, logoSrc) {
 }
 function receiptPrintPageHtml(o, logoSrc) {
   const items = receiptPaidItems(o);
-  if (items.length <= RECEIPT_FIRST_PAGE_ITEM_LIMIT) {
-    return `<div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div>`;
+  const hasPromo = receiptHasPromoSection(o);
+  const page = (html, continued = false, footerOnly = false) => {
+    const cls = [
+      "receipt-page",
+      continued ? "receipt-page--continued" : "",
+      footerOnly ? "receipt-page--footer-only" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return `<div class="${cls}">${html}</div>`;
+  };
+  const wrapLower = () =>
+    page(
+      receiptSheetHtml(o, logoSrc, {
+        items: [],
+        withHeader: false,
+        withInfo: false,
+        withItemsHead: false,
+        footerMode: "lower",
+        pushDown: true,
+      }),
+      true,
+      true,
+    );
+
+  // Prefer keeping all paid lines on page 1; if crowded, cut from promo downward.
+  if (items.length <= RECEIPT_PAGE_PAID_MAX) {
+    if (hasPromo && items.length >= RECEIPT_PAGE_SOFT_MAX) {
+      return (
+        page(
+          receiptSheetHtml(o, logoSrc, {
+            items,
+            footerMode: "upper",
+          }),
+        ) + wrapLower()
+      );
+    }
+    return page(receiptSheetHtml(o, logoSrc));
   }
-  const firstItems = items.slice(0, RECEIPT_FIRST_PAGE_ITEM_LIMIT),
-    restItems = items.slice(RECEIPT_FIRST_PAGE_ITEM_LIMIT);
-  return `<div class="receipt-page">${receiptSheetHtml(o, logoSrc, { items: firstItems, withFooter: false })}</div><div class="receipt-page receipt-page--continued">${receiptSheetHtml(o, logoSrc, { items: restItems, startIndex: RECEIPT_FIRST_PAGE_ITEM_LIMIT, withHeader: false, withInfo: false })}</div>`;
+
+  // Paid list alone overflows: fill pages with paid lines; promo+below only after last paid chunk.
+  const parts = [];
+  for (let i = 0; i < items.length; i += RECEIPT_PAGE_PAID_MAX) {
+    const chunk = items.slice(i, i + RECEIPT_PAGE_PAID_MAX);
+    const isLast = i + RECEIPT_PAGE_PAID_MAX >= items.length;
+    const continued = i > 0;
+    if (!isLast) {
+      parts.push(
+        page(
+          receiptSheetHtml(o, logoSrc, {
+            items: chunk,
+            startIndex: i,
+            withHeader: !continued,
+            withInfo: !continued,
+            withItemsHead: true,
+            footerMode: "none",
+          }),
+          continued,
+        ),
+      );
+      continue;
+    }
+    if (hasPromo && chunk.length >= RECEIPT_PAGE_SOFT_MAX) {
+      parts.push(
+        page(
+          receiptSheetHtml(o, logoSrc, {
+            items: chunk,
+            startIndex: i,
+            withHeader: !continued,
+            withInfo: !continued,
+            footerMode: "upper",
+          }),
+          continued,
+        ),
+      );
+      parts.push(wrapLower());
+    } else {
+      parts.push(
+        page(
+          receiptSheetHtml(o, logoSrc, {
+            items: chunk,
+            startIndex: i,
+            withHeader: !continued,
+            withInfo: !continued,
+            footerMode: "full",
+            pushDown: continued && chunk.length < 8,
+          }),
+          continued,
+        ),
+      );
+    }
+  }
+  return parts.join("");
 }
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
@@ -5773,7 +5880,9 @@ const RECEIPT_EXCEL_STYLES = `
 body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet { display: block; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
-.receipt-page { width: 100%; max-width: 194mm; margin: 0 auto; padding: 2mm 1mm 4mm; font-size: 9pt; line-height: 1.2; font-family: ${RECEIPT_FONT}; box-sizing: border-box; }
+.receipt-page { width: 100%; max-width: 194mm; margin: 0 auto; padding: 2mm 1mm 4mm; font-size: 9pt; line-height: 1.2; font-family: ${RECEIPT_FONT}; box-sizing: border-box; min-height: 270mm; }
+.receipt-page--footer-only { display: flex; flex-direction: column; }
+.receipt-page--footer-only .receipt-grid--sheet { flex: 1 1 auto; height: 100%; }
 .receipt-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
 .receipt-grid__a { width: 3.59%; } .receipt-grid__b { width: 7.48%; } .receipt-grid__c { width: 20.81%; } .receipt-grid__d { width: 4.65%; } .receipt-grid__e { width: 12.43%; }
 .receipt-grid__f { width: 11.52%; } .receipt-grid__g { width: 6.73%; } .receipt-grid__h { width: 5.84%; } .receipt-grid__i { width: 4.49%; } .receipt-grid__j { width: 11.08%; } .receipt-grid__k { width: 11.38%; }
@@ -5782,6 +5891,7 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid--sheet .receipt-grid__return td,
 .receipt-grid--sheet .receipt-grid__warn td,
 .receipt-grid--sheet .receipt-grid__spacer td,
+.receipt-grid--sheet .receipt-grid__fill td,
 .receipt-grid--sheet .receipt-grid__footnote td,
 .receipt-grid--sheet .receipt-grid__settle td,
 .receipt-grid--sheet .receipt-grid__sign td { border: none; padding: 1px 2px; vertical-align: middle; }
@@ -5793,12 +5903,13 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid--sheet .receipt-grid__summary td { border: none; padding: 2px 4px; vertical-align: middle; font-size: 9pt; }
 .receipt-grid--sheet .receipt-grid__return td { padding: 4px 4px 6px; }
 .receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #c8c8c8; background: #e8ebee; padding: 4px; }
-.receipt-grid--sheet .receipt-grid__promo td,
-.receipt-grid--sheet .receipt-grid__promo-note td { background: #fafafa; }
+.receipt-grid--sheet .receipt-grid__promo-note td { background: #fff8e6; padding: 6px 4px; }
+.receipt-grid--sheet .receipt-grid__promo td { background: #fafafa; border-bottom: 1px solid #e2e2e2; padding: 3px 4px; }
 .receipt-grid--sheet .receipt-grid__summary--grand td { border-top: 1px solid #c8c8c8; background: #e8ebee; padding: 4px; }
 .receipt-grid--sheet .receipt-grid__summary--pay td { padding-top: 6px; }
-.receipt-grid__promo-title { border-left: none !important; font-weight: 700; text-align: center; vertical-align: middle; }
-.receipt-grid__promo-settle { text-align: center; font-size: 9pt; white-space: normal; line-height: 1.25; background: #fff2cc; font-weight: 700; }
+.receipt-grid__promo-banner { display: table-cell; text-align: left; vertical-align: middle; }
+.receipt-grid__promo-title { display: inline-block; font-weight: 700; font-size: 10pt; margin-right: 10px; vertical-align: middle; white-space: nowrap; }
+.receipt-grid__promo-settle { display: inline-block; text-align: left; font-size: 9pt; white-space: normal; line-height: 1.3; background: #fff2cc; font-weight: 700; padding: 2px 6px; vertical-align: middle; }
 .receipt-grid__logo-cell { vertical-align: top; padding: 0; }
 .receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
@@ -5810,6 +5921,8 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__value { font-weight: 700; }
 .receipt-grid__value--address { white-space: normal; line-height: 1.25; font-weight: 700; }
 .receipt-grid__spacer td { height: 4px; padding: 0; }
+.receipt-grid__spacer--sign td { height: 8mm; }
+.receipt-grid__fill td { height: 42mm; padding: 0; border: none !important; }
 .receipt-grid__head { font-weight: 700; text-align: center; background: #f3f3f3; font-size: 9pt; }
 .receipt-grid__num { text-align: center; }
 .receipt-grid__name { text-align: left; }
@@ -5835,8 +5948,8 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid__warn-line:last-child,
 .receipt-grid__warn-line--last { margin-bottom: 0; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
-.receipt-grid__sign-label { font-size: 9pt; padding: 8px 2px 2px; vertical-align: bottom; white-space: nowrap; }
-.receipt-grid__sign-line { border-bottom: none !important; min-height: 22px; vertical-align: bottom; }
+.receipt-grid__sign-label { font-size: 9pt; padding: 12px 2px 6px; vertical-align: bottom; white-space: nowrap; }
+.receipt-grid__sign-line { border-bottom: 1px solid #333 !important; height: 18px; min-height: 18px; vertical-align: bottom; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 `;
 let receiptExcelLogoDataUri = "";
