@@ -2718,7 +2718,8 @@ async function downloadBlobFile(blob, filename, opts = {}) {
   // Keep the original ArrayBuffer so Android share does not get a detached/streamed blob.
   const buffer = await blob.arrayBuffer();
   const shareBlob = new Blob([buffer], { type });
-  const useShare = prefersMobileExcelShare() || !skipShare;
+  // skipShare=true means force direct download (needed for Samsung Excel openability).
+  const useShare = !skipShare && prefersMobileExcelShare();
   if (
     useShare &&
     typeof navigator.share === "function" &&
@@ -2741,11 +2742,15 @@ async function downloadBlobFile(blob, filename, opts = {}) {
     a.download = name;
     a.rel = "noopener";
     a.style.display = "none";
+    a.setAttribute("target", "_blank");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   } finally {
-    setTimeout(() => URL.revokeObjectURL(url), prefersMobileExcelShare() ? 60000 : 15000);
+    setTimeout(
+      () => URL.revokeObjectURL(url),
+      prefersMobileExcelShare() ? 60000 : 15000,
+    );
   }
   return true;
 }
@@ -3486,7 +3491,7 @@ function mergePromotionRuleKind(
   );
 }
 function mergePromotionRules(remote = {}, local = {}, deletionLog = []) {
-  return {
+  const merged = {
     quantity: mergePromotionRuleKind(
       "quantity",
       remote.quantity,
@@ -3501,6 +3506,7 @@ function mergePromotionRules(remote = {}, local = {}, deletionLog = []) {
       deletionLog,
     ),
   };
+  return normalizePromotionRulesState(merged);
 }
 function appendPromotionRule(kind, rule) {
   if (!state.promotionRules || typeof state.promotionRules !== "object") {
@@ -3724,17 +3730,11 @@ function applyPersistentState(data) {
   if (!state.promotionRules || typeof state.promotionRules !== "object") {
     state.promotionRules = { quantity: [], price: [], payment: [] };
   } else {
-    if (!Array.isArray(state.promotionRules.quantity))
-      state.promotionRules.quantity = [];
-    if (!Array.isArray(state.promotionRules.price))
-      state.promotionRules.price = [];
-    if (!Array.isArray(state.promotionRules.payment))
-      state.promotionRules.payment = [];
+    state.promotionRules = normalizePromotionRulesState(state.promotionRules);
     for (const kind of ["quantity", "price", "payment"]) {
-      state.promotionRules[kind] = dedupePromotionRuleList(
-        state.promotionRules[kind],
-      ).filter(
-        (rule) => !promotionDeletionLogHas(state.promotionDeletionLog, kind, rule),
+      state.promotionRules[kind] = (state.promotionRules[kind] || []).filter(
+        (rule) =>
+          !promotionDeletionLogHas(state.promotionDeletionLog, kind, rule),
       );
     }
   }
@@ -3992,14 +3992,20 @@ function armWhReceiptPickerDismissGuard() {
     });
   });
 }
-function suppressWhReceiptPickerDismiss(ms = 360) {
-  whReceiptPickerSuppressDismissUntil = Date.now() + ms;
+function suppressWhReceiptPickerDismiss(ms) {
+  const wait =
+    ms != null
+      ? ms
+      : isSamsungDevice() || isAndroidDevice()
+        ? 900
+        : 360;
+  whReceiptPickerSuppressDismissUntil = Date.now() + wait;
 }
 function shouldSuppressWhReceiptPickerDismiss() {
   return Date.now() < whReceiptPickerSuppressDismissUntil;
 }
 function whReceiptPickerTriggerAttrs() {
-  return ` onpointerdown="armWhReceiptPickerDismissGuard()"`;
+  return ` onpointerdown="armWhReceiptPickerDismissGuard()" ontouchstart="armWhReceiptPickerDismissGuard()"`;
 }
 function flushPendingWarehouseDateRender() {
   if (isWarehouseDateEditing()) return;
@@ -5460,7 +5466,15 @@ function initPageUnloadPersist() {
 }
 
 function go(view, opts = {}) {
-  if (!canAccessView(view)) return;
+  if (!canAccessView(view)) {
+    if (!opts.silent) {
+      alertModal(
+        "Эрхгүй",
+        "Энэ хэсгийг харах эрх байхгүй байна. Админаас эрхээ шалгуулна уу.",
+      );
+    }
+    return;
+  }
   const changed = state.currentView !== view;
   const wasWorkerOrders =
     state.currentView === "worker" && state.filters.worker === "orders";
@@ -5575,7 +5589,7 @@ function adminHubCard(view, label, iconKey) {
     ADMIN_METRIC_ICONS[iconKey] ||
     MOBILE_NAV_SVG[view] ||
     ADMIN_METRIC_ICONS.stock;
-  return `<button type="button" onclick="go('${view}')" class="admin-hub-card"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+  return `<button type="button" onclick="event.preventDefault();go('${view}')" class="admin-hub-card"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
 }
 function adminHubActionCard(action, label, iconKey) {
   const svg = ADMIN_METRIC_ICONS[iconKey] || ADMIN_METRIC_ICONS.stock;
@@ -6642,18 +6656,12 @@ async function exportOrderReceiptsExcel(orders) {
   try {
     const ok = await exportOrderReceiptsExcelXlsx(orders);
     if (ok === false) return;
-    showInstallToast(
-      prefersMobileExcelShare()
-        ? "Excel файл бэлэн — хадгалах цонхоос сонгоно уу"
-        : "Excel файл татагдлаа",
-    );
+    showInstallToast("Excel файл татагдлаа");
   } catch (err) {
     console.error("Receipt xlsx export failed", err);
     alertModal(
       "Excel татах амжилтгүй",
-      prefersMobileExcelShare()
-        ? "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Дахин оролдож, гарч ирсэн цонхоос «Файл» эсвэл «Drive»-д хадгална уу."
-        : "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+      "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
     );
   }
 }
@@ -10941,11 +10949,53 @@ function promotionBuyProductIds(rule) {
   return [];
 }
 function promotionFreeProductIds(rule) {
+  if (!rule || typeof rule !== "object") return [];
   if (Array.isArray(rule.freeProductIds) && rule.freeProductIds.length) {
     return rule.freeProductIds.filter(Boolean);
   }
+  // Legacy / alternate keys used by price & payment forms.
+  if (Array.isArray(rule.priceFreeProductIds) && rule.priceFreeProductIds.length) {
+    return rule.priceFreeProductIds.filter(Boolean);
+  }
+  if (
+    Array.isArray(rule.paymentFreeProductIds) &&
+    rule.paymentFreeProductIds.length
+  ) {
+    return rule.paymentFreeProductIds.filter(Boolean);
+  }
   if (rule.freeProductId) return [rule.freeProductId];
+  if (rule.priceFreeProductId) return [rule.priceFreeProductId];
+  if (rule.paymentFreeProductId) return [rule.paymentFreeProductId];
   return [];
+}
+function normalizePromotionRuleShape(rule) {
+  if (!rule || typeof rule !== "object") return rule;
+  const freeIds = promotionFreeProductIds(rule);
+  if (!freeIds.length) return rule;
+  if (
+    Array.isArray(rule.freeProductIds) &&
+    rule.freeProductIds.length === freeIds.length
+  ) {
+    return rule;
+  }
+  return {
+    ...rule,
+    freeProductIds: freeIds,
+    freeProductId: freeIds[0],
+  };
+}
+function normalizePromotionRulesState(rules = {}) {
+  const next = {
+    quantity: Array.isArray(rules.quantity) ? rules.quantity : [],
+    price: Array.isArray(rules.price) ? rules.price : [],
+    payment: Array.isArray(rules.payment) ? rules.payment : [],
+  };
+  for (const kind of ["quantity", "price", "payment"]) {
+    next[kind] = dedupePromotionRuleList(
+      next[kind].map(normalizePromotionRuleShape),
+    );
+  }
+  return next;
 }
 function promotionPickIds(pick, key) {
   const raw = pick?.[key];

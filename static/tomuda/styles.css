@@ -8583,7 +8583,7 @@ textarea::placeholder {
 /* Агуулах — баримтууд */
 .wh-receipts {
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   border: none;
   border-top: 1px solid var(--hex-border);
@@ -8599,6 +8599,9 @@ textarea::placeholder {
   gap: 10px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--hex-border);
+  overflow: visible;
+  position: relative;
+  z-index: 5;
 }
 
 .wh-receipts__head-main {
@@ -8622,6 +8625,9 @@ textarea::placeholder {
   flex-shrink: 1;
   min-width: 0;
   justify-content: flex-end;
+  overflow: visible;
+  position: relative;
+  z-index: 6;
 }
 
 .wh-receipt-field--picker {
@@ -8721,7 +8727,7 @@ textarea::placeholder {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  z-index: 30;
+  z-index: 80;
   width: min(92vw, 320px);
   border: 1px solid var(--hex-border);
   border-radius: 16px;
@@ -8731,6 +8737,8 @@ textarea::placeholder {
     0 2px 8px rgba(15, 23, 42, 0.06);
   overflow: hidden;
   animation: wh-receipt-picker-in 0.18s ease;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 @keyframes wh-receipt-picker-in {
@@ -9777,6 +9785,7 @@ textarea::placeholder {
     width: 100%;
     flex-direction: column;
     align-items: stretch;
+    overflow: visible;
   }
 
   .wh-receipt-picker,
@@ -9786,12 +9795,21 @@ textarea::placeholder {
     min-width: 0;
     width: 100%;
     flex: 1 1 auto;
+    overflow: visible;
+    position: relative;
+    z-index: 7;
+  }
+
+  .wh-receipt-picker.is-open {
+    z-index: 90;
   }
 
   .wh-receipt-picker__panel {
     left: 0;
     right: 0;
     width: auto;
+    max-height: min(70vh, 420px);
+    z-index: 100;
   }
 
   .wh-receipt-list {
@@ -11272,6 +11290,9 @@ textarea::placeholder {
   color: var(--hex-foreground);
   text-align: left;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
   box-shadow: 0 1px 3px rgba(16, 22, 35, 0.06);
   transition:
     transform 0.12s ease,
