@@ -2381,7 +2381,7 @@ function openEmployeePermissionsPage() {
 }
 function employeePermissionsView() {
   if (!canManageEmployeePermissions()) {
-    return `<div class="space-y-4">${pageHead("Эрх үүсгэх")}<p class="text-sm text-muted-foreground">Эрх хүрэлцэхгүй.</p></div>`;
+    return `<div class="space-y-4">${pageHead("Эрхийн тохиргоо")}<p class="text-sm text-muted-foreground">Эрх хүрэлцэхгүй.</p></div>`;
   }
   const selectedEmployees = selectedPermissionEmployees();
   const permHtml = permApi().permissionsFieldHtml(
@@ -2391,7 +2391,7 @@ function employeePermissionsView() {
   );
   const saveBtn = `<button type="button" onclick="saveGrantedPermissions()" class="btn btn--primary btn--sm shrink-0">Хадгалах</button>`;
   const pctHtml = permissionPercentDiscountFieldHtml(selectedEmployees);
-  return `<div class="space-y-4 perm-grant-page">${pageHead("Эрх үүсгэх", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p>${permissionEmployeePickerHtml()}${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${pctHtml}${permHtml}</div>`;
+  return `<div class="space-y-4 perm-grant-page">${pageHead("Эрхийн тохиргоо", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p>${permissionEmployeePickerHtml()}${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${pctHtml}${permHtml}</div>`;
 }
 const EMPLOYEE_EMAIL_DEFAULTS = {
   admin: "admin@tomuda.mn",
@@ -2651,7 +2651,7 @@ function currentPageTitle(nav) {
   }
   const extra = {
     employees: "Ажилтан",
-    employeePermissions: "Эрх үүсгэх",
+    employeePermissions: "Эрхийн тохиргоо",
     inventory: "Нярав",
     reports: "Тайлан",
     promotions: "Урамшуулал",
@@ -5603,7 +5603,7 @@ function adminHubHtml() {
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
     ["count", "Тооллого", "count", "count.view"],
-    ["employeePermissions", "Эрх үүсгэх", "employees", "__permissions__"],
+    ["employeePermissions", "Эрхийн тохиргоо", "employees", "__permissions__"],
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
     if (id === "promotions") return canManagePromotions();
@@ -5618,7 +5618,7 @@ function adminHubHtml() {
   if (canManagePercentDiscountSettings()) {
     settings.push([
       "percentDiscountSettingsModal()",
-      "Шууд төлөлтийн хувь",
+      "Шууд төлөлтийн хувь оруулах",
       "employees",
     ]);
   }
@@ -5675,7 +5675,7 @@ function percentDiscountSettingsModal() {
   ensureSettings();
   const rate = percentDiscountRate();
   box(
-    "Шууд төлөлтийн хувь",
+    "Шууд төлөлтийн хувь оруулах",
     `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">(Харилцагч хүлээн авсан барааны төлбөрийг шууд төлөх үед хөнгөлөлтийн хэмжээ)</p><label class="block text-sm font-medium">Шууд төлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
@@ -12449,7 +12449,7 @@ function workerChooser(orders) {
     detail = qtyDetail(orders),
     chooserLabel = canPick
       ? hasSelection
-        ? names || "Захиалга алга"
+        ? names || "Захиалга байхгүй"
         : "Сонгох"
       : state.currentEmployee?.name || "-",
     emptyText = canPick
@@ -14478,7 +14478,7 @@ function employeeModal(id) {
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрх үүсгэх хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрхийн тохиргоо хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-lg",
   );
   setTimeout(() => initEmployeeImageField(e || {}), 0);

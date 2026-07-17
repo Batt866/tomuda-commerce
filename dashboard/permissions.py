@@ -40,7 +40,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
             {"id": "receipts", "label": "Баримтууд", "actions": CRUD},
             {"id": "promotions", "label": "Урамшуулал", "actions": CRUD},
             {"id": "stockAlert", "label": "Үлдэгдлийн мэдэгдэл", "actions": CRUD},
-            {"id": "permissions", "label": "Эрх үүсгэх", "actions": CRUD},
+            {"id": "permissions", "label": "Эрхийн тохиргоо", "actions": CRUD},
             {
                 "id": "percentDiscount",
                 "label": "Шууд төлөлтийн хувь оруулах",
