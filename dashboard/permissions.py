@@ -36,7 +36,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
             {"id": "employeeAdd", "label": "Ажилтан нэмэх", "actions": CRUD},
             {"id": "stockIn", "label": "Орлого", "actions": CRUD},
             {"id": "stockOut", "label": "Зарлага", "actions": CRUD},
-            {"id": "reports", "label": "Тайлан", "actions": CRUD},
+            {"id": "reports", "label": "Борлуулалтын тайлан", "actions": CRUD},
             {"id": "receipts", "label": "Баримтууд", "actions": CRUD},
             {"id": "promotions", "label": "Урамшуулал", "actions": CRUD},
             {"id": "stockAlert", "label": "Үлдэгдлийн мэдэгдэл", "actions": CRUD},
@@ -57,7 +57,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
         "id": "system",
         "label": "Системийн эрх",
         "modules": [
-            {"id": "excelExport", "label": "Excel файл татах", "actions": CRUD},
+            {"id": "excelExport", "label": "Мэдээлэл татах", "actions": CRUD},
             {"id": "excelImport", "label": "Excel файл оруулах", "actions": CRUD},
             {"id": "excelTemplate", "label": "Формат татах", "actions": CRUD},
         ],

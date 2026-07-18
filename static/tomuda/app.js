@@ -1322,9 +1322,9 @@ function reportCustomerReceivableRow(customerName, unpaidOrders) {
       .join("");
   return `<div class="line-list__row line-list__row--static report-receivable-row"><div class="report-receivable-row__main"><p class="payment-row__customer">${esc(customerName)}</p><div class="worker-receivable"><p class="worker-receivable__label">Авлага</p><div class="worker-receivable__list">${items}</div></div><p class="line-list__meta">${esc(first.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(first))}</p></div></div>`;
 }
-function reportPaymentListHtml(orders) {
+function reportPaymentListHtml(orders, emptyText = "Захиалга байхгүй") {
   if (!orders.length)
-    return `<div class="line-panel__empty">Захиалга байхгүй</div>`;
+    return `<div class="line-panel__empty">${esc(emptyText)}</div>`;
   // One row per order so credit unpaid always shows «Тооцоо дууссан».
   return orders.map((o) => paymentRow(o)).join("");
 }
@@ -1432,7 +1432,7 @@ const pickerOpen = () => !!modal.querySelector("[data-picker-root]");
 const ORDER_PICKER_TITLE = "Захиалгад бараа сонгох";
 const PRODUCT_NEW_TITLE = "Бараа нэмэх";
 const PRODUCT_EDIT_TITLE = "Бараа засах";
-const EXCEL_FILE_DOWNLOAD = "Excel файл татах";
+const EXCEL_FILE_DOWNLOAD = "Мэдээлэл татах";
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const IMPORT_FILE_FORMAT_HINT =
@@ -1446,7 +1446,7 @@ function importUploadIconHtml() {
 function excelDownloadBtn(onclick, opts = {}) {
   const {
     label = EXCEL_FILE_DOWNLOAD,
-    shortLabel = "Excel",
+    shortLabel = EXCEL_FILE_DOWNLOAD,
     disabled = false,
     extraClass = "",
   } = opts;
@@ -2539,7 +2539,7 @@ const MOBILE_NAV_SHORT = {
   count: "Тооллого",
   employees: "Ажилтан",
   inventory: "Бүртгэл",
-  reports: "Тайлан",
+  reports: "Борлуулалтын тайлан",
   promotions: "Урамшуулал",
   admin: "Админ",
 };
@@ -2580,7 +2580,7 @@ function sidebarNavForRole(role) {
       ["warehouse", "Нярав"],
       ["employees", "Ажилтан"],
       ["inventory", "Агуулахын бүртгэл"],
-      ["reports", "Тайлан"],
+      ["reports", "Борлуулалтын тайлан"],
       ["promotions", "Урамшуулал"],
       ["admin", "Админ"],
     ];
@@ -2653,7 +2653,7 @@ function currentPageTitle(nav) {
     employees: "Ажилтан",
     employeePermissions: "Эрхийн тохиргоо",
     inventory: "Нярав",
-    reports: "Тайлан",
+    reports: "Борлуулалтын тайлан",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
     count: "Тооллого",
@@ -2713,12 +2713,13 @@ async function zipToExcelBlob(zip) {
 }
 async function downloadBlobFile(blob, filename, opts = {}) {
   const { skipShare = false } = opts;
-  const name = String(filename || "download.xlsx");
-  const type = blob.type || XLSX_MIME;
+  const name = safeDownloadFileName(filename, blob.type || XLSX_MIME);
+  const type = blob.type || guessMimeFromFileName(name);
   // Keep the original ArrayBuffer so Android share does not get a detached/streamed blob.
   const buffer = await blob.arrayBuffer();
   const shareBlob = new Blob([buffer], { type });
-  // skipShare=true means force direct download (needed for Samsung Excel openability).
+  // On Samsung/Android, share-to-Excel opens reliably; forced <a download> often
+  // saves a file the system cannot associate with Excel.
   const useShare = !skipShare && prefersMobileExcelShare();
   if (
     useShare &&
@@ -2742,7 +2743,8 @@ async function downloadBlobFile(blob, filename, opts = {}) {
     a.download = name;
     a.rel = "noopener";
     a.style.display = "none";
-    a.setAttribute("target", "_blank");
+    // Do not set target=_blank — Android WebView often opens blob: as a blank
+    // page and the saved file becomes unopenable.
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2753,6 +2755,35 @@ async function downloadBlobFile(blob, filename, opts = {}) {
     );
   }
   return true;
+}
+function guessMimeFromFileName(name) {
+  const lower = String(name || "").toLowerCase();
+  if (lower.endsWith(".xlsx")) return XLSX_MIME;
+  if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+  if (lower.endsWith(".csv")) return "text/csv;charset=utf-8";
+  return XLSX_MIME;
+}
+function safeDownloadFileName(name, mime = "") {
+  let base = String(name || "download")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+  if (!base) base = "download";
+  const mimeStr = String(mime || "").toLowerCase();
+  const wantsCsv = /\.csv$/i.test(base) || mimeStr.includes("csv");
+  const wantsXlsx =
+    /\.xlsx$/i.test(base) ||
+    mimeStr.includes("spreadsheetml") ||
+    mimeStr.includes("openxmlformats");
+  const wantsXls =
+    mimeStr.includes("vnd.ms-excel") ||
+    mimeStr.includes("html") ||
+    (!wantsXlsx && /\.xls$/i.test(base));
+  base = base.replace(/\.(xlsx|xls|csv)$/i, "");
+  if (wantsCsv) return `${base || "download"}.csv`;
+  if (wantsXls && !wantsXlsx) return `${base || "download"}.xls`;
+  return `${base || "download"}.xlsx`;
 }
 function productMediaPathFromUrl(url) {
   const raw = String(url || "").trim();
@@ -5517,6 +5548,58 @@ function scrollAppMainToTop() {
     document.querySelector(".app-main")?.scrollTo({ top: 0, left: 0 });
   });
 }
+const SCROLL_TOP_FAB_VIEWS = new Set([
+  "products",
+  "customers",
+  "orders",
+  "warehouseReceipts",
+]);
+function usesScrollTopFab() {
+  if (SCROLL_TOP_FAB_VIEWS.has(state.currentView)) return true;
+  return (
+    state.currentView === "worker" && state.filters.worker === "orders"
+  );
+}
+function scrollTopFabHtml() {
+  if (!usesScrollTopFab()) return "";
+  return `<button type="button" class="scroll-top-fab" data-scroll-top-fab hidden onclick="scrollPageToTop()" aria-label="Дээш очих"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>`;
+}
+function scrollTopScrollTargets() {
+  return [
+    document.querySelector(".app-main"),
+    document.querySelector(".line-list--scroll"),
+    document.querySelector(".wh-receipt-list"),
+    document.querySelector(".list-panel__body"),
+    document.querySelector(".product-list"),
+  ].filter(Boolean);
+}
+function scrollPageToTop() {
+  scrollTopScrollTargets().forEach((el) => {
+    try {
+      el.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    } catch {
+      el.scrollTop = 0;
+    }
+  });
+}
+function bindScrollTopFab() {
+  const fab = document.querySelector("[data-scroll-top-fab]");
+  if (!fab) return;
+  const targets = scrollTopScrollTargets();
+  const update = () => {
+    const scrolled = targets.some((el) => (el.scrollTop || 0) > 140);
+    fab.hidden = !scrolled;
+    fab.classList.toggle("is-visible", scrolled);
+  };
+  targets.forEach((el) => {
+    if (el._scrollTopFabHandler) {
+      el.removeEventListener("scroll", el._scrollTopFabHandler);
+    }
+    el._scrollTopFabHandler = update;
+    el.addEventListener("scroll", update, { passive: true });
+  });
+  update();
+}
 let lastRenderedView = null;
 function captureRenderScroll() {
   const main = document.querySelector(".app-main");
@@ -5582,7 +5665,7 @@ function shell(content) {
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${mobileBottomNav(bottomNav)}</div>`;
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${scrollTopFabHtml()}${mobileBottomNav(bottomNav)}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
   const svg =
@@ -5599,7 +5682,7 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["inventory", "Нярав", "inventory", "warehouse.view"],
-    ["reports", "Тайлан", "reports", "reports.view"],
+    ["reports", "Борлуулалтын тайлан", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
     ["count", "Тооллого", "count", "count.view"],
@@ -6064,18 +6147,27 @@ function buildReceiptExcelDocument(orders, logoSrc) {
 function receiptExcelFileName(orders) {
   const stamp = new Date().toISOString().slice(0, 10);
   if (orders.length === 1) {
-    return `zarlagyn-barimt-${formatReceiptNumber(orders[0])}.xlsx`;
+    const no = String(formatReceiptNumber(orders[0]) || "1").replace(
+      /[^\w.-]+/g,
+      "-",
+    );
+    return `zarlagyn-barimt-${no}.xlsx`;
   }
   return `zarlagyn-barimt-${stamp}.xlsx`;
 }
 function legacyExcelFileName(name) {
-  return String(name || "excel.xlsx").replace(/\.(xlsx|xls|csv)$/i, ".xls");
+  return safeDownloadFileName(
+    String(name || "excel.xlsx").replace(/\.(xlsx|xls|csv)$/i, ".xls"),
+    "application/vnd.ms-excel",
+  );
 }
-function downloadReceiptExcelBlob(name, html) {
+async function downloadReceiptExcelBlob(name, html) {
   const blob = new Blob(["\uFEFF" + html], {
     type: "application/vnd.ms-excel;charset=utf-8",
   });
-  void downloadBlobFile(blob, name);
+  return downloadBlobFile(blob, legacyExcelFileName(name), {
+    skipShare: !prefersMobileExcelShare(),
+  });
 }
 function exportOrderReceiptsExcelCsv(orders) {
   const stamp = new Date().toISOString().slice(0, 10),
@@ -6595,9 +6687,10 @@ function buildReceiptSheetXml(
 function buildReceiptWorkbookXml(orders, opts = {}) {
   const ctx = createReceiptStringContext();
   const usedNames = new Set();
+  const mobile = !!opts.mobileSafe;
   const sheets = orders.map((order, index) => {
     const built = buildReceiptSheetXml(order, ctx, {
-      sheetName: `Баримт ${index + 1}`,
+      sheetName: mobile ? `Receipt ${index + 1}` : `Баримт ${index + 1}`,
       hasLogo: opts.hasLogo,
     });
     let name = xlsxSafeSheetName(built.sheetName, `Sheet${index + 1}`);
@@ -6642,27 +6735,45 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const filename = receiptExcelFileName(orders);
+  const mobileSafe = prefersMobileExcelShare();
   // Samsung/Android Excel is very strict about drawings; skip logo there so the
   // workbook opens without the "repair content" dialog.
-  const embedLogo = !prefersMobileExcelShare();
+  const embedLogo = !mobileSafe;
   const logoBuffer = embedLogo ? await loadReceiptExcelLogoBuffer() : null;
   const hasLogo = !!logoBuffer;
-  const built = buildReceiptWorkbookXml(orders, { hasLogo });
+  const built = buildReceiptWorkbookXml(orders, { hasLogo, mobileSafe });
   const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
-  return downloadBlobFile(blob, filename, { skipShare: true });
+  // Prefer the share sheet on phones so Excel/Sheets can open the file directly.
+  return downloadBlobFile(blob, filename, { skipShare: !mobileSafe });
+}
+async function exportOrderReceiptsExcelLegacy(orders) {
+  const logoSrc = await getReceiptExcelLogoDataUri().catch(() => "");
+  const html = buildReceiptExcelDocument(orders, logoSrc || "");
+  return downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
   try {
     const ok = await exportOrderReceiptsExcelXlsx(orders);
     if (ok === false) return;
-    showInstallToast("Excel файл татагдлаа");
+    showInstallToast(
+      prefersMobileExcelShare()
+        ? "Файлыг Excel-ээр нээнэ үү"
+        : "Мэдээлэл татагдлаа",
+    );
   } catch (err) {
     console.error("Receipt xlsx export failed", err);
-    alertModal(
-      "Excel татах амжилтгүй",
-      "Баримтын Excel файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
-    );
+    try {
+      const ok = await exportOrderReceiptsExcelLegacy(orders);
+      if (ok === false) return;
+      showInstallToast("Мэдээлэл татагдлаа");
+    } catch (legacyErr) {
+      console.error("Receipt legacy excel export failed", legacyErr);
+      alertModal(
+        "Мэдээлэл татах амжилтгүй",
+        "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+      );
+    }
   }
 }
 function orderReceiptExportSnapshots(
@@ -6708,16 +6819,16 @@ function confirmOrderReceiptsExcel(
   if (!rows.length) {
     return alert(
       idList(state.receiptPrintOrderIds).length
-        ? "Excel татах захиалга сонгоно уу"
+        ? "Мэдээлэл татах захиалга сонгоно уу"
         : "Захиалга олдсонгүй",
     );
   }
-  confirmDataExport("Excel татах", () => exportOrderReceiptsExcel(rows));
+  confirmDataExport("Мэдээлэл татах", () => exportOrderReceiptsExcel(rows));
 }
 function confirmSingleOrderReceiptExcel(orderId) {
   const o = state.orders.find((x) => x.id === orderId);
   if (!o) return alert("Захиалга олдсонгүй");
-  confirmDataExport("Excel татах", () =>
+  confirmDataExport("Мэдээлэл татах", () =>
     exportOrderReceiptsExcel([orderReceiptSnapshot(o)]),
   );
 }
@@ -6970,6 +7081,11 @@ function customerDetailIdIcon() {
 function customerDetailRow(label, valueHtml, iconHtml) {
   return `<div class="customer-detail__row">${iconHtml}<div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
 }
+function dialPhoneNumber(phone) {
+  const n = String(phone || "").trim();
+  if (!n) return;
+  window.location.href = `tel:${encodeURIComponent(n)}`;
+}
 function customerDetailPhonesHtml(c) {
   const phones = [c.phone1, c.phone2]
     .map((p) => String(p || "").trim())
@@ -6978,11 +7094,11 @@ function customerDetailPhonesHtml(c) {
   return phones
     .map(
       (phone) =>
-        `<a href="tel:${encodeURIComponent(phone)}" class="customer-detail__phone">${esc(phone)}</a>`,
+        `<button type="button" class="customer-detail__phone" data-phone="${esc(phone)}" onclick="dialPhoneNumber(this.getAttribute('data-phone'))">${esc(phone)}</button>`,
     )
     .join('<span class="customer-detail__sep" aria-hidden="true">·</span>');
 }
-function customerDetailHtml(c, id) {
+function customerDetailHtml(c) {
   const addr = [c.province, c.district, c.khoroo, c.address]
       .filter(Boolean)
       .join(", "),
@@ -7012,7 +7128,7 @@ function customerDetailHtml(c, id) {
       customerCardPinIcon(),
     ),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div><footer class="customer-detail__actions">${editIconButton({ className: "btn btn--primary btn--block btn--icon-label", attrs: `onclick="confirmEditCustomer('${esc(id)}')"`, label: "Харилцагч засах" })}</footer></div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div></div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -7208,7 +7324,7 @@ function customerCardPhonesHtml(c) {
   return `<div class="customer-card__phones">${phones
     .map(
       (phone) =>
-        `<a href="tel:${encodeURIComponent(phone)}" class="customer-card__phone-link">${customerCardPhoneIcon()}<span>${esc(phone)}</span></a>`,
+        `<button type="button" class="customer-card__phone-link" data-phone="${esc(phone)}" onclick="dialPhoneNumber(this.getAttribute('data-phone'))" aria-label="Залгах ${esc(phone)}">${customerCardPhoneIcon()}<span>${esc(phone)}</span></button>`,
     )
     .join("")}</div>`;
 }
@@ -7267,7 +7383,7 @@ function customersView() {
         : "";
   return `<div class="space-y-4">${pageHead("Харилцагч")}<div class="list-panel list-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
 }
-function confirmDataExport(title, onConfirm, message = "Excel файл татах уу?") {
+function confirmDataExport(title, onConfirm, message = "Мэдээлэл татах уу?") {
   confirmModal(title, message, {
     confirmLabel: "Татах",
     onConfirm,
@@ -7287,10 +7403,12 @@ function orderReceiptSearchText(o) {
     o.customerName,
     customer.name,
     customer.companyName,
+    customer.registrationNumber,
     customer.phone1,
     customer.phone2,
     o.employeeName,
     o.employeePhone,
+    paymentTermLabel(o.paymentTerm),
     o.status,
   ]
     .map((value) => String(value || "").toLowerCase())
@@ -7625,12 +7743,12 @@ function receiptPeopleFiltersHtml() {
 function confirmCustomerExcel() {
   if (!canExportExcel()) return;
   if (!state.customers.length) return alert("Харилцагч байхгүй");
-  confirmDataExport("Excel татах", customerExcel);
+  confirmDataExport("Мэдээлэл татах", customerExcel);
 }
 function confirmProductsExport() {
-  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   if (!productsExportList().length) return alert("Бараа байхгүй");
-  confirmDataExport("Excel татах", exportProductsExcel);
+  confirmDataExport("Мэдээлэл татах", exportProductsExcel);
 }
 function productsExportList() {
   const q = state.searches.products || "",
@@ -7711,8 +7829,8 @@ function exportProductsExcelFallback() {
   ]);
 }
 function confirmInventoryExport() {
-  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
-  confirmDataExport("Excel татах", () => {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  confirmDataExport("Мэдээлэл татах", () => {
     excel(
       "inventory.xlsx",
       state.inventoryLogs.map((l) => [
@@ -7726,8 +7844,8 @@ function confirmInventoryExport() {
   });
 }
 function confirmReportExport() {
-  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
-  confirmDataExport("Excel татах", () => {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  confirmDataExport("Мэдээлэл татах", () => {
     const orders = reportOrdersFiltered(),
       total = orders.reduce((s, o) => s + orderAmount(o), 0),
       paid = orders
@@ -7740,11 +7858,11 @@ function confirmReportExport() {
   });
 }
 function confirmEmployeeExcel() {
-  if (!canExportExcel()) return alertModal("Эрхгүй", "Excel татах эрхгүй.");
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   if (canPickWarehouseWorkers() && !state.selectedWorkers.length)
     return alert("Ажилтан сонгоно уу");
   if (!warehouseScopeWorkerIds().length) return alert("Ажилтан сонгоно уу");
-  confirmDataExport("Excel татах", employeeExcel);
+  confirmDataExport("Мэдээлэл татах", employeeExcel);
 }
 function customerExcel() {
   if (!canExportExcel()) return;
@@ -8249,7 +8367,7 @@ function confirmFinishStockIn() {
   const receipt = buildStockInReceiptSnapshot();
   if (!receipt?.lines?.length) return;
   const normalized = normalizeStockInReceiptTotals(receipt);
-  const summary = `<p>Хадгалах үед Excel файл татагдана.</p><p class="text-sm text-muted-foreground mt-2">Excel татахгүй бол «Үгүй» дарна уу. Аль ч тохиолдолд орлого хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
+  const summary = `<p>Хадгалах үед мэдээлэл татагдана.</p><p class="text-sm text-muted-foreground mt-2">Мэдээлэл татахгүй бол «Үгүй» дарна уу. Аль ч тохиолдолд орлого хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
   confirmModal("Орлогын баримт", summary, {
     confirmLabel: "Хадгалах",
     cancelLabel: "Үгүй",
@@ -10405,15 +10523,15 @@ ${renderGroupRows(sections.regular)}${promoRows}
 }
 function exportWarehousePrepareExcel(orders, workerIds) {
   return exportWarehousePrepareExcelXlsx(orders, workerIds)
-    .then(() => showInstallToast("Excel файл татагдлаа"))
+    .then(() => showInstallToast("Мэдээлэл татагдлаа"))
     .catch((err) => {
       console.warn("Warehouse prepare xlsx failed", err);
       try {
         exportWarehousePrepareExcelFallback(orders, workerIds);
-        showInstallToast("Excel файл татагдлаа");
+        showInstallToast("Мэдээлэл татагдлаа");
       } catch (fallbackErr) {
         console.warn("Warehouse prepare fallback failed", fallbackErr);
-        alert("Excel файл татахад алдаа гарлаа. Дахин оролдоно уу.");
+        alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
         throw fallbackErr;
       }
     });
@@ -10489,7 +10607,7 @@ function exportCountExcel() {
 function confirmCountExcel() {
   if (!state.countDone) return alert("Эхлээд тооллогоо дуусгана уу");
   if (!countExcelRows().length) return alert("Тоолсон бараа байхгүй");
-  confirmDataExport("Excel татах", exportCountExcel);
+  confirmDataExport("Мэдээлэл татах", exportCountExcel);
 }
 function confirmFinishCount() {
   if (!countSessionActive()) {
@@ -10572,8 +10690,9 @@ function reportDateFiltersHtml() {
   const day = state.filters.reportDate || "",
     live = !day,
     pickerDay = day || todayIso(),
-    display = warehouseDateDisplayText(day);
-  const filters = `<div class="wh-date-filters wh-date-filters--reports"><button type="button" onclick="clearReportDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Бүгд</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setReportDate(this.value)" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Бүх захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+    display = warehouseDateDisplayText(day),
+    q = state.searches.reports || "";
+  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Нэр, баримт №-ээр хайх..." })}<div class="wh-date-filters wh-date-filters--reports"><button type="button" onclick="clearReportDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Бүгд</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setReportDate(this.value)" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Бүх захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
   return pageToolbarHtml({
     filters,
     actions: excelDownloadBtn("confirmReportExport()"),
@@ -10589,6 +10708,8 @@ function setReportDate(day) {
 }
 function reportsView() {
   const orders = reportOrdersFiltered(),
+    q = String(state.searches.reports || "").trim(),
+    paymentOrders = orders.filter((o) => orderReceiptMatchesQuery(o, q)),
     total = orders.reduce((s, o) => s + orderAmount(o), 0),
     paid = orders
       .filter((o) => orderIsPaid(o))
@@ -10606,7 +10727,7 @@ function reportsView() {
         commission: (sum * e.commissionRate) / 100,
       };
     });
-  return `<div class="space-y-4">${pageHead("Тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр</div><div class="line-list">${reportPaymentListHtml(orders)}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Борлуулалтын тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
   const paid = orderIsPaid(o),
@@ -12797,6 +12918,7 @@ function render() {
     permApi()?.syncAllPermissionRowDeps?.();
     bindProductImages(document);
     syncSettlementInputHeights(app);
+    bindScrollTopFab();
   });
 }
 function box(title, body, max = "max-w-2xl", opts = {}) {
@@ -13965,7 +14087,7 @@ async function saveCustomer(e, id) {
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
   if (!c) return;
-  box(c.name, customerDetailHtml(c, id), "max-w-xl");
+  box(c.name, customerDetailHtml(c), "max-w-xl");
 }
 function productModal(id) {
   if (
@@ -14880,8 +15002,8 @@ function downloadOrderReceiptExcel(id, ev) {
     const oldTotal = o ? orderPayableTotal(o) : 0;
     const newTotal = draft ? orderPayableTotal(draft) : oldTotal;
     confirmModal(
-      "Excel татах",
-      `<p>Захиалгын дүнг хадгалж Excel татах уу?</p><p class="text-sm text-muted-foreground mt-2">Нийт: ${fmt(oldTotal)} → <b>${fmt(newTotal)}</b></p>`,
+      "Мэдээлэл татах",
+      `<p>Захиалгын дүнг хадгалж мэдээлэл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Нийт: ${fmt(oldTotal)} → <b>${fmt(newTotal)}</b></p>`,
       {
         confirmLabel: "Татах",
         onConfirm: () => downloadOrderReceiptExcelNow(id),
@@ -16047,10 +16169,12 @@ Object.assign(window, {
   appBack,
   search,
   render,
+  scrollPageToTop,
   closeModal,
   confirmEditCustomer,
   confirmEditProduct,
   confirmEditEmployee,
+  dialPhoneNumber,
   customerModal,
   handleCustomerImage,
   clearCustomerImage,

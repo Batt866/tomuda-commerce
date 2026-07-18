@@ -822,9 +822,16 @@ textarea.text-sm,
 }
 
 .customer-detail__phone {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
   color: var(--hex-primary);
+  font: inherit;
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .customer-detail__phone:hover {
@@ -997,15 +1004,22 @@ textarea.text-sm,
 }
 
 .customer-card__phone-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
   color: var(--hex-primary);
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .customer-card__phone-link .customer-card__icon {
@@ -2847,6 +2861,58 @@ img[data-product-img],
   right: 12px;
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 9999;
+}
+
+.scroll-top-fab {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 42;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hex-border);
+  border-radius: 999px;
+  background: var(--hex-card);
+  color: var(--hex-primary);
+  box-shadow: 0 6px 18px rgba(16, 22, 35, 0.14);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    background 0.15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scroll-top-fab.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.scroll-top-fab:active {
+  background: color-mix(in srgb, var(--hex-primary) 12%, var(--hex-card));
+}
+
+.scroll-top-fab .ui-icon {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-shell--bottom-nav .scroll-top-fab {
+  bottom: calc(
+    var(--mobile-nav-h) + 14px + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 .pwa-install-inner {
