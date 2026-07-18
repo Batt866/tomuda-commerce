@@ -6215,7 +6215,9 @@ function createReceiptStringContext() {
   return { strings, si };
 }
 function receiptXlsxStylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="2"><numFmt numFmtId="164" formatCode="0"/><numFmt numFmtId="165" formatCode="m/d/yy"/></numFmts><fonts count="6"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="21"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  // Use only built-in numFmtIds (0/1/14). Custom 164+ formats break Apple Numbers
+  // and some mobile Excel builds ("couldn't read the file").
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="6"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="21"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="14" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -6285,7 +6287,16 @@ function filterXlsxCellsOutsideMerges(cells, mergeRefs) {
 }
 function xlsxSafeNumber(value) {
   const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) ? n : 0;
+  if (!Number.isFinite(n)) return 0;
+  // Keep spreadsheet numbers finite and compact so Numbers/Excel Mobile accept them.
+  return Math.round(n * 1000) / 1000;
+}
+function xlsxZipWriteUtf8(zip, path, xml) {
+  const bytes =
+    typeof TextEncoder !== "undefined"
+      ? new TextEncoder().encode(String(xml ?? ""))
+      : String(xml ?? "");
+  zip.file(path, bytes, zipFileOptions());
 }
 function buildReceiptSheetXml(
   o,
@@ -6735,16 +6746,20 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const filename = receiptExcelFileName(orders);
-  const mobileSafe = prefersMobileExcelShare();
-  // Samsung/Android Excel is very strict about drawings; skip logo there so the
-  // workbook opens without the "repair content" dialog.
-  const embedLogo = !mobileSafe;
-  const logoBuffer = embedLogo ? await loadReceiptExcelLogoBuffer() : null;
-  const hasLogo = !!logoBuffer;
-  const built = buildReceiptWorkbookXml(orders, { hasLogo, mobileSafe });
-  const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
-  // Prefer the share sheet on phones so Excel/Sheets can open the file directly.
-  return downloadBlobFile(blob, filename, { skipShare: !mobileSafe });
+  // Never embed drawings/logo in receipt workbooks — Numbers and mobile Excel
+  // frequently refuse packages with drawing parts.
+  const built = buildReceiptWorkbookXml(orders, {
+    hasLogo: false,
+    mobileSafe: true,
+  });
+  const blob = await assembleStyledXlsxZip(built, {
+    hasLogo: false,
+    logoBuffer: null,
+  });
+  // Prefer share on phones so the OS hands the file to Excel/Numbers cleanly.
+  return downloadBlobFile(blob, filename, {
+    skipShare: !prefersMobileExcelShare(),
+  });
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   const logoSrc = await getReceiptExcelLogoDataUri().catch(() => "");
@@ -6753,14 +6768,12 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
+  const mobile = prefersMobileExcelShare();
+  // iOS Numbers is picky; try real xlsx first (fixed package), then HTML .xls.
   try {
     const ok = await exportOrderReceiptsExcelXlsx(orders);
     if (ok === false) return;
-    showInstallToast(
-      prefersMobileExcelShare()
-        ? "Файлыг Excel-ээр нээнэ үү"
-        : "Мэдээлэл татагдлаа",
-    );
+    showInstallToast(mobile ? "Файлыг Excel/Numbers-ээр нээнэ үү" : "Мэдээлэл татагдлаа");
   } catch (err) {
     console.error("Receipt xlsx export failed", err);
     try {
@@ -9441,8 +9454,8 @@ function xlsxPackageRootRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
 }
 function xlsxPackageCoreXml() {
-  const stamp = new Date().toISOString();
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>TOMUDA</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${stamp}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${stamp}</dcterms:modified></cp:coreProperties>`;
+  const stamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>TOMUDA</dc:creator><cp:lastModifiedBy>TOMUDA</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${stamp}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${stamp}</dcterms:modified></cp:coreProperties>`;
 }
 function xlsxPackageAppXml(sheetCount = 1) {
   const titles = Array.from(
@@ -9500,28 +9513,43 @@ function styledContentTypesXml(sheetIds, { hasLogo = false } = {}) {
 async function assembleStyledXlsxZip(built, { hasLogo = false, logoBuffer = null } = {}) {
   const zip = new JSZip();
   const sheetIds = built.sheets.map((s) => s.id);
-  const opt = zipFileOptions({ binary: false });
-  zip.file("[Content_Types].xml", styledContentTypesXml(sheetIds, { hasLogo }), opt);
-  zip.file("_rels/.rels", xlsxPackageRootRelsXml(), opt);
-  zip.file("docProps/core.xml", xlsxPackageCoreXml(), opt);
-  zip.file("docProps/app.xml", xlsxPackageAppXml(sheetIds.length), opt);
-  zip.file("xl/workbook.xml", built.workbookXml, opt);
-  zip.file("xl/_rels/workbook.xml.rels", styledWorkbookRelsXml(sheetIds.length), opt);
-  zip.file("xl/styles.xml", receiptXlsxStylesXml(), opt);
-  zip.file("xl/sharedStrings.xml", built.sharedStringsXml, opt);
+  xlsxZipWriteUtf8(
+    zip,
+    "[Content_Types].xml",
+    styledContentTypesXml(sheetIds, { hasLogo }),
+  );
+  xlsxZipWriteUtf8(zip, "_rels/.rels", xlsxPackageRootRelsXml());
+  xlsxZipWriteUtf8(zip, "docProps/core.xml", xlsxPackageCoreXml());
+  xlsxZipWriteUtf8(zip, "docProps/app.xml", xlsxPackageAppXml(sheetIds.length));
+  xlsxZipWriteUtf8(zip, "xl/workbook.xml", built.workbookXml);
+  xlsxZipWriteUtf8(
+    zip,
+    "xl/_rels/workbook.xml.rels",
+    styledWorkbookRelsXml(sheetIds.length),
+  );
+  xlsxZipWriteUtf8(zip, "xl/styles.xml", receiptXlsxStylesXml());
+  xlsxZipWriteUtf8(zip, "xl/sharedStrings.xml", built.sharedStringsXml);
   built.sheets.forEach((sheet) => {
-    zip.file(`xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml, opt);
+    xlsxZipWriteUtf8(
+      zip,
+      `xl/worksheets/sheet${sheet.id}.xml`,
+      sheet.sheetXml,
+    );
     if (hasLogo) {
-      zip.file(
+      xlsxZipWriteUtf8(
+        zip,
         `xl/worksheets/_rels/sheet${sheet.id}.xml.rels`,
         receiptSheetRelsXml(sheet.id),
-        opt,
       );
-      zip.file(`xl/drawings/drawing${sheet.id}.xml`, receiptDrawingXml(), opt);
-      zip.file(
+      xlsxZipWriteUtf8(
+        zip,
+        `xl/drawings/drawing${sheet.id}.xml`,
+        receiptDrawingXml(),
+      );
+      xlsxZipWriteUtf8(
+        zip,
         `xl/drawings/_rels/drawing${sheet.id}.xml.rels`,
         receiptDrawingRelsXml(),
-        opt,
       );
     }
   });
