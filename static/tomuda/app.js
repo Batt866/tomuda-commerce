@@ -3437,11 +3437,40 @@ function promotionRuleFingerprint(rule) {
     });
   return JSON.stringify(ordered);
 }
+// Canonical fingerprint: stable no matter which legacy/alternate keys the
+// rule uses for its free products, so the same logical rule always matches.
+function promotionRuleCanonicalFingerprint(rule) {
+  if (!rule || typeof rule !== "object") return JSON.stringify(rule);
+  const copy = { ...rule };
+  const freeIds = promotionFreeProductIds(rule)
+    .map(String)
+    .filter(Boolean)
+    .sort();
+  delete copy.freeProductId;
+  delete copy.priceFreeProductId;
+  delete copy.paymentFreeProductId;
+  delete copy.priceFreeProductIds;
+  delete copy.paymentFreeProductIds;
+  copy.freeProductIds = freeIds;
+  if (Array.isArray(copy.buyProductIds)) {
+    copy.buyProductIds = [...copy.buyProductIds]
+      .map(String)
+      .filter(Boolean)
+      .sort();
+  }
+  const ordered = {};
+  Object.keys(copy)
+    .sort()
+    .forEach((key) => {
+      ordered[key] = copy[key];
+    });
+  return JSON.stringify(ordered);
+}
 function dedupePromotionRuleList(list = []) {
   const seen = new Set();
   const merged = [];
   for (const item of list || []) {
-    const key = promotionRuleFingerprint(item);
+    const key = promotionRuleCanonicalFingerprint(item);
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(item);
@@ -3455,56 +3484,113 @@ function promotionDeletionKey(kind, ruleOrFingerprint) {
       : promotionRuleFingerprint(ruleOrFingerprint);
   return `${kind}:${fp}`;
 }
+// Fingerprints are JSON strings of the rule, so old entries recorded from a
+// legacy/alternate rule shape can be re-canonicalized by parsing them back.
+function promotionDeletionCanonicalKey(kind, fingerprint) {
+  let fp = String(fingerprint);
+  try {
+    fp = promotionRuleCanonicalFingerprint(JSON.parse(fp));
+  } catch {
+    /* keep raw fingerprint */
+  }
+  return `${kind}:${fp}`;
+}
 function normalizePromotionDeletionLog(log = []) {
   if (!Array.isArray(log)) return [];
-  const seen = new Set();
-  return log
-    .filter((entry) => entry?.kind && entry?.fingerprint)
-    .map((entry) => ({
+  // Keep only the newest entry per logical rule so a later "restored" entry
+  // overrides older delete tombstones (and vice versa) across devices.
+  const byKey = new Map();
+  for (const entry of log) {
+    if (!entry?.kind || !entry?.fingerprint) continue;
+    const norm = {
       kind: String(entry.kind),
       fingerprint: String(entry.fingerprint),
       deletedBy: String(entry.deletedBy || ""),
       deletedAt: entry.deletedAt || "",
-    }))
-    .filter((entry) => {
-      const key = promotionDeletionKey(entry.kind, entry.fingerprint);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(-500);
+      restored: !!entry.restored,
+      updatedAt: String(entry.updatedAt || entry.deletedAt || ""),
+    };
+    const key = promotionDeletionCanonicalKey(norm.kind, norm.fingerprint);
+    const prev = byKey.get(key);
+    if (!prev || norm.updatedAt >= prev.updatedAt) byKey.set(key, norm);
+  }
+  return [...byKey.values()].slice(-500);
 }
 function mergedPromotionDeletionLog(remote = {}, local = {}) {
-  return normalizePromotionDeletionLog([
-    ...(remote.promotionDeletionLog || []),
+  const remoteLog = normalizePromotionDeletionLog(
+    remote.promotionDeletionLog || [],
+  );
+  const merged = normalizePromotionDeletionLog([
+    ...remoteLog,
     ...(local.promotionDeletionLog || []),
   ]);
+  const remoteKeys = new Set(
+    remoteLog.map((e) => promotionDeletionCanonicalKey(e.kind, e.fingerprint)),
+  );
+  const remoteRules = normalizePromotionRulesState(remote.promotionRules || {});
+  const FRESH_MS = 10 * 60 * 1000;
+  const now = Date.now();
+  return merged.map((entry) => {
+    if (entry.restored) return entry;
+    const key = promotionDeletionCanonicalKey(entry.kind, entry.fingerprint);
+    // Deletion the backend already knows about: keep it.
+    if (remoteKeys.has(key)) return entry;
+    // Recent local deletion (e.g. made offline) that hasn't synced yet: keep.
+    const ts = Date.parse(entry.updatedAt || entry.deletedAt || "");
+    if (Number.isFinite(ts) && now - ts < FRESH_MS) return entry;
+    // Stale local-only tombstone while the backend still has the rule alive:
+    // this deletion never propagated legitimately, so restore the rule
+    // instead of silently re-deleting it on this device.
+    const ruleAlive = (remoteRules[entry.kind] || []).some(
+      (rule) =>
+        key === `${entry.kind}:${promotionRuleCanonicalFingerprint(rule)}`,
+    );
+    if (!ruleAlive) return entry;
+    return { ...entry, restored: true, updatedAt: new Date().toISOString() };
+  });
 }
 function promotionDeletionLogHas(log = [], kind, rule) {
-  const key = promotionDeletionKey(kind, rule);
+  const key =
+    typeof rule === "string"
+      ? promotionDeletionCanonicalKey(kind, rule)
+      : `${kind}:${promotionRuleCanonicalFingerprint(rule)}`;
   return normalizePromotionDeletionLog(log).some(
-    (entry) => promotionDeletionKey(entry.kind, entry.fingerprint) === key,
+    (entry) =>
+      !entry.restored &&
+      promotionDeletionCanonicalKey(entry.kind, entry.fingerprint) === key,
   );
 }
 function recordPromotionDeletion(kind, rule) {
   if (!kind || !rule) return;
+  const now = new Date().toISOString();
   state.promotionDeletionLog = normalizePromotionDeletionLog([
     ...(state.promotionDeletionLog || []),
     {
       kind,
-      fingerprint: promotionRuleFingerprint(rule),
+      fingerprint: promotionRuleCanonicalFingerprint(rule),
       deletedBy: state.currentEmployee?.id || "",
-      deletedAt: new Date().toISOString(),
+      deletedAt: now,
+      restored: false,
+      updatedAt: now,
     },
   ]);
 }
 function clearPromotionDeletion(kind, rule) {
-  const key = promotionDeletionKey(kind, rule);
-  state.promotionDeletionLog = normalizePromotionDeletionLog(
-    state.promotionDeletionLog || [],
-  ).filter(
-    (entry) => promotionDeletionKey(entry.kind, entry.fingerprint) !== key,
-  );
+  if (!promotionDeletionLogHas(state.promotionDeletionLog, kind, rule)) return;
+  // Do NOT drop the tombstone: write a newer "restored" entry instead so the
+  // restore survives merges with stale copies of the log on other devices.
+  const now = new Date().toISOString();
+  state.promotionDeletionLog = normalizePromotionDeletionLog([
+    ...(state.promotionDeletionLog || []),
+    {
+      kind,
+      fingerprint: promotionRuleCanonicalFingerprint(rule),
+      deletedBy: state.currentEmployee?.id || "",
+      deletedAt: now,
+      restored: true,
+      updatedAt: now,
+    },
+  ]);
 }
 function mergeRuleArrays(remote = [], local = []) {
   return dedupePromotionRuleList([...(remote || []), ...(local || [])]);
@@ -3544,10 +3630,10 @@ function appendPromotionRule(kind, rule) {
     state.promotionRules = { quantity: [], price: [], payment: [] };
   }
   if (!Array.isArray(state.promotionRules[kind])) state.promotionRules[kind] = [];
-  const key = promotionRuleFingerprint(rule);
+  const key = promotionRuleCanonicalFingerprint(rule);
   if (
     state.promotionRules[kind].some(
-      (item) => promotionRuleFingerprint(item) === key,
+      (item) => promotionRuleCanonicalFingerprint(item) === key,
     )
   ) {
     return false;
@@ -3702,10 +3788,10 @@ function protectAccidentalDeletions(data) {
     ...(protectedData.deletionLog || []),
   ]);
   protectedData.deletionLog = deletionLog;
-  const promotionDeletionLog = normalizePromotionDeletionLog([
-    ...(baseline.promotionDeletionLog || []),
-    ...(protectedData.promotionDeletionLog || []),
-  ]);
+  const promotionDeletionLog = mergedPromotionDeletionLog(
+    baseline,
+    protectedData,
+  );
   protectedData.promotionDeletionLog = promotionDeletionLog;
   protectedData.promotionRules = mergePromotionRules(
     baseline.promotionRules,
