@@ -3666,7 +3666,7 @@ function resetPromotionModalDraft(kind) {
 function finishPromotionSave(kind) {
   const msg =
     kind === "quantity"
-      ? "Багцын хөнгөлөлт хадгалагдлаа"
+      ? "Багц худалдан авалтын хөнгөлөлт хадгалагдлаа"
       : kind === "price"
         ? "Үнийн урамшуулал хадгалагдлаа"
         : kind === "payment"
@@ -10965,14 +10965,15 @@ function confirmSetPaid(id) {
 }
 const PROMO_PRODUCT_LABEL = "Урамшууллын бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
-const PROMO_PAYMENT_LABEL = "Шууд төлбөрийн урамшуулал";
+const PROMO_PAYMENT_LABEL = "Шууд төлөлтийн урамшуулал оруулах";
+const PROMO_QUANTITY_LABEL = "Багц худалдан авалтын хөнгөлөлт";
 function promoProductQtyLabel(qty) {
   return `${Number(qty) || 1} ш · ${PROMO_PRODUCT_LABEL}`;
 }
 function promotionTypeLabel(type) {
   return (
     {
-      quantity: "Багцын хөнгөлөлт",
+      quantity: PROMO_QUANTITY_LABEL,
       price: "Нийт үнийн дүнгээс хөнгөлөлт олгох",
       payment: PROMO_PAYMENT_LABEL,
     }[type] || "Урамшуулал"
@@ -10981,7 +10982,7 @@ function promotionTypeLabel(type) {
 function promotionMenuHtml() {
   const items = [
     ["price", "Нийт үнийн дүнгээс хөнгөлөлт олгох"],
-    ["quantity", "Багцын хөнгөлөлт"],
+    ["quantity", PROMO_QUANTITY_LABEL],
     ["payment", PROMO_PAYMENT_LABEL],
   ];
   return `<nav class="admin-menu promo-type-menu" aria-label="Урамшууллын төрөл">${items
@@ -11522,7 +11523,7 @@ function promotionQtyRuleText(r) {
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцад хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Багцын хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцад хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">${PROMO_QUANTITY_LABEL}-ийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -11637,7 +11638,7 @@ function promotionQtyModal() {
   const buyIds = state.promoPick.buyProductIds,
     freeIds = state.promoPick.freeProductIds;
   box(
-    "Багцын хөнгөлөлт",
+    PROMO_QUANTITY_LABEL,
     `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно · сонгосон бараатай ижил байж болно", placeholder: `${PROMO_PRODUCT_LABEL} хайж нэмэх...`, badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
