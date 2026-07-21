@@ -12781,14 +12781,17 @@ function workerChooser(orders) {
     canPick = canPickWarehouseWorkers(),
     hasSelection = canPick ? !!state.selectedWorkers.length : true,
     hasOrders = !!orders.length,
+    selectedIds = warehouseScopeWorkerIds(),
     names = state.employees
-      .filter((e) => activeWorkerIds.includes(e.id))
+      .filter((e) => selectedIds.includes(e.id))
       .map((e) => e.name)
       .join(", "),
     detail = qtyDetail(orders),
+    // Show the picked reps' names here even when they have no orders — the
+    // empty state is already communicated in the list below.
     chooserLabel = canPick
-      ? hasSelection
-        ? names || "Захиалга байхгүй"
+      ? hasSelection && names
+        ? names
         : "Сонгох"
       : state.currentEmployee?.name || "-",
     emptyText = canPick
@@ -12797,7 +12800,7 @@ function workerChooser(orders) {
         : "Худалдааны төлөөлөгч сонгоно уу"
       : "Өнөөдрийн захиалга алга",
     pickerHtml = canPick
-      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${hasOrders || hasSelection ? "" : " is-placeholder"}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
+      ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${chooserLabel === "Сонгох" ? " is-placeholder" : ""}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
       : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></span></div>`;
   return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
