@@ -6378,11 +6378,10 @@ function xlsxSafeNumber(value) {
   return Math.round(n * 1000) / 1000;
 }
 function xlsxZipWriteUtf8(zip, path, xml) {
-  const bytes =
-    typeof TextEncoder !== "undefined"
-      ? new TextEncoder().encode(String(xml ?? ""))
-      : String(xml ?? "");
-  zip.file(path, bytes, zipFileOptions());
+  // Write XML as a UTF-8 string (not pre-encoded bytes). JSZip then encodes
+  // consistently; some mobile Excel builds rejected packages whose parts were
+  // inserted as raw Uint8Array with mismatched binary flags.
+  zip.file(path, String(xml ?? ""), zipFileOptions({ binary: false }));
 }
 function buildReceiptSheetXml(
   o,
@@ -6771,7 +6770,10 @@ function buildReceiptSheetXml(
     ? `<mergeCells count="${uniqueMerges.length}">${mergeXml}</mergeCells>`
     : "";
   const drawingXml = opts.hasLogo ? `<drawing r:id="rId1"/>` : "";
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}${drawingXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  // ECMA-376 worksheet child order: mergeCells → pageMargins → drawing.
+  // Putting drawing before pageMargins makes Excel Mobile report
+  // "We found a problem with some content".
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${drawingXml}</worksheet>`;
   return {
     sharedStringsXml: xlsxSharedStringsXml(strings),
     sheetXml,
@@ -6833,14 +6835,16 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const filename = receiptExcelFileName(orders);
   const mobileSafe = prefersMobileExcelShare();
-  // Samsung/Android Excel is very strict about drawings; skip logo there so the
-  // workbook opens without the "repair content" dialog.
-  const embedLogo = !mobileSafe;
-  const logoBuffer = embedLogo ? await loadReceiptExcelLogoBuffer() : null;
-  const hasLogo = !!logoBuffer;
-  const built = buildReceiptWorkbookXml(orders, { hasLogo });
-  const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
-  // Prefer the share sheet on phones so Excel/Sheets can open the file directly.
+  // Never embed drawings/logo — Excel Mobile frequently shows the
+  // "problem with some content" repair dialog for packages with drawings.
+  const built = buildReceiptWorkbookXml(orders, {
+    hasLogo: false,
+    mobileSafe: true,
+  });
+  const blob = await assembleStyledXlsxZip(built, {
+    hasLogo: false,
+    logoBuffer: null,
+  });
   return downloadBlobFile(blob, filename, { skipShare: !mobileSafe });
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
@@ -6851,24 +6855,42 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
   const mobile = prefersMobileExcelShare();
-  // iOS Numbers is picky; try real xlsx first (fixed package), then HTML .xls.
-  try {
+  // On phones, HTML .xls opens reliably in Excel (no OOXML repair dialog).
+  // Desktop keeps real .xlsx.
+  const runLegacy = async () => {
+    const ok = await exportOrderReceiptsExcelLegacy(orders);
+    if (ok === false) return false;
+    showInstallToast(mobile ? "Файлыг Excel-ээр нээнэ үү" : "Мэдээлэл татагдлаа");
+    return true;
+  };
+  const runXlsx = async () => {
     const ok = await exportOrderReceiptsExcelXlsx(orders);
-    if (ok === false) return;
-    showInstallToast(mobile ? "Файлыг Excel/Numbers-ээр нээнэ үү" : "Мэдээлэл татагдлаа");
-  } catch (err) {
-    console.error("Receipt xlsx export failed", err);
-    try {
-      const ok = await exportOrderReceiptsExcelLegacy(orders);
-      if (ok === false) return;
-      showInstallToast("Мэдээлэл татагдлаа");
-    } catch (legacyErr) {
-      console.error("Receipt legacy excel export failed", legacyErr);
-      alertModal(
-        "Мэдээлэл татах амжилтгүй",
-        "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
-      );
+    if (ok === false) return false;
+    showInstallToast(mobile ? "Файлыг Excel-ээр нээнэ үү" : "Мэдээлэл татагдлаа");
+    return true;
+  };
+  try {
+    if (mobile) {
+      try {
+        await runLegacy();
+      } catch (legacyErr) {
+        console.error("Receipt legacy excel export failed", legacyErr);
+        await runXlsx();
+      }
+      return;
     }
+    try {
+      await runXlsx();
+    } catch (err) {
+      console.error("Receipt xlsx export failed", err);
+      await runLegacy();
+    }
+  } catch (err) {
+    console.error("Receipt excel export failed", err);
+    alertModal(
+      "Мэдээлэл татах амжилтгүй",
+      "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+    );
   }
 }
 function orderReceiptExportSnapshots(
