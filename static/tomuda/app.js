@@ -6303,7 +6303,7 @@ function createReceiptStringContext() {
 function receiptXlsxStylesXml() {
   // Use only built-in numFmtIds (0/1/14). Custom 164+ formats break Apple Numbers
   // and some mobile Excel builds ("couldn't read the file").
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="6"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="21"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="14" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="7"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF8E6"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="26"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="14" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -6451,7 +6451,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const sub = payable / 1.1;
   const vat = payable - sub;
   pushRow(28, [
-    xlsxCellXml(`C${hr1}`, 1, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml(`C${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`K${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(hr1, "A", "B"),
     ...emptyCells(hr1, "G", "J"),
@@ -6557,17 +6557,17 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushRow(14.25, emptyCells(rowNum));
   const headerRow = rowNum;
   merges.push(`B${headerRow}:D${headerRow}`, `F${headerRow}:G${headerRow}`, `H${headerRow}:I${headerRow}`);
-  pushRow(14.25, [
-    xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
-    xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
-    xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
-    ...emptyCells(headerRow, "C", "D"),
-    ...emptyCells(headerRow, "G", "G"),
-    ...emptyCells(headerRow, "I", "I"),
+  pushRow(21, [
+    xlsxCellXml(`A${headerRow}`, 25, null, "empty"),
+    xlsxCellXml(`B${headerRow}`, 25, si("Барааны нэр"), "s"),
+    xlsxCellXml(`E${headerRow}`, 25, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`F${headerRow}`, 25, si("Баркод"), "s"),
+    xlsxCellXml(`H${headerRow}`, 25, si("Тоо/ш"), "s"),
+    xlsxCellXml(`J${headerRow}`, 25, si("Нэгж үнэ"), "s"),
+    xlsxCellXml(`K${headerRow}`, 25, si("Нийт үнэ"), "s"),
+    ...emptyCells(headerRow, "C", "D", 25),
+    ...emptyCells(headerRow, "G", "G", 25),
+    ...emptyCells(headerRow, "I", "I", 25),
   ]);
   const pushItemLikeRow = (item, index, { promo = false } = {}) => {
     const p = item
@@ -6616,7 +6616,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const pushSummaryAmountRow = (label, amount, { grand = false } = {}) => {
     const r = rowNum;
     merges.push(`B${r}:J${r}`);
-    const labelStyle = grand ? 19 : 8;
+    const labelStyle = grand ? 19 : 4;
     const valueStyle = grand ? 20 : 12;
     pushRow(14.25, [
       xlsxCellXml(`A${r}`, 1, null, "empty"),
@@ -6628,8 +6628,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const pushSummaryTextRow = (label, value, { grand = false } = {}) => {
     const r = rowNum;
     merges.push(`B${r}:J${r}`);
-    const labelStyle = grand ? 19 : 8;
-    const valueStyle = grand ? 20 : 10;
+    const labelStyle = grand ? 19 : 4;
+    const valueStyle = grand ? 20 : 3;
     pushRow(14.25, [
       xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
@@ -6659,12 +6659,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const bannerRow = rowNum;
     merges.push(`B${bannerRow}:K${bannerRow}`);
     const bannerText = promoSettleNote
-      ? `Урамшуулал  ${promoSettleNote}`
+      ? `Урамшуулал:  ${promoSettleNote}`
       : "Урамшуулал";
-    pushRow(14.25, [
+    pushRow(promoSettleNote ? 27 : 16.5, [
       xlsxCellXml(`A${bannerRow}`, 1, null, "empty"),
-      xlsxCellXml(`B${bannerRow}`, 15, si(bannerText), "s"),
-      ...emptyCells(bannerRow, "C", RECEIPT_XLSX_LAST_COL, 15),
+      xlsxCellXml(`B${bannerRow}`, 24, si(bannerText), "s"),
+      ...emptyCells(bannerRow, "C", RECEIPT_XLSX_LAST_COL, 24),
     ]);
     promoLines.forEach((item, index) =>
       pushItemLikeRow(item, index, { promo: true }),
@@ -6679,7 +6679,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
   const settleRow = rowNum;
   merges.push(`B${settleRow}:K${settleRow}`);
-  pushRow(14.25, [
+  pushRow(27, [
     xlsxCellXml(`A${settleRow}`, 1, null, "empty"),
     xlsxCellXml(`B${settleRow}`, 16, si(receiptSettleNoteText(o)), "s"),
     ...emptyCells(settleRow, "C", RECEIPT_XLSX_LAST_COL, 16),
@@ -6687,17 +6687,17 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payTerm = receiptPaymentTermText(f, o);
   pushSummaryTextRow("Төлбөрийн нөхцөл", payTerm);
   [
-    "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
-    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай. ",
-    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
-    "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
-  ].forEach((text, index) => {
+    ["Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.", 22],
+    ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.", 23],
+    ["Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно", 22],
+    ["Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!", 22],
+  ].forEach(([text, style], index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    pushRow(index === 0 ? 23.25 : 14.25, [
-      xlsxCellXml(`B${r}`, 8, si(text), "s"),
-      ...emptyCells(r, "A", "A"),
-      ...emptyCells(r, "C", RECEIPT_XLSX_LAST_COL),
+    pushRow(index === 0 ? 25.5 : 14.25, [
+      xlsxCellXml(`A${r}`, 1, null, "empty"),
+      xlsxCellXml(`B${r}`, style, si(text), "s"),
+      ...emptyCells(r, "C", RECEIPT_XLSX_LAST_COL, style),
     ]);
   });
   pushRow(14.25, emptyCells(rowNum));
@@ -6735,7 +6735,7 @@ function receiptWorksheetXml(rows, merges, lastRow) {
   const mergeCellsXml = uniqueMerges.length
     ? `<mergeCells count="${uniqueMerges.length}">${mergeXml}</mergeCells>`
     : "";
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
