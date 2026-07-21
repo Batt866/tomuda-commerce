@@ -10537,7 +10537,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
   pushRow(43.5, [
-    xlsxCellXml("A1", 13, si("Бараа бэлдэх хуудас"), "s"),
+    xlsxCellXml("A1", 13, si("Бараа бэлдэж ачуулах хуудас"), "s"),
     ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
   ]);
   pushRow(
@@ -10743,7 +10743,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .sign-block-gap td { height: 22px; border: none !important; }
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
-<tr><td colspan="6" class="title">Бараа бэлдэх хуудас</td></tr>
+<tr><td colspan="6" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td colspan="4" class="date">${h(orderDateText)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
