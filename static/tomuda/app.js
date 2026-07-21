@@ -424,7 +424,7 @@ function receiptPartyFields(o) {
     customerName: esc(c.name || o.customerName),
     customerReg: esc(c.registrationNumber || "-"),
     companyName: esc(c.companyName || "-"),
-    customerPhone: esc(c.phone1 || "-"),
+    customerPhone: esc(customerPhonesList(c).join(", ") || "-"),
     address: esc(addr),
     paid,
     bank,
@@ -6064,7 +6064,7 @@ function buildOrderReceiptExcelRows(o) {
       ["Харилцагч", c.name || o.customerName],
       ["Регистр", c.registrationNumber || "-"],
       ["Компани", c.companyName || "-"],
-      ["Утас", c.phone1 || "-"],
+      ["Утас", customerPhonesList(c).join(", ") || "-"],
       ["Хаяг", addr === "-" ? "" : addr],
       ["Төлбөр", paid ? "Шууд төлөх" : "Дансаар"],
       ["Төлөв", status(o.status)],
@@ -6832,20 +6832,16 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const filename = receiptExcelFileName(orders);
-  // Never embed drawings/logo in receipt workbooks — Numbers and mobile Excel
-  // frequently refuse packages with drawing parts.
-  const built = buildReceiptWorkbookXml(orders, {
-    hasLogo: false,
-    mobileSafe: true,
-  });
-  const blob = await assembleStyledXlsxZip(built, {
-    hasLogo: false,
-    logoBuffer: null,
-  });
-  // Prefer share on phones so the OS hands the file to Excel/Numbers cleanly.
-  return downloadBlobFile(blob, filename, {
-    skipShare: !prefersMobileExcelShare(),
-  });
+  const mobileSafe = prefersMobileExcelShare();
+  // Samsung/Android Excel is very strict about drawings; skip logo there so the
+  // workbook opens without the "repair content" dialog.
+  const embedLogo = !mobileSafe;
+  const logoBuffer = embedLogo ? await loadReceiptExcelLogoBuffer() : null;
+  const hasLogo = !!logoBuffer;
+  const built = buildReceiptWorkbookXml(orders, { hasLogo });
+  const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
+  // Prefer the share sheet on phones so Excel/Sheets can open the file directly.
+  return downloadBlobFile(blob, filename, { skipShare: !mobileSafe });
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   const logoSrc = await getReceiptExcelLogoDataUri().catch(() => "");
@@ -7185,10 +7181,103 @@ function dialPhoneNumber(phone) {
   if (!n) return;
   window.location.href = `tel:${encodeURIComponent(n)}`;
 }
-function customerDetailPhonesHtml(c) {
-  const phones = [c.phone1, c.phone2]
-    .map((p) => String(p || "").trim())
+const CUSTOMER_PHONE_MAX = 8;
+function customerPhonesList(c) {
+  const seen = new Set();
+  const out = [];
+  const push = (value) => {
+    const n = String(value || "").trim();
+    if (!n || seen.has(n)) return;
+    seen.add(n);
+    out.push(n);
+  };
+  if (Array.isArray(c?.phones)) c.phones.forEach(push);
+  push(c?.phone1);
+  push(c?.phone2);
+  return out;
+}
+function applyCustomerPhoneFields(target, phones) {
+  const list = (phones || [])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .slice(0, CUSTOMER_PHONE_MAX);
+  const unique = [];
+  const seen = new Set();
+  for (const n of list) {
+    if (seen.has(n)) continue;
+    seen.add(n);
+    unique.push(n);
+  }
+  target.phones = unique;
+  target.phone1 = unique[0] || "";
+  target.phone2 = unique[1] || "";
+  return target;
+}
+function customerPhonesFromFormData(fd) {
+  return (fd.getAll("phones") || [])
+    .map((value) => String(value || "").trim())
     .filter(Boolean);
+}
+function customerPhoneFieldRow(value = "", index = 0, total = 1) {
+  const canRemove = total > 1;
+  return `<div class="customer-phone-row" data-customer-phone-row><label class="customer-phone-row__field"><span class="block text-sm font-medium mb-2">Утас ${index + 1}</span><input name="phones" type="tel" inputmode="tel" autocomplete="tel" value="${esc(value || "")}" placeholder="Утасны дугаар" class="w-full px-4 py-3 bg-secondary rounded app-input"></label>${canRemove ? `<button type="button" class="customer-phone-row__remove" onclick="removeCustomerPhoneField(this)" aria-label="Утас устгах" title="Устгах">×</button>` : ""}</div>`;
+}
+function customerPhonesFieldsHtml(c) {
+  let phones = customerPhonesList(c);
+  if (!phones.length) phones = [""];
+  const addHidden = phones.length >= CUSTOMER_PHONE_MAX ? " hidden" : "";
+  return `<div class="customer-phones" data-customer-phones><div class="customer-phones__list" id="customerPhonesList">${phones.map((p, i) => customerPhoneFieldRow(p, i, phones.length)).join("")}</div><button type="button" class="customer-phones__add"${addHidden} onclick="addCustomerPhoneField()">+ Утас нэмэх</button></div>`;
+}
+function renumberCustomerPhoneFields() {
+  const list = document.getElementById("customerPhonesList");
+  if (!list) return;
+  const rows = [...list.querySelectorAll("[data-customer-phone-row]")];
+  rows.forEach((row, i) => {
+    const label = row.querySelector(".block");
+    if (label) label.textContent = `Утас ${i + 1}`;
+    let remove = row.querySelector(".customer-phone-row__remove");
+    if (rows.length > 1) {
+      if (!remove) {
+        remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "customer-phone-row__remove";
+        remove.setAttribute("aria-label", "Утас устгах");
+        remove.title = "Устгах";
+        remove.textContent = "×";
+        remove.setAttribute("onclick", "removeCustomerPhoneField(this)");
+        row.appendChild(remove);
+      }
+    } else if (remove) {
+      remove.remove();
+    }
+  });
+  const addBtn = document.querySelector(".customer-phones__add");
+  if (addBtn) addBtn.hidden = rows.length >= CUSTOMER_PHONE_MAX;
+}
+function addCustomerPhoneField() {
+  const list = document.getElementById("customerPhonesList");
+  if (!list) return;
+  const count = list.querySelectorAll("[data-customer-phone-row]").length;
+  if (count >= CUSTOMER_PHONE_MAX) return;
+  list.insertAdjacentHTML(
+    "beforeend",
+    customerPhoneFieldRow("", count, count + 1),
+  );
+  renumberCustomerPhoneFields();
+  list
+    .querySelector("[data-customer-phone-row]:last-child input")
+    ?.focus();
+}
+function removeCustomerPhoneField(btn) {
+  const row = btn?.closest?.("[data-customer-phone-row]");
+  const list = document.getElementById("customerPhonesList");
+  if (!row || !list) return;
+  if (list.querySelectorAll("[data-customer-phone-row]").length <= 1) return;
+  row.remove();
+  renumberCustomerPhoneFields();
+}
+function customerDetailPhonesHtml(c) {
+  const phones = customerPhonesList(c);
   if (!phones.length) return `<span class="customer-detail__muted">—</span>`;
   return phones
     .map(
@@ -7399,7 +7488,14 @@ function customerMatchesQuery(c, q) {
     !!stored.prefix &&
     stored.prefix.toLowerCase() === parsedQ.prefix.toLowerCase();
   return (
-    nameMatch || companyMatch || rdDigitsMatch || rdFullMatch || rdPrefixMatch
+    nameMatch ||
+    companyMatch ||
+    rdDigitsMatch ||
+    rdFullMatch ||
+    rdPrefixMatch ||
+    customerPhonesList(c).some((phone) =>
+      phone.toLowerCase().includes(needle),
+    )
   );
 }
 function sortCustomersByName(customers) {
@@ -7414,9 +7510,7 @@ function customerCardPinIcon() {
   return `<svg class="ui-icon customer-card__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>`;
 }
 function customerCardPhonesHtml(c) {
-  const phones = [c.phone1, c.phone2]
-    .map((p) => String(p || "").trim())
-    .filter(Boolean);
+  const phones = customerPhonesList(c);
   if (!phones.length) {
     return `<span class="customer-card__muted customer-card__phones">Утасгүй</span>`;
   }
@@ -7505,6 +7599,7 @@ function orderReceiptSearchText(o) {
     customer.registrationNumber,
     customer.phone1,
     customer.phone2,
+    ...customerPhonesList(customer),
     o.employeeName,
     o.employeePhone,
     paymentTermLabel(o.paymentTerm),
@@ -7966,14 +8061,24 @@ function confirmEmployeeExcel() {
 function customerExcel() {
   if (!canExportExcel()) return;
   if (!state.customers.length) return alert("Харилцагч байхгүй");
+  const sorted = [...state.customers].sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+  );
+  const phoneCount = Math.max(
+    2,
+    ...sorted.map((c) => customerPhonesList(c).length),
+  );
+  const phoneHeaders = Array.from(
+    { length: phoneCount },
+    (_, i) => `Утас ${i + 1}`,
+  );
   const rows = [
     [
       "№",
       "Нэр",
       "РД",
       "Байгууллагын нэр",
-      "Утас 1",
-      "Утас 2",
+      ...phoneHeaders,
       "Аймаг/Хот",
       "Дүүрэг/Сум",
       "Хороо",
@@ -7981,26 +8086,22 @@ function customerExcel() {
       "Уртраг",
       "Өргөрөг",
     ],
-    ...[...state.customers]
-      .sort((a, b) =>
-        String(a.name || "").localeCompare(String(b.name || ""), "mn"),
-      )
-      .map((c, i) => {
-        return [
-          i + 1,
-          c.name || "",
-          c.registrationNumber || "",
-          c.companyName || "",
-          c.phone1 || "",
-          c.phone2 || "",
-          c.province || "",
-          c.district || "",
-          c.khoroo || "",
-          c.address || "",
-          c.latitude ?? "",
-          c.longitude ?? "",
-        ];
-      }),
+    ...sorted.map((c, i) => {
+      const phones = customerPhonesList(c);
+      return [
+        i + 1,
+        c.name || "",
+        c.registrationNumber || "",
+        c.companyName || "",
+        ...Array.from({ length: phoneCount }, (_, n) => phones[n] || ""),
+        c.province || "",
+        c.district || "",
+        c.khoroo || "",
+        c.address || "",
+        c.latitude ?? "",
+        c.longitude ?? "",
+      ];
+    }),
   ];
   excel("hariltsagch.xlsx", rows);
 }
@@ -8028,7 +8129,7 @@ function customerRow(c) {
 function workerPickCard(c) {
   const active = state.workerCustomer === c.id;
   const sub = customerSubtitle(c);
-  const phone = (c.phone1 || "").trim();
+  const phone = customerPhonesList(c)[0] || "";
   const reg = customerRegistrationDisplay(c);
   const id = esc(c.id);
   const line2 = sub || reg || phone;
@@ -9537,7 +9638,7 @@ function isMobileExcelExportDevice() {
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || "");
 }
 function xlsxPackageRootRelsXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
 }
 function xlsxPackageCoreXml() {
   const stamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -9548,7 +9649,9 @@ function xlsxPackageAppXml(sheetCount = 1) {
     { length: sheetCount },
     (_, i) => `<vt:lpstr>Sheet${i + 1}</vt:lpstr>`,
   ).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>TOMUDA</Application><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${sheetCount}</vt:i4></vt:variant></HeadingPairs><TitlesOfParts><vt:vector size="${sheetCount}" baseType="lpstr">${titles}</vt:vector></TitlesOfParts></Properties>`;
+  // NOTE: </vt:vector> after HeadingPairs is required — omitting it makes the
+  // whole package invalid and strict apps (Numbers, mobile Excel) refuse to open it.
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>TOMUDA</Application><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>${sheetCount}</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="${sheetCount}" baseType="lpstr">${titles}</vt:vector></TitlesOfParts></Properties>`;
 }
 function styledWorkbookRelsXml(sheetCount) {
   const rels = [];
@@ -12430,8 +12533,7 @@ function filterDeliveryStores(rows, q) {
       c.name,
       c.companyName,
       c.registrationNumber,
-      c.phone1,
-      c.phone2,
+      ...customerPhonesList(c),
       c.address,
       c.province,
       c.district,
@@ -12464,7 +12566,9 @@ function deliveryStoreCard(entry, active = false) {
   const c = entry.customer,
     id = esc(c.id),
     addr = customerAddress(c),
-    meta = [c.phone1, addr !== "-" ? addr : ""].filter(Boolean).join(" · ");
+    meta = [customerPhonesList(c)[0] || "", addr !== "-" ? addr : ""]
+      .filter(Boolean)
+      .join(" · ");
   return `<button type="button" class="delivery-store-card${active ? " is-active" : ""}" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><div class="delivery-store-card__media"><img src="${customerStoreImage(c)}" alt="" class="delivery-store-card__img" loading="lazy" decoding="async"><span class="delivery-store-card__pin" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>${entry.orderCount ? `<span class="delivery-store-card__badge">${entry.orderCount} захиалга</span>` : ""}</div><div class="delivery-store-card__body"><p class="delivery-store-card__name">${esc(c.name)}</p>${c.companyName ? `<p class="delivery-store-card__company">${esc(c.companyName)}</p>` : ""}<p class="delivery-store-card__meta">${esc(meta || "—")}</p><p class="delivery-store-card__total">${fmt(entry.total)}</p></div></button>`;
 }
 function deliveryStorePickStep() {
@@ -13907,7 +14011,9 @@ function customerProvinceField(value = "") {
 function captureCustomerForm() {
   const form = modal.querySelector("form[data-customer-form]");
   if (!form) return null;
-  const data = Object.fromEntries(new FormData(form));
+  const fd = new FormData(form);
+  const data = Object.fromEntries(fd);
+  applyCustomerPhoneFields(data, customerPhonesFromFormData(fd));
   data.latitude =
     document.getElementById("customerLat")?.value || data.latitude || "";
   data.longitude =
@@ -13917,13 +14023,11 @@ function captureCustomerForm() {
 function customerFromDraft(id, draft) {
   const saved = state.customers.find((x) => x.id === id) || {};
   if (!draft) return { ...saved };
-  return {
+  const next = {
     ...saved,
     name: draft.name ?? saved.name,
     registrationNumber: draft.registrationNumber ?? saved.registrationNumber,
     companyName: draft.companyName ?? saved.companyName,
-    phone1: draft.phone1 ?? saved.phone1,
-    phone2: draft.phone2 ?? saved.phone2,
     province: draft.province ?? saved.province,
     district: draft.district ?? saved.district,
     khoroo: draft.khoroo ?? saved.khoroo,
@@ -13933,6 +14037,19 @@ function customerFromDraft(id, draft) {
     longitude: draft.longitude ?? saved.longitude,
     locationText: draft.locationText ?? saved.locationText,
   };
+  if (Array.isArray(draft.phones) || draft.phone1 != null || draft.phone2 != null) {
+    applyCustomerPhoneFields(
+      next,
+      Array.isArray(draft.phones)
+        ? draft.phones
+        : customerPhonesList({
+            phones: draft.phones,
+            phone1: draft.phone1 ?? saved.phone1,
+            phone2: draft.phone2 ?? saved.phone2,
+          }),
+    );
+  }
+  return next;
 }
 function confirmEditCustomer(id) {
   const c = state.customers.find((x) => x.id === id);
@@ -13991,7 +14108,7 @@ function customerModal(id, draft = null) {
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}<div class="grid sm:grid-cols-2 gap-4">${field("phone1", "Утас 1", c.phone1)}${field("phone2", "Утас 2", c.phone2)}</div><div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -14102,6 +14219,16 @@ async function applyCustomerSave(data, id) {
   if (productMediaPathFromUrl(incomingImage)) {
     data.image = productMediaPathFromUrl(incomingImage);
   }
+  applyCustomerPhoneFields(
+    data,
+    Array.isArray(data.phones)
+      ? data.phones
+      : customerPhonesList({
+          phones: data.phones,
+          phone1: data.phone1,
+          phone2: data.phone2,
+        }),
+  );
   let customer = null;
   if (id) {
     const existing = state.customers.find((c) => c.id === id);
@@ -14111,10 +14238,12 @@ async function applyCustomerSave(data, id) {
     if (!storedEntityImage(existing) && prevImage) {
       existing.image = prevImage;
     }
+    applyCustomerPhoneFields(existing, existing.phones);
     customer = existing;
   } else {
     customer = { ...data, id: String(Date.now()) };
     if (!customer.image) delete customer.image;
+    applyCustomerPhoneFields(customer, customer.phones);
     state.customers.push(customer);
   }
   if (customer) {
@@ -14151,7 +14280,9 @@ async function saveCustomer(e, id) {
       return;
     }
   }
-  const data = Object.fromEntries(new FormData(e.target));
+  const fd = new FormData(e.target);
+  const data = Object.fromEntries(fd);
+  applyCustomerPhoneFields(data, customerPhonesFromFormData(fd));
   const image = readCustomerImageFromForm(e.target);
   if (image) data.image = image;
   else delete data.image;
@@ -15671,7 +15802,7 @@ function storePickerModal() {
     );
   box(
     "Харилцагч сонгох",
-    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, РД-ээр хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${c.name}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${c.phone1 || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
+    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, РД-ээр хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${c.name}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${customerPhonesList(c)[0] || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
     "max-w-3xl",
   );
   const el = document.querySelector("[data-store-search]");
@@ -16289,6 +16420,8 @@ Object.assign(window, {
   confirmEditProduct,
   confirmEditEmployee,
   dialPhoneNumber,
+  addCustomerPhoneField,
+  removeCustomerPhoneField,
   customerModal,
   handleCustomerImage,
   clearCustomerImage,

@@ -843,6 +843,70 @@ textarea.text-sm,
   color: var(--hex-muted-foreground);
 }
 
+.customer-phones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.customer-phones__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.customer-phone-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.customer-phone-row__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.customer-phone-row__remove {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 48px;
+  margin-bottom: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hex-secondary);
+  color: var(--hex-muted-foreground);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.customer-phone-row__remove:hover,
+.customer-phone-row__remove:focus-visible {
+  color: var(--hex-foreground);
+  background: color-mix(in srgb, var(--hex-secondary) 70%, #e11);
+}
+
+.customer-phones__add {
+  align-self: flex-start;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 2px;
+  color: var(--hex-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.customer-phones__add:hover {
+  text-decoration: underline;
+}
+
+.customer-phones__add[hidden] {
+  display: none;
+}
+
 .customer-detail__maps {
   display: inline-flex;
   align-items: center;
