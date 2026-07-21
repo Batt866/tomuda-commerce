@@ -6383,15 +6383,22 @@ function xlsxZipWriteUtf8(zip, path, xml) {
   // inserted as raw Uint8Array with mismatched binary flags.
   zip.file(path, String(xml ?? ""), zipFileOptions({ binary: false }));
 }
-function buildReceiptSheetXml(
-  o,
-  ctx = createReceiptStringContext(),
-  opts = {},
-) {
-  const { strings, si } = ctx;
-  const merges = ["A1:B2", "C1:F1", "G1:J1", "C2:H2", "I2:J2", "C3:J3"];
-  const rows = [];
-  let rowNum = 1;
+// Appends one receipt's rows/merges starting at startRow; returns next free row.
+// Shared collectors let several receipts stack in a single worksheet.
+function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
+  const { si } = ctx;
+  let rowNum = startRow;
+  const hr1 = rowNum;
+  const hr2 = rowNum + 1;
+  const hr3 = rowNum + 2;
+  merges.push(
+    `A${hr1}:B${hr2}`,
+    `C${hr1}:F${hr1}`,
+    `G${hr1}:J${hr1}`,
+    `C${hr2}:H${hr2}`,
+    `I${hr2}:J${hr2}`,
+    `C${hr3}:J${hr3}`,
+  );
   const pushRow = (height, cells) => {
     const filtered = filterXlsxCellsOutsideMerges(cells, merges);
     rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
@@ -6458,21 +6465,21 @@ function buildReceiptSheetXml(
       ? `Өдөртөө тооцоог хийгээгүй тохиолдолд (${percentDiscountRate()}%) -н хөнгөлөлт хасагдахгүй болохыг анхаарна уу!!.`
       : "";
   pushRow(28, [
-    xlsxCellXml("C1", 1, si("ТОМУДА ГРУПП"), "s"),
-    xlsxCellXml("K1", 3, si("Хүргэлтийн огноо:"), "s"),
-    ...emptyCells(1, "A", "B"),
-    ...emptyCells(1, "G", "J"),
+    xlsxCellXml(`C${hr1}`, 1, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml(`K${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
+    ...emptyCells(hr1, "A", "B"),
+    ...emptyCells(hr1, "G", "J"),
   ]);
   pushRow(32, [
-    xlsxCellXml("C2", 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
-    xlsxCellXml("K2", 6, si(receiptDeliveryDateValue(o)), "s"),
-    ...emptyCells(2, "A", "B"),
-    ...emptyCells(2, "I", "J"),
+    xlsxCellXml(`C${hr2}`, 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
+    xlsxCellXml(`K${hr2}`, 6, si(receiptDeliveryDateValue(o)), "s"),
+    ...emptyCells(hr2, "A", "B"),
+    ...emptyCells(hr2, "I", "J"),
   ]);
   pushRow(31.5, [
-    xlsxCellXml("C3", 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(3, "A", "B"),
-    ...emptyCells(3, "K", RECEIPT_XLSX_LAST_COL),
+    xlsxCellXml(`C${hr3}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(hr3, "A", "B"),
+    ...emptyCells(hr3, "K", RECEIPT_XLSX_LAST_COL),
   ]);
   pushMetaPairRow(
     "Худалдааны төлөөлөгч:",
@@ -6761,7 +6768,9 @@ function buildReceiptSheetXml(
   ]);
   pushRow(14.25, emptyCells(rowNum));
   pushRow(14.25, emptyCells(rowNum));
-  const lastRow = rowNum - 1;
+  return rowNum;
+}
+function receiptWorksheetXml(rows, merges, lastRow) {
   const uniqueMerges = [...new Set(merges)];
   const mergeXml = uniqueMerges
     .map((ref) => `<mergeCell ref="${ref}"/>`)
@@ -6769,18 +6778,41 @@ function buildReceiptSheetXml(
   const mergeCellsXml = uniqueMerges.length
     ? `<mergeCells count="${uniqueMerges.length}">${mergeXml}</mergeCells>`
     : "";
-  const drawingXml = opts.hasLogo ? `<drawing r:id="rId1"/>` : "";
-  // ECMA-376 worksheet child order: mergeCells → pageMargins → drawing.
-  // Putting drawing before pageMargins makes Excel Mobile report
-  // "We found a problem with some content".
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+}
+function buildReceiptSheetXml(
+  o,
+  ctx = createReceiptStringContext(),
+  opts = {},
+) {
+  const rows = [];
+  const merges = [];
+  const nextRow = appendReceiptSheetRows(o, ctx, rows, merges, 1);
   return {
-    sharedStringsXml: xlsxSharedStringsXml(strings),
-    sheetXml,
+    sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
+    sheetXml: receiptWorksheetXml(rows, merges, nextRow - 1),
     sheetName: xlsxSafeSheetName(
-      opts.sheetName || `Баримт ${receiptNo}`,
+      opts.sheetName || `Баримт ${formatReceiptNumber(o)}`,
       "Баримт",
     ),
+  };
+}
+// All receipts stacked into one worksheet so the export can reuse the
+// known-good template package (same mechanism as the warehouse sheet).
+function buildReceiptsCombinedSheetXml(orders, ctx = createReceiptStringContext()) {
+  const rows = [];
+  const merges = [];
+  let rowNum = 1;
+  orders.forEach((o, index) => {
+    if (index > 0) {
+      rows.push(xlsxRowXml(rowNum, 14.25, [], RECEIPT_XLSX_LAST_COL));
+      rowNum += 1;
+    }
+    rowNum = appendReceiptSheetRows(o, ctx, rows, merges, rowNum);
+  });
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
+    sheetXml: receiptWorksheetXml(rows, merges, Math.max(1, rowNum - 1)),
   };
 }
 function buildReceiptWorkbookXml(orders, opts = {}) {
@@ -6833,19 +6865,20 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
 }
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
-  const filename = receiptExcelFileName(orders);
-  const mobileSafe = prefersMobileExcelShare();
-  // Never embed drawings/logo — Excel Mobile frequently shows the
-  // "problem with some content" repair dialog for packages with drawings.
-  const built = buildReceiptWorkbookXml(orders, {
-    hasLogo: false,
-    mobileSafe: true,
+  // Same mechanism as the warehouse prepare sheet (which opens everywhere):
+  // start from a real Excel-authored template package and only replace the
+  // sheet data, shared strings and styles.
+  const { sharedStringsXml, sheetXml } = buildReceiptsCombinedSheetXml(orders);
+  const tpl = await fetch(staticAssetUrl(RECEIPT_XLSX_TEMPLATE)).then((r) => {
+    if (!r.ok) throw new Error("template missing");
+    return r.arrayBuffer();
   });
-  const blob = await assembleStyledXlsxZip(built, {
-    hasLogo: false,
-    logoBuffer: null,
-  });
-  return downloadBlobFile(blob, filename, { skipShare: !mobileSafe });
+  const zip = await JSZip.loadAsync(tpl);
+  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  zip.file("xl/styles.xml", receiptXlsxStylesXml());
+  const blob = await zipToExcelBlob(zip);
+  await downloadBlobFile(blob, receiptExcelFileName(orders));
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   const logoSrc = await getReceiptExcelLogoDataUri().catch(() => "");
@@ -6854,43 +6887,21 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  const mobile = prefersMobileExcelShare();
-  // On phones, HTML .xls opens reliably in Excel (no OOXML repair dialog).
-  // Desktop keeps real .xlsx.
-  const runLegacy = async () => {
-    const ok = await exportOrderReceiptsExcelLegacy(orders);
-    if (ok === false) return false;
-    showInstallToast(mobile ? "Файлыг Excel-ээр нээнэ үү" : "Мэдээлэл татагдлаа");
-    return true;
-  };
-  const runXlsx = async () => {
-    const ok = await exportOrderReceiptsExcelXlsx(orders);
-    if (ok === false) return false;
-    showInstallToast(mobile ? "Файлыг Excel-ээр нээнэ үү" : "Мэдээлэл татагдлаа");
-    return true;
-  };
   try {
-    if (mobile) {
-      try {
-        await runLegacy();
-      } catch (legacyErr) {
-        console.error("Receipt legacy excel export failed", legacyErr);
-        await runXlsx();
-      }
-      return;
-    }
-    try {
-      await runXlsx();
-    } catch (err) {
-      console.error("Receipt xlsx export failed", err);
-      await runLegacy();
-    }
+    await exportOrderReceiptsExcelXlsx(orders);
+    showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.error("Receipt excel export failed", err);
-    alertModal(
-      "Мэдээлэл татах амжилтгүй",
-      "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
-    );
+    console.warn("Receipt xlsx export failed", err);
+    try {
+      await exportOrderReceiptsExcelLegacy(orders);
+      showInstallToast("Мэдээлэл татагдлаа");
+    } catch (fallbackErr) {
+      console.error("Receipt excel export failed", fallbackErr);
+      alertModal(
+        "Мэдээлэл татах амжилтгүй",
+        "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+      );
+    }
   }
 }
 function orderReceiptExportSnapshots(
