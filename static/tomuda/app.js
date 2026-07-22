@@ -6316,7 +6316,9 @@ function exportOrderReceiptsExcelCsv(orders) {
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
-const RECEIPT_XLSX_COL_WIDTHS = [4.0, 26.0, 1.0, 1.0, 11.0, 15.5, 1.0, 8.0, 1.0, 10.5, 11.5];
+const RECEIPT_XLSX_COL_WIDTHS = [
+  3.5, 20, 5, 5, 10, 12, 5, 5, 4, 10, 11,
+];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6447,6 +6449,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const pushRow = (height, cells) => {
     const filtered = filterXlsxCellsOutsideMerges(cells, merges);
     rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
+    rowNum += 1;
+  };
+  // Item table: keep every A–K cell (even under merges) so Excel draws full borders.
+  const pushItemTableRow = (height, cells) => {
+    const sorted = filterXlsxCellsOutsideMerges(cells, []);
+    rows.push(xlsxRowXml(rowNum, height, sorted, RECEIPT_XLSX_LAST_COL));
     rowNum += 1;
   };
   const emptyCells = (
@@ -6601,18 +6609,22 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(14.25, emptyCells(rowNum));
   const headerRow = rowNum;
-  // Print-like columns: name B:D, barcode F:G, qty H:I — one border each (no inner lines).
+  // Print columns: № | нэр(B:D) | нэгж | баркод(F:G) | тоо(H:I) | үнэ | нийт
   merges.push(
     `B${headerRow}:D${headerRow}`,
     `F${headerRow}:G${headerRow}`,
     `H${headerRow}:I${headerRow}`,
   );
-  pushRow(18, [
-    xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
+  pushItemTableRow(18, [
+    xlsxCellXml(`A${headerRow}`, 7, si("№"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, null, "empty"),
+    xlsxCellXml(`D${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`I${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
   ]);
@@ -6629,24 +6641,31 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = promo
       ? receiptPromoDisplayTotal(item)
       : resolveOrderItemLineTotal(item);
+    const qty = Number(item.quantity) || 0;
     const nameStyle = 8;
     const unitStyle = 9;
     const barcodeStyle = 9;
-    const qtyStyle = 11;
+    const qtyStyle = 9;
     const moneyStyle = 10;
-    const numStyle = 11;
+    const numStyle = 9;
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
+    const nameText = String(item.productName || "").trim() || "-";
+    const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
-    pushRow(15.75, [
+    pushItemTableRow(16.5, [
       promo
         ? xlsxCellXml(`A${r}`, numStyle, null, "empty")
-        : xlsxCellXml(`A${r}`, numStyle, index + 1, "n"),
-      xlsxCellXml(`B${r}`, nameStyle, si(item.productName || ""), "s"),
-      xlsxCellXml(`E${r}`, unitStyle, si(p.unit || "ш"), "s"),
+        : xlsxCellXml(`A${r}`, numStyle, si(String(index + 1)), "s"),
+      xlsxCellXml(`B${r}`, nameStyle, si(nameText), "s"),
+      xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
+      xlsxCellXml(`D${r}`, nameStyle, null, "empty"),
+      xlsxCellXml(`E${r}`, unitStyle, si(unitText), "s"),
       xlsxCellXml(`F${r}`, barcodeStyle, si(barcodeText), "s"),
-      xlsxCellXml(`H${r}`, qtyStyle, Number(item.quantity) || 0, "n"),
-      xlsxCellXml(`J${r}`, moneyStyle, unitPrice, "n"),
-      xlsxCellXml(`K${r}`, moneyStyle, lineTotal, "n"),
+      xlsxCellXml(`G${r}`, barcodeStyle, null, "empty"),
+      xlsxCellXml(`H${r}`, qtyStyle, si(String(qty)), "s"),
+      xlsxCellXml(`I${r}`, qtyStyle, null, "empty"),
+      xlsxCellXml(`J${r}`, moneyStyle, si(receiptMoney(unitPrice)), "s"),
+      xlsxCellXml(`K${r}`, moneyStyle, si(receiptMoney(lineTotal)), "s"),
     ]);
   };
   const pushSummaryAmountRow = (
