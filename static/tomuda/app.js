@@ -6123,6 +6123,8 @@ function receiptExcelPage(o, logoSrc) {
 }
 const RECEIPT_EXCEL_STYLES = `
 body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
+table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+td, th { border: none; }
 .receipt-excel-sheet { display: block; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page { width: 100%; max-width: 194mm; margin: 0 auto; padding: 2mm 1mm 4mm; font-size: 9pt; line-height: 1.2; font-family: ${RECEIPT_FONT}; box-sizing: border-box; min-height: 270mm; }
@@ -6139,19 +6141,24 @@ body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECE
 .receipt-grid--sheet .receipt-grid__fill td,
 .receipt-grid--sheet .receipt-grid__footnote td,
 .receipt-grid--sheet .receipt-grid__settle td,
-.receipt-grid--sheet .receipt-grid__sign td { border: none; padding: 1px 2px; vertical-align: middle; }
-.receipt-grid--sheet .receipt-grid__items-head td,
-.receipt-grid--sheet .receipt-grid__item td { border: 1px solid #808080; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__sign td,
 .receipt-grid--sheet .receipt-grid__promo td,
 .receipt-grid--sheet .receipt-grid__promo-note td,
 .receipt-grid--sheet .receipt-grid__gross td,
-.receipt-grid--sheet .receipt-grid__summary td { border: none; padding: 2px 4px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__summary td { border: none !important; border-top: none !important; border-right: none !important; border-bottom: none !important; border-left: none !important; padding: 1px 2px; vertical-align: middle; mso-border-alt: none; }
+.receipt-grid--sheet .receipt-grid__items-head td,
+.receipt-grid--sheet .receipt-grid__item td { border: 1px solid #808080 !important; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__promo td,
+.receipt-grid--sheet .receipt-grid__promo-note td,
+.receipt-grid--sheet .receipt-grid__gross td,
+.receipt-grid--sheet .receipt-grid__summary td { padding: 2px 4px; font-size: 9pt; }
 .receipt-grid--sheet .receipt-grid__return td { padding: 4px 4px 6px; }
-.receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #c8c8c8; background: #e8ebee; padding: 4px; }
+.receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #c8c8c8 !important; background: #e8ebee; padding: 4px; }
 .receipt-grid--sheet .receipt-grid__promo-note td { background: #fff8e6; padding: 6px 4px; }
-.receipt-grid--sheet .receipt-grid__promo td { background: #fafafa; border-bottom: 1px solid #e2e2e2; padding: 3px 4px; }
-.receipt-grid--sheet .receipt-grid__summary--grand td { border-top: 1px solid #c8c8c8; background: #e8ebee; padding: 4px; }
+.receipt-grid--sheet .receipt-grid__promo td { background: #fafafa; border-bottom: 1px solid #e2e2e2 !important; padding: 3px 4px; }
+.receipt-grid--sheet .receipt-grid__summary--grand td { border-top: 1px solid #c8c8c8 !important; background: #e8ebee; padding: 4px; }
 .receipt-grid--sheet .receipt-grid__summary--pay td { padding-top: 6px; }
+.receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px solid #333 !important; }
 .receipt-grid__promo-banner { display: table-cell; text-align: left; vertical-align: middle; }
 .receipt-grid__promo-title { display: inline-block; font-weight: 700; font-size: 10pt; margin-right: 10px; vertical-align: middle; white-space: nowrap; }
 .receipt-grid__promo-settle { display: inline-block; text-align: left; font-size: 9pt; white-space: normal; line-height: 1.3; background: #fff2cc; font-weight: 700; padding: 2px 6px; vertical-align: middle; }
@@ -6224,7 +6231,7 @@ function buildReceiptExcelDocument(orders, logoSrc) {
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <link rel="stylesheet" href="${RECEIPT_FONT_LINK}">
-<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Баримт</x:Name><x:WorksheetOptions><x:DisplayGridlines/><x:Print><x:ValidPrinterInfo/></x:Print></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Баримт</x:Name><x:WorksheetOptions><x:Print><x:ValidPrinterInfo/><x:PaperSizeIndex>9</x:PaperSizeIndex></x:Print></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
 <style>${RECEIPT_EXCEL_STYLES}</style>
 </head>
 <body>${pages}</body>
@@ -6237,9 +6244,9 @@ function receiptExcelFileName(orders) {
       /[^\w.-]+/g,
       "-",
     );
-    return `zarlagyn-barimt-${no}.xlsx`;
+    return `zarlagyn-barimt-${no}.xls`;
   }
-  return `zarlagyn-barimt-${stamp}.xlsx`;
+  return `zarlagyn-barimt-${stamp}.xls`;
 }
 function legacyExcelFileName(name) {
   return safeDownloadFileName(
@@ -6583,34 +6590,47 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = promo
       ? receiptPromoDisplayTotal(item)
       : resolveOrderItemLineTotal(item);
+    // Paid lines use table borders; promo lines stay borderless like print.
+    const nameStyle = promo ? 4 : 8;
+    const unitStyle = promo ? 6 : 8;
+    const barcodeStyle = promo ? 6 : 9;
+    const qtyStyle = promo ? 12 : 10;
+    const moneyStyle = promo ? 12 : 10;
     pushRow(14.25, [
       promo
-        ? xlsxCellXml(`A${r}`, 10, null, "empty")
+        ? xlsxCellXml(`A${r}`, 1, null, "empty")
         : item
           ? xlsxCellXml(`A${r}`, 10, index + 1, "n")
           : xlsxCellXml(`A${r}`, 10, null, "empty"),
       item
-        ? xlsxCellXml(`B${r}`, 8, si(item.productName || ""), "s")
-        : xlsxCellXml(`B${r}`, 8, null, "empty"),
+        ? xlsxCellXml(`B${r}`, nameStyle, si(item.productName || ""), "s")
+        : xlsxCellXml(`B${r}`, nameStyle, null, "empty"),
       item
-        ? xlsxCellXml(`E${r}`, 8, si(p.unit || "ш"), "s")
-        : xlsxCellXml(`E${r}`, 8, null, "empty"),
+        ? xlsxCellXml(`E${r}`, unitStyle, si(p.unit || "ш"), "s")
+        : xlsxCellXml(`E${r}`, unitStyle, null, "empty"),
       item
-        ? xlsxBarcodeCell(`F${r}`, 9, p.barcode, si)
-        : xlsxCellXml(`F${r}`, 9, null, "empty"),
+        ? promo
+          ? xlsxCellXml(
+              `F${r}`,
+              barcodeStyle,
+              si(String(p.barcode || "").replace(/\D/g, "") || "-"),
+              "s",
+            )
+          : xlsxBarcodeCell(`F${r}`, barcodeStyle, p.barcode, si)
+        : xlsxCellXml(`F${r}`, barcodeStyle, null, "empty"),
       item
-        ? xlsxCellXml(`H${r}`, 10, Number(item.quantity) || 0, "n")
-        : xlsxCellXml(`H${r}`, 10, null, "empty"),
+        ? xlsxCellXml(`H${r}`, qtyStyle, Number(item.quantity) || 0, "n")
+        : xlsxCellXml(`H${r}`, qtyStyle, null, "empty"),
       item
-        ? xlsxCellXml(`J${r}`, 10, unitPrice, "n")
-        : xlsxCellXml(`J${r}`, 10, null, "empty"),
+        ? xlsxCellXml(`J${r}`, moneyStyle, unitPrice, "n")
+        : xlsxCellXml(`J${r}`, moneyStyle, null, "empty"),
       item
-        ? xlsxCellXml(`K${r}`, 10, lineTotal, "n")
-        : xlsxCellXml(`K${r}`, 10, null, "empty"),
-      xlsxCellXml(`C${r}`, 8, null, "empty"),
-      xlsxCellXml(`D${r}`, 8, null, "empty"),
-      xlsxCellXml(`G${r}`, 8, null, "empty"),
-      xlsxCellXml(`I${r}`, 10, null, "empty"),
+        ? xlsxCellXml(`K${r}`, moneyStyle, lineTotal, "n")
+        : xlsxCellXml(`K${r}`, moneyStyle, null, "empty"),
+      xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
+      xlsxCellXml(`D${r}`, nameStyle, null, "empty"),
+      xlsxCellXml(`G${r}`, nameStyle, null, "empty"),
+      xlsxCellXml(`I${r}`, qtyStyle, null, "empty"),
     ]);
   };
   const pushSummaryAmountRow = (label, amount, { grand = false } = {}) => {
@@ -6834,8 +6854,13 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
   zip.file("xl/styles.xml", receiptXlsxStylesXml());
+  // Drop orphaned printerSettings / drawing rels so Excel does not try to
+  // repair leftover package parts from the blank template.
+  zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
+  zip.remove("xl/printerSettings/printerSettings1.bin");
   const blob = await zipToExcelBlob(zip);
-  await downloadBlobFile(blob, receiptExcelFileName(orders));
+  const name = receiptExcelFileName(orders).replace(/\.xls$/i, ".xlsx");
+  await downloadBlobFile(blob, name);
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   const logoSrc = await getReceiptExcelLogoDataUri().catch(() => "");
@@ -6844,13 +6869,15 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
+  // Prefer the print HTML layout so Excel matches "Хэвлэх" exactly
+  // (logo, borders only on the item table, no stray grid boxes).
   try {
-    await exportOrderReceiptsExcelXlsx(orders);
+    await exportOrderReceiptsExcelLegacy(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt xlsx export failed", err);
+    console.warn("Receipt HTML excel export failed", err);
     try {
-      await exportOrderReceiptsExcelLegacy(orders);
+      await exportOrderReceiptsExcelXlsx(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
