@@ -6355,9 +6355,9 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // ~18mm square logo anchored over A1:B2 (print receipt footprint).
+  // Fixed 18mm square (print size). oneCellAnchor — do not stretch across wide B column.
   const emu = Math.round((18 / 25.4) * 914400);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>50000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>50000</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emu}" cy="${emu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>40000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>40000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -6492,15 +6492,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  // Logo sits in A1:B2 via DrawingML overlay — keep cells empty (no green TD).
-  pushRow(28, [
+  // Logo area A1:B2 — taller rows so 18mm logo fits without clipping.
+  pushRow(34, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`C${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`K${hr1}`, 18, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(hr1, "B", "B"),
     ...emptyCells(hr1, "G", "J"),
   ]);
-  pushRow(32, [
+  pushRow(34, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(`C${hr2}`, 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
     xlsxCellXml(`K${hr2}`, 18, si(receiptDeliveryDateValue(o)), "s"),
@@ -6601,16 +6601,18 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(14.25, emptyCells(rowNum));
   const headerRow = rowNum;
+  // Print-like columns: name B:D, barcode F:G, qty H:I — one border each (no inner lines).
+  merges.push(
+    `B${headerRow}:D${headerRow}`,
+    `F${headerRow}:G${headerRow}`,
+    `H${headerRow}:I${headerRow}`,
+  );
   pushRow(18, [
     xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
-    xlsxCellXml(`C${headerRow}`, 7, null, "empty"),
-    xlsxCellXml(`D${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
-    xlsxCellXml(`I${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
   ]);
@@ -6627,7 +6629,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = promo
       ? receiptPromoDisplayTotal(item)
       : resolveOrderItemLineTotal(item);
-    // Match print: no zebra, thin gray borders, full barcode text.
     const nameStyle = 8;
     const unitStyle = 9;
     const barcodeStyle = 9;
@@ -6635,18 +6636,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const moneyStyle = 10;
     const numStyle = 11;
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
+    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushRow(15.75, [
       promo
         ? xlsxCellXml(`A${r}`, numStyle, null, "empty")
         : xlsxCellXml(`A${r}`, numStyle, index + 1, "n"),
       xlsxCellXml(`B${r}`, nameStyle, si(item.productName || ""), "s"),
-      xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
-      xlsxCellXml(`D${r}`, nameStyle, null, "empty"),
       xlsxCellXml(`E${r}`, unitStyle, si(p.unit || "ш"), "s"),
       xlsxCellXml(`F${r}`, barcodeStyle, si(barcodeText), "s"),
-      xlsxCellXml(`G${r}`, barcodeStyle, null, "empty"),
       xlsxCellXml(`H${r}`, qtyStyle, Number(item.quantity) || 0, "n"),
-      xlsxCellXml(`I${r}`, qtyStyle, null, "empty"),
       xlsxCellXml(`J${r}`, moneyStyle, unitPrice, "n"),
       xlsxCellXml(`K${r}`, moneyStyle, lineTotal, "n"),
     ]);
