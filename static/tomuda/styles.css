@@ -2223,6 +2223,111 @@ img[data-product-img],
     "meta";
 }
 
+@media (max-width: 640px) {
+  /* Golden-ratio product cards on phone (φ ≈ 1.618) */
+  .product-list {
+    gap: 13px;
+    padding: 0;
+  }
+
+  .product-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "img copy actions"
+      "img meta actions";
+    gap: 8px 13px;
+    align-items: start;
+    padding: 13px;
+    border-bottom: none;
+    background: color-mix(in srgb, var(--hex-card) 94%, var(--hex-primary-soft));
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, var(--hex-border) 88%, transparent);
+  }
+
+  .product-list--readonly .product-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "img copy"
+      "img meta";
+  }
+
+  .product-card:last-child {
+    border-bottom: none;
+  }
+
+  .product-card__name {
+    display: contents;
+  }
+
+  .product-card__img {
+    grid-area: img;
+    width: 120px;
+    height: 120px;
+    border-radius: 0;
+    align-self: start;
+  }
+
+  .product-card__copy {
+    grid-area: copy;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    padding-top: 2px;
+  }
+
+  .product-card__title {
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .product-card__hint {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.45;
+    gap: 4px 8px;
+  }
+
+  .product-card__facts {
+    grid-area: meta;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 0.618fr;
+    gap: 5px 13px;
+    align-items: end;
+    padding-left: 0;
+  }
+
+  .product-card__price {
+    font-size: 16px;
+    letter-spacing: -0.01em;
+  }
+
+  .product-card__cost {
+    grid-column: 1;
+    font-size: 11px;
+  }
+
+  .product-card__stock {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: end;
+    border-radius: 0;
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .product-card__actions {
+    grid-area: actions;
+    gap: 8px;
+    align-self: start;
+  }
+
+  .product-card__action-btn {
+    border-radius: 0;
+  }
+}
 
 @media (min-width: 1024px) {
   .product-list {
