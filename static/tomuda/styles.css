@@ -9760,6 +9760,27 @@ textarea::placeholder {
   width: 64px;
 }
 
+.wh-receipt-sheet__item-name {
+  display: block;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.wh-receipt-sheet__item-detail,
+.wh-receipt-sheet__item-qty-label,
+.wh-receipt-sheet__item-sum-label {
+  display: none;
+}
+
+.wh-receipt-sheet__item-qty-value,
+.wh-receipt-sheet__item-sum-value {
+  display: inline;
+}
+
+.wh-receipt-sheet__products {
+  min-width: 0;
+}
+
 .wh-receipt-sheet__row--promo {
   border-left: 4px solid var(--hex-success);
   background: color-mix(in srgb, var(--hex-success) 14%, #ffffff);
@@ -9988,6 +10009,130 @@ textarea::placeholder {
   .wh-receipt-detail__btns .btn {
     flex: 1 1 calc(50% - 4px);
     min-width: 0;
+  }
+
+  /* Golden-ratio product cards on phone (φ ≈ 1.618) */
+  .wh-receipt-sheet {
+    gap: 13px;
+    padding: 13px;
+    border-radius: 13px;
+  }
+
+  .wh-receipt-sheet__logo {
+    width: 42px;
+    height: 42px;
+  }
+
+  .wh-receipt-sheet__company {
+    font-size: 14px;
+  }
+
+  .wh-receipt-sheet__meta {
+    grid-template-columns: 1fr;
+    gap: 13px;
+    padding: 13px;
+    border-radius: 13px;
+  }
+
+  .wh-receipt-sheet__table--golden thead {
+    display: none;
+  }
+
+  .wh-receipt-sheet__table--golden tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+  }
+
+  .wh-receipt-sheet__table--golden tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 0.618fr;
+    gap: 8px 13px;
+    padding: 13px;
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--hex-card) 94%, var(--hex-primary-soft));
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, var(--hex-border) 88%, transparent);
+  }
+
+  .wh-receipt-sheet__table--golden td {
+    border: none;
+    padding: 0;
+  }
+
+  .wh-receipt-sheet__name {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .wh-receipt-sheet__item-name {
+    font-size: 14px;
+  }
+
+  .wh-receipt-sheet__item-detail {
+    display: block;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--hex-muted-foreground);
+  }
+
+  .wh-receipt-sheet__qty,
+  .wh-receipt-sheet__sum {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: auto;
+  }
+
+  .wh-receipt-sheet__qty {
+    grid-column: 1;
+    text-align: left;
+    align-self: end;
+  }
+
+  .wh-receipt-sheet__sum {
+    grid-column: 2;
+    text-align: right;
+    align-items: flex-end;
+    align-self: end;
+  }
+
+  .wh-receipt-sheet__item-qty-label,
+  .wh-receipt-sheet__item-sum-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--hex-muted-foreground);
+  }
+
+  .wh-receipt-sheet__item-qty-value {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .wh-receipt-sheet__item-sum-value {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--hex-primary);
+  }
+
+  .wh-receipt-sheet__row--promo {
+    border-left: none;
+    box-shadow: inset 4px 0 0 var(--hex-success),
+      inset 0 0 0 1px color-mix(in srgb, var(--hex-border) 88%, transparent);
+  }
+
+  .wh-receipt-sheet__totals {
+    padding: 13px;
+    border-radius: 13px;
+  }
+
+  .wh-receipt-sheet__total-line--pay {
+    font-size: 16px;
   }
 }
 

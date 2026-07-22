@@ -6171,8 +6171,8 @@ td, th { border: none; }
 .receipt-page--footer-only { display: flex; flex-direction: column; }
 .receipt-page--footer-only .receipt-grid--sheet { flex: 1 1 auto; height: 100%; }
 .receipt-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
-.receipt-grid__a { width: 7%; } .receipt-grid__b { width: 5.48%; } .receipt-grid__c { width: 20.81%; } .receipt-grid__d { width: 4.65%; } .receipt-grid__e { width: 12.43%; }
-.receipt-grid__f { width: 11.52%; } .receipt-grid__g { width: 6.73%; } .receipt-grid__h { width: 5.84%; } .receipt-grid__i { width: 4.49%; } .receipt-grid__j { width: 11.08%; } .receipt-grid__k { width: 11.38%; }
+.receipt-grid__a { width: 5.6%; } .receipt-grid__b { width: 8.9%; } .receipt-grid__c { width: 14.4%; } .receipt-grid__d { width: 8.9%; } .receipt-grid__e { width: 7.8%; }
+.receipt-grid__f { width: 12.2%; } .receipt-grid__g { width: 7.8%; } .receipt-grid__h { width: 7.8%; } .receipt-grid__i { width: 5.6%; } .receipt-grid__j { width: 10%; } .receipt-grid__k { width: 11.1%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__return td,
@@ -6247,6 +6247,57 @@ td, th { border: none; }
 .receipt-grid__sign-label { font-size: 9pt; padding: 12px 2px 6px; vertical-align: bottom; white-space: nowrap; }
 .receipt-grid__sign-line { border-bottom: 1px solid #333 !important; height: 18px; min-height: 18px; vertical-align: bottom; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
+@media screen and (max-width: 640px) {
+  .receipt-page { padding: 13px 10px 21px; max-width: none; }
+  .receipt-grid--sheet .receipt-grid__items-head { display: none; }
+  .receipt-grid--sheet tbody { display: block; }
+  .receipt-grid--sheet .receipt-grid__item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 0.618fr;
+    gap: 8px 13px;
+    margin: 0 0 13px;
+    padding: 13px;
+    border: none !important;
+    border-radius: 13px;
+    background: #f7faf8;
+    box-shadow: inset 0 0 0 1px #d5ddd8;
+  }
+  .receipt-grid--sheet .receipt-grid__item td {
+    display: block;
+    border: none !important;
+    padding: 0;
+  }
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__num { display: none; }
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__name {
+    grid-column: 1 / -1;
+    font-size: 10.5pt;
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: left;
+  }
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__unit,
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__barcode {
+    grid-column: 1 / -1;
+    font-size: 8.5pt;
+    color: #555;
+    text-align: left;
+  }
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__qty {
+    grid-column: 1;
+    font-size: 9.5pt;
+    text-align: left;
+  }
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__money {
+    grid-column: 2;
+    font-size: 10.5pt;
+    font-weight: 700;
+    text-align: right;
+    align-self: end;
+  }
+  .receipt-grid--sheet .receipt-grid__item .receipt-grid__money:last-child {
+    color: #0f7a3f;
+  }
+}
 `;
 let receiptExcelLogoDataUri = "";
 async function getReceiptExcelLogoDataUri() {
@@ -6344,7 +6395,7 @@ function exportOrderReceiptsExcelCsv(orders) {
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
-const RECEIPT_XLSX_COL_WIDTHS = [4, 10, 8, 5, 8, 11, 4, 6, 4, 11, 11];
+const RECEIPT_XLSX_COL_WIDTHS = [5, 8, 13, 8, 6, 10, 6, 6, 5, 9, 10];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -7189,10 +7240,13 @@ function warehouseOrderDetail(o) {
     itemRows = displayItems
       .map((i) => {
         const isPromo = !!i.isPromoFree;
-        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name">${esc(i.productName)}${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</td><td class="wh-receipt-sheet__qty">${i.quantity} ш</td><td class="wh-receipt-sheet__sum">${isPromo ? "0 ₮" : fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
+        const p = productForReceiptLine(i);
+        const unitPrice = isPromo ? 0 : resolveOrderItemUnitPrice(i);
+        const lineTotal = isPromo ? 0 : resolveOrderItemLineTotal(i);
+        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name"><span class="wh-receipt-sheet__item-name">${esc(i.productName)}</span><span class="wh-receipt-sheet__item-detail">${esc(p.barcode || "—")} · ${esc(p.unit || "ш")} · ${isPromo ? "0 ₮" : fmt(unitPrice)}/нэгж</span>${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</td><td class="wh-receipt-sheet__qty"><span class="wh-receipt-sheet__item-qty-label">Тоо</span><span class="wh-receipt-sheet__item-qty-value">${i.quantity} ш</span></td><td class="wh-receipt-sheet__sum"><span class="wh-receipt-sheet__item-sum-label">Дүн</span><span class="wh-receipt-sheet__item-sum-value">${isPromo ? "0 ₮" : fmt(lineTotal)}</span></td></tr>`;
       })
       .join("");
-  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${BRAND.receiptLogo}" alt="" class="wh-receipt-sheet__logo" width="40" height="40"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><table class="wh-receipt-sheet__table"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paymentTermLabel(o.paymentTerm)}${paid && o.paymentTerm === "credit" ? " · Тооцоо дууссан" : ""}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${RECEIPT_LOGO_DATA_URI}" alt="" class="wh-receipt-sheet__logo" width="42" height="42"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><div class="wh-receipt-sheet__products"><table class="wh-receipt-sheet__table wh-receipt-sheet__table--golden"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table></div><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paymentTermLabel(o.paymentTerm)}${paid && o.paymentTerm === "credit" ? " · Тооцоо дууссан" : ""}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
