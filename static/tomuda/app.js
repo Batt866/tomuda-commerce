@@ -2762,6 +2762,8 @@ function guessMimeFromFileName(name) {
   const lower = String(name || "").toLowerCase();
   if (lower.endsWith(".xlsx")) return XLSX_MIME;
   if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+  if (lower.endsWith(".html") || lower.endsWith(".htm"))
+    return "text/html;charset=utf-8";
   if (lower.endsWith(".csv")) return "text/csv;charset=utf-8";
   return XLSX_MIME;
 }
@@ -2773,16 +2775,22 @@ function safeDownloadFileName(name, mime = "") {
     .replace(/-+/g, "-");
   if (!base) base = "download";
   const mimeStr = String(mime || "").toLowerCase();
+  const wantsHtml =
+    /\.html?$/i.test(base) ||
+    mimeStr.includes("text/html") ||
+    mimeStr === "text/html;charset=utf-8";
   const wantsCsv = /\.csv$/i.test(base) || mimeStr.includes("csv");
   const wantsXlsx =
     /\.xlsx$/i.test(base) ||
     mimeStr.includes("spreadsheetml") ||
     mimeStr.includes("openxmlformats");
+  // Do NOT treat text/html as .xls — Excel/Numbers strip logos and break layout.
   const wantsXls =
-    mimeStr.includes("vnd.ms-excel") ||
-    mimeStr.includes("html") ||
-    (!wantsXlsx && /\.xls$/i.test(base));
-  base = base.replace(/\.(xlsx|xls|csv)$/i, "");
+    !wantsHtml &&
+    (mimeStr.includes("vnd.ms-excel") ||
+      (!wantsXlsx && /\.xls$/i.test(base)));
+  base = base.replace(/\.(xlsx|xls|csv|html|htm)$/i, "");
+  if (wantsHtml) return `${base || "download"}.html`;
   if (wantsCsv) return `${base || "download"}.csv`;
   if (wantsXls && !wantsXlsx) return `${base || "download"}.xls`;
   return `${base || "download"}.xlsx`;
