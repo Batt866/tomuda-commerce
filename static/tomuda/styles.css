@@ -2047,9 +2047,9 @@ img[data-product-img],
 
 .product-card__img {
   flex-shrink: 0;
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
+  width: 120px;
+  height: 120px;
+  border-radius: 0;
   object-fit: contain;
   object-position: center;
   padding: 4px;
@@ -2115,7 +2115,7 @@ img[data-product-img],
   align-items: center;
   gap: 8px 12px;
   min-width: 0;
-  padding-left: 76px;
+  padding-left: 132px;
 }
 
 .product-card__price {
@@ -2278,9 +2278,9 @@ img[data-product-img],
   }
 
   .product-card__img {
-    width: 56px;
-    height: 56px;
-    border-radius: 8px;
+    width: 96px;
+    height: 96px;
+    border-radius: 0;
   }
 
   .product-card__title {
