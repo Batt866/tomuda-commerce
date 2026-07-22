@@ -2189,7 +2189,7 @@ img[data-product-img],
   height: 40px;
   padding: 0;
   border: 1.5px solid var(--hex-border);
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 0;
   font-weight: 700;
   line-height: 1;
@@ -2326,7 +2326,7 @@ img[data-product-img],
   }
 
   .product-card__action-btn {
-    border-radius: 999px;
+    border-radius: 10px;
   }
 }
 
