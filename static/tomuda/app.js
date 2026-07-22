@@ -6317,8 +6317,9 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Anchor logo across A1:B2 (same footprint as the print receipt logo cell).
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>40000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>40000</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="receipt-logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1" cstate="print"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  // ~18mm square logo anchored over A1:B2 (print receipt footprint).
+  const emu = Math.round((18 / 25.4) * 914400);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>50000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>50000</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${emu}" cy="${emu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -6743,9 +6744,9 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
   const mergeCellsXml = uniqueMerges.length
     ? `<mergeCells count="${uniqueMerges.length}">${mergeXml}</mergeCells>`
     : "";
-  // ECMA-376 order: mergeCells → pageMargins → drawing → pageSetup
+  // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.45" right="0.45" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>${drawingXml}<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.45" right="0.45" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -6814,6 +6815,19 @@ function buildReceiptWorkbookXml(orders, opts = {}) {
   };
 }
 async function loadReceiptExcelLogoBuffer() {
+  // Prefer the same data-URI path the print receipt already uses successfully.
+  try {
+    const dataUri = await getReceiptExcelLogoDataUri();
+    const m = String(dataUri || "").match(/^data:image\/\w+;base64,(.+)$/i);
+    if (m) {
+      const bin = atob(m[1]);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      if (bytes.byteLength > 100) return bytes.buffer;
+    }
+  } catch {
+    /* fall through */
+  }
   const urls = [
     staticAssetUrl(BRAND.receiptLogo),
     BRAND.receiptLogo,
