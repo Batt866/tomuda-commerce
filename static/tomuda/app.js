@@ -6276,9 +6276,9 @@ function receiptExcelFileName(orders) {
       /[^\w.-]+/g,
       "-",
     );
-    return `zarlagyn-barimt-${no}.xls`;
+    return `zarlagyn-barimt-${no}.html`;
   }
-  return `zarlagyn-barimt-${stamp}.xls`;
+  return `zarlagyn-barimt-${stamp}.html`;
 }
 function legacyExcelFileName(name) {
   return safeDownloadFileName(
@@ -6287,10 +6287,16 @@ function legacyExcelFileName(name) {
   );
 }
 async function downloadReceiptExcelBlob(name, html) {
+  // Same print HTML as "Хэвлэх". Save as .html so the browser shows logo +
+  // layout; Excel/Numbers .xls mode strips images and mangling the table.
+  const fileName = String(name || "zarlagyn-barimt.html").replace(
+    /\.(xlsx|xls)$/i,
+    ".html",
+  );
   const blob = new Blob(["\uFEFF" + html], {
-    type: "application/vnd.ms-excel;charset=utf-8",
+    type: "text/html;charset=utf-8",
   });
-  return downloadBlobFile(blob, legacyExcelFileName(name), {
+  return downloadBlobFile(blob, fileName, {
     skipShare: !prefersMobileExcelShare(),
   });
 }
@@ -6949,10 +6955,24 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Same HTML as "Хэвлэх" (receiptPrintPageHtml + RECEIPT_EXCEL_STYLES) so
-  // print and download look identical — no separate XLSX layout.
+  // Identical to "Хэвлэх": same HTML builder + open in browser (Excel breaks
+  // logos/layout). Also download .html for keeping a file copy.
   try {
-    await exportOrderReceiptsExcelLegacy(orders);
+    const logoSrc =
+      (await getReceiptExcelLogoDataUri().catch(() => "")) ||
+      RECEIPT_LOGO_DATA_URI;
+    const html = buildReceiptExcelDocument(orders, logoSrc);
+    const blob = new Blob(["\uFEFF" + html], {
+      type: "text/html;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank");
+    if (opened) {
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } else {
+      URL.revokeObjectURL(url);
+    }
+    await downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
     console.error("Receipt excel export failed", err);
