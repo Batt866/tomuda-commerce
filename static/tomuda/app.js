@@ -93,6 +93,8 @@ const BRAND = {
   logoBlue: "/static/tomuda/branding/logo-blue.png",
   receiptLogo: "/static/tomuda/branding/receipt-logo.png",
 };
+const RECEIPT_LOGO_DATA_URI =
+  "data:image/png;base64,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";
 const MN_PROVINCES = [
   "Улаанбаатар",
   "Архангай",
@@ -6239,8 +6241,9 @@ async function getReceiptExcelLogoDataUri() {
     });
     return receiptExcelLogoDataUri;
   } catch {
-    receiptExcelLogoDataUri = "";
-    return "";
+    // Bundled logo — never leave the receipt header blank.
+    receiptExcelLogoDataUri = RECEIPT_LOGO_DATA_URI;
+    return RECEIPT_LOGO_DATA_URI;
   }
 }
 function buildReceiptExcelDocument(orders, logoSrc) {
@@ -6837,36 +6840,25 @@ function buildReceiptWorkbookXml(orders, opts = {}) {
     workbookXml,
   };
 }
+function receiptLogoBytesFromDataUri(dataUri = RECEIPT_LOGO_DATA_URI) {
+  const m = String(dataUri || "").match(/^data:image\/\w+;base64,(.+)$/i);
+  if (!m) return null;
+  const bin = atob(m[1]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+  return bytes.byteLength > 100 ? bytes.buffer : null;
+}
 async function loadReceiptExcelLogoBuffer() {
-  // Prefer the same data-URI path the print receipt already uses successfully.
+  // Always start from the bundled logo so export never depends on network.
+  let buf = receiptLogoBytesFromDataUri(RECEIPT_LOGO_DATA_URI);
   try {
     const dataUri = await getReceiptExcelLogoDataUri();
-    const m = String(dataUri || "").match(/^data:image\/\w+;base64,(.+)$/i);
-    if (m) {
-      const bin = atob(m[1]);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-      if (bytes.byteLength > 100) return bytes.buffer;
-    }
+    const fromFetch = receiptLogoBytesFromDataUri(dataUri);
+    if (fromFetch) buf = fromFetch;
   } catch {
-    /* fall through */
+    /* keep bundled */
   }
-  const urls = [
-    staticAssetUrl(BRAND.receiptLogo),
-    BRAND.receiptLogo,
-    "/static/tomuda/branding/receipt-logo.png",
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) continue;
-      const buf = await res.arrayBuffer();
-      if (buf && buf.byteLength > 100) return buf;
-    } catch {
-      /* try next */
-    }
-  }
-  return null;
+  return buf;
 }
 function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
   const drawingPath = `xl/drawings/drawing${sheetId}.xml`;
@@ -6942,14 +6934,15 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   );
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
-  const logoSrc = await getReceiptExcelLogoDataUri().catch(() => "");
-  const html = buildReceiptExcelDocument(orders, logoSrc || "");
+  const logoSrc =
+    (await getReceiptExcelLogoDataUri().catch(() => "")) || RECEIPT_LOGO_DATA_URI;
+  const html = buildReceiptExcelDocument(orders, logoSrc);
   return downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Apple Numbers drops OOXML drawings, so Mac/iOS get HTML .xls with a real
-  // <img> logo (same as print). Other platforms use XLSX (+ green TD mark).
+  // Always include a real logo image. Mac/Numbers: HTML .xls with <img>.
+  // Others: XLSX with embedded drawing (+ green TD mark underneath).
   try {
     if (isAppleDesktopOrIos()) {
       await exportOrderReceiptsExcelLegacy(orders);
@@ -6960,11 +6953,7 @@ async function exportOrderReceiptsExcel(orders) {
   } catch (err) {
     console.warn("Receipt excel export failed", err);
     try {
-      if (isAppleDesktopOrIos()) {
-        await exportOrderReceiptsExcelXlsx(orders);
-      } else {
-        await exportOrderReceiptsExcelLegacy(orders);
-      }
+      await exportOrderReceiptsExcelLegacy(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
@@ -15399,8 +15388,12 @@ function printOrderReceiptsNow(ids) {
     .filter(Boolean);
   if (!orders.length) return alert("Захиалга олдсонгүй");
   closeModal();
-  const root = printRootEl();
-  root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
+  void (async () => {
+    const logoSrc =
+      (await getReceiptExcelLogoDataUri().catch(() => "")) ||
+      RECEIPT_LOGO_DATA_URI;
+    const root = printRootEl();
+    root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
   @page { size: A4 portrait; margin: 8mm; }
   .receipt-page { width: 100%; max-width: none; padding: 0; font-size: 9pt; }
@@ -15408,22 +15401,25 @@ function printOrderReceiptsNow(ids) {
   .receipt-grid__brand { font-size: 11pt; }
   .receipt-title { font-size: 14pt; }
 }
-</style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), BRAND.receiptLogo)}</div>`).join("")}`;
-  const cleanup = () => {
-    root.innerHTML = "";
-  };
-  window.addEventListener("afterprint", cleanup, { once: true });
-  setTimeout(() => {
-    window.print();
-    setTimeout(cleanup, 1500);
-  }, 120);
+</style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
+    const cleanup = () => {
+      root.innerHTML = "";
+    };
+    window.addEventListener("afterprint", cleanup, { once: true });
+    setTimeout(() => {
+      window.print();
+      setTimeout(cleanup, 1500);
+    }, 120);
+  })();
 }
 function printSelectedOrderReceipts() {
   const ids = idList(state.receiptPrintOrderIds);
   if (!receiptPrintWorkerIds().length)
     return alert("Худалдааны төлөөлөгч сонгоно уу");
   if (!ids.length) return alert("Хэвлэх захиалга сонгоно уу");
-  confirmPrintExport("Баримт хэвлэх", () => printOrderReceiptsNow(ids));
+  confirmPrintExport("Баримт хэвлэх", () => {
+    void printOrderReceiptsNow(ids);
+  });
 }
 function orderDetail(id) {
   orderReceiptModal(id);
@@ -15432,7 +15428,7 @@ function receiptDetail(id) {
   orderReceiptModal(id);
 }
 function receipt(o) {
-  return `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), BRAND.receiptLogo)}</div>`;
+  return `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), RECEIPT_LOGO_DATA_URI)}</div>`;
 }
 function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);
