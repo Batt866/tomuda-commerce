@@ -436,9 +436,7 @@ function receiptGridColgroup() {
   return `<colgroup><col class="receipt-grid__a"><col class="receipt-grid__b"><col class="receipt-grid__c"><col class="receipt-grid__d"><col class="receipt-grid__e"><col class="receipt-grid__f"><col class="receipt-grid__g"><col class="receipt-grid__h"><col class="receipt-grid__i"><col class="receipt-grid__j"><col class="receipt-grid__k"></colgroup>`;
 }
 function receiptDeliveryDateValue(o) {
-  const raw = o.createdAt
-    ? new Date(o.createdAt).toISOString().slice(0, 10)
-    : todayIso();
+  const raw = orderDeliveryDay(o);
   const parts = String(raw).split("-");
   if (parts.length === 3) {
     const y = Number(parts[0]) % 100;
@@ -447,6 +445,16 @@ function receiptDeliveryDateValue(o) {
     if (m && d) return `${m}/${d}/${String(y).padStart(2, "0")}`;
   }
   return String(raw).trim();
+}
+function receiptPrintedDateValue() {
+  const parts = String(todayIso()).split("-");
+  if (parts.length === 3) {
+    const y = Number(parts[0]) % 100;
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (m && d) return `${m}/${d}/${String(y).padStart(2, "0")}`;
+  }
+  return todayIso();
 }
 function receiptMetaRow(
   leftLabel,
@@ -474,7 +482,8 @@ function receiptPaymentChecksHtml(paid, bank) {
 }
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateValue(o);
-  return `<tr class="receipt-grid__header"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="4"></td><td class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header"><td colspan="6" class="receipt-grid__address">${esc(RECEIPT_COMPANY_ADDRESS)}</td><td colspan="2"></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
+  const printedDate = receiptPrintedDateValue();
+  return `<tr class="receipt-grid__header"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="4" class="receipt-grid__address">${esc(RECEIPT_COMPANY_ADDRESS)}</td><td colspan="3" class="receipt-grid__date-label">Хэвлэсэн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(printedDate)}</td></tr><tr class="receipt-grid__header"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -6185,7 +6194,8 @@ td, th { border: none; }
 .receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
 .receipt-grid__address { font-size: 8pt; line-height: 1.25; vertical-align: top; white-space: normal; }
-.receipt-grid__date-label, .receipt-grid__date { font-size: 9pt; text-align: center; white-space: nowrap; vertical-align: middle; }
+.receipt-grid__date-label, .receipt-grid__date { font-size: 9pt; text-align: left; white-space: nowrap; vertical-align: middle; }
+.receipt-grid__date { text-align: center; font-weight: 700; }
 .receipt-title { text-align: center; font-family: ${RECEIPT_FONT_TITLE}; font-size: 14pt; font-weight: 700; padding: 3px 0 5px; }
 .receipt-grid__meta td { font-size: 9pt; line-height: 1.2; }
 .receipt-grid__label { color: #111; white-space: nowrap; font-weight: 400; }
@@ -6441,9 +6451,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   merges.push(
     `A${hr1}:B${hr2}`,
     `C${hr1}:F${hr1}`,
-    `G${hr1}:J${hr1}`,
-    `C${hr2}:H${hr2}`,
-    `I${hr2}:J${hr2}`,
+    `G${hr1}:I${hr1}`,
+    `J${hr1}:K${hr1}`,
+    `C${hr2}:F${hr2}`,
+    `G${hr2}:I${hr2}`,
+    `J${hr2}:K${hr2}`,
     `C${hr3}:J${hr3}`,
   );
   const pushRow = (height, cells) => {
@@ -6500,20 +6512,24 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  // Logo area A1:B2 — taller rows so 18mm logo fits without clipping.
+  // Logo A1:B2; dates fully visible: label G:I + value J:K
   pushRow(34, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`C${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
-    xlsxCellXml(`K${hr1}`, 18, si("Хүргэлтийн огноо:"), "s"),
+    xlsxCellXml(`G${hr1}`, 5, si("Хүргэлтийн огноо:"), "s"),
+    xlsxCellXml(`J${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "B", "B"),
-    ...emptyCells(hr1, "G", "J"),
+    ...emptyCells(hr1, "H", "I"),
+    ...emptyCells(hr1, "K", "K"),
   ]);
   pushRow(34, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(`C${hr2}`, 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
-    xlsxCellXml(`K${hr2}`, 18, si(receiptDeliveryDateValue(o)), "s"),
+    xlsxCellXml(`G${hr2}`, 5, si("Хэвлэсэн огноо:"), "s"),
+    xlsxCellXml(`J${hr2}`, 18, si(receiptPrintedDateValue()), "s"),
     ...emptyCells(hr2, "B", "B"),
-    ...emptyCells(hr2, "I", "J"),
+    ...emptyCells(hr2, "H", "I"),
+    ...emptyCells(hr2, "K", "K"),
   ]);
   pushRow(31.5, [
     xlsxCellXml(`C${hr3}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
