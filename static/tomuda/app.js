@@ -6955,24 +6955,9 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Identical to "Хэвлэх": same HTML builder + open in browser (Excel breaks
-  // logos/layout). Also download .html for keeping a file copy.
+  // Same HTML as "Хэвлэх" — download as .html file (do not open a browser tab).
   try {
-    const logoSrc =
-      (await getReceiptExcelLogoDataUri().catch(() => "")) ||
-      RECEIPT_LOGO_DATA_URI;
-    const html = buildReceiptExcelDocument(orders, logoSrc);
-    const blob = new Blob(["\uFEFF" + html], {
-      type: "text/html;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const opened = window.open(url, "_blank");
-    if (opened) {
-      setTimeout(() => URL.revokeObjectURL(url), 120000);
-    } else {
-      URL.revokeObjectURL(url);
-    }
-    await downloadReceiptExcelBlob(receiptExcelFileName(orders), html);
+    await exportOrderReceiptsExcelLegacy(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
     console.error("Receipt excel export failed", err);
