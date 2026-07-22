@@ -2189,7 +2189,7 @@ img[data-product-img],
   height: 40px;
   padding: 0;
   border: 1.5px solid var(--hex-border);
-  border-radius: 0;
+  border-radius: 999px;
   font-size: 0;
   font-weight: 700;
   line-height: 1;
@@ -2197,41 +2197,23 @@ img[data-product-img],
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   box-shadow: none !important;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    color 0.15s ease;
 }
 
 .product-card__action-btn .ui-icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .product-card__action-btn--edit {
-  background: #fff;
-  color: var(--hex-primary);
-  border-color: color-mix(in srgb, var(--hex-primary) 55%, var(--hex-border));
-}
-
-.product-card__action-btn--edit:hover,
-.product-card__action-btn--edit:focus-visible {
-  background: var(--hex-primary-soft);
-  border-color: var(--hex-primary);
-  color: var(--hex-primary);
+  background: var(--hex-secondary);
+  color: var(--hex-foreground);
+  border-color: var(--hex-border);
 }
 
 .product-card__action-btn--delete {
-  background: #fff;
-  color: var(--hex-danger-text);
-  border-color: color-mix(in srgb, var(--hex-danger) 45%, var(--hex-border));
-}
-
-.product-card__action-btn--delete:hover,
-.product-card__action-btn--delete:focus-visible {
-  background: var(--hex-danger-soft);
-  border-color: var(--hex-danger);
-  color: var(--hex-danger-text);
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  border-color: var(--hex-border);
 }
 
 .product-list--readonly .product-card {
@@ -2344,17 +2326,7 @@ img[data-product-img],
   }
 
   .product-card__action-btn {
-    width: 42px;
-    height: 42px;
-    min-width: 42px;
-    min-height: 42px;
-    border-width: 1.5px;
-    border-radius: 0;
-  }
-
-  .product-card__action-btn .ui-icon {
-    width: 20px;
-    height: 20px;
+    border-radius: 999px;
   }
 }
 
