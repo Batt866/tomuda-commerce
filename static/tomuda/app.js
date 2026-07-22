@@ -966,8 +966,7 @@ function orderInWarehouseLiveSession(o) {
   return orderDay(o) === today;
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
-  const targetDay = normalizeIsoDateInput(day);
-  if (!targetDay) return orderInWarehouseLiveSession(o);
+  const targetDay = normalizeIsoDateInput(day) || todayIso();
   // Warehouse/receipt date filters should follow delivery day shown on receipts.
   return normalizeIsoDateInput(orderDay(o)) === targetDay;
 }
@@ -5483,7 +5482,10 @@ function dataSaveBannerHtml() {
   return "";
 }
 function warehouseDateFilterActive() {
-  return !state.filters.warehouseDate;
+  return (
+    (normalizeIsoDateInput(state.filters.warehouseDate) || todayIso()) ===
+    todayIso()
+  );
 }
 function warehouseLiveFilterBannerHtml() {
   if (!warehouseDateFilterActive()) return "";
@@ -5654,6 +5656,10 @@ function go(view, opts = {}) {
   state.mobileOpen = false;
   if (changed && view !== "promotions") state.filters.promotionDetail = "";
   if (changed && view === "promotions") state.filters.promotionDetail = "";
+  if (changed && (view === "warehouse" || view === "warehouseReceipts")) {
+    state.filters.warehouseDate = todayIso();
+    state.selectedWarehouseOrderId = "";
+  }
   saveAuthSession();
   render();
   if (changed && !opts.silent && !suppressHistoryPush) pushAppHistory();
@@ -8062,20 +8068,29 @@ function warehouseDateDisplayText(day = state.filters.warehouseDate || "") {
   const iso = normalizeIsoDateInput(day) || todayIso();
   return iso.replace(/-/g, ".");
 }
-function warehouseDateFiltersHtml() {
-  const day = normalizeIsoDateInput(state.filters.warehouseDate) || "",
-    live = !day,
-    pickerDay = day || todayIso(),
-    display = warehouseDateDisplayText(day);
-  return `<div class="wh-date-filters"><button type="button" onclick="clearWarehouseDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Одоогийн</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+function ensureWarehouseDateDefault() {
+  if (!normalizeIsoDateInput(state.filters.warehouseDate)) {
+    state.filters.warehouseDate = todayIso();
+  }
 }
-function clearWarehouseDate() {
-  state.filters.warehouseDate = "";
+function warehouseDateFiltersHtml() {
+  ensureWarehouseDateDefault();
+  const today = todayIso(),
+    day = normalizeIsoDateInput(state.filters.warehouseDate) || today,
+    isToday = day === today,
+    display = warehouseDateDisplayText(day);
+  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+}
+function selectWarehouseToday() {
+  state.filters.warehouseDate = todayIso();
   state.selectedWarehouseOrderId = "";
   render();
 }
+function clearWarehouseDate() {
+  selectWarehouseToday();
+}
 function setWarehouseDate(day) {
-  state.filters.warehouseDate = normalizeIsoDateInput(day);
+  state.filters.warehouseDate = normalizeIsoDateInput(day) || todayIso();
   state.selectedWarehouseOrderId = "";
   render();
 }
@@ -16773,6 +16788,7 @@ Object.assign(window, {
   clearWorkerOrderDate,
   setWorkerOrderDate,
   clearWarehouseDate,
+  selectWarehouseToday,
   setWarehouseDate,
   receiptFilterToggle,
   receiptFilterClear,
