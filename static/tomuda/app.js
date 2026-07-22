@@ -2629,7 +2629,9 @@ function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
   if (
     navId === "admin" &&
-    (viewId === "warehouseReceipts" || viewId === "count")
+    (viewId === "warehouseReceipts" ||
+      viewId === "count" ||
+      viewId === "delivery")
   )
     return true;
   return false;
@@ -4427,6 +4429,9 @@ function canAppBack() {
   ) {
     return true;
   }
+  if (state.currentView === "delivery" && currentRole() !== "delivery") {
+    return true;
+  }
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     return true;
   }
@@ -4514,6 +4519,15 @@ function handleAppBack() {
   ) {
     state.workerCustomer = "";
     render();
+    return true;
+  }
+
+  if (state.currentView === "delivery" && currentRole() !== "delivery") {
+    if (state.deliveryStoreReady) {
+      clearDeliveryStore();
+      return true;
+    }
+    go("admin", { silent: true });
     return true;
   }
 
@@ -5812,6 +5826,7 @@ function adminHubHtml() {
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
     ["count", "Тооллого", "count", "count.view"],
+    ["delivery", "Хүргэлт", "delivery", "orders.view"],
     ["employeePermissions", "Эрхийн тохиргоо", "employees", "__permissions__"],
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
@@ -7243,7 +7258,7 @@ function warehouseOrderDetail(o) {
         const p = productForReceiptLine(i);
         const unitPrice = isPromo ? 0 : resolveOrderItemUnitPrice(i);
         const lineTotal = isPromo ? 0 : resolveOrderItemLineTotal(i);
-        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name"><span class="wh-receipt-sheet__item-name">${esc(i.productName)}</span><span class="wh-receipt-sheet__item-detail">${esc(p.barcode || "—")} · ${esc(p.unit || "ш")} · ${isPromo ? "0 ₮" : fmt(unitPrice)}/нэгж</span>${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</td><td class="wh-receipt-sheet__qty"><span class="wh-receipt-sheet__item-qty-label">Тоо</span><span class="wh-receipt-sheet__item-qty-value">${i.quantity} ш</span></td><td class="wh-receipt-sheet__sum"><span class="wh-receipt-sheet__item-sum-label">Дүн</span><span class="wh-receipt-sheet__item-sum-value">${isPromo ? "0 ₮" : fmt(lineTotal)}</span></td></tr>`;
+        return `<tr class="wh-receipt-sheet__row${isPromo ? " wh-receipt-sheet__row--promo" : ""}"><td class="wh-receipt-sheet__name"><div class="wh-receipt-sheet__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="wh-receipt-sheet__item-img" loading="lazy" decoding="async" alt=""><div class="wh-receipt-sheet__product-text"><span class="wh-receipt-sheet__item-name">${esc(i.productName)}</span><span class="wh-receipt-sheet__item-detail">${esc(p.barcode || "—")} · ${esc(p.unit || "ш")} · ${isPromo ? "0 ₮" : fmt(unitPrice)}/нэгж</span>${isPromo ? `<span class="wh-receipt-sheet__promo-tag">${PROMO_PRODUCT_LABEL}</span>` : ""}</div></div></td><td class="wh-receipt-sheet__qty"><span class="wh-receipt-sheet__item-qty-label">Тоо</span><span class="wh-receipt-sheet__item-qty-value">${i.quantity} ш</span></td><td class="wh-receipt-sheet__sum"><span class="wh-receipt-sheet__item-sum-label">Дүн</span><span class="wh-receipt-sheet__item-sum-value">${isPromo ? "0 ₮" : fmt(lineTotal)}</span></td></tr>`;
       })
       .join("");
   return `<div class="wh-receipt-detail wh-receipt-sheet"><div class="wh-receipt-sheet__brand"><img src="${RECEIPT_LOGO_DATA_URI}" alt="" class="wh-receipt-sheet__logo" width="42" height="42"><div><p class="wh-receipt-sheet__company">ТОМУДА групп ХХК</p><p class="wh-receipt-sheet__doc">ЗАРЛАГЫН БАРИМТ ${formatReceiptNumber(o)}</p></div></div><div class="wh-receipt-sheet__meta"><div class="wh-receipt-sheet__col"><p><span>Харилцагч</span><b>${esc(c.name || o.customerName)}</b></p><p><span>Регистр</span><b>${esc(c.registrationNumber || "-")}</b></p><p><span>Хаяг</span><b>${esc(addr === "-" ? "" : addr)}</b></p></div><div class="wh-receipt-sheet__col"><p><span>Төлөөлөгч</span><b>${esc(o.employeeName || "-")}</b></p><p><span>Түгээгч</span><b>${esc(delivery.deliveryName)}</b></p><p><span>Захиалгын огноо</span><b>${dte(o.createdAt)}</b></p></div></div><div class="wh-receipt-sheet__products"><table class="wh-receipt-sheet__table wh-receipt-sheet__table--golden"><thead><tr><th>Бараа</th><th>Тоо</th><th>Дүн</th></tr></thead><tbody>${itemRows}</tbody></table></div><div class="wh-receipt-sheet__totals"><div class="wh-receipt-sheet__total-line"><span>Нийт (хөнгөлөлтгүй)</span><b>${fmt(gross)}</b></div>${receiptGrossPercentNoticeHtml(o)}${discount ? `<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--discount"><span>Хөнгөлөлт${pct ? ` (${pct}%)` : ""}</span><b>-${fmt(discount)}</b></div>` : ""}<div class="wh-receipt-sheet__total-line wh-receipt-sheet__total-line--pay"><span>Төлөх дүн</span><b>${fmt(payable)}</b></div><p class="wh-receipt-sheet__pay-term">${paymentTermLabel(o.paymentTerm)}${paid && o.paymentTerm === "credit" ? " · Тооцоо дууссан" : ""}</p></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;

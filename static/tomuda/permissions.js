@@ -268,7 +268,6 @@
     ["reports", "Борлуулалтын тайлан", "reports.view"],
     ["promotions", "Урамшуулал", "promotions.view"],
     ["admin", "Админ", "dashboard.view"],
-    ["delivery", "Хүргэлт", "orders.view"],
   ];
 
   function normalizeKeys(list) {
@@ -319,6 +318,7 @@
   }
 
   function allowedNavForEmployee(emp) {
+    if (emp?.role === "delivery") return [["delivery", "Хүргэлт"]];
     return NAV_ITEMS.filter(([, , perm]) => hasPermission(perm, emp));
   }
 
