@@ -483,7 +483,7 @@ function receiptPaymentChecksHtml(paid, bank) {
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateValue(o);
   const printedDate = receiptPrintedDateValue();
-  return `<tr class="receipt-grid__header"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="4" class="receipt-grid__address">${esc(RECEIPT_COMPANY_ADDRESS)}</td><td colspan="3" class="receipt-grid__date-label">Хэвлэсэн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(printedDate)}</td></tr><tr class="receipt-grid__header"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
+  return `<tr class="receipt-grid__header"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__address">${esc(RECEIPT_COMPANY_ADDRESS)}</td><td colspan="3" class="receipt-grid__date-label">Хэвлэсэн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(printedDate)}</td></tr><tr class="receipt-grid__header"><td></td><td colspan="9" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -1511,7 +1511,9 @@ function csrfTokenFromCookie() {
 function importUploadFilename(file, kind) {
   const raw = String(file?.name || "").trim();
   if (/\.(xlsx|xls)$/i.test(raw)) return raw;
-  const base = raw.replace(/\.[^.]+$/, "") || (kind === "customers" ? "hariltsagch" : "baraa");
+  const base =
+    raw.replace(/\.[^.]+$/, "") ||
+    (kind === "customers" ? "hariltsagch" : "baraa");
   return `${base}.xlsx`;
 }
 async function importFileLooksLikeExcel(file) {
@@ -1530,8 +1532,10 @@ async function importFileLooksLikeExcel(file) {
   try {
     const head = await file.slice(0, 4).arrayBuffer();
     const bytes = new Uint8Array(head);
-    if (bytes.length >= 2 && bytes[0] === 0xd0 && bytes[1] === 0xcf) return true;
-    if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) return true;
+    if (bytes.length >= 2 && bytes[0] === 0xd0 && bytes[1] === 0xcf)
+      return true;
+    if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b)
+      return true;
   } catch {
     /* ignore */
   }
@@ -1741,7 +1745,10 @@ function finishImportSuccess(kind, payload, report) {
       "error",
     );
   } else {
-    showAppToast(`${label} импорт амжилтгүй${importReportHint(report)}`, "error");
+    showAppToast(
+      `${label} импорт амжилтгүй${importReportHint(report)}`,
+      "error",
+    );
   }
   showImportReportModal(report, kind);
 }
@@ -2155,10 +2162,7 @@ function canManageCount() {
   );
 }
 function canManageReceipts() {
-  return (
-    hasPermission("receipts.view") ||
-    hasPermission("warehouse.view")
-  );
+  return hasPermission("receipts.view") || hasPermission("warehouse.view");
 }
 function canManagePromotions() {
   return (
@@ -2494,8 +2498,7 @@ const ADMIN_METRIC_ICONS = {
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   employees:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
-  count:
-    '<path d="M4 7h16M4 12h10M4 17h16"/><path d="M18 10v6M15 13h6"/>',
+  count: '<path d="M4 7h16M4 12h10M4 17h16"/><path d="M18 10v6M15 13h6"/>',
 };
 function adminMetricCard(
   label,
@@ -2624,7 +2627,10 @@ function mobileNavIcon(id) {
 }
 function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
-  if (navId === "admin" && (viewId === "warehouseReceipts" || viewId === "count"))
+  if (
+    navId === "admin" &&
+    (viewId === "warehouseReceipts" || viewId === "count")
+  )
     return true;
   return false;
 }
@@ -2710,7 +2716,9 @@ async function zipToExcelBlob(zip) {
   // Rebuild without directory stubs — Excel Mobile treats empty folder
   // entries as corrupt package content.
   const clean = new JSZip();
-  const paths = Object.keys(zip.files || {}).filter((path) => !zip.files[path]?.dir);
+  const paths = Object.keys(zip.files || {}).filter(
+    (path) => !zip.files[path]?.dir,
+  );
   for (const path of paths) {
     const data = await zip.files[path].async("uint8array");
     clean.file(path, data, zipFileOptions());
@@ -2796,8 +2804,7 @@ function safeDownloadFileName(name, mime = "") {
   // Do NOT treat text/html as .xls — Excel/Numbers strip logos and break layout.
   const wantsXls =
     !wantsHtml &&
-    (mimeStr.includes("vnd.ms-excel") ||
-      (!wantsXlsx && /\.xls$/i.test(base)));
+    (mimeStr.includes("vnd.ms-excel") || (!wantsXlsx && /\.xls$/i.test(base)));
   base = base.replace(/\.(xlsx|xls|csv|html|htm)$/i, "");
   if (wantsHtml) return `${base || "download"}.html`;
   if (wantsCsv) return `${base || "download"}.csv`;
@@ -3634,7 +3641,12 @@ function mergePromotionRules(remote = {}, local = {}, deletionLog = []) {
       local.quantity,
       deletionLog,
     ),
-    price: mergePromotionRuleKind("price", remote.price, local.price, deletionLog),
+    price: mergePromotionRuleKind(
+      "price",
+      remote.price,
+      local.price,
+      deletionLog,
+    ),
     payment: mergePromotionRuleKind(
       "payment",
       remote.payment,
@@ -3648,7 +3660,8 @@ function appendPromotionRule(kind, rule) {
   if (!state.promotionRules || typeof state.promotionRules !== "object") {
     state.promotionRules = { quantity: [], price: [], payment: [] };
   }
-  if (!Array.isArray(state.promotionRules[kind])) state.promotionRules[kind] = [];
+  if (!Array.isArray(state.promotionRules[kind]))
+    state.promotionRules[kind] = [];
   const key = promotionRuleCanonicalFingerprint(rule);
   if (
     state.promotionRules[kind].some(
@@ -3659,7 +3672,9 @@ function appendPromotionRule(kind, rule) {
   }
   clearPromotionDeletion(kind, rule);
   state.promotionRules[kind].push(rule);
-  state.promotionRules[kind] = dedupePromotionRuleList(state.promotionRules[kind]);
+  state.promotionRules[kind] = dedupePromotionRuleList(
+    state.promotionRules[kind],
+  );
   return true;
 }
 function resetPromotionModalDraft(kind) {
@@ -4124,17 +4139,16 @@ function armWhReceiptPickerDismissGuard() {
   whReceiptPickerDismissGuard += 1;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      whReceiptPickerDismissGuard = Math.max(0, whReceiptPickerDismissGuard - 1);
+      whReceiptPickerDismissGuard = Math.max(
+        0,
+        whReceiptPickerDismissGuard - 1,
+      );
     });
   });
 }
 function suppressWhReceiptPickerDismiss(ms) {
   const wait =
-    ms != null
-      ? ms
-      : isSamsungDevice() || isAndroidDevice()
-        ? 900
-        : 360;
+    ms != null ? ms : isSamsungDevice() || isAndroidDevice() ? 900 : 360;
   whReceiptPickerSuppressDismissUntil = Date.now() + wait;
 }
 function shouldSuppressWhReceiptPickerDismiss() {
@@ -5670,9 +5684,7 @@ const SCROLL_TOP_FAB_VIEWS = new Set([
 ]);
 function usesScrollTopFab() {
   if (SCROLL_TOP_FAB_VIEWS.has(state.currentView)) return true;
-  return (
-    state.currentView === "worker" && state.filters.worker === "orders"
-  );
+  return state.currentView === "worker" && state.filters.worker === "orders";
 }
 function scrollTopFabHtml() {
   if (!usesScrollTopFab()) return "";
@@ -5975,7 +5987,7 @@ function stockAlertModal() {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
           const limitAttr = limit > 0 ? `value="${limit}" ` : "";
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${p}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
@@ -6159,7 +6171,7 @@ td, th { border: none; }
 .receipt-page--footer-only { display: flex; flex-direction: column; }
 .receipt-page--footer-only .receipt-grid--sheet { flex: 1 1 auto; height: 100%; }
 .receipt-grid { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
-.receipt-grid__a { width: 3.59%; } .receipt-grid__b { width: 7.48%; } .receipt-grid__c { width: 20.81%; } .receipt-grid__d { width: 4.65%; } .receipt-grid__e { width: 12.43%; }
+.receipt-grid__a { width: 7%; } .receipt-grid__b { width: 5.48%; } .receipt-grid__c { width: 20.81%; } .receipt-grid__d { width: 4.65%; } .receipt-grid__e { width: 12.43%; }
 .receipt-grid__f { width: 11.52%; } .receipt-grid__g { width: 6.73%; } .receipt-grid__h { width: 5.84%; } .receipt-grid__i { width: 4.49%; } .receipt-grid__j { width: 11.08%; } .receipt-grid__k { width: 11.38%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -6190,10 +6202,10 @@ td, th { border: none; }
 .receipt-grid__promo-banner { display: table-cell; text-align: left; vertical-align: middle; }
 .receipt-grid__promo-title { display: inline-block; font-weight: 700; font-size: 10pt; margin-right: 10px; vertical-align: middle; white-space: nowrap; }
 .receipt-grid__promo-settle { display: inline-block; text-align: left; font-size: 9pt; white-space: normal; line-height: 1.3; background: #fff2cc; font-weight: 700; padding: 2px 6px; vertical-align: middle; }
-.receipt-grid__logo-cell { vertical-align: top; padding: 0; }
+.receipt-grid__logo-cell { width: 18mm; max-width: 18mm; vertical-align: middle; padding: 0 1mm 0 0; }
 .receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
-.receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; }
-.receipt-grid__address { font-size: 8pt; line-height: 1.25; vertical-align: top; white-space: normal; }
+.receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 11pt; font-weight: 700; vertical-align: middle; padding-left: 0; }
+.receipt-grid__address { font-size: 8pt; line-height: 1.25; vertical-align: top; white-space: normal; padding-left: 0; }
 .receipt-grid__date-label, .receipt-grid__date { font-size: 9pt; text-align: left; white-space: nowrap; vertical-align: middle; }
 .receipt-grid__date { text-align: center; font-weight: 700; }
 .receipt-title { text-align: center; font-family: ${RECEIPT_FONT_TITLE}; font-size: 14pt; font-weight: 700; padding: 3px 0 5px; }
@@ -6235,7 +6247,10 @@ td, th { border: none; }
 `;
 let receiptExcelLogoDataUri = "";
 async function getReceiptExcelLogoDataUri() {
-  if (receiptExcelLogoDataUri && /^data:image\//i.test(receiptExcelLogoDataUri)) {
+  if (
+    receiptExcelLogoDataUri &&
+    /^data:image\//i.test(receiptExcelLogoDataUri)
+  ) {
     return receiptExcelLogoDataUri;
   }
   try {
@@ -6326,9 +6341,7 @@ function exportOrderReceiptsExcelCsv(orders) {
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
-const RECEIPT_XLSX_COL_WIDTHS = [
-  3.5, 20, 5, 5, 10, 12, 5, 5, 4, 10, 11,
-];
+const RECEIPT_XLSX_COL_WIDTHS = [5, 2, 16, 5, 10, 12, 5, 5, 4, 10, 11];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6415,14 +6428,20 @@ function filterXlsxCellsOutsideMerges(cells, mergeRefs) {
   const seen = new Set();
   const out = [];
   for (const cell of cells || []) {
-    const ref = String(cell).match(/\br="([A-Z]+\d+)"/i)?.[1]?.toUpperCase();
+    const ref = String(cell)
+      .match(/\br="([A-Z]+\d+)"/i)?.[1]
+      ?.toUpperCase();
     if (!ref || covered.has(ref) || seen.has(ref)) continue;
     seen.add(ref);
     out.push(cell);
   }
   out.sort((a, b) => {
-    const ra = xlsxParseCellRef(String(a).match(/\br="([A-Z]+\d+)"/i)?.[1] || "");
-    const rb = xlsxParseCellRef(String(b).match(/\br="([A-Z]+\d+)"/i)?.[1] || "");
+    const ra = xlsxParseCellRef(
+      String(a).match(/\br="([A-Z]+\d+)"/i)?.[1] || "",
+    );
+    const rb = xlsxParseCellRef(
+      String(b).match(/\br="([A-Z]+\d+)"/i)?.[1] || "",
+    );
     if (!ra || !rb) return 0;
     return ra.col - rb.col;
   });
@@ -6449,14 +6468,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
   merges.push(
-    `A${hr1}:B${hr2}`,
-    `C${hr1}:F${hr1}`,
+    `A${hr1}:A${hr2}`,
+    `B${hr1}:F${hr1}`,
     `G${hr1}:I${hr1}`,
     `J${hr1}:K${hr1}`,
-    `C${hr2}:F${hr2}`,
+    `B${hr2}:F${hr2}`,
     `G${hr2}:I${hr2}`,
     `J${hr2}:K${hr2}`,
-    `C${hr3}:J${hr3}`,
+    `B${hr3}:J${hr3}`,
   );
   const pushRow = (height, cells) => {
     const filtered = filterXlsxCellsOutsideMerges(cells, merges);
@@ -6512,28 +6531,26 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  // Logo A1:B2; dates fully visible: label G:I + value J:K
+  // Logo column A only; brand/address start at B (right next to logo).
   pushRow(34, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
-    xlsxCellXml(`C${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml(`B${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`G${hr1}`, 5, si("Хүргэлтийн огноо:"), "s"),
     xlsxCellXml(`J${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
-    ...emptyCells(hr1, "B", "B"),
     ...emptyCells(hr1, "H", "I"),
     ...emptyCells(hr1, "K", "K"),
   ]);
   pushRow(34, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
-    xlsxCellXml(`C${hr2}`, 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
+    xlsxCellXml(`B${hr2}`, 2, si(RECEIPT_COMPANY_ADDRESS), "s"),
     xlsxCellXml(`G${hr2}`, 5, si("Хэвлэсэн огноо:"), "s"),
     xlsxCellXml(`J${hr2}`, 18, si(receiptPrintedDateValue()), "s"),
-    ...emptyCells(hr2, "B", "B"),
     ...emptyCells(hr2, "H", "I"),
     ...emptyCells(hr2, "K", "K"),
   ]);
   pushRow(31.5, [
-    xlsxCellXml(`C${hr3}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr3, "A", "B"),
+    xlsxCellXml(`B${hr3}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(hr3, "A", "A"),
     ...emptyCells(hr3, "K", RECEIPT_XLSX_LAST_COL),
   ]);
   pushMetaPairRow(
@@ -6787,12 +6804,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   merges.push(`B${sign1}:E${sign1}`, `F${sign1}:K${sign1}`);
   pushRow(22, [
     xlsxCellXml(`A${sign1}`, 1, null, "empty"),
-    xlsxCellXml(
-      `B${sign1}`,
-      5,
-      si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"),
-      "s",
-    ),
+    xlsxCellXml(`B${sign1}`, 5, si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"), "s"),
     xlsxCellXml(`F${sign1}`, 17, null, "empty"),
     ...emptyCells(sign1, "G", RECEIPT_XLSX_LAST_COL, 17),
   ]);
@@ -6978,7 +6990,8 @@ async function exportOrderReceiptsExcelXlsx(orders) {
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   const logoSrc =
-    (await getReceiptExcelLogoDataUri().catch(() => "")) || RECEIPT_LOGO_DATA_URI;
+    (await getReceiptExcelLogoDataUri().catch(() => "")) ||
+    RECEIPT_LOGO_DATA_URI;
   const html = buildReceiptExcelDocument(orders, logoSrc);
   // HTML fallback only — keep .html so Excel is not forced to mangle layout.
   const name = receiptExcelFileName(orders).replace(/\.xlsx$/i, ".html");
@@ -7020,7 +7033,10 @@ function orderReceiptExportSnapshots(
 function confirmVisibleOrderReceiptsExcel(searchKey = "warehouseOrders") {
   confirmOrderReceiptsExcel(searchKey, [], receiptFilterOptions());
 }
-function warehouseReceiptToolbarActionsHtml(exportOnclick, { hasOrders = true } = {}) {
+function warehouseReceiptToolbarActionsHtml(
+  exportOnclick,
+  { hasOrders = true } = {},
+) {
   const workerIds = receiptPrintWorkerIds(),
     selectedCount = idList(state.receiptPrintOrderIds).length,
     printBtn = workerIds.length
@@ -7397,9 +7413,7 @@ function addCustomerPhoneField() {
     customerPhoneFieldRow("", count, count + 1),
   );
   renumberCustomerPhoneFields();
-  list
-    .querySelector("[data-customer-phone-row]:last-child input")
-    ?.focus();
+  list.querySelector("[data-customer-phone-row]:last-child input")?.focus();
 }
 function removeCustomerPhoneField(btn) {
   const row = btn?.closest?.("[data-customer-phone-row]");
@@ -7626,9 +7640,7 @@ function customerMatchesQuery(c, q) {
     rdDigitsMatch ||
     rdFullMatch ||
     rdPrefixMatch ||
-    customerPhonesList(c).some((phone) =>
-      phone.toLowerCase().includes(needle),
-    )
+    customerPhonesList(c).some((phone) => phone.toLowerCase().includes(needle))
   );
 }
 function sortCustomersByName(customers) {
@@ -8096,13 +8108,7 @@ function productsExportList() {
     );
 }
 function productExcelHeaders() {
-  const headers = [
-    "№",
-    "Баркод",
-    "Барааны нэр",
-    "Төрөл",
-    "Борлуулалтын үнэ",
-  ];
+  const headers = ["№", "Баркод", "Барааны нэр", "Төрөл", "Борлуулалтын үнэ"];
   if (canViewProductCost()) headers.push("Өртөг үнэ");
   headers.push("Үлдэгдэл", "Нэгж");
   return headers;
@@ -8302,7 +8308,9 @@ function productsView() {
 function productListHead() {
   const actions = canManageProducts(),
     showCost = canViewProductCost();
-  return `<div class="product-list__head"><span class="product-list__col product-list__col--name">Бараа</span><span class="product-list__col product-list__col--cat">Төрөл</span><span class="product-list__col product-list__col--price">Үнэ</span>${showCost ? `<span class="product-list__col product-list__col--cost">Өртөг үнэ</span>` : ""}<span class="product-list__col product-list__col--stock">Үлдэгдэл</span><span class="product-list__col product-list__col--barcode">Баркод</span>${actions ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>` : ""}</div>`;
+  return actions
+    ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>`
+    : "";
 }
 function productDetailRow(label, valueHtml) {
   return `<div class="customer-detail__row"><div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
@@ -8472,14 +8480,13 @@ function stockInCostExceedsSalesPrice(costPrice, p) {
   return Number.isFinite(cost) && cost > 0 && sales > 0 && cost > sales;
 }
 function stockInCostPriceWarn(el, salesPrice) {
-  const warn = el?.closest?.("form")?.querySelector("[data-stock-in-cost-warn]");
+  const warn = el
+    ?.closest?.("form")
+    ?.querySelector("[data-stock-in-cost-warn]");
   if (!warn) return;
   const cost = Number(el.value || 0);
   const show =
-    Number.isFinite(cost) &&
-    cost > 0 &&
-    salesPrice > 0 &&
-    cost > salesPrice;
+    Number.isFinite(cost) && cost > 0 && salesPrice > 0 && cost > salesPrice;
   warn.classList.toggle("hidden", !show);
 }
 function stockInReceiptLineUnitPrice(line) {
@@ -8690,10 +8697,7 @@ function applyStockInReceipt(receipt) {
 function confirmFinishStockIn() {
   ensureStockInSession();
   if (!canManageStockIn()) {
-    return alertModal(
-      "Эрхгүй",
-      "Орлого бүртгэх эрхгүй.",
-    );
+    return alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
   }
   if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
   if (!stockInHasEntries()) return alert("Орлого оруулна уу");
@@ -8704,8 +8708,10 @@ function confirmFinishStockIn() {
   confirmModal("Орлогын баримт", summary, {
     confirmLabel: "Хадгалах",
     cancelLabel: "Үгүй",
-    onConfirm: () => void finishStockInReceipt(receipt, { downloadExcel: true }),
-    onCancel: () => void finishStockInReceipt(receipt, { downloadExcel: false }),
+    onConfirm: () =>
+      void finishStockInReceipt(receipt, { downloadExcel: true }),
+    onCancel: () =>
+      void finishStockInReceipt(receipt, { downloadExcel: false }),
   });
 }
 async function finishStockInReceipt(receipt, { downloadExcel = false } = {}) {
@@ -8752,7 +8758,10 @@ function stockInEmployeeField() {
 }
 function stockOutEmployeeField() {
   ensureStockOutSession();
-  return inventoryEmployeeField(state.stockOutEmployeeId, "setStockOutEmployee");
+  return inventoryEmployeeField(
+    state.stockOutEmployeeId,
+    "setStockOutEmployee",
+  );
 }
 function barcodeScannerPanelHtml() {
   return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
@@ -8886,9 +8895,7 @@ function stockInEntryModal(id) {
   ensureStockInSession();
   const d = state.stockInDraft[p.id] || {};
   const costVal =
-    d.costPrice != null && d.costPrice !== ""
-      ? esc(String(d.costPrice))
-      : "";
+    d.costPrice != null && d.costPrice !== "" ? esc(String(d.costPrice)) : "";
   const qtyFields = stockInPackQtyFieldsHtml(p, d);
   const salesPrice = productSalesPrice(p);
   const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
@@ -9080,7 +9087,10 @@ ${bodyRows}
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
   });
-  void downloadBlobFile(blob, legacyExcelFileName(stockInReceiptFileName(receipt)));
+  void downloadBlobFile(
+    blob,
+    legacyExcelFileName(stockInReceiptFileName(receipt)),
+  );
 }
 function stockActionRow(p, tab) {
   const openModal =
@@ -9832,7 +9842,10 @@ function styledContentTypesXml(sheetIds, { hasLogo = false } = {}) {
   }
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${parts.join("")}</Types>`;
 }
-async function assembleStyledXlsxZip(built, { hasLogo = false, logoBuffer = null } = {}) {
+async function assembleStyledXlsxZip(
+  built,
+  { hasLogo = false, logoBuffer = null } = {},
+) {
   const zip = new JSZip();
   const sheetIds = built.sheets.map((s) => s.id);
   xlsxZipWriteUtf8(
@@ -9852,11 +9865,7 @@ async function assembleStyledXlsxZip(built, { hasLogo = false, logoBuffer = null
   xlsxZipWriteUtf8(zip, "xl/styles.xml", receiptXlsxStylesXml());
   xlsxZipWriteUtf8(zip, "xl/sharedStrings.xml", built.sharedStringsXml);
   built.sheets.forEach((sheet) => {
-    xlsxZipWriteUtf8(
-      zip,
-      `xl/worksheets/sheet${sheet.id}.xml`,
-      sheet.sheetXml,
-    );
+    xlsxZipWriteUtf8(zip, `xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
     if (hasLogo) {
       xlsxZipWriteUtf8(
         zip,
@@ -9894,8 +9903,9 @@ function xlsxSharedStringsXml(strings) {
   const items = strings
     .map((s) => {
       const text = xlsxXmlEsc(s);
-      const preserve =
-        /^\s|\s$/.test(String(s ?? "")) ? ' xml:space="preserve"' : "";
+      const preserve = /^\s|\s$/.test(String(s ?? ""))
+        ? ' xml:space="preserve"'
+        : "";
       return `<si><t${preserve}>${text}</t></si>`;
     })
     .join("");
@@ -11426,7 +11436,10 @@ function promotionFreeProductIds(rule) {
     return rule.freeProductIds.filter(Boolean);
   }
   // Legacy / alternate keys used by price & payment forms.
-  if (Array.isArray(rule.priceFreeProductIds) && rule.priceFreeProductIds.length) {
+  if (
+    Array.isArray(rule.priceFreeProductIds) &&
+    rule.priceFreeProductIds.length
+  ) {
     return rule.priceFreeProductIds.filter(Boolean);
   }
   if (
@@ -12240,7 +12253,9 @@ function removePromotionRule(type, index) {
   if (index < 0 || index >= state.promotionRules[type].length) return;
   recordPromotionDeletion(type, state.promotionRules[type][index]);
   state.promotionRules[type].splice(index, 1);
-  state.promotionRules[type] = dedupePromotionRuleList(state.promotionRules[type]);
+  state.promotionRules[type] = dedupePromotionRuleList(
+    state.promotionRules[type],
+  );
   render();
   showAppToast(`${promotionTypeLabel(type)} дүрэм устгагдлаа`, "success");
   criticalBackendSave();
@@ -13286,7 +13301,7 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
     panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "";
   const wasOpen = !!modal.innerHTML.trim();
   const modalScrollTop = wasOpen
-    ? modal.querySelector(".modal-scroll")?.scrollTop ?? 0
+    ? (modal.querySelector(".modal-scroll")?.scrollTop ?? 0)
     : 0;
   modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
   requestAnimationFrame(() => {
@@ -13442,7 +13457,7 @@ function cleanupCustomerMapInstance() {
 }
 let tomudaGeolocationPlugin = null;
 function isCapacitorNative() {
-  return !!(window.Capacitor?.isNativePlatform?.());
+  return !!window.Capacitor?.isNativePlatform?.();
 }
 function capGeolocationPlugin() {
   if (!isCapacitorNative()) return null;
@@ -13488,7 +13503,10 @@ function normalizeGeolocationError(err) {
   const capCode = String(err.code || "");
   const normalized =
     err instanceof Error ? err : new Error(msg || "geolocation error");
-  if (capCode.includes("OS-PLUG-GLOC-0003") || capCode.includes("OS-PLUG-GLOC-0009")) {
+  if (
+    capCode.includes("OS-PLUG-GLOC-0003") ||
+    capCode.includes("OS-PLUG-GLOC-0009")
+  ) {
     normalized.code = 1;
     return normalized;
   }
@@ -13505,7 +13523,8 @@ function normalizeGeolocationError(err) {
     return normalized;
   }
   if (normalized.code == null) {
-    if (msg.includes("denied") || msg.includes("permission")) normalized.code = 1;
+    if (msg.includes("denied") || msg.includes("permission"))
+      normalized.code = 1;
     else if (
       msg.includes("disabled") ||
       msg.includes("not enabled") ||
@@ -13514,7 +13533,8 @@ function normalizeGeolocationError(err) {
       msg.includes("turned off")
     )
       normalized.code = 2;
-    else if (msg.includes("timeout") || msg.includes("in time")) normalized.code = 3;
+    else if (msg.includes("timeout") || msg.includes("in time"))
+      normalized.code = 3;
     else if (msg.includes("unsupported") || msg.includes("plugin missing"))
       normalized.code = 0;
     else normalized.code = 2;
@@ -13566,7 +13586,11 @@ function geolocationErrorDetail(err) {
       offerSettings: isAndroidDevice(),
     };
   }
-  if (code === 0 || msg.includes("unsupported") || msg.includes("plugin missing")) {
+  if (
+    code === 0 ||
+    msg.includes("unsupported") ||
+    msg.includes("plugin missing")
+  ) {
     return {
       text: isCapacitorNative()
         ? "GPS plugin олдсонгүй. App-аа шинэчилж (APK) дахин суулгана уу."
@@ -13688,9 +13712,12 @@ function readBrowserGeolocationWithWatch(options, onSuccess, onError) {
     fn(value);
   };
   let watchId = null;
-  const timer = setTimeout(() => {
-    finish(onError, Object.assign(new Error("timeout"), { code: 3 }));
-  }, Number(options.timeout || 25000) + 2000);
+  const timer = setTimeout(
+    () => {
+      finish(onError, Object.assign(new Error("timeout"), { code: 3 }));
+    },
+    Number(options.timeout || 25000) + 2000,
+  );
   watchId = navigator.geolocation.watchPosition(
     (pos) => finish(onSuccess, pos),
     (err) => finish(onError, err),
@@ -13777,7 +13804,11 @@ async function ensureCapacitorGeolocationPermission(capGeo) {
     throw denied;
   }
 }
-async function readCapacitorPosition(capGeo, options = {}, { androidFirst = false } = {}) {
+async function readCapacitorPosition(
+  capGeo,
+  options = {},
+  { androidFirst = false } = {},
+) {
   const geo = capGeo || (await waitForCapGeolocationPlugin());
   if (!geo) {
     const missing = new Error("Capacitor Geolocation plugin missing");
@@ -13856,21 +13887,27 @@ async function requestDevicePosition(options = {}) {
       throw missing;
     }
     try {
-      return await readCapacitorPosition(capGeo, options, { androidFirst: true });
+      return await readCapacitorPosition(capGeo, options, {
+        androidFirst: true,
+      });
     } catch (nativeErr) {
       const normalized = normalizeGeolocationError(nativeErr);
       if (navigator.geolocation && normalized.code !== 1) {
         try {
           return await readBrowserGeolocationForDevice(options);
         } catch (browserErr) {
-          throw normalized.code !== 2 ? normalized : normalizeGeolocationError(browserErr);
+          throw normalized.code !== 2
+            ? normalized
+            : normalizeGeolocationError(browserErr);
         }
       }
       throw normalized;
     }
   }
 
-  const capGeo = isCapacitorNative() ? await waitForCapGeolocationPlugin() : null;
+  const capGeo = isCapacitorNative()
+    ? await waitForCapGeolocationPlugin()
+    : null;
   let lastErr = null;
 
   if (navigator.geolocation) {
@@ -13904,7 +13941,10 @@ function waitForCustomerMap(callback, attempt = 0) {
   if (attempt >= 50) return;
   setTimeout(() => waitForCustomerMap(callback, attempt + 1), 120);
 }
-function applyCustomerCoords(coords, { setPin = false, hasCustomerPin = false } = {}) {
+function applyCustomerCoords(
+  coords,
+  { setPin = false, hasCustomerPin = false } = {},
+) {
   const status = document.getElementById("customerMapStatus");
   const la = coords.latitude,
     ln = coords.longitude;
@@ -13915,7 +13955,10 @@ function applyCustomerCoords(coords, { setPin = false, hasCustomerPin = false } 
     setCustomerMapPoint(la, ln, "Таны байршил");
     window.customerMap.setView([la, ln], 16);
   } else {
-    window.customerMap.setView([la, ln], Math.max(window.customerMap.getZoom(), 15));
+    window.customerMap.setView(
+      [la, ln],
+      Math.max(window.customerMap.getZoom(), 15),
+    );
     if (status) status.textContent = "Таны байршил хараглаа";
   }
   hideCustomerLocationSettingsPrompt();
@@ -13961,7 +14004,10 @@ function showCustomerUserMarker(la, ln, accuracy) {
     }).addTo(window.customerMap);
   }
 }
-function applyCustomerUserPosition({ setPin = false, hasCustomerPin = false } = {}) {
+function applyCustomerUserPosition({
+  setPin = false,
+  hasCustomerPin = false,
+} = {}) {
   const status = document.getElementById("customerMapStatus");
   if (!window.customerMap) {
     if (status) status.textContent = "Газрын зураг ачаалж байна...";
@@ -14174,7 +14220,11 @@ function customerFromDraft(id, draft) {
     longitude: draft.longitude ?? saved.longitude,
     locationText: draft.locationText ?? saved.locationText,
   };
-  if (Array.isArray(draft.phones) || draft.phone1 != null || draft.phone2 != null) {
+  if (
+    Array.isArray(draft.phones) ||
+    draft.phone1 != null ||
+    draft.phone2 != null
+  ) {
     applyCustomerPhoneFields(
       next,
       Array.isArray(draft.phones)
@@ -14387,8 +14437,7 @@ async function applyCustomerSave(data, id) {
     await persistProfileImageToMedia(customer, "customer");
   }
   const customerId = customer?.id || "";
-  const customerName =
-    customer?.name || customer?.companyName || "Харилцагч";
+  const customerName = customer?.name || customer?.companyName || "Харилцагч";
   closeModal();
   focusSavedCustomer(customerId, customerName);
   const saved = await criticalBackendSave();
@@ -14863,11 +14912,13 @@ function categoryModal() {
         count > 0
           ? `<span class="category-row__meta">${count} бараа</span>`
           : `<span class="category-row__meta category-row__meta--empty">Хоосон</span>`;
-      return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span><div class="category-row__actions">${meta}${deleteIconButton({
-        className: "category-row__delete",
-        attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
-        label: "Төрөл устгах",
-      })}</div></div>`;
+      return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span><div class="category-row__actions">${meta}${deleteIconButton(
+        {
+          className: "category-row__delete",
+          attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
+          label: "Төрөл устгах",
+        },
+      )}</div></div>`;
     })
     .join("");
   box(
@@ -15500,7 +15551,9 @@ function orderStockIssues(items) {
   return issues;
 }
 function itemNameFromOrderItems(items, productId) {
-  const line = (items || []).find((i) => String(i.productId) === String(productId));
+  const line = (items || []).find(
+    (i) => String(i.productId) === String(productId),
+  );
   return line?.productName || "";
 }
 function alertOrderStockIssues(issues) {
@@ -16101,16 +16154,18 @@ function initConfirmCard() {
   const overlay = document.getElementById("confirm-card-overlay");
   if (!overlay || overlay.dataset.bound) return;
   overlay.dataset.bound = "1";
-  overlay.querySelector("#confirm-card-yes")?.addEventListener("click", async () => {
-    const fn = pendingConfirm?.onConfirm;
-    closeConfirmCard();
-    try {
-      await fn?.();
-    } catch (err) {
-      console.warn("Confirm action failed", err);
-      alert("Алдаа гарлаа. Дахин оролдоно уу.");
-    }
-  });
+  overlay
+    .querySelector("#confirm-card-yes")
+    ?.addEventListener("click", async () => {
+      const fn = pendingConfirm?.onConfirm;
+      closeConfirmCard();
+      try {
+        await fn?.();
+      } catch (err) {
+        console.warn("Confirm action failed", err);
+        alert("Алдаа гарлаа. Дахин оролдоно уу.");
+      }
+    });
   overlay.querySelector("#confirm-card-no")?.addEventListener("click", () => {
     const fn = pendingConfirm?.onCancel;
     closeConfirmCard();
@@ -16381,7 +16436,8 @@ function deleteReceiptNow(id) {
   criticalBackendSave();
 }
 function recordDeletion(type, id) {
-  if (!["product", "customer", "employee", "order"].includes(type) || !id) return;
+  if (!["product", "customer", "employee", "order"].includes(type) || !id)
+    return;
   state.deletionLog = normalizeDeletionLog([
     ...(state.deletionLog || []),
     {
