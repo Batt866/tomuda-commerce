@@ -6941,27 +6941,17 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Always include a real logo image. Mac/Numbers: HTML .xls with <img>.
-  // Others: XLSX with embedded drawing (+ green TD mark underneath).
+  // Same HTML as "Хэвлэх" (receiptPrintPageHtml + RECEIPT_EXCEL_STYLES) so
+  // print and download look identical — no separate XLSX layout.
   try {
-    if (isAppleDesktopOrIos()) {
-      await exportOrderReceiptsExcelLegacy(orders);
-    } else {
-      await exportOrderReceiptsExcelXlsx(orders);
-    }
+    await exportOrderReceiptsExcelLegacy(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt excel export failed", err);
-    try {
-      await exportOrderReceiptsExcelLegacy(orders);
-      showInstallToast("Мэдээлэл татагдлаа");
-    } catch (fallbackErr) {
-      console.error("Receipt excel export failed", fallbackErr);
-      alertModal(
-        "Мэдээлэл татах амжилтгүй",
-        "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
-      );
-    }
+    console.error("Receipt excel export failed", err);
+    alertModal(
+      "Мэдээлэл татах амжилтгүй",
+      "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+    );
   }
 }
 function orderReceiptExportSnapshots(
