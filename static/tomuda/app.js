@@ -6561,18 +6561,19 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(14.25, emptyCells(rowNum));
   const headerRow = rowNum;
-  merges.push(`B${headerRow}:D${headerRow}`, `F${headerRow}:G${headerRow}`, `H${headerRow}:I${headerRow}`);
+  merges.push(`B${headerRow}:D${headerRow}`);
   pushRow(18, [
     xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, null, "empty"),
+    xlsxCellXml(`D${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`I${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
-    ...emptyCells(headerRow, "C", "D", 7),
-    ...emptyCells(headerRow, "G", "G", 7),
-    ...emptyCells(headerRow, "I", "I", 7),
   ]);
   const pushItemLikeRow = (item, index, { promo = false } = {}) => {
     const p = item
@@ -6581,36 +6582,39 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         {}
       : {};
     const r = rowNum;
-    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
+    // Only merge product name. Do NOT merge barcode/qty — Excel drops borders
+    // on non-anchor cells of F:G / H:I merges, which made those columns look
+    // like they were missing lines.
+    merges.push(`B${r}:D${r}`);
     const unitPrice = promo
       ? receiptPromoDisplayPrice(item)
       : resolveOrderItemUnitPrice(item);
     const lineTotal = promo
       ? receiptPromoDisplayTotal(item)
       : resolveOrderItemLineTotal(item);
-    const zebra = !promo && index % 2 === 1;
-    // Paid lines: bordered table (+ zebra). Promo: borderless like print.
-    const nameStyle = promo ? 4 : zebra ? 25 : 8;
-    const unitStyle = promo ? 6 : zebra ? 26 : 9;
-    const barcodeStyle = promo ? 6 : zebra ? 26 : 9;
-    const qtyStyle = promo ? 12 : zebra ? 28 : 11;
-    const moneyStyle = promo ? 12 : zebra ? 27 : 10;
-    const numStyle = promo ? 1 : zebra ? 28 : 11;
+    const zebra = index % 2 === 1;
+    // Promo uses the same bordered styles as paid items (no missing lines).
+    const nameStyle = zebra ? 25 : 8;
+    const unitStyle = zebra ? 26 : 9;
+    const barcodeStyle = zebra ? 26 : 9;
+    const qtyStyle = zebra ? 28 : 11;
+    const moneyStyle = zebra ? 27 : 10;
+    const numStyle = zebra ? 28 : 11;
     const barcodeText = String(p.barcode || "").replace(/\D/g, "") || "-";
     pushRow(14.25, [
       promo
-        ? xlsxCellXml(`A${r}`, 1, null, "empty")
+        ? xlsxCellXml(`A${r}`, numStyle, null, "empty")
         : xlsxCellXml(`A${r}`, numStyle, index + 1, "n"),
       xlsxCellXml(`B${r}`, nameStyle, si(item.productName || ""), "s"),
-      xlsxCellXml(`E${r}`, unitStyle, si(p.unit || "ш"), "s"),
-      xlsxCellXml(`F${r}`, barcodeStyle, si(barcodeText), "s"),
-      xlsxCellXml(`H${r}`, qtyStyle, Number(item.quantity) || 0, "n"),
-      xlsxCellXml(`J${r}`, moneyStyle, unitPrice, "n"),
-      xlsxCellXml(`K${r}`, moneyStyle, lineTotal, "n"),
       xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
       xlsxCellXml(`D${r}`, nameStyle, null, "empty"),
-      xlsxCellXml(`G${r}`, nameStyle, null, "empty"),
+      xlsxCellXml(`E${r}`, unitStyle, si(p.unit || "ш"), "s"),
+      xlsxCellXml(`F${r}`, barcodeStyle, si(barcodeText), "s"),
+      xlsxCellXml(`G${r}`, barcodeStyle, null, "empty"),
+      xlsxCellXml(`H${r}`, qtyStyle, Number(item.quantity) || 0, "n"),
       xlsxCellXml(`I${r}`, qtyStyle, null, "empty"),
+      xlsxCellXml(`J${r}`, moneyStyle, unitPrice, "n"),
+      xlsxCellXml(`K${r}`, moneyStyle, lineTotal, "n"),
     ]);
   };
   const pushSummaryAmountRow = (
