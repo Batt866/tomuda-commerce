@@ -6187,7 +6187,10 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__gross td,
 .receipt-grid--sheet .receipt-grid__summary td { border: none !important; border-top: none !important; border-right: none !important; border-bottom: none !important; border-left: none !important; padding: 1px 2px; vertical-align: middle; mso-border-alt: none; }
 .receipt-grid--sheet .receipt-grid__items-head td,
-.receipt-grid--sheet .receipt-grid__item td { border: 1px solid #808080 !important; padding: 1px 2px; vertical-align: middle; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__item td { border: 1px solid #808080 !important; padding: 2px 4px; vertical-align: middle; font-size: 9pt; line-height: 1.25; }
+.receipt-grid--sheet .receipt-grid__items-head td { background: #f3f3f3; font-weight: 700; text-align: center; }
+.receipt-grid--sheet .receipt-grid__item .receipt-grid__name { text-align: left; }
+.receipt-grid--sheet .receipt-grid__item .receipt-grid__money { text-align: right; font-variant-numeric: tabular-nums; }
 .receipt-grid--sheet .receipt-grid__promo td,
 .receipt-grid--sheet .receipt-grid__promo-note td,
 .receipt-grid--sheet .receipt-grid__gross td,
@@ -6341,7 +6344,7 @@ function exportOrderReceiptsExcelCsv(orders) {
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
-const RECEIPT_XLSX_COL_WIDTHS = [5, 2, 16, 5, 10, 12, 5, 5, 4, 10, 11];
+const RECEIPT_XLSX_COL_WIDTHS = [4, 10, 8, 5, 8, 11, 4, 6, 4, 11, 11];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6482,10 +6485,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
     rowNum += 1;
   };
-  // Item table: keep every A–K cell (even under merges) so Excel draws full borders.
+  // Item table: only anchor cells per merge — avoids inner box borders in Excel.
   const pushItemTableRow = (height, cells) => {
-    const sorted = filterXlsxCellsOutsideMerges(cells, []);
-    rows.push(xlsxRowXml(rowNum, height, sorted, RECEIPT_XLSX_LAST_COL));
+    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
+    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
     rowNum += 1;
   };
   const emptyCells = (
@@ -6651,13 +6654,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushItemTableRow(18, [
     xlsxCellXml(`A${headerRow}`, 7, si("№"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
-    xlsxCellXml(`C${headerRow}`, 7, null, "empty"),
-    xlsxCellXml(`D${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
-    xlsxCellXml(`I${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
   ]);
@@ -6685,18 +6684,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const nameText = String(item.productName || "").trim() || "-";
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
-    pushItemTableRow(16.5, [
+    pushItemTableRow(17, [
       promo
         ? xlsxCellXml(`A${r}`, numStyle, null, "empty")
         : xlsxCellXml(`A${r}`, numStyle, si(String(index + 1)), "s"),
       xlsxCellXml(`B${r}`, nameStyle, si(nameText), "s"),
-      xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
-      xlsxCellXml(`D${r}`, nameStyle, null, "empty"),
       xlsxCellXml(`E${r}`, unitStyle, si(unitText), "s"),
       xlsxCellXml(`F${r}`, barcodeStyle, si(barcodeText), "s"),
-      xlsxCellXml(`G${r}`, barcodeStyle, null, "empty"),
       xlsxCellXml(`H${r}`, qtyStyle, si(String(qty)), "s"),
-      xlsxCellXml(`I${r}`, qtyStyle, null, "empty"),
       xlsxCellXml(`J${r}`, moneyStyle, si(receiptMoney(unitPrice)), "s"),
       xlsxCellXml(`K${r}`, moneyStyle, si(receiptMoney(lineTotal)), "s"),
     ]);
