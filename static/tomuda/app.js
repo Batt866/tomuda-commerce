@@ -7353,55 +7353,91 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
     zipFileOptions({ binary: true }),
   );
 }
+async function forceDownloadXlsxFile(blob, filename) {
+  // Always save a real Excel file — never navigate Chrome to HTML/blob preview.
+  const name = xlsxFileName(filename || "zarlagyn-barimt.xlsx");
+  const buffer = await blob.arrayBuffer();
+  const excelBlob = new Blob([buffer], { type: XLSX_MIME });
+  const downloadBlob = new Blob([buffer], {
+    type: "application/octet-stream",
+  });
+
+  if (typeof window.showSaveFilePicker === "function") {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: name,
+        types: [
+          {
+            description: "Excel workbook",
+            accept: { [XLSX_MIME]: [".xlsx"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(excelBlob);
+      await writable.close();
+      return true;
+    } catch (err) {
+      if (err?.name === "AbortError") return false;
+    }
+  }
+
+  if (
+    prefersMobileExcelShare() &&
+    typeof navigator.share === "function" &&
+    typeof File !== "undefined"
+  ) {
+    try {
+      const file = new File([excelBlob], name, { type: XLSX_MIME });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return true;
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") return false;
+    }
+  }
+
+  if (typeof navigator.msSaveOrOpenBlob === "function") {
+    navigator.msSaveOrOpenBlob(downloadBlob, name);
+    return true;
+  }
+
+  const url = URL.createObjectURL(downloadBlob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.setAttribute("download", name);
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      try {
+        a.remove();
+      } catch {
+        /* ignore */
+      }
+    }, 2500);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  return true;
+}
 async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const logoBuffer = await loadReceiptExcelLogoBuffer().catch(() => null);
   const hasLogo = !!logoBuffer;
-  const { sharedStringsXml, sheetXml } = buildReceiptsCombinedSheetXml(
-    orders,
-    createReceiptStringContext(),
-    { hasLogo },
-  );
-  const tpl = await fetch(staticAssetUrl(RECEIPT_XLSX_TEMPLATE)).then((r) => {
-    if (!r.ok) throw new Error("template missing");
-    return r.arrayBuffer();
+  // Build OOXML in-memory — do not depend on fetching a template (that failure
+  // previously fell back to HTML, which Chrome opens instead of downloading).
+  const built = buildReceiptWorkbookXml(orders, {
+    hasLogo,
+    mobileSafe: prefersMobileExcelShare(),
   });
-  const zip = await JSZip.loadAsync(tpl);
-  zip.file("xl/sharedStrings.xml", sharedStringsXml);
-  zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", receiptXlsxStylesXml());
-  zip.remove("xl/printerSettings/printerSettings1.bin");
-  if (hasLogo) {
-    applyReceiptLogoFiles(zip, { hasLogo: true, logoBuffer, sheetId: 1 });
-    let ct = await zip.file("[Content_Types].xml").async("string");
-    if (!/Extension="png"/i.test(ct)) {
-      ct = ct.replace(
-        "</Types>",
-        '<Default Extension="png" ContentType="image/png"/></Types>',
-      );
-    }
-    if (!ct.includes("/xl/drawings/drawing1.xml")) {
-      ct = ct.replace(
-        "</Types>",
-        '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>',
-      );
-    }
-    // Drop unused printerSettings content type noise if present without file.
-    zip.file("[Content_Types].xml", ct, zipFileOptions({ binary: false }));
-  } else {
-    console.warn("Receipt logo missing — exporting without logo");
-    zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
-  }
-  const blob = await zipToExcelBlob(zip);
-  // Force .xlsx download so Chrome/Safari save an Excel file (not open as a page).
-  await downloadBlobFile(
-    new Blob([await blob.arrayBuffer()], { type: XLSX_MIME }),
-    receiptExcelFileName(orders),
-    {
-      skipShare: !prefersMobileExcelShare(),
-      savePicker: false,
-    },
-  );
+  const blob = await assembleStyledXlsxZip(built, { hasLogo, logoBuffer });
+  const ok = await forceDownloadXlsxFile(blob, receiptExcelFileName(orders));
+  if (ok === false) throw new Error("download cancelled");
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   // Use bundled logo synchronously so download can start without an async gap
@@ -7411,22 +7447,17 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Always download a real .xlsx Excel file (not HTML opened in Chrome).
+  // Excel .xlsx only — never fall back to HTML (Chrome opens HTML as a tab).
   try {
     await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt xlsx export failed", err);
-    try {
-      await exportOrderReceiptsExcelLegacy(orders);
-      showInstallToast("Мэдээлэл татагдлаа");
-    } catch (fallbackErr) {
-      console.error("Receipt excel export failed", fallbackErr);
-      alertModal(
-        "Мэдээлэл татах амжилтгүй",
-        "Баримтын файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
-      );
-    }
+    if (String(err?.message || "").includes("cancelled")) return;
+    console.error("Receipt excel export failed", err);
+    alertModal(
+      "Мэдээлэл татах амжилтгүй",
+      "Excel (.xlsx) файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
+    );
   }
 }
 function orderReceiptExportSnapshots(
