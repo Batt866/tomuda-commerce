@@ -7353,8 +7353,21 @@ function applyReceiptLogoFiles(zip, { hasLogo, logoBuffer, sheetId = 1 } = {}) {
     zipFileOptions({ binary: true }),
   );
 }
+function isMacDesktop() {
+  const ua = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  return (
+    /Mac|Macintosh/i.test(platform) ||
+    (/Mac OS X/i.test(ua) && !/iPhone|iPad|iPod/i.test(ua))
+  );
+}
+function prefersExcelFileShare() {
+  // Mobile + Mac: share sheet lets the user pick Microsoft Excel
+  // instead of auto-opening Numbers.
+  return prefersMobileExcelShare() || isMacDesktop();
+}
 async function forceDownloadXlsxFile(blob, filename) {
-  // Always save a real Excel file — never navigate Chrome to HTML/blob preview.
+  // Always deliver a real .xlsx Excel workbook.
   const name = xlsxFileName(filename || "zarlagyn-barimt.xlsx");
   const buffer = await blob.arrayBuffer();
   const excelBlob = new Blob([buffer], { type: XLSX_MIME });
@@ -7362,13 +7375,41 @@ async function forceDownloadXlsxFile(blob, filename) {
     type: "application/octet-stream",
   });
 
+  // Share-to-Excel first (Mac/iOS/Android). On Mac this avoids Numbers auto-open.
+  if (
+    prefersExcelFileShare() &&
+    typeof navigator.share === "function" &&
+    typeof File !== "undefined"
+  ) {
+    try {
+      const file = new File([excelBlob], name, { type: XLSX_MIME });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: name,
+          text: "Excel-ээр нээнэ үү",
+        });
+        return true;
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") return false;
+    }
+  }
+
+  if (typeof navigator.msSaveOrOpenBlob === "function") {
+    // Windows / legacy Edge — opens with Microsoft Excel.
+    navigator.msSaveOrOpenBlob(excelBlob, name);
+    return true;
+  }
+
+  // Desktop Chrome/Edge: Save As Excel file (Windows then opens Excel).
   if (typeof window.showSaveFilePicker === "function") {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: name,
         types: [
           {
-            description: "Excel workbook",
+            description: "Excel (.xlsx)",
             accept: { [XLSX_MIME]: [".xlsx"] },
           },
         ],
@@ -7382,27 +7423,6 @@ async function forceDownloadXlsxFile(blob, filename) {
     }
   }
 
-  if (
-    prefersMobileExcelShare() &&
-    typeof navigator.share === "function" &&
-    typeof File !== "undefined"
-  ) {
-    try {
-      const file = new File([excelBlob], name, { type: XLSX_MIME });
-      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: name });
-        return true;
-      }
-    } catch (err) {
-      if (err?.name === "AbortError") return false;
-    }
-  }
-
-  if (typeof navigator.msSaveOrOpenBlob === "function") {
-    navigator.msSaveOrOpenBlob(downloadBlob, name);
-    return true;
-  }
-
   const url = URL.createObjectURL(downloadBlob);
   try {
     const a = document.createElement("a");
@@ -7410,6 +7430,7 @@ async function forceDownloadXlsxFile(blob, filename) {
     a.download = name;
     a.setAttribute("download", name);
     a.rel = "noopener";
+    a.type = XLSX_MIME;
     a.style.display = "none";
     document.body.appendChild(a);
     a.click();
@@ -7429,8 +7450,6 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   if (typeof JSZip === "undefined") throw new Error("JSZip missing");
   const logoBuffer = await loadReceiptExcelLogoBuffer().catch(() => null);
   const hasLogo = !!logoBuffer;
-  // Build OOXML in-memory — do not depend on fetching a template (that failure
-  // previously fell back to HTML, which Chrome opens instead of downloading).
   const built = buildReceiptWorkbookXml(orders, {
     hasLogo,
     mobileSafe: prefersMobileExcelShare(),
@@ -7440,17 +7459,14 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   if (ok === false) throw new Error("download cancelled");
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
-  // Use bundled logo synchronously so download can start without an async gap
-  // that drops the user-gesture (Safari then refuses file download).
   const html = buildReceiptExcelDocument(orders, RECEIPT_LOGO_DATA_URI);
   return downloadReceiptExcelBlob(receiptHtmlFileName(orders), html);
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Excel .xlsx only — never fall back to HTML (Chrome opens HTML as a tab).
   try {
     await exportOrderReceiptsExcelXlsx(orders);
-    showInstallToast("Мэдээлэл татагдлаа");
+    showInstallToast("Excel файл татагдлаа");
   } catch (err) {
     if (String(err?.message || "").includes("cancelled")) return;
     console.error("Receipt excel export failed", err);
