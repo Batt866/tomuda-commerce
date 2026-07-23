@@ -7072,14 +7072,14 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Prefer the same HTML document as Баримтууд preview so download matches the screen.
+  // Real .xlsx file download — same print-style layout as the receipt template.
   try {
-    await exportOrderReceiptsExcelLegacy(orders);
+    await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt HTML export failed, trying xlsx", err);
+    console.warn("Receipt xlsx export failed", err);
     try {
-      await exportOrderReceiptsExcelXlsx(orders);
+      await exportOrderReceiptsExcelLegacy(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
