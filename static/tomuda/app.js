@@ -6339,8 +6339,8 @@ td, th { border: none; }
   line-height: 1.2;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid__a { width: 5.6%; } .receipt-grid__b { width: 8.9%; } .receipt-grid__c { width: 14.4%; } .receipt-grid__d { width: 8.9%; } .receipt-grid__e { width: 7.8%; }
-.receipt-grid__f { width: 12.2%; } .receipt-grid__g { width: 7.8%; } .receipt-grid__h { width: 7.8%; } .receipt-grid__i { width: 5.6%; } .receipt-grid__j { width: 10%; } .receipt-grid__k { width: 11.1%; }
+.receipt-grid__a { width: 9%; } .receipt-grid__b { width: 8.9%; } .receipt-grid__c { width: 12.5%; } .receipt-grid__d { width: 8.9%; } .receipt-grid__e { width: 7.8%; }
+.receipt-grid__f { width: 10.8%; } .receipt-grid__g { width: 7.8%; } .receipt-grid__h { width: 7.8%; } .receipt-grid__i { width: 5.6%; } .receipt-grid__j { width: 10%; } .receipt-grid__k { width: 11.1%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__info-wrap td,
@@ -6494,8 +6494,21 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 20px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
-.receipt-grid__logo-cell { width: 18mm; max-width: 18mm; vertical-align: middle; padding: 0 4px 0 0 !important; }
-.receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
+.receipt-grid__logo-cell {
+  width: 16.18mm;
+  max-width: 16.18mm;
+  vertical-align: middle;
+  text-align: right;
+  padding: 0 1.6mm 0 0 !important;
+}
+.receipt-logo {
+  width: 16.18mm;
+  height: 16.18mm;
+  object-fit: contain;
+  display: block;
+  margin-left: auto;
+  margin-right: 0;
+}
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT};
   font-size: 18px;
@@ -6731,7 +6744,8 @@ function exportOrderReceiptsExcelCsv(orders) {
 const RECEIPT_XLSX_LAST_COL = "K";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 // A = logo / №, B = product name (wide), C–G = unit…total (no merges on item rows).
-const RECEIPT_XLSX_COL_WIDTHS = [10, 24, 10, 14, 8, 11, 12, 7, 5, 9, 10];
+// A ≈ 16.18mm logo (10mm × φ) + right gutter before brand at C.
+const RECEIPT_XLSX_COL_WIDTHS = [12, 22, 10, 14, 8, 11, 12, 7, 5, 9, 10];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6770,9 +6784,11 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Match print logo size (~18mm).
-  const emu = Math.round((18 / 25.4) * 914400);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>20000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>20000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  // Logo = 10mm × φ (golden ratio), nudged right in column A toward brand text.
+  const logoMm = 10 * 1.6180339887;
+  const emu = Math.round((logoMm / 25.4) * 914400);
+  const colOff = Math.round((3.2 / 25.4) * 914400);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>20000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
