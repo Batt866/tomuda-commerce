@@ -7393,9 +7393,15 @@ async function exportOrderReceiptsExcelXlsx(orders) {
     zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
   }
   const blob = await zipToExcelBlob(zip);
-  await downloadBlobFile(blob, receiptExcelFileName(orders), {
-    skipShare: !prefersMobileExcelShare(),
-  });
+  // Force .xlsx download so Chrome/Safari save an Excel file (not open as a page).
+  await downloadBlobFile(
+    new Blob([await blob.arrayBuffer()], { type: XLSX_MIME }),
+    receiptExcelFileName(orders),
+    {
+      skipShare: !prefersMobileExcelShare(),
+      savePicker: false,
+    },
+  );
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
   // Use bundled logo synchronously so download can start without an async gap
@@ -7405,15 +7411,14 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Download the same HTML document as print/preview (CSS layout applies).
-  // XLSX ignores print CSS — keep only as fallback.
+  // Always download a real .xlsx Excel file (not HTML opened in Chrome).
   try {
-    await exportOrderReceiptsExcelLegacy(orders);
+    await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt HTML export failed, trying xlsx", err);
+    console.warn("Receipt xlsx export failed", err);
     try {
-      await exportOrderReceiptsExcelXlsx(orders);
+      await exportOrderReceiptsExcelLegacy(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
