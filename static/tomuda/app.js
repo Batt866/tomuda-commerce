@@ -616,13 +616,17 @@ function receiptSettleNoteText(o) {
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   if (!promoItems.length) return "";
-  const banner = `<tr class="receipt-items__promo-note"><td colspan="7"><span class="receipt-items__promo-title">Урамшуулал</span></td></tr>`;
+  const count = promoItems.length;
   const itemRows = promoItems
-    .map((i) => {
-      return `<tr class="receipt-items__promo"><td class="receipt-items__num"></td><td class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit"></td><td class="receipt-items__barcode"></td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+    .map((i, idx) => {
+      const labelCell =
+        idx === 0
+          ? `<td class="receipt-items__promo-label" rowspan="${count}">Урамшуулал</td>`
+          : "";
+      return `<tr class="receipt-items__promo">${labelCell}<td class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit"></td><td class="receipt-items__barcode"></td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
-  return `<tr class="receipt-grid__items-wrap"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table">${banner}${itemRows}</table></td></tr>`;
+  return `<tr class="receipt-grid__items-wrap"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table">${itemRows}</table></td></tr>`;
 }
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
@@ -6169,7 +6173,8 @@ function orderReceiptSnapshot(o) {
   return snap;
 }
 function receiptExcelPage(o, logoSrc) {
-  return `<div class="receipt-excel-sheet">${receiptPrintPageHtml(o, logoSrc)}</div>`;
+  // Same single-sheet layout as Баримтууд on-screen preview.
+  return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
 body { margin: 0; padding: 0; background: #fff; color: #111; font-family: ${RECEIPT_FONT}; }
@@ -6209,20 +6214,27 @@ td, th { border: none; }
 .receipt-items__total { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .receipt-items--promo th,
 .receipt-items--promo td { border: none !important; background: #fff !important; padding: 3px 6px; }
-.receipt-items--promo .receipt-items__promo-note td {
-  border: none !important;
-  border-bottom: 1px dotted #555 !important;
-  background: #fff !important;
+.receipt-items--promo .receipt-items__promo-label {
+  width: 14%;
   font-weight: 700;
-  text-align: center;
-  padding: 6px 6px 4px;
+  text-align: left;
+  vertical-align: top;
+  padding-top: 4px !important;
+  white-space: nowrap;
+  border: none !important;
+  border-bottom: none !important;
+  background: #fff !important;
 }
+.receipt-items--promo .receipt-items__name { width: 30%; text-align: left; }
 .receipt-items--promo .receipt-items__promo td {
   border: none !important;
   border-bottom: 1px dotted #555 !important;
   background: #fff !important;
 }
-.receipt-items--promo .receipt-items__promo:last-child td {
+.receipt-items--promo .receipt-items__promo td.receipt-items__promo-label {
+  border-bottom: none !important;
+}
+.receipt-items--promo .receipt-items__promo:last-child td:not(.receipt-items__promo-label) {
   border-bottom: 1px dotted #555 !important;
 }
 .receipt-items__promo-title { display: inline-block; font-weight: 700; }
@@ -6728,6 +6740,26 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       xlsxCellXml(`K${r}`, moneyStyle, si(receiptMoney(lineTotal)), "s"),
     ]);
   };
+  const pushPromoProductRow = (item, { label = "" } = {}) => {
+    const r = rowNum;
+    const unitPrice = receiptPromoDisplayPrice(item);
+    const lineTotal = receiptPromoDisplayTotal(item);
+    const qty = Number(item.quantity) || 0;
+    const nameText = String(item.productName || "").trim() || "-";
+    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
+    // No full grid borders — match on-screen preview (Урамшуулал | бараа).
+    pushItemTableRow(17, [
+      label
+        ? xlsxCellXml(`A${r}`, 4, si(label), "s")
+        : xlsxCellXml(`A${r}`, 1, null, "empty"),
+      xlsxCellXml(`B${r}`, 5, si(nameText), "s"),
+      xlsxCellXml(`E${r}`, 1, null, "empty"),
+      xlsxCellXml(`F${r}`, 1, null, "empty"),
+      xlsxCellXml(`H${r}`, 6, si(String(qty)), "s"),
+      xlsxCellXml(`J${r}`, 3, si(receiptMoney(unitPrice)), "s"),
+      xlsxCellXml(`K${r}`, 3, si(receiptMoney(lineTotal)), "s"),
+    ]);
+  };
   const pushSummaryAmountRow = (
     label,
     amount,
@@ -6770,21 +6802,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`K${grossRow}`, 20, gross, "n"),
     ...emptyCells(grossRow, "C", "J", 19),
   ]);
-  const promoSettleNote = receiptPromoSettleNote(o);
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
-  if (promoLines.length || promoSettleNote) {
-    const bannerRow = rowNum;
-    merges.push(`B${bannerRow}:K${bannerRow}`);
-    const bannerText = promoSettleNote
-      ? `Урамшуулал:  ${promoSettleNote}`
-      : "Урамшуулал";
-    pushRow(promoSettleNote ? 27 : 16.5, [
-      xlsxCellXml(`A${bannerRow}`, 1, null, "empty"),
-      xlsxCellXml(`B${bannerRow}`, 24, si(bannerText), "s"),
-      ...emptyCells(bannerRow, "C", RECEIPT_XLSX_LAST_COL, 24),
-    ]);
+  if (promoLines.length) {
     promoLines.forEach((item, index) =>
-      pushItemLikeRow(item, index, { promo: true }),
+      pushPromoProductRow(item, {
+        label: index === 0 ? "Урамшуулал" : "",
+      }),
     );
   }
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
@@ -7026,14 +7049,14 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Real .xlsx for Excel (embedded logo + print-like layout). HTML only if XLSX fails.
+  // Prefer the same HTML document as Баримтууд preview so download matches the screen.
   try {
-    await exportOrderReceiptsExcelXlsx(orders);
+    await exportOrderReceiptsExcelLegacy(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt xlsx export failed", err);
+    console.warn("Receipt HTML export failed, trying xlsx", err);
     try {
-      await exportOrderReceiptsExcelLegacy(orders);
+      await exportOrderReceiptsExcelXlsx(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
