@@ -2722,14 +2722,54 @@ async function zipToExcelBlob(zip) {
   return new Blob([bytes], { type: XLSX_MIME });
 }
 async function downloadBlobFile(blob, filename, opts = {}) {
-  const { skipShare = false } = opts;
+  const { skipShare = false, savePicker = false } = opts;
   const name = safeDownloadFileName(filename, blob.type || XLSX_MIME);
-  const type = blob.type || guessMimeFromFileName(name);
   // Keep the original ArrayBuffer so Android share does not get a detached/streamed blob.
   const buffer = await blob.arrayBuffer();
-  const shareBlob = new Blob([buffer], { type });
-  // On Samsung/Android, share-to-Excel opens reliably; forced <a download> often
-  // saves a file the system cannot associate with Excel.
+  // Prefer octet-stream for <a download> so Safari/Chrome Save As a file
+  // instead of opening HTML/text in a tab. Share still uses a proper type.
+  const shareType =
+    blob.type && blob.type !== "application/octet-stream"
+      ? blob.type
+      : guessMimeFromFileName(name);
+  const shareBlob = new Blob([buffer], { type: shareType });
+  const downloadBlob = new Blob([buffer], {
+    type: "application/octet-stream",
+  });
+
+  // Optional Save dialog (receipts) — keeps a clear file-download UX on desktop.
+  if (savePicker && typeof window.showSaveFilePicker === "function") {
+    try {
+      const extMatch = name.match(/(\.[a-z0-9]+)$/i);
+      const ext = extMatch ? extMatch[1].toLowerCase() : "";
+      const handle = await window.showSaveFilePicker({
+        suggestedName: name,
+        types: [
+          {
+            description: "Файл",
+            accept: {
+              [shareType || "application/octet-stream"]: ext ? [ext] : [".bin"],
+            },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(downloadBlob);
+      await writable.close();
+      return true;
+    } catch (err) {
+      if (err?.name === "AbortError") return false;
+      // Fall through to share / anchor download.
+    }
+  }
+
+  if (typeof navigator.msSaveOrOpenBlob === "function") {
+    navigator.msSaveOrOpenBlob(downloadBlob, name);
+    return true;
+  }
+
+  // On Samsung/Android/iOS, share-to-Files/Excel opens reliably; forced
+  // <a download> is often ignored (especially for blob: HTML).
   const useShare = !skipShare && prefersMobileExcelShare();
   if (
     useShare &&
@@ -2737,7 +2777,7 @@ async function downloadBlobFile(blob, filename, opts = {}) {
     typeof File !== "undefined"
   ) {
     try {
-      const file = new File([shareBlob], name, { type });
+      const file = new File([shareBlob], name, { type: shareType });
       if (!navigator.canShare || navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: name });
         return true;
@@ -2746,22 +2786,31 @@ async function downloadBlobFile(blob, filename, opts = {}) {
       if (err?.name === "AbortError") return false;
     }
   }
-  const url = URL.createObjectURL(shareBlob);
+
+  const url = URL.createObjectURL(downloadBlob);
   try {
     const a = document.createElement("a");
     a.href = url;
     a.download = name;
+    a.setAttribute("download", name);
     a.rel = "noopener";
     a.style.display = "none";
     // Do not set target=_blank — Android WebView often opens blob: as a blank
     // page and the saved file becomes unopenable.
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    // Keep the node briefly — some WebViews cancel download if removed instantly.
+    setTimeout(() => {
+      try {
+        a.remove();
+      } catch {
+        /* ignore */
+      }
+    }, 2000);
   } finally {
     setTimeout(
       () => URL.revokeObjectURL(url),
-      prefersMobileExcelShare() ? 60000 : 15000,
+      prefersMobileExcelShare() ? 60000 : 20000,
     );
   }
   return true;
@@ -2770,6 +2819,7 @@ function guessMimeFromFileName(name) {
   const lower = String(name || "").toLowerCase();
   if (lower.endsWith(".xlsx")) return XLSX_MIME;
   if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+  if (lower.endsWith(".zip")) return "application/zip";
   if (lower.endsWith(".html") || lower.endsWith(".htm"))
     return "text/html;charset=utf-8";
   if (lower.endsWith(".csv")) return "text/csv;charset=utf-8";
@@ -2783,25 +2833,33 @@ function safeDownloadFileName(name, mime = "") {
     .replace(/-+/g, "-");
   if (!base) base = "download";
   const mimeStr = String(mime || "").toLowerCase();
-  // Prefer the filename extension — octet-stream downloads must keep .html
+  // Prefer the filename extension — octet-stream downloads must keep .html/.zip
   // so Excel/Numbers do not open a mangled spreadsheet.
   const wantsHtml =
     /\.html?$/i.test(base) ||
     mimeStr.includes("text/html") ||
     mimeStr === "text/html;charset=utf-8";
+  const wantsZip =
+    !wantsHtml &&
+    (/\.zip$/i.test(base) ||
+      mimeStr.includes("application/zip") ||
+      mimeStr === "application/x-zip-compressed");
   const wantsCsv = /\.csv$/i.test(base) || mimeStr.includes("csv");
   const wantsXlsx =
     !wantsHtml &&
+    !wantsZip &&
     (/\.xlsx$/i.test(base) ||
       mimeStr.includes("spreadsheetml") ||
       mimeStr.includes("openxmlformats"));
   // Do NOT treat text/html as .xls — Excel/Numbers strip logos and break layout.
   const wantsXls =
     !wantsHtml &&
+    !wantsZip &&
     !wantsXlsx &&
     (mimeStr.includes("vnd.ms-excel") || /\.xls$/i.test(base));
-  base = base.replace(/\.(xlsx|xls|csv|html|htm)$/i, "");
+  base = base.replace(/\.(xlsx|xls|csv|html|htm|zip)$/i, "");
   if (wantsHtml) return `${base || "download"}.html`;
+  if (wantsZip) return `${base || "download"}.zip`;
   if (wantsCsv) return `${base || "download"}.csv`;
   if (wantsXls) return `${base || "download"}.xls`;
   return `${base || "download"}.xlsx`;
@@ -6380,17 +6438,44 @@ function legacyExcelFileName(name) {
   );
 }
 async function downloadReceiptExcelBlob(name, html) {
-  // Same print HTML as Баримтууд preview — keeps logo + item table intact.
-  // Use octet-stream so browsers Save As a real file instead of opening a tab.
-  const fileName = String(name || "zarlagyn-barimt.html").replace(
-    /\.(xlsx|xls)$/i,
+  // Browsers often open text/html blobs in a tab instead of saving a file.
+  // Pack the print-layout HTML (+ logo) into a .zip so download behaves like
+  // other Excel exports — a real file — while the template stays intact.
+  const htmlName = String(name || "zarlagyn-barimt.html").replace(
+    /\.(xlsx|xls|zip)$/i,
     ".html",
   );
+  const zipName = htmlName.replace(/\.html?$/i, ".zip");
+  const logoBytes = receiptLogoBytesFromDataUri(RECEIPT_LOGO_DATA_URI);
+  let docHtml = html;
+  if (typeof JSZip !== "undefined") {
+    const zip = new JSZip();
+    if (logoBytes) {
+      zip.file("receipt-logo.png", logoBytes, zipFileOptions({ binary: true }));
+      // Prefer relative logo so the unzipped HTML stays small and printable.
+      docHtml = String(html || "").replace(
+        /src="data:image\/[^"]+"/gi,
+        'src="receipt-logo.png"',
+      );
+    }
+    zip.file(htmlName, "\uFEFF" + docHtml, zipFileOptions({ binary: false }));
+    const bytes = await zip.generateAsync({
+      type: "uint8array",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
+    const blob = new Blob([bytes], { type: "application/zip" });
+    return downloadBlobFile(blob, zipName, {
+      skipShare: !prefersMobileExcelShare(),
+      savePicker: !prefersMobileExcelShare(),
+    });
+  }
   const blob = new Blob(["\uFEFF" + html], {
     type: "application/octet-stream",
   });
-  return downloadBlobFile(blob, fileName, {
-    skipShare: !prefersMobileExcelShare(),
+  return downloadBlobFile(blob, htmlName, {
+    skipShare: true,
+    savePicker: true,
   });
 }
 function exportOrderReceiptsExcelCsv(orders) {
@@ -7069,11 +7154,9 @@ async function exportOrderReceiptsExcelXlsx(orders) {
   await downloadBlobFile(blob, receiptExcelFileName(orders));
 }
 async function exportOrderReceiptsExcelLegacy(orders) {
-  const logoSrc =
-    (await getReceiptExcelLogoDataUri().catch(() => "")) ||
-    RECEIPT_LOGO_DATA_URI;
-  const html = buildReceiptExcelDocument(orders, logoSrc);
-  // HTML matches preview — keep .html so Excel is not forced to mangle layout.
+  // Use bundled logo synchronously so download can start without an async gap
+  // that drops the user-gesture (Safari then refuses file download).
+  const html = buildReceiptExcelDocument(orders, RECEIPT_LOGO_DATA_URI);
   return downloadReceiptExcelBlob(receiptHtmlFileName(orders), html);
 }
 async function exportOrderReceiptsExcel(orders) {
