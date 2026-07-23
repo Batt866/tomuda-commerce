@@ -623,7 +623,7 @@ function receiptPromoRowsHtml(o) {
         idx === 0
           ? `<td class="receipt-items__promo-label" rowspan="${count}">Урамшуулал</td>`
           : "";
-      return `<tr class="receipt-items__promo">${labelCell}<td class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit"></td><td class="receipt-items__barcode"></td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__promo">${labelCell}<td class="receipt-items__name" colspan="3">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
   return `<tr class="receipt-grid__items-wrap"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table">${itemRows}</table></td></tr>`;
@@ -6215,7 +6215,7 @@ td, th { border: none; }
 .receipt-items--promo th,
 .receipt-items--promo td { border: none !important; background: #fff !important; padding: 3px 6px; }
 .receipt-items--promo .receipt-items__promo-label {
-  width: 14%;
+  width: 12%;
   font-weight: 700;
   text-align: left;
   vertical-align: top;
@@ -6225,7 +6225,16 @@ td, th { border: none; }
   border-bottom: none !important;
   background: #fff !important;
 }
-.receipt-items--promo .receipt-items__name { width: 30%; text-align: left; }
+.receipt-items--promo .receipt-items__name {
+  width: auto;
+  text-align: left;
+}
+.receipt-items--promo .receipt-items__qty { width: 10%; text-align: center; }
+.receipt-items--promo .receipt-items__price,
+.receipt-items--promo .receipt-items__total {
+  width: 14%;
+  text-align: right;
+}
 .receipt-items--promo .receipt-items__promo td {
   border: none !important;
   border-bottom: 1px dotted #555 !important;
@@ -6746,15 +6755,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
-    // No full grid borders — match on-screen preview (Урамшуулал | бараа).
+    // Name spans former unit+barcode columns so qty sits closer to the name.
+    merges.push(`B${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(17, [
       label
         ? xlsxCellXml(`A${r}`, 4, si(label), "s")
         : xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, 5, si(nameText), "s"),
-      xlsxCellXml(`E${r}`, 1, null, "empty"),
-      xlsxCellXml(`F${r}`, 1, null, "empty"),
       xlsxCellXml(`H${r}`, 6, si(String(qty)), "s"),
       xlsxCellXml(`J${r}`, 3, si(receiptMoney(unitPrice)), "s"),
       xlsxCellXml(`K${r}`, 3, si(receiptMoney(lineTotal)), "s"),
