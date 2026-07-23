@@ -487,15 +487,22 @@ function receiptHasPromoSection(o) {
   return receiptPromoItems(o).length > 0 || !!receiptPromoSettleNote(o);
 }
 function receiptItemsHeadRow() {
-  return `<tr class="receipt-grid__items-head"><td class="receipt-grid__num"></td><td colspan="3" class="receipt-grid__head">Барааны нэр</td><td class="receipt-grid__head">Хэмжих нэгж</td><td colspan="2" class="receipt-grid__head">Баркод</td><td colspan="2" class="receipt-grid__head">Тоо/ш</td><td class="receipt-grid__head">Нэгж үнэ</td><td class="receipt-grid__head">Нийт үнэ</td></tr>`;
+  return `<tr class="receipt-items__head"><th class="receipt-items__num">№</th><th class="receipt-items__name">Барааны нэр</th><th class="receipt-items__unit">Хэмжих нэгж</th><th class="receipt-items__barcode">Баркод</th><th class="receipt-items__qty">Тоо/ш</th><th class="receipt-items__price">Нэгж үнэ</th><th class="receipt-items__total">Нийт үнэ</th></tr>`;
 }
 function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
   return (items || [])
     .map((i, n) => {
-      const p = state.products.find((x) => x.id === i.productId) || {};
-      return `<tr class="receipt-grid__item"><td class="receipt-grid__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-grid__name">${esc(i.productName)}</td><td class="receipt-grid__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-grid__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-grid__qty">${i.quantity}</td><td class="receipt-grid__money">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-grid__money">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
+      const p = productForReceiptLine(i);
+      return `<tr class="receipt-items__row"><td class="receipt-items__num">${startIndex + n + 1}</td><td class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
+}
+function receiptItemsBlockHtml(o, items, startIndex = 0, withHead = true) {
+  const list = items || [];
+  if (!withHead && !list.length) return "";
+  const head = withHead ? receiptItemsHeadRow() : "";
+  const body = receiptTableRowsHtml(o, list, startIndex);
+  return `<tr class="receipt-grid__items-wrap"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items" role="table">${head}${body}</table></td></tr>`;
 }
 function receiptTableHtml(o, opts = {}) {
   return receiptTableRowsHtml(o, opts.items, opts.startIndex || 0);
@@ -608,16 +615,14 @@ function receiptSettleNoteText(o) {
 }
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
-  const settleNote = receiptPromoSettleNote(o);
-  if (!promoItems.length && !settleNote) return "";
-  const banner = `<tr class="receipt-grid__promo-note"><td></td><td colspan="10" class="receipt-grid__promo-banner"><span class="receipt-grid__promo-title">Урамшуулал</span>${settleNote ? `<span class="receipt-grid__promo-settle">${esc(settleNote)}</span>` : ""}</td></tr>`;
+  if (!promoItems.length) return "";
+  const banner = `<tr class="receipt-items__promo-note"><td colspan="7"><span class="receipt-items__promo-title">Урамшуулал</span></td></tr>`;
   const itemRows = promoItems
     .map((i) => {
-      const p = productForReceiptLine(i);
-      return `<tr class="receipt-grid__promo"><td class="receipt-grid__num"></td><td colspan="3" class="receipt-grid__name">${esc(i.productName)}</td><td class="receipt-grid__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-grid__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-grid__qty">${i.quantity}</td><td class="receipt-grid__money">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-grid__money">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__promo"><td class="receipt-items__num"></td><td class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit"></td><td class="receipt-items__barcode"></td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
-  return banner + itemRows;
+  return `<tr class="receipt-grid__items-wrap"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table">${banner}${itemRows}</table></td></tr>`;
 }
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
@@ -735,8 +740,7 @@ function receiptSheetHtml(o, logoSrc, opts = {}) {
   const rows = [
     withHeader ? receiptHeaderRows(logoSrc, o) : "",
     withInfo ? receiptInfoRows(o) : "",
-    withItemsHead ? receiptItemsHeadRow() : "",
-    receiptTableRowsHtml(o, items, startIndex),
+    receiptItemsBlockHtml(o, items, startIndex, withItemsHead),
     receiptFooterRows(o, { footerMode, pushDown: opts.pushDown }),
   ].join("");
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${rows}</table>`;
@@ -6188,29 +6192,47 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__footnote td,
 .receipt-grid--sheet .receipt-grid__settle td,
 .receipt-grid--sheet .receipt-grid__sign td,
-.receipt-grid--sheet .receipt-grid__promo td,
-.receipt-grid--sheet .receipt-grid__promo-note td,
 .receipt-grid--sheet .receipt-grid__gross td,
-.receipt-grid--sheet .receipt-grid__summary td { border: none !important; border-top: none !important; border-right: none !important; border-bottom: none !important; border-left: none !important; padding: 1.5px 3px; vertical-align: middle; mso-border-alt: none; }
-.receipt-grid--sheet .receipt-grid__items-head td,
-.receipt-grid--sheet .receipt-grid__item td { border: 1px solid #333 !important; padding: 3px 5px; vertical-align: middle; font-size: 9pt; line-height: 1.25; }
-.receipt-grid--sheet .receipt-grid__items-head td { background: #f0f0f0; font-weight: 700; text-align: center; }
-.receipt-grid--sheet .receipt-grid__item .receipt-grid__name { text-align: left; }
-.receipt-grid--sheet .receipt-grid__item .receipt-grid__money { text-align: right; font-variant-numeric: tabular-nums; }
-.receipt-grid--sheet .receipt-grid__promo td,
-.receipt-grid--sheet .receipt-grid__promo-note td,
+.receipt-grid--sheet .receipt-grid__summary td,
+.receipt-grid--sheet tr.receipt-grid__items-wrap > td { border: none !important; padding: 1.5px 3px; vertical-align: middle; mso-border-alt: none; }
+.receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 4px 0 6px !important; }
+.receipt-items { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
+.receipt-items th,
+.receipt-items td { border: 1px solid #333 !important; padding: 4px 6px; vertical-align: middle; background: #fff; }
+.receipt-items__head th { background: #f0f0f0; font-weight: 700; text-align: center; }
+.receipt-items__num { width: 6%; text-align: center; }
+.receipt-items__name { width: 34%; text-align: left; }
+.receipt-items__unit { width: 12%; text-align: center; }
+.receipt-items__barcode { width: 16%; text-align: center; word-break: break-all; }
+.receipt-items__qty { width: 8%; text-align: center; }
+.receipt-items__price,
+.receipt-items__total { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-items--promo th,
+.receipt-items--promo td { border: none !important; background: #fff !important; padding: 3px 6px; }
+.receipt-items--promo .receipt-items__promo-note td {
+  border: none !important;
+  border-bottom: 1px dotted #555 !important;
+  background: #fff !important;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 6px 4px;
+}
+.receipt-items--promo .receipt-items__promo td {
+  border: none !important;
+  border-bottom: 1px dotted #555 !important;
+  background: #fff !important;
+}
+.receipt-items--promo .receipt-items__promo:last-child td {
+  border-bottom: 1px dotted #555 !important;
+}
+.receipt-items__promo-title { display: inline-block; font-weight: 700; }
 .receipt-grid--sheet .receipt-grid__gross td,
-.receipt-grid--sheet .receipt-grid__summary td { padding: 3px 5px; font-size: 9pt; }
-.receipt-grid--sheet .receipt-grid__return td { padding: 5px 4px 7px; }
-.receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #c8c8c8 !important; background: #ececec; padding: 5px; }
-.receipt-grid--sheet .receipt-grid__promo-note td { background: #f7ecc2; padding: 7px 5px; }
-.receipt-grid--sheet .receipt-grid__promo td { background: #fff; border-bottom: 1px dotted #999 !important; padding: 4px 5px; }
+.receipt-grid--sheet .receipt-grid__summary td { padding: 4px 6px; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__return td { padding: 6px 4px 8px; }
+.receipt-grid--sheet .receipt-grid__gross td { border-top: 1px solid #c8c8c8 !important; background: #ececec; }
 .receipt-grid--sheet .receipt-grid__summary--grand td { background: #555 !important; color: #fff !important; padding: 7px 8px; }
 .receipt-grid--sheet .receipt-grid__summary--pay td { padding-top: 7px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #333 !important; }
-.receipt-grid__promo-banner { display: table-cell; text-align: left; vertical-align: middle; }
-.receipt-grid__promo-title { display: inline-block; font-weight: 700; font-size: 10pt; margin-right: 10px; vertical-align: middle; white-space: nowrap; }
-.receipt-grid__promo-settle { display: inline-block; text-align: left; font-size: 9pt; white-space: normal; line-height: 1.3; background: transparent; font-weight: 700; padding: 0; vertical-align: middle; }
 .receipt-grid__logo-cell { width: 18mm; max-width: 18mm; vertical-align: middle; padding: 0 1mm 0 0; }
 .receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
 .receipt-grid__brand { font-family: ${RECEIPT_FONT_TITLE}; font-size: 12pt; font-weight: 700; vertical-align: middle; padding-left: 0; letter-spacing: 0.02em; }
@@ -6686,17 +6708,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const qtyStyle = 9;
     const moneyStyle = 10;
     const numStyle = 9;
-    const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
+    const barcodeText = promo
+      ? ""
+      : String(p.barcode || item.barcode || "").trim() || "-";
     const nameText = String(item.productName || "").trim() || "-";
-    const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
+    const unitText = promo
+      ? ""
+      : String(p.unit || item.unit || "ш").trim() || "ш";
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(17, [
       promo
         ? xlsxCellXml(`A${r}`, numStyle, null, "empty")
         : xlsxCellXml(`A${r}`, numStyle, si(String(index + 1)), "s"),
       xlsxCellXml(`B${r}`, nameStyle, si(nameText), "s"),
-      xlsxCellXml(`E${r}`, unitStyle, si(unitText), "s"),
-      xlsxCellXml(`F${r}`, barcodeStyle, si(barcodeText), "s"),
+      xlsxCellXml(`E${r}`, unitStyle, unitText ? si(unitText) : null, unitText ? "s" : "empty"),
+      xlsxCellXml(`F${r}`, barcodeStyle, barcodeText ? si(barcodeText) : null, barcodeText ? "s" : "empty"),
       xlsxCellXml(`H${r}`, qtyStyle, si(String(qty)), "s"),
       xlsxCellXml(`J${r}`, moneyStyle, si(receiptMoney(unitPrice)), "s"),
       xlsxCellXml(`K${r}`, moneyStyle, si(receiptMoney(lineTotal)), "s"),
@@ -7185,9 +7211,12 @@ function warehouseOrderDetail(o) {
   return `<div class="wh-receipt-detail wh-receipt-preview"><div class="wh-receipt-preview__scroll"><div class="wh-receipt-preview__doc receipt-page">${docHtml}</div></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
 }
 function ensureReceiptScreenStyles() {
-  if (document.getElementById("tomuda-receipt-screen-styles")) return;
-  const el = document.createElement("style");
-  el.id = "tomuda-receipt-screen-styles";
+  let el = document.getElementById("tomuda-receipt-screen-styles");
+  if (!el) {
+    el = document.createElement("style");
+    el.id = "tomuda-receipt-screen-styles";
+    document.head.appendChild(el);
+  }
   el.textContent = `${RECEIPT_EXCEL_STYLES}
 .wh-receipt-preview {
   gap: 14px;
@@ -7211,6 +7240,9 @@ function ensureReceiptScreenStyles() {
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
 }
 .wh-receipt-preview .receipt-grid {
+  font-size: 12px;
+}
+.wh-receipt-preview .receipt-items {
   font-size: 12px;
 }
 .wh-receipt-preview .receipt-logo {
@@ -7238,7 +7270,6 @@ function ensureReceiptScreenStyles() {
   }
 }
 `;
-  document.head.appendChild(el);
 }
 function orderRow(o) {
   return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
