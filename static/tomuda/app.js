@@ -623,7 +623,7 @@ function receiptPromoRowsHtml(o) {
         idx === 0
           ? `<td class="receipt-items__promo-label" rowspan="${count}">Урамшуулал</td>`
           : "";
-      return `<tr class="receipt-items__promo">${labelCell}<td class="receipt-items__name" colspan="3">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__promo">${labelCell}<td class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
   return `<tr class="receipt-grid__items-wrap"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table">${itemRows}</table></td></tr>`;
@@ -6212,29 +6212,40 @@ td, th { border: none; }
 .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items__price,
 .receipt-items__total { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-items--promo {
+  width: auto;
+  max-width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+}
 .receipt-items--promo th,
-.receipt-items--promo td { border: none !important; background: #fff !important; padding: 3px 6px; }
+.receipt-items--promo td { border: none !important; background: #fff !important; padding: 3px 8px; }
 .receipt-items--promo .receipt-items__promo-label {
-  width: 12%;
+  width: 1%;
   font-weight: 700;
   text-align: left;
   vertical-align: top;
-  padding-top: 4px !important;
+  padding: 4px 12px 4px 0 !important;
   white-space: nowrap;
   border: none !important;
-  border-bottom: none !important;
   background: #fff !important;
 }
 .receipt-items--promo .receipt-items__name {
   width: auto;
+  max-width: 280px;
   text-align: left;
+  padding-right: 18px !important;
 }
-.receipt-items--promo .receipt-items__qty { width: 10%; text-align: center; }
+.receipt-items--promo .receipt-items__qty,
 .receipt-items--promo .receipt-items__price,
 .receipt-items--promo .receipt-items__total {
-  width: 14%;
-  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 14px !important;
 }
+.receipt-items--promo .receipt-items__qty { text-align: center; }
+.receipt-items--promo .receipt-items__price,
+.receipt-items--promo .receipt-items__total { text-align: right; }
 .receipt-items--promo .receipt-items__promo td {
   border: none !important;
   border-bottom: 1px dotted #555 !important;
@@ -6755,16 +6766,16 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    // Name spans former unit+barcode columns so qty sits closer to the name.
-    merges.push(`B${r}:G${r}`, `H${r}:I${r}`);
+    // Compact row: label | name | qty | price | total (no empty unit/barcode gap).
+    merges.push(`B${r}:E${r}`);
     pushItemTableRow(17, [
       label
         ? xlsxCellXml(`A${r}`, 4, si(label), "s")
         : xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, 5, si(nameText), "s"),
-      xlsxCellXml(`H${r}`, 6, si(String(qty)), "s"),
-      xlsxCellXml(`J${r}`, 3, si(receiptMoney(unitPrice)), "s"),
-      xlsxCellXml(`K${r}`, 3, si(receiptMoney(lineTotal)), "s"),
+      xlsxCellXml(`F${r}`, 6, si(String(qty)), "s"),
+      xlsxCellXml(`G${r}`, 3, si(receiptMoney(unitPrice)), "s"),
+      xlsxCellXml(`H${r}`, 3, si(receiptMoney(lineTotal)), "s"),
     ]);
   };
   const pushSummaryAmountRow = (
