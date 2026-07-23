@@ -6319,10 +6319,10 @@ td, th { border: none; }
   width: 210mm;
   max-width: 210mm;
   margin: 0 auto;
-  padding: 6mm 8mm 8mm;
+  padding: 4mm 8mm 6mm;
   box-sizing: border-box;
   font-size: 10px;
-  line-height: 1.2;
+  line-height: 1.15;
   font-family: ${RECEIPT_FONT};
   background: #fff;
   color: ${RECEIPT_TEXT};
@@ -6360,18 +6360,18 @@ td, th { border: none; }
   mso-border-alt: none;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 4px 0 3px !important; }
-.receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 4px 0 2px !important; }
-.receipt-grid--sheet tr.receipt-grid__info-wrap > td.receipt-grid__info-cell { padding: 4px 0 4px !important; }
+.receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 2px 0 2px !important; }
+.receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 2px 0 1px !important; }
+.receipt-grid--sheet tr.receipt-grid__info-wrap > td.receipt-grid__info-cell { padding: 2px 0 2px !important; }
 .receipt-info {
   display: grid;
   grid-template-columns: 50% 50%;
-  column-gap: 28px;
+  column-gap: 20px;
   width: 100%;
   box-sizing: border-box;
 }
 .receipt-info__col { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.receipt-info__row td { padding-top: 0; padding-bottom: 4px; vertical-align: top; line-height: 1.2; }
+.receipt-info__row td { padding-top: 0; padding-bottom: 2px; vertical-align: top; line-height: 1.15; }
 .receipt-info__row:last-child td { padding-bottom: 0; }
 .receipt-info__label {
   width: 140px;
@@ -6494,8 +6494,8 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 20px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
-.receipt-grid__logo-cell { width: 38px; max-width: 38px; vertical-align: top; padding: 0 6px 0 0 !important; }
-.receipt-logo { width: 36px; height: 36px; object-fit: contain; display: block; }
+.receipt-grid__logo-cell { width: 18mm; max-width: 18mm; vertical-align: middle; padding: 0 4px 0 0 !important; }
+.receipt-logo { width: 18mm; height: 18mm; object-fit: contain; display: block; }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT};
   font-size: 18px;
@@ -6542,14 +6542,14 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
 }
-.receipt-grid__header--title td { padding-bottom: 6px !important; padding-top: 2px !important; }
-.receipt-grid__meta td { font-size: 11px; line-height: 1.2; }
+.receipt-grid__header--title td { padding-bottom: 3px !important; padding-top: 1px !important; }
+.receipt-grid__meta td { font-size: 11px; line-height: 1.15; }
 .receipt-grid__label { color: ${RECEIPT_TEXT}; white-space: nowrap; font-weight: 400; font-size: 11px; }
 .receipt-grid__value { font-weight: 700; color: ${RECEIPT_TEXT}; font-size: 11px; }
-.receipt-grid__value--address { white-space: normal; line-height: 1.2; font-weight: 700; }
-.receipt-grid__spacer td { height: 3px; padding: 0; }
-.receipt-grid__spacer--sign td { height: 8mm; }
-.receipt-grid__fill td { height: 6mm; padding: 0; border: none !important; }
+.receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 700; }
+.receipt-grid__spacer td { height: 2px; padding: 0; }
+.receipt-grid__spacer--sign td { height: 4mm; }
+.receipt-grid__fill td { height: 3mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 11px; }
 .receipt-grid__gross td { font-weight: 700; }
@@ -6568,41 +6568,41 @@ td, th { border: none; }
 .receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: #fff !important; font-size: 11px; }
 .receipt-grid__summary-value--grand { font-size: 11px; }
 .receipt-grid__summary-value--pay { font-weight: 700; }
-.receipt-grid__settle td { padding: 4px 0 !important; }
+.receipt-grid__settle td { padding: 2px 0 !important; }
 .receipt-grid__settle-text {
   text-align: center;
   font-size: 10px;
-  line-height: 1.2;
-  padding: 6px 8px !important;
+  line-height: 1.15;
+  padding: 4px 6px !important;
   background: ${RECEIPT_SETTLE_BG} !important;
   border: 1px solid ${RECEIPT_SETTLE_BORDER} !important;
   font-weight: 600;
   color: ${RECEIPT_TEXT};
   box-sizing: border-box;
 }
-.receipt-grid__warn td { border: none; padding: 4px 0 0 !important; }
+.receipt-grid__warn td { border: none; padding: 2px 0 0 !important; }
 .receipt-grid__warn-box {
   background: ${RECEIPT_WARN_BG} !important;
   text-align: center;
-  padding: 8px 10px !important;
+  padding: 6px 8px !important;
   border: none !important;
   box-sizing: border-box;
 }
-.receipt-grid__warn-line { margin: 0 0 2px; font-size: 10px; line-height: 1.2; color: ${RECEIPT_TEXT}; }
+.receipt-grid__warn-line { margin: 0 0 1px; font-size: 10px; line-height: 1.15; color: ${RECEIPT_TEXT}; }
 .receipt-grid__warn-line:last-child,
 .receipt-grid__warn-line--last { margin-bottom: 0; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
 .receipt-grid__sign-label {
   font-size: 10px;
-  padding: 4px 2px 2px;
+  padding: 2px 2px 1px;
   vertical-align: bottom;
   white-space: nowrap;
   color: ${RECEIPT_TEXT};
 }
 .receipt-grid__sign-line {
   border-bottom: 1px dotted #666 !important;
-  height: 14px;
-  min-height: 14px;
+  height: 12px;
+  min-height: 12px;
   vertical-align: bottom;
 }
 .receipt-page--continued { page-break-before: always; break-before: page; }
@@ -6701,44 +6701,17 @@ function legacyExcelFileName(name) {
   );
 }
 async function downloadReceiptExcelBlob(name, html) {
-  // Browsers often open text/html blobs in a tab instead of saving a file.
-  // Pack the print-layout HTML (+ logo) into a .zip so download behaves like
-  // other Excel exports — a real file — while the template stays intact.
-  const htmlName = String(name || "zarlagyn-barimt.html").replace(
+  // Same print HTML + CSS as on-screen preview so download matches what you see.
+  const fileName = String(name || "zarlagyn-barimt.html").replace(
     /\.(xlsx|xls|zip)$/i,
     ".html",
   );
-  const zipName = htmlName.replace(/\.html?$/i, ".zip");
-  const logoBytes = receiptLogoBytesFromDataUri(RECEIPT_LOGO_DATA_URI);
-  let docHtml = html;
-  if (typeof JSZip !== "undefined") {
-    const zip = new JSZip();
-    if (logoBytes) {
-      zip.file("receipt-logo.png", logoBytes, zipFileOptions({ binary: true }));
-      // Prefer relative logo so the unzipped HTML stays small and printable.
-      docHtml = String(html || "").replace(
-        /src="data:image\/[^"]+"/gi,
-        'src="receipt-logo.png"',
-      );
-    }
-    zip.file(htmlName, "\uFEFF" + docHtml, zipFileOptions({ binary: false }));
-    const bytes = await zip.generateAsync({
-      type: "uint8array",
-      compression: "DEFLATE",
-      compressionOptions: { level: 6 },
-    });
-    const blob = new Blob([bytes], { type: "application/zip" });
-    return downloadBlobFile(blob, zipName, {
-      skipShare: !prefersMobileExcelShare(),
-      savePicker: !prefersMobileExcelShare(),
-    });
-  }
   const blob = new Blob(["\uFEFF" + html], {
     type: "application/octet-stream",
   });
-  return downloadBlobFile(blob, htmlName, {
-    skipShare: true,
-    savePicker: true,
+  return downloadBlobFile(blob, fileName, {
+    skipShare: !prefersMobileExcelShare(),
+    savePicker: !prefersMobileExcelShare(),
   });
 }
 function exportOrderReceiptsExcelCsv(orders) {
@@ -6797,9 +6770,8 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Fit inside column A (~10 chars wide). Keep company text starting at C
-  // so the logo never covers "ТОМУДА ГРУПП".
-  const emu = Math.round((15 / 25.4) * 914400);
+  // Match print logo size (~18mm).
+  const emu = Math.round((18 / 25.4) * 914400);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>20000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>20000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
@@ -7433,14 +7405,15 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Real .xlsx Excel file — primary download format.
+  // Download the same HTML document as print/preview (CSS layout applies).
+  // XLSX ignores print CSS — keep only as fallback.
   try {
-    await exportOrderReceiptsExcelXlsx(orders);
+    await exportOrderReceiptsExcelLegacy(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt xlsx export failed", err);
+    console.warn("Receipt HTML export failed, trying xlsx", err);
     try {
-      await exportOrderReceiptsExcelLegacy(orders);
+      await exportOrderReceiptsExcelXlsx(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
@@ -7643,7 +7616,7 @@ function ensureReceiptScreenStyles() {
   width: 210mm;
   max-width: 210mm;
   margin: 0 auto;
-  padding: 6mm 8mm 8mm;
+  padding: 4mm 8mm 6mm;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
 }
@@ -7657,7 +7630,7 @@ function ensureReceiptScreenStyles() {
   }
   .wh-receipt-preview__doc.receipt-page {
     min-width: 210mm;
-    padding: 6mm 8mm 8mm;
+    padding: 4mm 8mm 6mm;
   }
 }
 `;
@@ -15958,11 +15931,8 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: A4 portrait; margin: 8mm; }
-  .receipt-page { width: 100%; max-width: none; padding: 0; font-size: 9pt; }
-  .receipt-logo { width: 18mm; height: 18mm; }
-  .receipt-grid__brand { font-size: 11pt; }
-  .receipt-title { font-size: 14pt; }
+  @page { size: A4 portrait; margin: 8mm 10mm; }
+  .receipt-page { width: 100%; max-width: none; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
     const cleanup = () => {
