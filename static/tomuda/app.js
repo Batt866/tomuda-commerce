@@ -2783,23 +2783,27 @@ function safeDownloadFileName(name, mime = "") {
     .replace(/-+/g, "-");
   if (!base) base = "download";
   const mimeStr = String(mime || "").toLowerCase();
+  // Prefer the filename extension — octet-stream downloads must keep .html
+  // so Excel/Numbers do not open a mangled spreadsheet.
   const wantsHtml =
     /\.html?$/i.test(base) ||
     mimeStr.includes("text/html") ||
     mimeStr === "text/html;charset=utf-8";
   const wantsCsv = /\.csv$/i.test(base) || mimeStr.includes("csv");
   const wantsXlsx =
-    /\.xlsx$/i.test(base) ||
-    mimeStr.includes("spreadsheetml") ||
-    mimeStr.includes("openxmlformats");
+    !wantsHtml &&
+    (/\.xlsx$/i.test(base) ||
+      mimeStr.includes("spreadsheetml") ||
+      mimeStr.includes("openxmlformats"));
   // Do NOT treat text/html as .xls — Excel/Numbers strip logos and break layout.
   const wantsXls =
     !wantsHtml &&
-    (mimeStr.includes("vnd.ms-excel") || (!wantsXlsx && /\.xls$/i.test(base)));
+    !wantsXlsx &&
+    (mimeStr.includes("vnd.ms-excel") || /\.xls$/i.test(base));
   base = base.replace(/\.(xlsx|xls|csv|html|htm)$/i, "");
   if (wantsHtml) return `${base || "download"}.html`;
   if (wantsCsv) return `${base || "download"}.csv`;
-  if (wantsXls && !wantsXlsx) return `${base || "download"}.xls`;
+  if (wantsXls) return `${base || "download"}.xls`;
   return `${base || "download"}.xlsx`;
 }
 function productMediaPathFromUrl(url) {
@@ -6366,6 +6370,9 @@ function receiptExcelFileName(orders) {
   }
   return `zarlagyn-barimt-${stamp}.xlsx`;
 }
+function receiptHtmlFileName(orders) {
+  return receiptExcelFileName(orders).replace(/\.xlsx$/i, ".html");
+}
 function legacyExcelFileName(name) {
   return safeDownloadFileName(
     String(name || "excel.xlsx").replace(/\.(xlsx|xls|csv)$/i, ".xls"),
@@ -6373,14 +6380,14 @@ function legacyExcelFileName(name) {
   );
 }
 async function downloadReceiptExcelBlob(name, html) {
-  // Same print HTML as "Хэвлэх". Save as .html so the browser shows logo +
-  // layout; Excel/Numbers .xls mode strips images and mangling the table.
+  // Same print HTML as Баримтууд preview — keeps logo + item table intact.
+  // Use octet-stream so browsers Save As a real file instead of opening a tab.
   const fileName = String(name || "zarlagyn-barimt.html").replace(
     /\.(xlsx|xls)$/i,
     ".html",
   );
   const blob = new Blob(["\uFEFF" + html], {
-    type: "text/html;charset=utf-8",
+    type: "application/octet-stream",
   });
   return downloadBlobFile(blob, fileName, {
     skipShare: !prefersMobileExcelShare(),
@@ -7066,20 +7073,20 @@ async function exportOrderReceiptsExcelLegacy(orders) {
     (await getReceiptExcelLogoDataUri().catch(() => "")) ||
     RECEIPT_LOGO_DATA_URI;
   const html = buildReceiptExcelDocument(orders, logoSrc);
-  // HTML fallback only — keep .html so Excel is not forced to mangle layout.
-  const name = receiptExcelFileName(orders).replace(/\.xlsx$/i, ".html");
-  return downloadReceiptExcelBlob(name, html);
+  // HTML matches preview — keep .html so Excel is not forced to mangle layout.
+  return downloadReceiptExcelBlob(receiptHtmlFileName(orders), html);
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  // Real .xlsx file download — same print-style layout as the receipt template.
+  // HTML file matches the on-screen/print template (logo + item table).
+  // XLSX mangled merges/borders; keep it only as a last-resort fallback.
   try {
-    await exportOrderReceiptsExcelXlsx(orders);
+    await exportOrderReceiptsExcelLegacy(orders);
     showInstallToast("Мэдээлэл татагдлаа");
   } catch (err) {
-    console.warn("Receipt xlsx export failed", err);
+    console.warn("Receipt HTML export failed, trying xlsx", err);
     try {
-      await exportOrderReceiptsExcelLegacy(orders);
+      await exportOrderReceiptsExcelXlsx(orders);
       showInstallToast("Мэдээлэл татагдлаа");
     } catch (fallbackErr) {
       console.error("Receipt excel export failed", fallbackErr);
