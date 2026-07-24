@@ -10727,9 +10727,9 @@ textarea::placeholder {
     break-after: page;
   }
   .receipt-page {
-    width: 190mm;
+    width: 186mm;
     margin: 0 auto;
-    padding: 4mm 3mm;
+    padding: 4mm 0;
     font-size: 10.5px;
     line-height: 1.22;
     font-family: "Roboto", Arial, sans-serif;
