@@ -659,7 +659,7 @@ function receiptSettleNoteText(o) {
     "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!"
   );
 }
-/** RewardTable — Урамшуулал under Баркод; name spans to qty (tight gap). */
+/** RewardTable — Урамшуулал left of first product (same row), name spans to qty. */
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   const settleNote = receiptPromoSettleNote(o);
@@ -667,13 +667,16 @@ function receiptPromoRowsHtml(o) {
   const settleRow = settleNote
     ? `<tr class="receipt-items__promo-settle-row"><td colspan="7"><span class="receipt-items__promo-settle">${esc(settleNote)}</span></td></tr>`
     : "";
-  const titleRow = `<tr class="receipt-items__promo-note"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name">&nbsp;</td><td class="receipt-items__unit">&nbsp;</td><td class="receipt-items__barcode receipt-items__promo-title-cell"><span class="receipt-items__promo-title">Урамшуулал</span></td><td class="receipt-items__qty">&nbsp;</td><td class="receipt-items__price">&nbsp;</td><td class="receipt-items__total">&nbsp;</td></tr>`;
   const itemRows = promoItems
-    .map((i) => {
-      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name receipt-items__promo-name" colspan="3">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+    .map((i, idx) => {
+      const labelCell =
+        idx === 0
+          ? `<td class="receipt-items__num receipt-items__promo-label">Урамшуулал</td>`
+          : `<td class="receipt-items__num">&nbsp;</td>`;
+      return `<tr class="receipt-items__promo">${labelCell}<td class="receipt-items__name receipt-items__promo-name" colspan="3">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
-  return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${titleRow}${itemRows}</table></td></tr>`;
+  return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${itemRows}</table></td></tr>`;
 }
 function RewardTable(o) {
   return receiptPromoRowsHtml(o);
@@ -6460,30 +6463,21 @@ td, th { border: none; }
   padding: 3px 6px;
 }
 .receipt-items--promo .receipt-items__promo-settle { font-weight: 600; font-size: 10px; }
-.receipt-items--promo .receipt-items__num { width: 5%; }
-.receipt-items--promo .receipt-items__name { width: 33%; text-align: left; }
+.receipt-items--promo .receipt-items__num { width: 14%; }
+.receipt-items--promo .receipt-items__promo-label {
+  width: 14%;
+  font-weight: 700;
+  font-size: 11px;
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.receipt-items--promo .receipt-items__name { width: 24%; text-align: left; }
 .receipt-items--promo .receipt-items__unit { width: 13%; }
 .receipt-items--promo .receipt-items__barcode { width: 19%; }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 10%; text-align: right; white-space: nowrap; }
 .receipt-items--promo .receipt-items__total { width: 12%; text-align: right; white-space: nowrap; }
-.receipt-items--promo .receipt-items__promo-note td {
-  border: none !important;
-  border-bottom: 1px dotted #666 !important;
-  background: #fff !important;
-  padding: 4px 6px 3px;
-}
-.receipt-items--promo .receipt-items__promo-title-cell {
-  text-align: center;
-  font-weight: 700;
-  padding-left: 0;
-  padding-right: 0;
-}
-.receipt-items--promo .receipt-items__promo-title {
-  display: inline-block;
-  font-weight: 700;
-  font-size: 11px;
-}
 .receipt-items--promo .receipt-items__promo-name {
   text-align: left;
   padding-right: 4px;
@@ -6776,9 +6770,9 @@ const RECEIPT_XLSX_LAST_COL = "G";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // Widths sized so "ширхэг", 13-digit barcodes, and money fully show on A4.
-// A for logo/№; B name wide; D barcode (Урамшуулал title sits here).
-/* A–G: №, нэр, нэгж, баркод, тоо, үнэ, нийт — meta шошгод A:B / E хангалттай өргөн */
-const RECEIPT_XLSX_COL_WIDTHS = [8, 26, 10, 12, 18, 10, 11];
+// A for logo/№/Урамшуулал; B name wide; D barcode.
+/* A–G: № / Урамшуулал, нэр, нэгж, баркод, тоо, үнэ, нийт; meta A:B + E өргөн */
+const RECEIPT_XLSX_COL_WIDTHS = [12, 22, 10, 12, 14, 10, 11];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -7120,16 +7114,18 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       xlsxCellXml(`G${r}`, moneyStyle, Number(lineTotal) || 0, "n"),
     ]);
   };
-  const pushPromoProductRow = (item) => {
+  const pushPromoProductRow = (item, index = 0) => {
     const r = rowNum;
     const unitPrice = receiptPromoDisplayPrice(item);
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    // Name spans B–D (closes gap to qty); dotted line under each promo row.
+    // Урамшуулал left of first product; name B–D (closer to qty); dotted row line.
     merges.push(`B${r}:D${r}`);
     pushItemTableRow(18, [
-      xlsxCellXml(`A${r}`, 37, null, "empty"),
+      index === 0
+        ? xlsxCellXml(`A${r}`, 37, si("Урамшуулал"), "s")
+        : xlsxCellXml(`A${r}`, 37, null, "empty"),
       xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
       ...emptyCells(r, "C", "D", 36),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
@@ -7188,18 +7184,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         ...emptyCells(noteRow, "B", "G", 35),
       ]);
     }
-    const titleRow = rowNum;
-    // "Урамшуулал" under Баркод column (D).
-    pushRow(16, [
-      xlsxCellXml(`A${titleRow}`, 35, null, "empty"),
-      xlsxCellXml(`B${titleRow}`, 35, null, "empty"),
-      xlsxCellXml(`C${titleRow}`, 35, null, "empty"),
-      xlsxCellXml(`D${titleRow}`, 36, si("Урамшуулал"), "s"),
-      xlsxCellXml(`E${titleRow}`, 35, null, "empty"),
-      xlsxCellXml(`F${titleRow}`, 35, null, "empty"),
-      xlsxCellXml(`G${titleRow}`, 35, null, "empty"),
-    ]);
-    promoLines.forEach((item) => pushPromoProductRow(item));
+    promoLines.forEach((item, index) => pushPromoProductRow(item, index));
   }
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
