@@ -6464,9 +6464,9 @@ td, th { border: none; }
 }
 .receipt-items--promo .receipt-items__promo-settle { font-weight: 600; font-size: 10px; }
 .receipt-items--promo .receipt-items__num { width: 5%; }
-.receipt-items--promo .receipt-items__name { width: 28%; text-align: left; }
+.receipt-items--promo .receipt-items__name { width: 18%; text-align: left; }
 .receipt-items--promo .receipt-items__unit { width: 14%; }
-.receipt-items--promo .receipt-items__barcode { width: 23%; }
+.receipt-items--promo .receipt-items__barcode { width: 33%; }
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
@@ -6474,15 +6474,16 @@ td, th { border: none; }
   white-space: nowrap;
   vertical-align: middle;
   padding-left: 0;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 10%; text-align: right; white-space: nowrap; }
 .receipt-items--promo .receipt-items__total { width: 12%; text-align: right; white-space: nowrap; }
 .receipt-items--promo .receipt-items__promo-name {
-  text-align: left;
+  text-align: right;
   padding-left: 4px;
-  padding-right: 4px;
+  padding-right: 6px;
+  white-space: nowrap;
 }
 .receipt-items--promo .receipt-items__promo td {
   border: none !important;
@@ -6773,8 +6774,8 @@ const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // Widths sized so "ширхэг", 13-digit barcodes, and money fully show on A4.
 // A logo/№; C нэгж / Урамшуулал; D баркод / promo нэр.
-/* A–G: №, нэр, нэгж/Урамшуулал, баркод/нэр, тоо, үнэ, нийт */
-const RECEIPT_XLSX_COL_WIDTHS = [8, 20, 14, 20, 10, 10, 12];
+/* A–G: №, нэр (spacer), нэгж/Урамшуулал, нэр→тоо руу, тоо, үнэ, нийт */
+const RECEIPT_XLSX_COL_WIDTHS = [8, 16, 14, 24, 10, 10, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -7122,14 +7123,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    // C = Урамшуулал (under Нэгж); D = product name to its right.
+    // C = Урамшуулал (under Нэгж); D = name right-aligned against Тоо/ш.
     pushItemTableRow(18, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
       xlsxCellXml(`B${r}`, 36, null, "empty"),
       index === 0
         ? xlsxCellXml(`C${r}`, 37, si("Урамшуулал"), "s")
         : xlsxCellXml(`C${r}`, 37, null, "empty"),
-      xlsxCellXml(`D${r}`, 36, si(nameText), "s"),
+      xlsxCellXml(`D${r}`, 39, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
       xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
