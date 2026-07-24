@@ -5151,8 +5151,8 @@ textarea::placeholder {
 }
 
 .receipt-logo {
-  width: 16.18mm;
-  height: 16.18mm;
+  width: 10mm;
+  height: 10mm;
   object-fit: contain;
   display: block;
   margin-left: auto;
@@ -10736,36 +10736,37 @@ textarea::placeholder {
   }
   .receipt-header {
     display: grid;
-    grid-template-columns: 16.18mm 1fr;
-    gap: 1.6mm;
+    grid-template-columns: 10mm 1fr;
+    gap: 1mm;
     align-items: start;
     justify-items: end;
-    margin-bottom: 3mm;
+    margin-bottom: 2mm;
   }
   .receipt-header .receipt-company {
     justify-self: start;
   }
   .receipt-logo {
-    width: 16.18mm;
-    height: 16.18mm;
+    width: 10mm;
+    height: 10mm;
     object-fit: contain;
     display: block;
     margin-left: auto;
     margin-right: 0;
   }
   .receipt-company h1 {
-    font-size: 15px;
-    margin: 1mm 0 2mm;
+    font-size: 12px;
+    margin: 0 0 1mm;
     font-weight: 800;
   }
   .receipt-company p {
-    margin: 0.7mm 0;
+    margin: 0.3mm 0;
+    font-size: 8px;
   }
   .receipt-title {
     text-align: center;
     font-family: "Roboto", Arial, sans-serif;
-    font-size: 17px;
-    margin: 3mm 0 5mm;
+    font-size: 15px;
+    margin: 2mm 0 3mm;
     font-weight: 900;
   }
   .receipt-info {
