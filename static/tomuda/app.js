@@ -659,7 +659,7 @@ function receiptSettleNoteText(o) {
     "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!"
   );
 }
-/** RewardTable — Урамшуулал in barcode col (next to Тоо/ш); name left of it. */
+/** RewardTable — Урамшуулал under Нэгж; product name to its right. */
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   const settleNote = receiptPromoSettleNote(o);
@@ -671,9 +671,9 @@ function receiptPromoRowsHtml(o) {
     .map((i, idx) => {
       const labelCell =
         idx === 0
-          ? `<td class="receipt-items__barcode receipt-items__promo-label">Урамшуулал</td>`
-          : `<td class="receipt-items__barcode">&nbsp;</td>`;
-      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name receipt-items__promo-name" colspan="2">${esc(i.productName)}</td>${labelCell}<td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+          ? `<td class="receipt-items__unit receipt-items__promo-label">Урамшуулал</td>`
+          : `<td class="receipt-items__unit">&nbsp;</td>`;
+      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name">&nbsp;</td>${labelCell}<td class="receipt-items__barcode receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
   return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${itemRows}</table></td></tr>`;
@@ -6464,15 +6464,16 @@ td, th { border: none; }
 }
 .receipt-items--promo .receipt-items__promo-settle { font-weight: 600; font-size: 10px; }
 .receipt-items--promo .receipt-items__num { width: 5%; }
-.receipt-items--promo .receipt-items__name { width: 33%; text-align: left; }
-.receipt-items--promo .receipt-items__unit { width: 13%; }
-.receipt-items--promo .receipt-items__barcode { width: 19%; }
+.receipt-items--promo .receipt-items__name { width: 28%; text-align: left; }
+.receipt-items--promo .receipt-items__unit { width: 14%; }
+.receipt-items--promo .receipt-items__barcode { width: 23%; }
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
   vertical-align: middle;
+  padding-left: 0;
   padding-right: 4px;
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
@@ -6480,6 +6481,7 @@ td, th { border: none; }
 .receipt-items--promo .receipt-items__total { width: 12%; text-align: right; white-space: nowrap; }
 .receipt-items--promo .receipt-items__promo-name {
   text-align: left;
+  padding-left: 4px;
   padding-right: 4px;
 }
 .receipt-items--promo .receipt-items__promo td {
@@ -6770,9 +6772,9 @@ const RECEIPT_XLSX_LAST_COL = "G";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // Widths sized so "ширхэг", 13-digit barcodes, and money fully show on A4.
-// A for logo/№; B name; D barcode / Урамшуулал (next to qty).
-/* A–G: №, нэр, нэгж, баркод/Урамшуулал, тоо, үнэ, нийт — meta A:B + E өргөн */
-const RECEIPT_XLSX_COL_WIDTHS = [8, 24, 10, 14, 12, 10, 12];
+// A logo/№; C нэгж / Урамшуулал; D баркод / promo нэр.
+/* A–G: №, нэр, нэгж/Урамшуулал, баркод/нэр, тоо, үнэ, нийт */
+const RECEIPT_XLSX_COL_WIDTHS = [8, 20, 14, 20, 10, 10, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -7120,15 +7122,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    // Name B:C; Урамшуулал in D (against Тоо/ш); dotted row line.
-    merges.push(`B${r}:C${r}`);
+    // C = Урамшуулал (under Нэгж); D = product name to its right.
     pushItemTableRow(18, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
-      xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
-      ...emptyCells(r, "C", "C", 36),
+      xlsxCellXml(`B${r}`, 36, null, "empty"),
       index === 0
-        ? xlsxCellXml(`D${r}`, 39, si("Урамшуулал"), "s")
-        : xlsxCellXml(`D${r}`, 37, null, "empty"),
+        ? xlsxCellXml(`C${r}`, 37, si("Урамшуулал"), "s")
+        : xlsxCellXml(`C${r}`, 37, null, "empty"),
+      xlsxCellXml(`D${r}`, 36, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
       xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
