@@ -6422,10 +6422,10 @@ td, th { border: none; }
 .receipt-items__row { page-break-inside: avoid; break-inside: avoid; }
 .receipt-items__row td { font-size: 11px; }
 .receipt-items__num { width: 5%; text-align: center; }
-.receipt-items__name { width: 34%; text-align: left; }
-.receipt-items__unit { width: 11%; text-align: center; white-space: nowrap; }
+.receipt-items__name { width: 33%; text-align: left; }
+.receipt-items__unit { width: 13%; text-align: center; white-space: nowrap; overflow: visible; }
 .receipt-items__barcode {
-  width: 20%;
+  width: 19%;
   text-align: center;
   white-space: nowrap;
   word-break: normal;
@@ -6467,9 +6467,9 @@ td, th { border: none; }
 }
 .receipt-items--promo .receipt-items__promo-settle { font-weight: 600; font-size: 10px; }
 .receipt-items--promo .receipt-items__num { width: 5%; }
-.receipt-items--promo .receipt-items__name { width: 34%; text-align: left; }
-.receipt-items--promo .receipt-items__unit { width: 11%; }
-.receipt-items--promo .receipt-items__barcode { width: 20%; }
+.receipt-items--promo .receipt-items__name { width: 33%; text-align: left; }
+.receipt-items--promo .receipt-items__unit { width: 13%; }
+.receipt-items--promo .receipt-items__barcode { width: 19%; }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 10%; text-align: right; white-space: nowrap; }
 .receipt-items--promo .receipt-items__total { width: 12%; text-align: right; white-space: nowrap; }
@@ -6757,11 +6757,11 @@ function exportOrderReceiptsExcelCsv(orders) {
   });
   excel(`zahialgiin-barimt-${stamp}.xlsx`, sheetRows);
 }
-const RECEIPT_XLSX_LAST_COL = "K";
+const RECEIPT_XLSX_LAST_COL = "G";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
-// A = logo / №, B = product name (wide), C–G = unit…total (no merges on item rows).
-// A ≈ 10mm logo; D wide enough for full 13-digit barcodes as text.
-const RECEIPT_XLSX_COL_WIDTHS = [6, 26, 11, 16, 8, 11, 12, 7, 5, 9, 10];
+// A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
+// Widths sized so "ширхэг", 13-digit barcodes, and money fully show on A4.
+const RECEIPT_XLSX_COL_WIDTHS = [5, 28, 13, 15, 7, 10, 11];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6890,15 +6890,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
+  // Header merges stay inside A–G (same as items table).
   merges.push(
     `A${hr1}:A${hr2}`,
-    `C${hr1}:F${hr1}`,
-    `G${hr1}:I${hr1}`,
-    `J${hr1}:K${hr1}`,
-    `C${hr2}:F${hr2}`,
-    `G${hr2}:I${hr2}`,
-    `J${hr2}:K${hr2}`,
-    `B${hr3}:J${hr3}`,
+    `B${hr1}:C${hr1}`,
+    `F${hr1}:G${hr1}`,
+    `B${hr2}:C${hr2}`,
+    `F${hr2}:G${hr2}`,
+    `A${hr3}:G${hr3}`,
   );
   const pushRow = (height, cells) => {
     const filtered = filterXlsxCellsOutsideMerges(cells, merges);
@@ -6934,7 +6933,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     // Keep party rows inside A–G (same width as items table).
     const row = rowNum;
     merges.push(`C${row}:D${row}`, `F${row}:G${row}`);
-    pushRow(12, [
+    pushRow(14, [
       xlsxCellXml(`A${row}`, 1, null, "empty"),
       xlsxCellXml(`B${row}`, 5, si(leftLabel), "s"),
       xlsxCellXml(`C${row}`, 4, si(leftValue), "s"),
@@ -6952,29 +6951,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  // Compact company header aligned to items width (A–G).
-  merges.push(
-    `B${hr1}:C${hr1}`,
-    `F${hr1}:G${hr1}`,
-    `B${hr2}:C${hr2}`,
-    `F${hr2}:G${hr2}`,
-    `A${hr3}:G${hr3}`,
-  );
-  pushRow(16, [
+  pushRow(18, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`E${hr1}`, 5, si("Хүргэлтийн огноо:"), "s"),
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "C", "D", 21),
   ]);
-  pushRow(12, [
+  pushRow(14, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(`B${hr2}`, 1, si(RECEIPT_COMPANY_ADDRESS), "s"),
     xlsxCellXml(`E${hr2}`, 5, si("Хэвлэсэн огноо:"), "s"),
     xlsxCellXml(`F${hr2}`, 18, si(receiptPrintedDateValue()), "s"),
     ...emptyCells(hr2, "C", "D", 1),
   ]);
-  pushRow(18, [
+  pushRow(20, [
     xlsxCellXml(`A${hr3}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
     ...emptyCells(hr3, "B", "G", 14),
   ]);
@@ -7071,8 +7062,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const nameStyle = 8;
     const unitStyle = 9;
     const barcodeStyle = 34; // @ text format — full barcode digits
-    const qtyStyle = 9;
-    const moneyStyle = 10;
+    const qtyStyle = 11; // number, center
+    const moneyStyle = 10; // number #,##0, right
     const numStyle = 9;
     const barcodeText = promo
       ? ""
@@ -7095,9 +7086,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       barcodeText
         ? xlsxCellXml(`D${r}`, barcodeStyle, barcodeText, "inlineStr")
         : xlsxCellXml(`D${r}`, barcodeStyle, null, "empty"),
-      xlsxCellXml(`E${r}`, qtyStyle, si(String(qty)), "s"),
-      xlsxCellXml(`F${r}`, moneyStyle, si(receiptMoney(unitPrice)), "s"),
-      xlsxCellXml(`G${r}`, moneyStyle, si(receiptMoney(lineTotal)), "s"),
+      xlsxCellXml(`E${r}`, qtyStyle, qty, "n"),
+      xlsxCellXml(`F${r}`, moneyStyle, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(`G${r}`, moneyStyle, Number(lineTotal) || 0, "n"),
     ]);
   };
   const pushPromoProductRow = (item) => {
@@ -7112,9 +7103,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
       xlsxCellXml(`C${r}`, 37, null, "empty"),
       xlsxCellXml(`D${r}`, 37, null, "empty"),
-      xlsxCellXml(`E${r}`, 37, si(String(qty)), "s"),
-      xlsxCellXml(`F${r}`, 38, si(receiptMoney(unitPrice)), "s"),
-      xlsxCellXml(`G${r}`, 38, si(receiptMoney(lineTotal)), "s"),
+      xlsxCellXml(`E${r}`, 37, qty, "n"),
+      xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
     ]);
   };
   const pushSummaryAmountRow = (
@@ -7243,7 +7234,7 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
     : "";
   // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.45" right="0.45" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.4" right="0.4" top="0.45" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
