@@ -466,6 +466,24 @@ function receiptMetaRow(
 function receiptInfoFieldRow(label, value, valueClass = "") {
   return `<tr class="receipt-info__row"><td class="receipt-info__label">${esc(label)}</td><td class="receipt-info__value${valueClass ? ` ${valueClass}` : ""}">${value}</td></tr>`;
 }
+/** Soft-wrap long store/delivery address onto 2+ lines (never one clipped line). */
+function receiptWrapAddressLines(text, maxChars = 38) {
+  const raw = String(text || "-").replace(/\s+/g, " ").trim() || "-";
+  const words = raw.split(" ");
+  const lines = [];
+  let cur = "";
+  for (const word of words) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (next.length > maxChars && cur) {
+      lines.push(cur);
+      cur = word;
+    } else {
+      cur = next;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : ["-"];
+}
 /** 4-column party row like reference PDF (label|value|label|value). */
 function receiptInfoPairRow(l1, v1, l2 = "", v2 = "") {
   return `<div class="receipt-info__pair"><span class="receipt-info__l">${esc(l1)}</span><span class="receipt-info__v">${v1}</span><span class="receipt-info__l">${esc(l2)}</span><span class="receipt-info__v">${v2}</span></div>`;
@@ -509,7 +527,10 @@ function receiptInfoRows(o) {
     ),
     receiptInfoFieldRow("", `<b>${RECEIPT_BANK_ACCOUNT}</b>`),
   ].join("");
-  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label">Хүргэлтийн хаяг:</div><div class="receipt-info__address-text">${f.address}</div></div></div></div>`;
+  const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 36)
+    .map((line) => `<div class="receipt-info__address-line">${esc(line)}</div>`)
+    .join("");
+  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label">Хүргэлтийн хаяг:</div><div class="receipt-info__address-text">${addressLines}</div></div></div></div>`;
   return `<tr class="receipt-grid__info-wrap"><td colspan="11" class="receipt-grid__info-cell">${info}</td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -6476,6 +6497,7 @@ td, th { border: none; }
   padding: 0;
   overflow: visible;
   min-width: 0;
+  width: 100%;
 }
 .receipt-info__address-label {
   font-weight: 400;
@@ -6487,12 +6509,22 @@ td, th { border: none; }
 .receipt-info__address-text {
   font-weight: 700;
   font-size: 9px;
-  line-height: 1.35;
+  line-height: 1.4;
   color: ${RECEIPT_TEXT};
-  white-space: normal;
+  white-space: normal !important;
   word-break: break-word;
   overflow-wrap: anywhere;
   overflow: visible;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+.receipt-info__address-line {
+  display: block;
+  white-space: normal !important;
+  overflow: visible;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .receipt-items {
   width: 100%;
@@ -6633,7 +6665,7 @@ td, th { border: none; }
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 3.1mm;
+  gap: 1mm;
   width: 100%;
   box-sizing: border-box;
 }
@@ -7193,12 +7225,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `A${bankNumRow}:B${bankNumRow}`,
     `D${bankNameRow}:G${bankNumRow}`,
   );
-  const deliveryAddress = String(f.addressPlain || "-");
-  const addressText = `Хүргэлтийн хаяг:\n${deliveryAddress}`;
-  const bankRowH = Math.max(
-    20,
-    Math.min(36, 14 + Math.ceil(deliveryAddress.length / 36) * 4),
-  );
+  const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 34);
+  const addressText = `Хүргэлтийн хаяг:\n${addressLines.join("\n")}`;
+  // Tall enough for 2+ wrapped store-address lines (never clip to one line).
+  const bankRowH = Math.max(24, 12 + Math.max(2, addressLines.length) * 9);
   pushRow(bankRowH, [
     xlsxCellXml(`A${bankNameRow}`, 5, si("Дансны нэр:"), "s"),
     xlsxCellXml(`C${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
