@@ -513,10 +513,21 @@ function receiptPaymentChecksHtml(paid, bank) {
     bank: `<span class="receipt-check">${bank ? "☑" : "☐"}</span> Зээлээр`,
   };
 }
-/** InvoiceHeader — logo, company, delivery date, centered title (reference PDF). */
+/** InvoiceHeader — logo + company block (address clear of logo), delivery date, title. */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateValue(o);
-  return `<tr class="receipt-grid__header"><td rowspan="3" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__address">Хаяг: ${esc(RECEIPT_COMPANY_ADDRESS_LINE1)}</td><td colspan="5"></td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__phone">${esc(RECEIPT_COMPANY_ADDRESS_LINE2)}</td><td colspan="5"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  const companyBlock = `<div class="receipt-header-brand">
+      <img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo" width="60" height="60">
+      <div class="receipt-header-copy">
+        <div class="receipt-header-top">
+          <div class="receipt-grid__brand">ТОМУДА ГРУПП</div>
+          <div class="receipt-header-date"><span class="receipt-grid__date-label">Хүргэлтийн огноо:</span> <span class="receipt-grid__date">${esc(deliveryDate)}</span></div>
+        </div>
+        <div class="receipt-grid__address">Хаяг: ${esc(RECEIPT_COMPANY_ADDRESS_LINE1)}</div>
+        <div class="receipt-grid__phone">${esc(RECEIPT_COMPANY_ADDRESS_LINE2)}</div>
+      </div>
+    </div>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--brand"><td colspan="11" class="receipt-grid__header-cell">${companyBlock}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -6554,63 +6565,75 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 20px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
-.receipt-grid__logo-cell {
-  width: 20mm;
-  min-width: 20mm;
-  max-width: 22mm;
-  height: 18mm;
-  min-height: 18mm;
+.receipt-grid__header-cell {
+  padding: 0 0 2px !important;
   vertical-align: top;
-  text-align: left;
-  padding: 0 3mm 0 0 !important;
-  overflow: hidden;
+  overflow: visible;
+}
+.receipt-header-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 3mm;
+  width: 100%;
   box-sizing: border-box;
 }
 .receipt-logo {
   width: 16mm;
   height: 16mm;
+  min-width: 16mm;
   max-width: 16mm;
-  max-height: 16mm;
   object-fit: contain;
   display: block;
+  flex: 0 0 16mm;
   margin: 0;
+}
+.receipt-header-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: visible;
+}
+.receipt-header-top {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 1px;
+}
+.receipt-header-date {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 8px;
+  line-height: 1.15;
 }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT};
   font-size: 12px;
   font-weight: 700;
-  vertical-align: bottom;
-  padding: 0 0 1px 1mm !important;
+  padding: 0 !important;
+  margin: 0;
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
 }
-.receipt-grid__address {
-  font-size: 8px;
-  line-height: 1.15;
-  vertical-align: top;
-  white-space: normal;
-  padding: 0 0 0 1mm !important;
-  color: ${RECEIPT_TEXT};
-}
+.receipt-grid__address,
 .receipt-grid__phone {
   font-size: 8px;
-  line-height: 1.15;
-  vertical-align: top;
-  padding: 0 0 0 1mm !important;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  padding: 0 !important;
+  margin: 0;
   color: ${RECEIPT_TEXT};
-  font-weight: 400;
 }
-.receipt-grid--sheet tr.receipt-grid__header td.receipt-grid__brand,
-.receipt-grid--sheet tr.receipt-grid__header td.receipt-grid__address,
-.receipt-grid--sheet tr.receipt-grid__header td.receipt-grid__phone {
-  min-height: 5mm;
-}
+.receipt-grid__phone { font-weight: 400; }
 .receipt-grid__date-label,
 .receipt-grid__date {
   font-size: 8px;
   text-align: left;
   white-space: nowrap;
-  vertical-align: top;
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
   padding: 0 !important;
@@ -6822,8 +6845,8 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
 // A = logo gutter; meta labels all start in B (same left edge). No fitToWidth crush.
 // Meta: A empty, B:C label, D value, E:F right label, G right value.
-/* A = logo gutter (wide enough that 16mm logo never covers B text). */
-const RECEIPT_XLSX_COL_WIDTHS = [14, 14, 13, 13, 12, 12, 12];
+/* A must be wider than the 16mm logo so B text never sits under the drawing. */
+const RECEIPT_XLSX_COL_WIDTHS = [18, 13, 12, 12, 11, 12, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6863,12 +6886,11 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Keep 16mm logo, but clamp drawing to col A so brand/address in B stay clear.
-  const logoMm = 16;
-  const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.6 / 25.4) * 914400);
+  // 16mm logo; twoCellAnchor ends at col B edge so drawing cannot cover brand/address text.
+  const colOff = Math.round((0.4 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>2000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const logoEndRow = logoRow + 2;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>1000</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoEndRow}</xdr:row><xdr:rowOff>8000</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -6983,13 +7005,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
   const hr4 = rowNum + 3;
-  // Header merges stay inside A–G (same as items table).
+  // Logo lives only in A; brand/address start in B so they never sit under the drawing.
   merges.push(
     `A${hr1}:A${hr3}`,
     `B${hr1}:D${hr1}`,
     `F${hr1}:G${hr1}`,
-    `B${hr2}:D${hr2}`,
-    `B${hr3}:D${hr3}`,
+    `B${hr2}:E${hr2}`,
+    `B${hr3}:E${hr3}`,
     `A${hr4}:G${hr4}`,
   );
   const pushMetaPairRow = (
@@ -7020,7 +7042,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  // Header rows tall enough that 16mm logo fits above party-info text.
   pushRow(18, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
@@ -7028,7 +7049,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "C", "D", 21),
   ]);
-  pushRow(15, [
+  pushRow(16, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
@@ -7036,12 +7057,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       si(`Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}`),
       "s",
     ),
-    ...emptyCells(hr2, "C", "D", 3),
+    ...emptyCells(hr2, "C", "E", 3),
   ]);
-  pushRow(15, [
+  pushRow(16, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
     xlsxCellXml(`B${hr3}`, 3, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
-    ...emptyCells(hr3, "C", "D", 3),
+    ...emptyCells(hr3, "C", "E", 3),
   ]);
   pushRow(20, [
     xlsxCellXml(`A${hr4}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
