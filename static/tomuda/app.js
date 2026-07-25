@@ -466,13 +466,16 @@ function receiptMetaRow(
 function receiptInfoFieldRow(label, value, valueClass = "") {
   return `<tr class="receipt-info__row"><td class="receipt-info__label">${esc(label)}</td><td class="receipt-info__value${valueClass ? ` ${valueClass}` : ""}">${value}</td></tr>`;
 }
-/** Soft-wrap long store/delivery address onto 2+ lines (never one clipped line). */
-function receiptWrapAddressLines(text, maxChars = 38) {
+/** Soft-wrap address for Excel/print — prefer breaks after commas, then spaces. */
+function receiptWrapAddressLines(text, maxChars = 32) {
   const raw = String(text || "-").replace(/\s+/g, " ").trim() || "-";
-  const words = raw.split(" ");
+  // Split into comma chunks first (matches screenshot line breaks).
+  const chunks = raw.includes(",")
+    ? raw.split(/,\s*/).map((c, i, arr) => (i < arr.length - 1 ? `${c},` : c))
+    : [raw];
   const lines = [];
   let cur = "";
-  for (const word of words) {
+  const pushWord = (word) => {
     const next = cur ? `${cur} ${word}` : word;
     if (next.length > maxChars && cur) {
       lines.push(cur);
@@ -480,6 +483,26 @@ function receiptWrapAddressLines(text, maxChars = 38) {
     } else {
       cur = next;
     }
+  };
+  for (const chunk of chunks) {
+    if (!cur) {
+      if (chunk.length <= maxChars) {
+        cur = chunk;
+        continue;
+      }
+    } else if (`${cur} ${chunk}`.length <= maxChars) {
+      cur = `${cur} ${chunk}`;
+      continue;
+    } else {
+      lines.push(cur);
+      cur = "";
+      if (chunk.length <= maxChars) {
+        cur = chunk;
+        continue;
+      }
+    }
+    // Chunk itself longer than max — break on spaces.
+    for (const word of chunk.split(" ")) pushWord(word);
   }
   if (cur) lines.push(cur);
   return lines.length ? lines : ["-"];
@@ -527,10 +550,10 @@ function receiptInfoRows(o) {
     ),
     receiptInfoFieldRow("", `<b>${RECEIPT_BANK_ACCOUNT}</b>`),
   ].join("");
-  const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 36)
+  const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 32)
     .map((line) => `<div class="receipt-info__address-line">${esc(line)}</div>`)
     .join("");
-  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label">Хүргэлтийн хаяг:</div><div class="receipt-info__address-text">${addressLines}</div></div></div></div>`;
+  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label"><b>Хүргэлтийн хаяг:</b></div><div class="receipt-info__address-text">${addressLines}</div></div></div></div>`;
   return `<tr class="receipt-grid__info-wrap"><td colspan="11" class="receipt-grid__info-cell">${info}</td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -7117,10 +7140,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
   const hr4 = rowNum + 3;
-  // PDF layout: logo in A; brand/address in B…; meta uses A–G fully (no wasted gutter).
+  // Logo in A; brand/address start immediately in B (close to logo), like screenshot.
   merges.push(
     `A${hr1}:A${hr3}`,
-    `B${hr1}:D${hr1}`,
+    `B${hr1}:C${hr1}`,
     `F${hr1}:G${hr1}`,
     `B${hr2}:G${hr2}`,
     `B${hr3}:G${hr3}`,
@@ -7165,22 +7188,23 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`E${hr1}`, 6, si("Хүргэлтийн огноо:"), "s"),
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
-    ...emptyCells(hr1, "C", "D", 39),
+    ...emptyCells(hr1, "C", "C", 39),
   ]);
-  pushRow(18, [
+  // Company address — two explicit lines under brand, close to logo (col B).
+  pushRow(14, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
-      3,
+      5,
       si(`Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}`),
       "s",
     ),
-    ...emptyCells(hr2, "C", "G", 3),
+    ...emptyCells(hr2, "C", "G", 5),
   ]);
-  pushRow(18, [
+  pushRow(14, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
-    xlsxCellXml(`B${hr3}`, 3, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
-    ...emptyCells(hr3, "C", "G", 3),
+    xlsxCellXml(`B${hr3}`, 5, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
+    ...emptyCells(hr3, "C", "G", 5),
   ]);
   pushRow(20, [
     xlsxCellXml(`A${hr4}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -7211,60 +7235,42 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     f.customerPhone,
   );
   pushRow(8, emptyCells(rowNum));
-  // Bank A:B label / C value; delivery address D:G (PDF right half, full wrap).
-  const bankNameRow = rowNum;
-  const bankRegRow = bankNameRow + 1;
-  const bankTitleRow = bankNameRow + 2;
-  const bankAcctRow = bankNameRow + 3;
-  const bankNumRow = bankNameRow + 4;
-  merges.push(
-    `A${bankNameRow}:B${bankNameRow}`,
-    `A${bankRegRow}:B${bankRegRow}`,
-    `A${bankTitleRow}:B${bankTitleRow}`,
-    `A${bankAcctRow}:B${bankAcctRow}`,
-    `A${bankNumRow}:B${bankNumRow}`,
-    `D${bankNameRow}:G${bankNumRow}`,
-  );
-  const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 34);
-  const addressText = `Хүргэлтийн хаяг:\n${addressLines.join("\n")}`;
-  // Tall enough for 2+ wrapped store-address lines (never clip to one line).
-  const bankRowH = Math.max(24, 12 + Math.max(2, addressLines.length) * 9);
-  pushRow(bankRowH, [
-    xlsxCellXml(`A${bankNameRow}`, 5, si("Дансны нэр:"), "s"),
-    xlsxCellXml(`C${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
-    xlsxCellXml(`D${bankNameRow}`, 3, si(addressText), "s"),
-    ...emptyCells(bankNameRow, "B", "B", 5),
-    ...emptyCells(bankNameRow, "E", "G", 3),
-  ]);
-  pushRow(bankRowH, [
-    xlsxCellXml(`A${bankRegRow}`, 5, si("Регистрийн дугаар:"), "s"),
-    xlsxCellXml(`C${bankRegRow}`, 5, si("5397987"), "s"),
-    ...emptyCells(bankRegRow, "B", "B", 5),
-    ...emptyCells(bankRegRow, "D", "G", 3),
-  ]);
-  pushRow(bankRowH, [
-    xlsxCellXml(`A${bankTitleRow}`, 5, si("Банкны нэр:"), "s"),
-    xlsxCellXml(`C${bankTitleRow}`, 5, si("Хаан банк"), "s"),
-    ...emptyCells(bankTitleRow, "B", "B", 5),
-    ...emptyCells(bankTitleRow, "D", "G", 3),
-  ]);
-  pushRow(bankRowH, [
-    xlsxCellXml(`A${bankAcctRow}`, 5, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(
-      `C${bankAcctRow}`,
-      5,
-      si(`IBAN: ${RECEIPT_BANK_IBAN_SHORT}`),
-      "s",
-    ),
-    ...emptyCells(bankAcctRow, "B", "B", 5),
-    ...emptyCells(bankAcctRow, "D", "G", 3),
-  ]);
-  pushRow(bankRowH, [
-    xlsxCellXml(`A${bankNumRow}`, 5, si(""), "s"),
-    xlsxCellXml(`C${bankNumRow}`, 5, si(RECEIPT_BANK_ACCOUNT), "s"),
-    ...emptyCells(bankNumRow, "B", "B", 5),
-    ...emptyCells(bankNumRow, "D", "G", 3),
-  ]);
+  // Bank left + delivery address as separate wrapped lines (screenshot-like).
+  const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 30);
+  const rightAddrLines = ["Хүргэлтийн хаяг:", ...addressLines];
+  const bankLeft = [
+    ["Дансны нэр:", "ТОМУДА групп"],
+    ["Регистрийн дугаар:", "5397987"],
+    ["Банкны нэр:", "Хаан банк"],
+    ["Дансны дугаар:", `IBAN: ${RECEIPT_BANK_IBAN_SHORT}`],
+    ["", RECEIPT_BANK_ACCOUNT],
+  ];
+  const bankRowCount = Math.max(bankLeft.length, rightAddrLines.length);
+  for (let i = 0; i < bankRowCount; i += 1) {
+    const r = rowNum;
+    merges.push(`A${r}:B${r}`, `D${r}:G${r}`);
+    const [leftLabel, leftValue] = bankLeft[i] || ["", ""];
+    const rightText = rightAddrLines[i] || "";
+    // Style 4 = bold wrap (address); style 5 = normal wrap (bank labels).
+    const rightStyle = rightText ? 4 : 5;
+    pushRow(16, [
+      xlsxCellXml(`A${r}`, 5, si(leftLabel), "s"),
+      xlsxCellXml(
+        `C${r}`,
+        5,
+        leftValue ? si(leftValue) : null,
+        leftValue ? "s" : "empty",
+      ),
+      xlsxCellXml(
+        `D${r}`,
+        rightStyle,
+        rightText ? si(rightText) : null,
+        rightText ? "s" : "empty",
+      ),
+      ...emptyCells(r, "B", "B", 5),
+      ...emptyCells(r, "E", "G", rightStyle),
+    ]);
+  }
   pushRow(10, emptyCells(rowNum));
   const headerRow = rowNum;
   // 7 real columns (no merges) so Excel/Numbers borders line up cleanly.
