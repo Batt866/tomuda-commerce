@@ -405,17 +405,21 @@ const RECEIPT_FONT = 'Arial, Helvetica, sans-serif';
 const RECEIPT_FONT_TITLE = 'Arial, Helvetica, sans-serif';
 const RECEIPT_FONT_LINK = "";
 const RECEIPT_COMPANY_PHONE = "+976-75333357";
-const RECEIPT_COMPANY_ADDRESS =
-  "Хаяг: Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/                                             Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357";
-const RECEIPT_COMPANY_ADDRESS_LINE =
-  "Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/ Нийслэл хүрээ өргөн чөлөө 331-401";
+const RECEIPT_COMPANY_ADDRESS_LINE1 =
+  "Улаанбаатар Баянзүрх, 26-р хороо, Олимп хороолол- 2 /13312/";
+const RECEIPT_COMPANY_ADDRESS_LINE2 =
+  "Нийслэл хүрээ өргөн чөлөө 331-401. Утас: +976-75333357";
+const RECEIPT_COMPANY_ADDRESS_LINE = `${RECEIPT_COMPANY_ADDRESS_LINE1} ${RECEIPT_COMPANY_ADDRESS_LINE2.replace(` Утас: ${RECEIPT_COMPANY_PHONE}`, "")}`;
+const RECEIPT_COMPANY_ADDRESS = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 const RECEIPT_BORDER = "#999999";
 const RECEIPT_HEADER_BG = "#F3F3F3";
-const RECEIPT_GRAND_BG = "#5E5E5E";
-const RECEIPT_SETTLE_BG = "#FFF8E1";
-const RECEIPT_SETTLE_BORDER = "#E5D28A";
+const RECEIPT_GRAND_BG = "#E8EBEE";
+const RECEIPT_SETTLE_BG = "#ffffff";
+const RECEIPT_SETTLE_BORDER = "#ffffff";
 const RECEIPT_WARN_BG = "#F0F0F0";
 const RECEIPT_TEXT = "#222222";
+const RECEIPT_BANK_IBAN_SHORT = "60000500";
+const RECEIPT_BANK_ACCOUNT = "5133333307";
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
@@ -461,38 +465,38 @@ function receiptMetaRow(
 function receiptInfoFieldRow(label, value, valueClass = "") {
   return `<tr class="receipt-info__row"><td class="receipt-info__label">${esc(label)}</td><td class="receipt-info__value${valueClass ? ` ${valueClass}` : ""}">${value}</td></tr>`;
 }
-/** CustomerInformation — two boxed blocks (party, then bank+address) like reference. */
+/** CustomerInformation — one 2-column block like reference PDF (no box fill). */
 function receiptInfoRows(o) {
   const f = receiptPartyFields(o);
-  const partyLeft = [
+  const left = [
     receiptInfoFieldRow("Худалдааны төлөөлөгч:", f.salesName),
     receiptInfoFieldRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone),
     receiptInfoFieldRow("Түгээгчийн нэр:", f.deliveryName),
     receiptInfoFieldRow("Түгээгчийн утас:", f.deliveryPhone),
+    receiptInfoFieldRow("", "&nbsp;"),
+    receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
+    receiptInfoFieldRow("Регистрийн дугаар:", "5397987"),
+    receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
+    receiptInfoFieldRow(
+      "Дансны дугаар:",
+      `<b>IBAN: ${RECEIPT_BANK_IBAN_SHORT}</b>`,
+    ),
+    receiptInfoFieldRow("", `<b>${RECEIPT_BANK_ACCOUNT}</b>`),
   ].join("");
-  const partyRight = [
+  const right = [
     receiptInfoFieldRow("Харилцагч:", f.customerName),
-    receiptInfoFieldRow("Регистерийн дугаар:", f.customerReg),
+    receiptInfoFieldRow("Регистрийн дугаар:", f.customerReg),
     receiptInfoFieldRow("Компаний нэр:", f.companyName),
     receiptInfoFieldRow("Утасны дугаар:", f.customerPhone),
-  ].join("");
-  const bankLeft = [
-    receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
-    receiptInfoFieldRow("Регистерийн дугаар:", "5397987"),
-    receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
-    receiptInfoFieldRow("IBAN:", "5133333307"),
-    receiptInfoFieldRow("Дансны дугаар:", "60000500"),
-  ].join("");
-  const bankRight = [
+    receiptInfoFieldRow("", "&nbsp;"),
     receiptInfoFieldRow(
       "Хүргэлтийн хаяг:",
       f.address,
       "receipt-info__value--address",
     ),
   ].join("");
-  const partyBox = `<div class="receipt-info receipt-info--party" role="group" aria-label="Талуудын мэдээлэл"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${partyLeft}</tbody></table><table class="receipt-info__col receipt-info__col--right" role="presentation"><tbody>${partyRight}</tbody></table></div>`;
-  const bankBox = `<div class="receipt-info receipt-info--bank" role="group" aria-label="Данс, хүргэлтийн хаяг"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bankLeft}</tbody></table><table class="receipt-info__col receipt-info__col--right" role="presentation"><tbody>${bankRight}</tbody></table></div>`;
-  return `<tr class="receipt-grid__info-wrap"><td colspan="11" class="receipt-grid__info-cell">${partyBox}${bankBox}</td></tr>`;
+  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${left}</tbody></table><table class="receipt-info__col receipt-info__col--right" role="presentation"><tbody>${right}</tbody></table></div>`;
+  return `<tr class="receipt-grid__info-wrap"><td colspan="11" class="receipt-grid__info-cell">${info}</td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
   return receiptInfoRows(o);
@@ -509,11 +513,10 @@ function receiptPaymentChecksHtml(paid, bank) {
     bank: `<span class="receipt-check">${bank ? "☑" : "☐"}</span> Зээлээр`,
   };
 }
-/** InvoiceHeader — logo, company, dates, centered title. */
+/** InvoiceHeader — logo, company, delivery date, centered title (reference PDF). */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateValue(o);
-  const printedDate = receiptPrintedDateValue();
-  return `<tr class="receipt-grid__header"><td rowspan="3" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__address">Хаяг: ${esc(RECEIPT_COMPANY_ADDRESS_LINE)}</td><td colspan="3" class="receipt-grid__date-label">Хэвлэсэн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(printedDate)}</td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__phone">Утас: ${esc(RECEIPT_COMPANY_PHONE)}</td><td colspan="5"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  return `<tr class="receipt-grid__header"><td rowspan="3" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="10" class="receipt-grid__address">Хаяг: ${esc(RECEIPT_COMPANY_ADDRESS_LINE1)}</td></tr><tr class="receipt-grid__header"><td colspan="10" class="receipt-grid__phone">${esc(RECEIPT_COMPANY_ADDRESS_LINE2)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -535,7 +538,7 @@ function receiptHasPromoSection(o) {
   return receiptPromoItems(o).length > 0 || !!receiptPromoSettleNote(o);
 }
 function receiptItemsHeadRow() {
-  return `<tr class="receipt-items__head"><th class="receipt-items__num">№</th><th class="receipt-items__name">Барааны нэр</th><th class="receipt-items__unit">Хэмжих нэгж</th><th class="receipt-items__barcode">Баркод</th><th class="receipt-items__qty">Тоо/ш</th><th class="receipt-items__price">Нэгж үнэ</th><th class="receipt-items__total">Нийт үнэ</th></tr>`;
+  return `<tr class="receipt-items__head"><th class="receipt-items__num"></th><th class="receipt-items__name">Барааны нэр</th><th class="receipt-items__unit">Хэмжих нэгж</th><th class="receipt-items__barcode">Баркод</th><th class="receipt-items__qty">Тоо/ш</th><th class="receipt-items__price">Нэгж үнэ</th><th class="receipt-items__total">Нийт үнэ</th></tr>`;
 }
 function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
   return (items || [])
@@ -720,7 +723,7 @@ function SummarySection(sub, vat, payable, payTerm, o) {
 }
 function receiptPaymentTermText(f, o) {
   if (f.bank || o.paymentTerm === "credit") return "Зээлээр";
-  return "Шууд төлөлт";
+  return "Шууд төлөх";
 }
 function receiptShouldShowGross(o) {
   return true;
@@ -731,13 +734,13 @@ function receiptGrandNote(o) {
     o.applyPercentDiscount && isCashPayment(o.paymentTerm)
       ? Number(o.percentDiscount || RECEIPT_PERCENT_DISCOUNT)
       : 0;
-  if (pct) return `(Бэлэн төлөлтийн ${pct}% хасагдав)`;
+  if (pct) return `(Шууд төлөлтийн ${pct}% хасагдав)`;
   if (discount) return `(Хөнгөлөлт ${percentDiscountRate()}%)`;
   return "";
 }
 /** PaymentInformation — gray instruction box. */
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td colspan="11" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return `<tr class="receipt-grid__warn"><td colspan="11" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
 }
 function PaymentInformation() {
   return receiptWarningRowsHtml();
@@ -6379,16 +6382,14 @@ td, th { border: none; }
 .receipt-info {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  column-gap: 8px;
+  column-gap: 12px;
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid ${RECEIPT_BORDER};
+  border: none;
   background: #fff !important;
-  padding: 5px 8px;
-  margin: 0 0 4px;
+  padding: 2px 0 6px;
+  margin: 0;
 }
-.receipt-info--bank { margin-bottom: 2px; min-height: 22mm; }
-.receipt-info--bank .receipt-info__col--right { align-self: stretch; }
 .receipt-info__col { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .receipt-info__row td { padding-top: 1px; padding-bottom: 2px; vertical-align: top; line-height: 1.25; }
 .receipt-info__row:last-child td { padding-bottom: 0; }
@@ -6417,7 +6418,12 @@ td, th { border: none; }
   overflow: visible;
   line-height: 1.25;
 }
-.receipt-info__value--address { white-space: normal; line-height: 1.25; font-weight: 700; }
+.receipt-info__value--address {
+  white-space: normal;
+  line-height: 1.25;
+  font-weight: 700;
+  min-height: 18mm;
+}
 .receipt-items {
   width: 100%;
   border-collapse: collapse;
@@ -6540,7 +6546,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: ${RECEIPT_GRAND_BG} !important;
-  color: #fff !important;
+  color: ${RECEIPT_TEXT} !important;
   height: 28px;
   padding: 4px 8px;
   font-weight: 700;
@@ -6624,7 +6630,7 @@ td, th { border: none; }
 .receipt-grid__gross-label { text-align: left; font-size: 11px; }
 .receipt-grid__gross .receipt-grid__money { font-size: 11px; text-align: right; }
 .receipt-grid__summary-label { background: transparent; font-weight: 400; font-size: 11px; text-align: left; color: ${RECEIPT_TEXT}; }
-.receipt-grid__summary-label--grand { font-weight: 700; color: #fff !important; font-size: 11px; }
+.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 11px; }
 .receipt-grid__summary-value {
   text-align: right;
   font-size: 11px;
@@ -6633,7 +6639,7 @@ td, th { border: none; }
   font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: #fff !important; font-size: 11px; }
+.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 11px; }
 .receipt-grid__summary-value--grand { font-size: 11px; }
 .receipt-grid__summary-value--pay { font-weight: 700; }
 .receipt-grid__settle td { padding: 2px 0 !important; }
@@ -6641,10 +6647,10 @@ td, th { border: none; }
   text-align: center;
   font-size: 10px;
   line-height: 1.15;
-  padding: 4px 6px !important;
-  background: ${RECEIPT_SETTLE_BG} !important;
-  border: 1px solid ${RECEIPT_SETTLE_BORDER} !important;
-  font-weight: 600;
+  padding: 3px 4px !important;
+  background: #fff !important;
+  border: none !important;
+  font-weight: 400;
   color: ${RECEIPT_TEXT};
   box-sizing: border-box;
 }
@@ -6964,14 +6970,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
+  const hr4 = rowNum + 3;
   // Header merges stay inside A–G (same as items table).
   merges.push(
-    `A${hr1}:A${hr2}`,
+    `A${hr1}:A${hr3}`,
     `B${hr1}:C${hr1}`,
     `F${hr1}:G${hr1}`,
-    `B${hr2}:C${hr2}`,
-    `F${hr2}:G${hr2}`,
-    `A${hr3}:G${hr3}`,
+    `B${hr2}:G${hr2}`,
+    `B${hr3}:G${hr3}`,
+    `A${hr4}:G${hr4}`,
   );
   const pushMetaPairRow = (
     leftLabel,
@@ -7008,16 +7015,24 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "C", "D", 21),
   ]);
-  pushRow(16, [
+  pushRow(14, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
-    xlsxCellXml(`B${hr2}`, 3, si(RECEIPT_COMPANY_ADDRESS), "s"),
-    xlsxCellXml(`E${hr2}`, 6, si("Хэвлэсэн огноо:"), "s"),
-    xlsxCellXml(`F${hr2}`, 18, si(receiptPrintedDateValue()), "s"),
-    ...emptyCells(hr2, "C", "D", 3),
+    xlsxCellXml(
+      `B${hr2}`,
+      3,
+      si(`Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}`),
+      "s",
+    ),
+    ...emptyCells(hr2, "C", "G", 3),
+  ]);
+  pushRow(14, [
+    xlsxCellXml(`A${hr3}`, 1, null, "empty"),
+    xlsxCellXml(`B${hr3}`, 3, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
+    ...emptyCells(hr3, "C", "G", 3),
   ]);
   pushRow(20, [
-    xlsxCellXml(`A${hr3}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr3, "B", "G", 14),
+    xlsxCellXml(`A${hr4}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(hr4, "B", "G", 14),
   ]);
   pushMetaPairRow(
     "Худалдааны төлөөлөгч:",
@@ -7028,7 +7043,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushMetaPairRow(
     "Худалдааны төлөөлөгчийн утас:",
     f.salesPhone,
-    "Регистерийн дугаар:",
+    "Регистрийн дугаар:",
     f.customerReg,
   );
   pushMetaPairRow(
@@ -7043,23 +7058,23 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     "Утасны дугаар:",
     f.customerPhone,
   );
-  pushRow(10, emptyCells(rowNum));
-  // Bank left + delivery address box on the right (multi-row merge like reference).
+  pushRow(8, emptyCells(rowNum));
+  // Bank left + delivery address on the right (multi-row merge like reference PDF).
   const bankNameRow = rowNum;
   const bankRegRow = bankNameRow + 1;
   const bankTitleRow = bankNameRow + 2;
   const bankAcctRow = bankNameRow + 3;
-  const bankIbanRow = bankNameRow + 4;
+  const bankNumRow = bankNameRow + 4;
   merges.push(
     `B${bankNameRow}:C${bankNameRow}`,
     `B${bankRegRow}:C${bankRegRow}`,
     `B${bankTitleRow}:C${bankTitleRow}`,
     `B${bankAcctRow}:C${bankAcctRow}`,
-    `B${bankIbanRow}:C${bankIbanRow}`,
-    `E${bankNameRow}:G${bankIbanRow}`,
+    `B${bankNumRow}:C${bankNumRow}`,
+    `E${bankNameRow}:G${bankNumRow}`,
   );
   const addressText = `Хүргэлтийн хаяг:\n${f.address || "-"}`;
-  pushRow(22, [
+  pushRow(18, [
     xlsxCellXml(`A${bankNameRow}`, 1, null, "empty"),
     xlsxCellXml(`B${bankNameRow}`, 5, si("Дансны нэр:"), "s"),
     xlsxCellXml(`D${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
@@ -7067,39 +7082,44 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankNameRow, "C", "C", 5),
     ...emptyCells(bankNameRow, "F", "G", 3),
   ]);
-  pushRow(22, [
+  pushRow(18, [
     xlsxCellXml(`A${bankRegRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankRegRow}`, 5, si("Регистерийн дугаар:"), "s"),
+    xlsxCellXml(`B${bankRegRow}`, 5, si("Регистрийн дугаар:"), "s"),
     xlsxCellXml(`D${bankRegRow}`, 5, si("5397987"), "s"),
     ...emptyCells(bankRegRow, "C", "C", 5),
     ...emptyCells(bankRegRow, "E", "G", 3),
   ]);
-  pushRow(22, [
+  pushRow(18, [
     xlsxCellXml(`A${bankTitleRow}`, 1, null, "empty"),
     xlsxCellXml(`B${bankTitleRow}`, 5, si("Банкны нэр:"), "s"),
     xlsxCellXml(`D${bankTitleRow}`, 5, si("Хаан банк"), "s"),
     ...emptyCells(bankTitleRow, "C", "C", 5),
     ...emptyCells(bankTitleRow, "E", "G", 3),
   ]);
-  pushRow(22, [
+  pushRow(18, [
     xlsxCellXml(`A${bankAcctRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankAcctRow}`, 5, si("IBAN:"), "s"),
-    xlsxCellXml(`D${bankAcctRow}`, 5, si("5133333307"), "s"),
+    xlsxCellXml(`B${bankAcctRow}`, 5, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(
+      `D${bankAcctRow}`,
+      5,
+      si(`IBAN: ${RECEIPT_BANK_IBAN_SHORT}`),
+      "s",
+    ),
     ...emptyCells(bankAcctRow, "C", "C", 5),
     ...emptyCells(bankAcctRow, "E", "G", 3),
   ]);
-  pushRow(22, [
-    xlsxCellXml(`A${bankIbanRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankIbanRow}`, 5, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`D${bankIbanRow}`, 5, si("60000500"), "s"),
-    ...emptyCells(bankIbanRow, "C", "C", 5),
-    ...emptyCells(bankIbanRow, "E", "G", 3),
+  pushRow(18, [
+    xlsxCellXml(`A${bankNumRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankNumRow}`, 5, si(""), "s"),
+    xlsxCellXml(`D${bankNumRow}`, 5, si(RECEIPT_BANK_ACCOUNT), "s"),
+    ...emptyCells(bankNumRow, "C", "C", 5),
+    ...emptyCells(bankNumRow, "E", "G", 3),
   ]);
   pushRow(10, emptyCells(rowNum));
   const headerRow = rowNum;
   // 7 real columns (no merges) so Excel/Numbers borders line up cleanly.
   pushItemTableRow(18, [
-    xlsxCellXml(`A${headerRow}`, 7, si("№"), "s"),
+    xlsxCellXml(`A${headerRow}`, 7, si(""), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`D${headerRow}`, 7, si("Баркод"), "s"),
@@ -7234,9 +7254,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
   const settleRow = rowNum;
   merges.push(`A${settleRow}:G${settleRow}`);
-  pushRow(27, [
-    xlsxCellXml(`A${settleRow}`, 16, si(receiptSettleNoteText(o)), "s"),
-    ...emptyCells(settleRow, "B", "G", 16),
+  pushRow(18, [
+    xlsxCellXml(`A${settleRow}`, 22, si(receiptSettleNoteText(o)), "s"),
+    ...emptyCells(settleRow, "B", "G", 22),
   ]);
   const payTerm = receiptPaymentTermText(f, o);
   pushSummaryTextRow("Төлбөрийн нөхцөл", payTerm);
@@ -7247,7 +7267,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ],
     ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.", 23],
     [
-      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно",
+      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
       22,
     ],
     [
