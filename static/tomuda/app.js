@@ -6527,15 +6527,15 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 20px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
 .receipt-grid__logo-cell {
-  width: 12mm;
-  max-width: 12mm;
+  width: 18mm;
+  max-width: 18mm;
   vertical-align: middle;
   text-align: center;
-  padding: 0 2mm 0 0 !important;
+  padding: 0 2.5mm 0 0 !important;
 }
 .receipt-logo {
-  width: 11mm;
-  height: 11mm;
+  width: 16mm;
+  height: 16mm;
   object-fit: contain;
   display: block;
   margin: 0 auto;
@@ -6545,7 +6545,7 @@ td, th { border: none; }
   font-size: 12px;
   font-weight: 700;
   vertical-align: middle;
-  padding: 0 0 0 1mm !important;
+  padding: 0 0 0 2mm !important;
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
 }
@@ -6780,9 +6780,9 @@ const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
-// A wide enough for logo (no overlap into brand). Sum fits A4 without fitToWidth crush.
+// A sized for 16mm logo (brand starts in B — no overlap). No fitToWidth crush.
 // Meta: A:B label, C value, D:E right label, F:G value.
-const RECEIPT_XLSX_COL_WIDTHS = [11, 20, 12, 14, 10, 11, 12];
+const RECEIPT_XLSX_COL_WIDTHS = [15, 18, 12, 14, 10, 11, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6822,12 +6822,12 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // ~11mm logo stays inside col A so it does not cover brand text in B.
-  const logoMm = 11;
+  // 16mm logo; col A widened so drawing stays left of brand text in B.
+  const logoMm = 16;
   const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.4 / 25.4) * 914400);
+  const colOff = Math.round((0.5 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>6000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>4000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;

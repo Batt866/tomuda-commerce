@@ -5151,8 +5151,8 @@ textarea::placeholder {
 }
 
 .receipt-logo {
-  width: 11mm;
-  height: 11mm;
+  width: 16mm;
+  height: 16mm;
   object-fit: contain;
   display: block;
   margin-left: auto;
@@ -10736,8 +10736,8 @@ textarea::placeholder {
   }
   .receipt-header {
     display: grid;
-    grid-template-columns: 12mm 1fr;
-    gap: 2mm;
+    grid-template-columns: 18mm 1fr;
+    gap: 2.5mm;
     align-items: start;
     justify-items: end;
     margin-bottom: 2mm;
@@ -10746,8 +10746,8 @@ textarea::placeholder {
     justify-self: start;
   }
   .receipt-logo {
-    width: 11mm;
-    height: 11mm;
+    width: 16mm;
+    height: 16mm;
     object-fit: contain;
     display: block;
     margin-left: auto;
