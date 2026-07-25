@@ -6379,26 +6379,26 @@ td, th { border: none; }
   border: 1px solid ${RECEIPT_BORDER};
   padding: 4px 6px;
 }
-.receipt-info__col { width: 100%; border-collapse: collapse; table-layout: auto; }
+.receipt-info__col { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .receipt-info__row td { padding-top: 1px; padding-bottom: 2px; vertical-align: top; line-height: 1.2; }
 .receipt-info__row:last-child td { padding-bottom: 0; }
 .receipt-info__label {
-  width: 1%;
-  max-width: none;
+  width: 48%;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
   font-size: 9px;
   padding-right: 6px;
+  text-align: left;
   white-space: nowrap;
   overflow: visible;
-  text-overflow: clip;
   line-height: 1.25;
 }
 .receipt-info__value {
-  width: auto;
+  width: 52%;
   font-weight: 700;
   font-size: 9px;
   color: ${RECEIPT_TEXT};
+  text-align: left;
   word-break: break-word;
   overflow-wrap: anywhere;
   overflow: visible;
@@ -6780,9 +6780,9 @@ const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
-// A sized for 16mm logo (brand starts in B — no overlap). No fitToWidth crush.
-// Meta: A:B label, C value, D:E right label, F:G value.
-const RECEIPT_XLSX_COL_WIDTHS = [15, 18, 12, 14, 10, 11, 12];
+// A = logo gutter; meta labels all start in B (same left edge). No fitToWidth crush.
+// Meta: A empty, B:C label, D value, E:F right label, G right value.
+const RECEIPT_XLSX_COL_WIDTHS = [14, 18, 12, 12, 12, 12, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6956,17 +6956,18 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     rightLabel = "",
     rightValue = "",
   ) => {
-    // A:B label, C value, D:E right label, F:G value — wrap + taller rows for A4.
+    // A gutter (logo col); labels start in B so every first letter shares one column.
     const row = rowNum;
-    merges.push(`A${row}:B${row}`, `D${row}:E${row}`, `F${row}:G${row}`);
-    pushRow(20, [
-      xlsxCellXml(`A${row}`, 6, si(leftLabel), "s"),
-      xlsxCellXml(`C${row}`, 5, si(leftValue), "s"),
-      xlsxCellXml(`D${row}`, 6, si(rightLabel), "s"),
-      xlsxCellXml(`F${row}`, 5, si(rightValue), "s"),
-      ...emptyCells(row, "B", "B", 6),
-      ...emptyCells(row, "E", "E", 6),
-      ...emptyCells(row, "G", "G", 5),
+    merges.push(`B${row}:C${row}`, `E${row}:F${row}`);
+    // Style 31 = left, no wrap — first letters stay on one vertical line.
+    pushRow(18, [
+      xlsxCellXml(`A${row}`, 1, null, "empty"),
+      xlsxCellXml(`B${row}`, 31, si(leftLabel), "s"),
+      xlsxCellXml(`D${row}`, 5, si(leftValue), "s"),
+      xlsxCellXml(`E${row}`, 31, si(rightLabel), "s"),
+      xlsxCellXml(`G${row}`, 5, si(rightValue), "s"),
+      ...emptyCells(row, "C", "C", 31),
+      ...emptyCells(row, "F", "F", 31),
     ]);
   };
   const f = receiptPartyFields(o);
@@ -7027,44 +7028,49 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const bankAcctRow = bankNameRow + 3;
   const bankIbanRow = bankNameRow + 4;
   merges.push(
-    `A${bankNameRow}:B${bankNameRow}`,
-    `A${bankRegRow}:B${bankRegRow}`,
-    `A${bankTitleRow}:B${bankTitleRow}`,
-    `A${bankAcctRow}:B${bankAcctRow}`,
-    `A${bankIbanRow}:B${bankIbanRow}`,
-    `D${bankNameRow}:G${bankIbanRow}`,
+    `B${bankNameRow}:C${bankNameRow}`,
+    `B${bankRegRow}:C${bankRegRow}`,
+    `B${bankTitleRow}:C${bankTitleRow}`,
+    `B${bankAcctRow}:C${bankAcctRow}`,
+    `B${bankIbanRow}:C${bankIbanRow}`,
+    `E${bankNameRow}:G${bankIbanRow}`,
   );
   const addressText = `Хүргэлтийн хаяг:\n${f.address || "-"}`;
   pushRow(18, [
-    xlsxCellXml(`A${bankNameRow}`, 6, si("Дансны нэр:"), "s"),
-    xlsxCellXml(`C${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
-    xlsxCellXml(`D${bankNameRow}`, 3, si(addressText), "s"),
-    ...emptyCells(bankNameRow, "B", "B", 6),
-    ...emptyCells(bankNameRow, "E", "G", 3),
+    xlsxCellXml(`A${bankNameRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankNameRow}`, 31, si("Дансны нэр:"), "s"),
+    xlsxCellXml(`D${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
+    xlsxCellXml(`E${bankNameRow}`, 3, si(addressText), "s"),
+    ...emptyCells(bankNameRow, "C", "C", 31),
+    ...emptyCells(bankNameRow, "F", "G", 3),
   ]);
   pushRow(18, [
-    xlsxCellXml(`A${bankRegRow}`, 6, si("Регистерийн дугаар:"), "s"),
-    xlsxCellXml(`C${bankRegRow}`, 5, si("5397987"), "s"),
-    ...emptyCells(bankRegRow, "B", "B", 6),
-    ...emptyCells(bankRegRow, "D", "G", 3),
+    xlsxCellXml(`A${bankRegRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankRegRow}`, 31, si("Регистерийн дугаар:"), "s"),
+    xlsxCellXml(`D${bankRegRow}`, 5, si("5397987"), "s"),
+    ...emptyCells(bankRegRow, "C", "C", 31),
+    ...emptyCells(bankRegRow, "E", "G", 3),
   ]);
   pushRow(18, [
-    xlsxCellXml(`A${bankTitleRow}`, 6, si("Банкны нэр:"), "s"),
-    xlsxCellXml(`C${bankTitleRow}`, 5, si("Хаан банк"), "s"),
-    ...emptyCells(bankTitleRow, "B", "B", 6),
-    ...emptyCells(bankTitleRow, "D", "G", 3),
+    xlsxCellXml(`A${bankTitleRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankTitleRow}`, 31, si("Банкны нэр:"), "s"),
+    xlsxCellXml(`D${bankTitleRow}`, 5, si("Хаан банк"), "s"),
+    ...emptyCells(bankTitleRow, "C", "C", 31),
+    ...emptyCells(bankTitleRow, "E", "G", 3),
   ]);
   pushRow(18, [
-    xlsxCellXml(`A${bankAcctRow}`, 6, si("IBAN:"), "s"),
-    xlsxCellXml(`C${bankAcctRow}`, 5, si("5133333307"), "s"),
-    ...emptyCells(bankAcctRow, "B", "B", 6),
-    ...emptyCells(bankAcctRow, "D", "G", 3),
+    xlsxCellXml(`A${bankAcctRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankAcctRow}`, 31, si("IBAN:"), "s"),
+    xlsxCellXml(`D${bankAcctRow}`, 5, si("5133333307"), "s"),
+    ...emptyCells(bankAcctRow, "C", "C", 31),
+    ...emptyCells(bankAcctRow, "E", "G", 3),
   ]);
   pushRow(18, [
-    xlsxCellXml(`A${bankIbanRow}`, 6, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`C${bankIbanRow}`, 5, si("60000500"), "s"),
-    ...emptyCells(bankIbanRow, "B", "B", 6),
-    ...emptyCells(bankIbanRow, "D", "G", 3),
+    xlsxCellXml(`A${bankIbanRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${bankIbanRow}`, 31, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(`D${bankIbanRow}`, 5, si("60000500"), "s"),
+    ...emptyCells(bankIbanRow, "C", "C", 31),
+    ...emptyCells(bankIbanRow, "E", "G", 3),
   ]);
   pushRow(10, emptyCells(rowNum));
   const headerRow = rowNum;
