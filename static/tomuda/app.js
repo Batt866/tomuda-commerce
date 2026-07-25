@@ -779,11 +779,16 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
       const valueClass = grand
         ? "receipt-grid__summary-value receipt-grid__summary-value--grand"
         : "receipt-grid__summary-value";
-      return `<tr class="${rowClass}"><td colspan="10" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td class="${valueClass}">${value}</td></tr>`;
+      // Spacer left + label near amounts (right) + amount column; dotted underline.
+      return `<tr class="${rowClass}"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td colspan="2" class="${valueClass}">${value}</td></tr>`;
     })
     .join("");
-  const settleRow = `<tr class="receipt-grid__settle"><td colspan="11" class="receipt-grid__settle-text">${esc(receiptSettleNoteText(o))}</td></tr>`;
-  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="10" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td class="receipt-grid__summary-value receipt-grid__summary-value--pay">${esc(payTerm)}</td></tr>`;
+  // Тооцоо нийлэх өдөр / тэмдэглэл — зөвхөн тэмдэглэгээ мөрөнд (буцаалтын мөр байхгүй).
+  const settleText = receiptSettleNoteText(o);
+  const settleRow = settleText
+    ? `<tr class="receipt-grid__settle"><td colspan="11" class="receipt-grid__settle-text">${esc(settleText)}</td></tr>`
+    : "";
+  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${esc(payTerm)}</td></tr>`;
   return summaryPart + settleRow + payRow;
 }
 function SummarySection(sub, vat, payable, payTerm, o) {
@@ -852,10 +857,9 @@ function stockInSignatureRowsHtml() {
 }
 function receiptUpperFooterRows(o) {
   const gross = orderGrossTotal(o);
-  const grossRow = receiptShouldShowGross(o)
-    ? `<tr class="receipt-grid__gross"><td colspan="10" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`
-    : "";
-  return `<tr class="receipt-grid__return"><td colspan="3" class="receipt-grid__label">Буцаалтын тэмдэглэгээ:</td><td colspan="8"></td></tr>${grossRow}`;
+  if (!receiptShouldShowGross(o)) return "";
+  // No "Буцаалтын тэмдэглэгээ" — reference receipt has none.
+  return `<tr class="receipt-grid__gross"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td colspan="2" class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
   const f = receiptPartyFields(o);
@@ -6795,9 +6799,27 @@ td, th { border: none; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 11px; }
 .receipt-grid__gross td { font-weight: 700; }
-.receipt-grid__gross-label { text-align: left; font-size: 11px; }
-.receipt-grid__gross .receipt-grid__money { font-size: 11px; text-align: right; }
-.receipt-grid__summary-label { background: transparent; font-weight: 400; font-size: 11px; text-align: left; color: ${RECEIPT_TEXT}; }
+.receipt-grid__summary-pad { border: none !important; background: transparent !important; padding: 0 !important; }
+.receipt-grid__gross-label {
+  text-align: right;
+  font-size: 11px;
+  padding-right: 8px !important;
+  border-bottom: 1px dotted #666 !important;
+}
+.receipt-grid__gross .receipt-grid__money {
+  font-size: 11px;
+  text-align: right;
+  border-bottom: 1px dotted #666 !important;
+}
+.receipt-grid__summary-label {
+  background: transparent;
+  font-weight: 400;
+  font-size: 11px;
+  text-align: right;
+  color: ${RECEIPT_TEXT};
+  padding-right: 8px !important;
+  border-bottom: 1px dotted #666 !important;
+}
 .receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 11px; }
 .receipt-grid__summary-value {
   text-align: right;
@@ -6806,10 +6828,15 @@ td, th { border: none; }
   white-space: nowrap;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
+  border-bottom: 1px dotted #666 !important;
 }
 .receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 11px; }
 .receipt-grid__summary-value--grand { font-size: 11px; }
 .receipt-grid__summary-value--pay { font-weight: 700; }
+.receipt-grid__summary--pay .receipt-grid__summary-label,
+.receipt-grid__summary--pay .receipt-grid__summary-value {
+  border-bottom: 1px dotted #666 !important;
+}
 .receipt-grid__settle td { padding: 2px 0 !important; }
 .receipt-grid__settle-text {
   text-align: center;
@@ -7020,7 +7047,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Borders appear ONLY on item-table styles (borderId 1 = thin gray like print).
   // Everything else is borderless so the sheet matches the print receipt.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="11"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="12"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="15"/><color rgb="FF000000"/><name val="Times New Roman"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="41"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="11"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="12"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="15"/><color rgb="FF000000"/><name val="Times New Roman"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="41"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="3" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="3" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -7383,39 +7410,39 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     { grand = false, decimals = false } = {},
   ) => {
     const r = rowNum;
-    // A–G same width as product item table.
-    merges.push(`A${r}:F${r}`);
+    // Label in C–F (near amounts), value in G — dotted underline, right-aligned.
+    merges.push(`C${r}:F${r}`);
     const labelStyle = grand ? 31 : 30;
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
-    pushRow(14.25, [
-      xlsxCellXml(`A${r}`, labelStyle, si(label), "s"),
+    pushRow(16, [
+      xlsxCellXml(`A${r}`, 37, null, "empty"),
+      xlsxCellXml(`B${r}`, 37, null, "empty"),
+      xlsxCellXml(`C${r}`, labelStyle, si(label), "s"),
       xlsxCellXml(`G${r}`, valueStyle, Number(amount) || 0, "n"),
-      ...emptyCells(r, "B", "F", labelStyle),
+      ...emptyCells(r, "D", "F", labelStyle),
     ]);
   };
   const pushSummaryTextRow = (label, value) => {
     const r = rowNum;
-    merges.push(`A${r}:F${r}`);
-    pushRow(14.25, [
-      xlsxCellXml(`A${r}`, 30, si(label), "s"),
-      xlsxCellXml(`G${r}`, 4, si(String(value ?? "")), "s"),
-      ...emptyCells(r, "B", "F", 30),
+    merges.push(`C${r}:F${r}`);
+    pushRow(16, [
+      xlsxCellXml(`A${r}`, 37, null, "empty"),
+      xlsxCellXml(`B${r}`, 37, null, "empty"),
+      xlsxCellXml(`C${r}`, 30, si(label), "s"),
+      xlsxCellXml(`G${r}`, 38, si(String(value ?? "")), "s"),
+      ...emptyCells(r, "D", "F", 30),
     ]);
   };
   items.forEach((item, index) => pushItemLikeRow(item, index));
-  const returnRow = rowNum;
-  merges.push(`A${returnRow}:C${returnRow}`, `D${returnRow}:G${returnRow}`);
-  pushRow(14.25, [
-    xlsxCellXml(`A${returnRow}`, 5, si("Буцаалтын тэмдэглэгээ:"), "s"),
-    ...emptyCells(returnRow, "B", "C", 5),
-    ...emptyCells(returnRow, "D", "G"),
-  ]);
+  // No "Буцаалтын тэмдэглэгээ" row — reference receipt omits it.
   const grossRow = rowNum;
-  merges.push(`A${grossRow}:F${grossRow}`);
+  merges.push(`C${grossRow}:F${grossRow}`);
   pushRow(16.5, [
-    xlsxCellXml(`A${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
+    xlsxCellXml(`A${grossRow}`, 37, null, "empty"),
+    xlsxCellXml(`B${grossRow}`, 37, null, "empty"),
+    xlsxCellXml(`C${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
     xlsxCellXml(`G${grossRow}`, 20, gross, "n"),
-    ...emptyCells(grossRow, "B", "F", 19),
+    ...emptyCells(grossRow, "D", "F", 19),
   ]);
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
   const promoSettleNote = receiptPromoSettleNote(o);
