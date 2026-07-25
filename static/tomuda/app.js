@@ -516,7 +516,7 @@ function receiptPaymentChecksHtml(paid, bank) {
 /** InvoiceHeader — logo, company, delivery date, centered title (reference PDF). */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateValue(o);
-  return `<tr class="receipt-grid__header"><td rowspan="3" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="10" class="receipt-grid__address">Хаяг: ${esc(RECEIPT_COMPANY_ADDRESS_LINE1)}</td></tr><tr class="receipt-grid__header"><td colspan="10" class="receipt-grid__phone">${esc(RECEIPT_COMPANY_ADDRESS_LINE2)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  return `<tr class="receipt-grid__header"><td rowspan="3" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3" class="receipt-grid__date-label">Хүргэлтийн огноо:</td><td colspan="2" class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__address">Хаяг: ${esc(RECEIPT_COMPANY_ADDRESS_LINE1)}</td><td colspan="5"></td></tr><tr class="receipt-grid__header"><td colspan="5" class="receipt-grid__phone">${esc(RECEIPT_COMPANY_ADDRESS_LINE2)}</td><td colspan="5"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -6572,8 +6572,8 @@ td, th { border: none; }
   font-family: ${RECEIPT_FONT};
   font-size: 12px;
   font-weight: 700;
-  vertical-align: middle;
-  padding: 0 0 0 2mm !important;
+  vertical-align: bottom;
+  padding: 0 0 1px 2mm !important;
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
 }
@@ -6582,14 +6582,14 @@ td, th { border: none; }
   line-height: 1.15;
   vertical-align: top;
   white-space: normal;
-  padding: 0 !important;
+  padding: 0 0 0 2mm !important;
   color: ${RECEIPT_TEXT};
 }
 .receipt-grid__phone {
   font-size: 8px;
   line-height: 1.15;
   vertical-align: top;
-  padding: 0 !important;
+  padding: 0 0 0 2mm !important;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
 }
@@ -6974,10 +6974,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Header merges stay inside A–G (same as items table).
   merges.push(
     `A${hr1}:A${hr3}`,
-    `B${hr1}:C${hr1}`,
+    `B${hr1}:D${hr1}`,
     `F${hr1}:G${hr1}`,
-    `B${hr2}:G${hr2}`,
-    `B${hr3}:G${hr3}`,
+    `B${hr2}:D${hr2}`,
+    `B${hr3}:D${hr3}`,
     `A${hr4}:G${hr4}`,
   );
   const pushMetaPairRow = (
@@ -7008,14 +7008,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  pushRow(18, [
+  pushRow(16, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`E${hr1}`, 6, si("Хүргэлтийн огноо:"), "s"),
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "C", "D", 21),
   ]);
-  pushRow(14, [
+  pushRow(12, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
@@ -7023,12 +7023,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       si(`Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}`),
       "s",
     ),
-    ...emptyCells(hr2, "C", "G", 3),
+    ...emptyCells(hr2, "C", "D", 3),
   ]);
-  pushRow(14, [
+  pushRow(12, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
     xlsxCellXml(`B${hr3}`, 3, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
-    ...emptyCells(hr3, "C", "G", 3),
+    ...emptyCells(hr3, "C", "D", 3),
   ]);
   pushRow(20, [
     xlsxCellXml(`A${hr4}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
