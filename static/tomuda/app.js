@@ -466,15 +466,40 @@ function receiptMetaRow(
 function receiptInfoFieldRow(label, value, valueClass = "") {
   return `<tr class="receipt-info__row"><td class="receipt-info__label">${esc(label)}</td><td class="receipt-info__value${valueClass ? ` ${valueClass}` : ""}">${value}</td></tr>`;
 }
-/** CustomerInformation — one 2-column block like reference PDF (no box fill). */
+/** 4-column party row like reference PDF (label|value|label|value). */
+function receiptInfoPairRow(l1, v1, l2 = "", v2 = "") {
+  return `<div class="receipt-info__pair"><span class="receipt-info__l">${esc(l1)}</span><span class="receipt-info__v">${v1}</span><span class="receipt-info__l">${esc(l2)}</span><span class="receipt-info__v">${v2}</span></div>`;
+}
+/** CustomerInformation — PDF column proportions, full visible addresses. */
 function receiptInfoRows(o) {
   const f = receiptPartyFields(o);
-  const left = [
-    receiptInfoFieldRow("Худалдааны төлөөлөгч:", f.salesName),
-    receiptInfoFieldRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone),
-    receiptInfoFieldRow("Түгээгчийн нэр:", f.deliveryName),
-    receiptInfoFieldRow("Түгээгчийн утас:", f.deliveryPhone),
-    receiptInfoFieldRow("", "&nbsp;"),
+  const party = [
+    receiptInfoPairRow(
+      "Худалдааны төлөөлөгч:",
+      f.salesName,
+      "Харилцагч:",
+      f.customerName,
+    ),
+    receiptInfoPairRow(
+      "Худалдааны төлөөлөгчийн утас:",
+      f.salesPhone,
+      "Регистрийн дугаар:",
+      f.customerReg,
+    ),
+    receiptInfoPairRow(
+      "Түгээгчийн нэр:",
+      f.deliveryName,
+      "Компаний нэр:",
+      f.companyName,
+    ),
+    receiptInfoPairRow(
+      "Түгээгчийн утас:",
+      f.deliveryPhone,
+      "Утасны дугаар:",
+      f.customerPhone,
+    ),
+  ].join("");
+  const bank = [
     receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
     receiptInfoFieldRow("Регистрийн дугаар:", "5397987"),
     receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
@@ -484,15 +509,7 @@ function receiptInfoRows(o) {
     ),
     receiptInfoFieldRow("", `<b>${RECEIPT_BANK_ACCOUNT}</b>`),
   ].join("");
-  const right = [
-    receiptInfoFieldRow("Харилцагч:", f.customerName),
-    receiptInfoFieldRow("Регистрийн дугаар:", f.customerReg),
-    receiptInfoFieldRow("Компаний нэр:", f.companyName),
-    receiptInfoFieldRow("Утасны дугаар:", f.customerPhone),
-    receiptInfoFieldRow("", "&nbsp;"),
-    `<tr class="receipt-info__row receipt-info__row--address"><td colspan="2" class="receipt-info__address-block"><div class="receipt-info__address-label">Хүргэлтийн хаяг:</div><div class="receipt-info__address-text">${f.address}</div></td></tr>`,
-  ].join("");
-  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${left}</tbody></table><table class="receipt-info__col receipt-info__col--right" role="presentation"><tbody>${right}</tbody></table></div>`;
+  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label">Хүргэлтийн хаяг:</div><div class="receipt-info__address-text">${f.address}</div></div></div></div>`;
   return `<tr class="receipt-grid__info-wrap"><td colspan="11" class="receipt-grid__info-cell">${info}</td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -6324,7 +6341,7 @@ function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 10mm 8mm 8mm 12mm; }
+@page { size: letter portrait; margin: 10mm 8mm 8mm 12mm; }
 body {
   margin: 0;
   padding: 0;
@@ -6339,10 +6356,10 @@ td, th { border: none; }
 .receipt-excel-sheet { display: block; background: #fff; color: ${RECEIPT_TEXT}; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page {
-  width: 210mm;
-  max-width: 210mm;
+  width: 215.9mm;
+  max-width: 215.9mm;
   margin: 0 auto;
-  /* Top/left staple gutter — keep printable width so A4 text is not crushed. */
+  /* Letter page like reference PDF; left padding clears staple + logo. */
   padding: 8mm 8mm 6mm 12mm;
   box-sizing: border-box;
   font-size: 10px;
@@ -6388,9 +6405,6 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 2px 0 1px !important; }
 .receipt-grid--sheet tr.receipt-grid__info-wrap > td.receipt-grid__info-cell { padding: 2px 0 2px !important; }
 .receipt-info {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 12px;
   width: 100%;
   box-sizing: border-box;
   border: none;
@@ -6398,11 +6412,43 @@ td, th { border: none; }
   padding: 2px 0 6px;
   margin: 0;
 }
-.receipt-info__col { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.receipt-info__row td { padding-top: 1px; padding-bottom: 2px; vertical-align: top; line-height: 1.25; }
+.receipt-info__party { width: 100%; margin: 0 0 4px; }
+.receipt-info__pair {
+  display: grid;
+  grid-template-columns: 30% 20% 22% 28%;
+  column-gap: 4px;
+  align-items: start;
+  margin: 0 0 2px;
+  font-size: 9px;
+  line-height: 1.3;
+}
+.receipt-info__l {
+  color: ${RECEIPT_TEXT};
+  font-weight: 400;
+  white-space: normal;
+  overflow: visible;
+  word-break: break-word;
+}
+.receipt-info__v {
+  color: ${RECEIPT_TEXT};
+  font-weight: 700;
+  white-space: normal;
+  overflow: visible;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.receipt-info__bank {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 10px;
+  align-items: start;
+  width: 100%;
+}
+.receipt-info__col { width: 100%; border-collapse: collapse; table-layout: auto; }
+.receipt-info__row td { padding-top: 1px; padding-bottom: 2px; vertical-align: top; line-height: 1.3; }
 .receipt-info__row:last-child td { padding-bottom: 0; }
 .receipt-info__label {
-  width: 52%;
+  width: 48%;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
   font-size: 9px;
@@ -6410,12 +6456,10 @@ td, th { border: none; }
   text-align: left;
   white-space: normal;
   overflow: visible;
-  word-break: normal;
-  overflow-wrap: break-word;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 .receipt-info__value {
-  width: 48%;
+  width: 52%;
   font-weight: 700;
   font-size: 9px;
   color: ${RECEIPT_TEXT};
@@ -6424,31 +6468,30 @@ td, th { border: none; }
   word-break: break-word;
   overflow-wrap: anywhere;
   overflow: visible;
-  line-height: 1.25;
+  line-height: 1.3;
 }
-.receipt-info__row--address td { padding-top: 2px; }
 .receipt-info__address-block {
   vertical-align: top;
-  padding: 0 !important;
+  padding: 0;
   overflow: visible;
+  min-width: 0;
 }
 .receipt-info__address-label {
   font-weight: 400;
   font-size: 9px;
-  line-height: 1.25;
+  line-height: 1.3;
   color: ${RECEIPT_TEXT};
   margin: 0 0 2px;
 }
 .receipt-info__address-text {
   font-weight: 700;
   font-size: 9px;
-  line-height: 1.3;
+  line-height: 1.35;
   color: ${RECEIPT_TEXT};
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
   overflow: visible;
-  min-height: 22mm;
 }
 .receipt-items {
   width: 100%;
@@ -6589,12 +6632,12 @@ td, th { border: none; }
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 3mm;
+  gap: 3.1mm;
   width: 100%;
   box-sizing: border-box;
 }
 .receipt-logo {
-  /* Fixed logo size — do not shrink/grow. */
+  /* Fixed 16mm — same as reference PDF; never rescale. */
   width: 16mm !important;
   height: 16mm !important;
   min-width: 16mm !important;
@@ -6607,6 +6650,7 @@ td, th { border: none; }
 .receipt-header-copy {
   flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
   overflow: visible;
 }
 .receipt-header-top {
@@ -6733,7 +6777,7 @@ td, th { border: none; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 @media print {
   html, body {
-    width: 210mm;
+    width: 215.9mm;
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -6861,8 +6905,8 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
 // A = logo gutter; meta labels all start in B (same left edge). No fitToWidth crush.
 // Meta: A empty, B:C label, D value, E:F right label, G right value.
-/* A must be wider than the 16mm logo so B text never sits under the drawing. */
-const RECEIPT_XLSX_COL_WIDTHS = [18, 13, 12, 12, 11, 12, 12];
+/* PDF-matched A–G widths (logo 16mm in A; name/address get real room). */
+const RECEIPT_XLSX_COL_WIDTHS = [11, 16, 12, 11, 10, 12, 13];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -7022,33 +7066,39 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
   const hr4 = rowNum + 3;
-  // Logo lives only in A; brand/address start in B so they never sit under the drawing.
+  // PDF layout: logo in A; brand/address in B…; meta uses A–G fully (no wasted gutter).
   merges.push(
     `A${hr1}:A${hr3}`,
     `B${hr1}:D${hr1}`,
     `F${hr1}:G${hr1}`,
-    `B${hr2}:E${hr2}`,
-    `B${hr3}:E${hr3}`,
+    `B${hr2}:G${hr2}`,
+    `B${hr3}:G${hr3}`,
     `A${hr4}:G${hr4}`,
   );
+  const plain = (value) =>
+    String(value ?? "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
   const pushMetaPairRow = (
     leftLabel,
     leftValue,
     rightLabel = "",
     rightValue = "",
   ) => {
-    // A gutter (logo col); labels start in B so every first letter shares one column.
+    // PDF columns: A:B label | C value | D:E label | F:G value
     const row = rowNum;
-    merges.push(`B${row}:C${row}`, `E${row}:F${row}`);
-    // Style 5 = left wrap, no fill — full label/value text, first letters align in B/E.
-    pushRow(24, [
-      xlsxCellXml(`A${row}`, 1, null, "empty"),
-      xlsxCellXml(`B${row}`, 5, si(leftLabel), "s"),
-      xlsxCellXml(`D${row}`, 5, si(leftValue), "s"),
-      xlsxCellXml(`E${row}`, 5, si(rightLabel), "s"),
-      xlsxCellXml(`G${row}`, 5, si(rightValue), "s"),
-      ...emptyCells(row, "C", "C", 5),
-      ...emptyCells(row, "F", "F", 5),
+    merges.push(`A${row}:B${row}`, `D${row}:E${row}`, `F${row}:G${row}`);
+    pushRow(18, [
+      xlsxCellXml(`A${row}`, 5, si(leftLabel), "s"),
+      xlsxCellXml(`C${row}`, 5, si(plain(leftValue)), "s"),
+      xlsxCellXml(`D${row}`, 5, si(rightLabel), "s"),
+      xlsxCellXml(`F${row}`, 5, si(plain(rightValue)), "s"),
+      ...emptyCells(row, "B", "B", 5),
+      ...emptyCells(row, "E", "E", 5),
+      ...emptyCells(row, "G", "G", 5),
     ]);
   };
   const f = receiptPartyFields(o);
@@ -7059,14 +7109,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  pushRow(18, [
+  pushRow(16, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`E${hr1}`, 6, si("Хүргэлтийн огноо:"), "s"),
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "C", "D", 21),
   ]);
-  pushRow(16, [
+  pushRow(18, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
@@ -7074,12 +7124,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       si(`Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}`),
       "s",
     ),
-    ...emptyCells(hr2, "C", "E", 3),
+    ...emptyCells(hr2, "C", "G", 3),
   ]);
-  pushRow(16, [
+  pushRow(18, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
     xlsxCellXml(`B${hr3}`, 3, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
-    ...emptyCells(hr3, "C", "E", 3),
+    ...emptyCells(hr3, "C", "G", 3),
   ]);
   pushRow(20, [
     xlsxCellXml(`A${hr4}`, 14, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -7110,66 +7160,61 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     f.customerPhone,
   );
   pushRow(8, emptyCells(rowNum));
-  // Bank left + full delivery address on the right (tall wrapped merge).
+  // Bank A:B label / C value; delivery address D:G (PDF right half, full wrap).
   const bankNameRow = rowNum;
   const bankRegRow = bankNameRow + 1;
   const bankTitleRow = bankNameRow + 2;
   const bankAcctRow = bankNameRow + 3;
   const bankNumRow = bankNameRow + 4;
   merges.push(
-    `B${bankNameRow}:C${bankNameRow}`,
-    `B${bankRegRow}:C${bankRegRow}`,
-    `B${bankTitleRow}:C${bankTitleRow}`,
-    `B${bankAcctRow}:C${bankAcctRow}`,
-    `B${bankNumRow}:C${bankNumRow}`,
-    `E${bankNameRow}:G${bankNumRow}`,
+    `A${bankNameRow}:B${bankNameRow}`,
+    `A${bankRegRow}:B${bankRegRow}`,
+    `A${bankTitleRow}:B${bankTitleRow}`,
+    `A${bankAcctRow}:B${bankAcctRow}`,
+    `A${bankNumRow}:B${bankNumRow}`,
+    `D${bankNameRow}:G${bankNumRow}`,
   );
   const deliveryAddress = String(f.addressPlain || "-");
   const addressText = `Хүргэлтийн хаяг:\n${deliveryAddress}`;
   const bankRowH = Math.max(
-    22,
-    Math.min(40, 16 + Math.ceil(deliveryAddress.length / 28) * 5),
+    20,
+    Math.min(36, 14 + Math.ceil(deliveryAddress.length / 36) * 4),
   );
   pushRow(bankRowH, [
-    xlsxCellXml(`A${bankNameRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankNameRow}`, 5, si("Дансны нэр:"), "s"),
-    xlsxCellXml(`D${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
-    xlsxCellXml(`E${bankNameRow}`, 3, si(addressText), "s"),
-    ...emptyCells(bankNameRow, "C", "C", 5),
-    ...emptyCells(bankNameRow, "F", "G", 3),
+    xlsxCellXml(`A${bankNameRow}`, 5, si("Дансны нэр:"), "s"),
+    xlsxCellXml(`C${bankNameRow}`, 5, si("ТОМУДА групп"), "s"),
+    xlsxCellXml(`D${bankNameRow}`, 3, si(addressText), "s"),
+    ...emptyCells(bankNameRow, "B", "B", 5),
+    ...emptyCells(bankNameRow, "E", "G", 3),
   ]);
   pushRow(bankRowH, [
-    xlsxCellXml(`A${bankRegRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankRegRow}`, 5, si("Регистрийн дугаар:"), "s"),
-    xlsxCellXml(`D${bankRegRow}`, 5, si("5397987"), "s"),
-    ...emptyCells(bankRegRow, "C", "C", 5),
-    ...emptyCells(bankRegRow, "E", "G", 3),
+    xlsxCellXml(`A${bankRegRow}`, 5, si("Регистрийн дугаар:"), "s"),
+    xlsxCellXml(`C${bankRegRow}`, 5, si("5397987"), "s"),
+    ...emptyCells(bankRegRow, "B", "B", 5),
+    ...emptyCells(bankRegRow, "D", "G", 3),
   ]);
   pushRow(bankRowH, [
-    xlsxCellXml(`A${bankTitleRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankTitleRow}`, 5, si("Банкны нэр:"), "s"),
-    xlsxCellXml(`D${bankTitleRow}`, 5, si("Хаан банк"), "s"),
-    ...emptyCells(bankTitleRow, "C", "C", 5),
-    ...emptyCells(bankTitleRow, "E", "G", 3),
+    xlsxCellXml(`A${bankTitleRow}`, 5, si("Банкны нэр:"), "s"),
+    xlsxCellXml(`C${bankTitleRow}`, 5, si("Хаан банк"), "s"),
+    ...emptyCells(bankTitleRow, "B", "B", 5),
+    ...emptyCells(bankTitleRow, "D", "G", 3),
   ]);
   pushRow(bankRowH, [
-    xlsxCellXml(`A${bankAcctRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankAcctRow}`, 5, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(`A${bankAcctRow}`, 5, si("Дансны дугаар:"), "s"),
     xlsxCellXml(
-      `D${bankAcctRow}`,
+      `C${bankAcctRow}`,
       5,
       si(`IBAN: ${RECEIPT_BANK_IBAN_SHORT}`),
       "s",
     ),
-    ...emptyCells(bankAcctRow, "C", "C", 5),
-    ...emptyCells(bankAcctRow, "E", "G", 3),
+    ...emptyCells(bankAcctRow, "B", "B", 5),
+    ...emptyCells(bankAcctRow, "D", "G", 3),
   ]);
   pushRow(bankRowH, [
-    xlsxCellXml(`A${bankNumRow}`, 1, null, "empty"),
-    xlsxCellXml(`B${bankNumRow}`, 5, si(""), "s"),
-    xlsxCellXml(`D${bankNumRow}`, 5, si(RECEIPT_BANK_ACCOUNT), "s"),
-    ...emptyCells(bankNumRow, "C", "C", 5),
-    ...emptyCells(bankNumRow, "E", "G", 3),
+    xlsxCellXml(`A${bankNumRow}`, 5, si(""), "s"),
+    xlsxCellXml(`C${bankNumRow}`, 5, si(RECEIPT_BANK_ACCOUNT), "s"),
+    ...emptyCells(bankNumRow, "B", "B", 5),
+    ...emptyCells(bankNumRow, "D", "G", 3),
   ]);
   pushRow(10, emptyCells(rowNum));
   const headerRow = rowNum;
@@ -7371,7 +7416,8 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
   // No fitToWidth — scaling was crushing Mongolian labels on A4 print.
   // Margins keep staple gutter; column widths already sized for A4.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="0"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.55" right="0.4" top="0.55" bottom="0.4" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="0" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  // Letter + margins close to reference PDF; no fitToWidth crush.
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="0"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.7" right="0.55" top="0.6" bottom="0.5" header="0.15" footer="0.15"/><pageSetup paperSize="1" orientation="portrait" fitToWidth="0" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -7799,8 +7845,8 @@ function ensureReceiptScreenStyles() {
 }
 .wh-receipt-preview__doc.receipt-page {
   min-height: 0;
-  width: 210mm;
-  max-width: 210mm;
+  width: 215.9mm;
+  max-width: 215.9mm;
   margin: 0 auto;
   padding: 4mm 12mm 6mm;
   background: #fff;
@@ -16128,7 +16174,7 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: A4 portrait; margin: 10mm 8mm 8mm 12mm; }
+  @page { size: letter portrait; margin: 10mm 8mm 8mm 12mm; }
   .receipt-page { width: 100%; max-width: none; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
