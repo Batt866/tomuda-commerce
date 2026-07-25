@@ -749,6 +749,7 @@ function receiptPromoRowsHtml(o) {
         idx === 0
           ? `<td class="receipt-items__name receipt-items__promo-label">Урамшуулал</td>`
           : `<td class="receipt-items__name">&nbsp;</td>`;
+      // Name sits in barcode col (tight against qty) — no wide empty middle gap.
       return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td>${labelCell}<td class="receipt-items__unit">&nbsp;</td><td class="receipt-items__barcode receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
@@ -6621,7 +6622,7 @@ td, th { border: none; }
 }
 .receipt-items--promo .receipt-items__promo-settle { font-weight: 600; font-size: 10px; }
 .receipt-items--promo .receipt-items__num { width: 5%; }
-.receipt-items--promo .receipt-items__name { width: 22%; text-align: left; }
+.receipt-items--promo .receipt-items__name { width: 34%; text-align: left; }
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
@@ -6631,13 +6632,16 @@ td, th { border: none; }
   padding-left: 4px;
   padding-right: 4px;
 }
-.receipt-items--promo .receipt-items__unit { width: 0; padding: 0; border: none !important; font-size: 0; }
+.receipt-items--promo .receipt-items__unit {
+  width: 11%;
+  border-bottom: 1px dotted #666 !important;
+}
 .receipt-items--promo .receipt-items__barcode,
 .receipt-items--promo .receipt-items__promo-name {
-  width: 30%;
+  width: 16%;
   text-align: left !important;
-  padding-left: 4px;
-  padding-right: 4px;
+  padding-left: 2px;
+  padding-right: 2px;
   white-space: normal !important;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -7358,19 +7362,19 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    const promoH = nameText.length > 18 ? 28 : 22;
-    // B = Урамшуулал; C:D = name. Style 36 = dotted bottom only (no box borders).
-    merges.push(`C${r}:D${r}`);
+    const promoH = nameText.length > 16 ? 28 : 20;
+    // B = Урамшуулал; D = name tight against qty (E). No wide C:D gap.
+    // A–G all use dotted bottom so the underline stays continuous.
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
       index === 0
         ? xlsxCellXml(`B${r}`, 36, si("Урамшуулал"), "s")
         : xlsxCellXml(`B${r}`, 37, null, "empty"),
-      xlsxCellXml(`C${r}`, 36, si(nameText), "s"),
+      xlsxCellXml(`C${r}`, 37, null, "empty"),
+      xlsxCellXml(`D${r}`, 36, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
       xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "D", "D", 36),
     ]);
   };
   const pushSummaryAmountRow = (
