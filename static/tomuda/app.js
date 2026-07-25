@@ -472,8 +472,8 @@ function receiptInfoRows(o) {
     receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
     receiptInfoFieldRow("Регистерийн дугаар:", "5397987"),
     receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
-    receiptInfoFieldRow("Дансны дугаар:", "60000500"),
     receiptInfoFieldRow("IBAN:", "5133333307"),
+    receiptInfoFieldRow("Дансны дугаар:", "60000500"),
   ].join("");
   const right = [
     receiptInfoFieldRow("Харилцагч:", f.customerName),
@@ -6307,7 +6307,7 @@ function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 12mm 10mm 10mm 16mm; }
+@page { size: A4 portrait; margin: 10mm 8mm 8mm 12mm; }
 body {
   margin: 0;
   padding: 0;
@@ -6325,8 +6325,8 @@ td, th { border: none; }
   width: 210mm;
   max-width: 210mm;
   margin: 0 auto;
-  /* Extra top/left padding = staple gutter (stores clip receipts there). */
-  padding: 10mm 10mm 8mm 16mm;
+  /* Top/left staple gutter — keep printable width so A4 text is not crushed. */
+  padding: 8mm 8mm 6mm 12mm;
   box-sizing: border-box;
   font-size: 10px;
   line-height: 1.15;
@@ -6527,26 +6527,25 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 20px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
 .receipt-grid__logo-cell {
-  width: 16mm;
-  max-width: 16mm;
+  width: 12mm;
+  max-width: 12mm;
   vertical-align: middle;
-  text-align: right;
-  padding: 0 1.5mm 0 0 !important;
+  text-align: center;
+  padding: 0 2mm 0 0 !important;
 }
 .receipt-logo {
-  width: 16mm;
-  height: 16mm;
+  width: 11mm;
+  height: 11mm;
   object-fit: contain;
   display: block;
-  margin-left: auto;
-  margin-right: 0;
+  margin: 0 auto;
 }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT};
   font-size: 12px;
   font-weight: 700;
   vertical-align: middle;
-  padding: 0 !important;
+  padding: 0 0 0 1mm !important;
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
 }
@@ -6781,8 +6780,9 @@ const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
-// Meta: A:B label, C value, D:E right label, F:G value — full Mongolian text + barcodes.
-const RECEIPT_XLSX_COL_WIDTHS = [5, 24, 12, 16, 12, 12, 13];
+// A wide enough for logo (no overlap into brand). Sum fits A4 without fitToWidth crush.
+// Meta: A:B label, C value, D:E right label, F:G value.
+const RECEIPT_XLSX_COL_WIDTHS = [11, 20, 12, 14, 10, 11, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6822,12 +6822,12 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Receipt logo ~16mm; anchor after top staple pad rows.
-  const logoMm = 16;
+  // ~11mm logo stays inside col A so it does not cover brand text in B.
+  const logoMm = 11;
   const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.6 / 25.4) * 914400);
+  const colOff = Math.round((0.4 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>8000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>6000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -6956,10 +6956,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     rightLabel = "",
     rightValue = "",
   ) => {
-    // A:B label, C value, D:E right label, F:G value — wrap so full text shows.
+    // A:B label, C value, D:E right label, F:G value — wrap + taller rows for A4.
     const row = rowNum;
     merges.push(`A${row}:B${row}`, `D${row}:E${row}`, `F${row}:G${row}`);
-    pushRow(18, [
+    pushRow(20, [
       xlsxCellXml(`A${row}`, 6, si(leftLabel), "s"),
       xlsxCellXml(`C${row}`, 5, si(leftValue), "s"),
       xlsxCellXml(`D${row}`, 6, si(rightLabel), "s"),
@@ -7055,14 +7055,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankTitleRow, "D", "G", 3),
   ]);
   pushRow(18, [
-    xlsxCellXml(`A${bankAcctRow}`, 6, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`C${bankAcctRow}`, 5, si("60000500"), "s"),
+    xlsxCellXml(`A${bankAcctRow}`, 6, si("IBAN:"), "s"),
+    xlsxCellXml(`C${bankAcctRow}`, 5, si("5133333307"), "s"),
     ...emptyCells(bankAcctRow, "B", "B", 6),
     ...emptyCells(bankAcctRow, "D", "G", 3),
   ]);
   pushRow(18, [
-    xlsxCellXml(`A${bankIbanRow}`, 6, si("IBAN:"), "s"),
-    xlsxCellXml(`C${bankIbanRow}`, 5, si("5133333307"), "s"),
+    xlsxCellXml(`A${bankIbanRow}`, 6, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(`C${bankIbanRow}`, 5, si("60000500"), "s"),
     ...emptyCells(bankIbanRow, "B", "B", 6),
     ...emptyCells(bankIbanRow, "D", "G", 3),
   ]);
@@ -7264,8 +7264,9 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
     : "";
   // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
-  // Wider left/top margins = staple gutter (reference invoice).
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.75" right="0.4" top="0.65" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  // No fitToWidth — scaling was crushing Mongolian labels on A4 print.
+  // Margins keep staple gutter; column widths already sized for A4.
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="0"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.55" right="0.4" top="0.55" bottom="0.4" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="0" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -16022,7 +16023,7 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: A4 portrait; margin: 12mm 10mm 10mm 16mm; }
+  @page { size: A4 portrait; margin: 10mm 8mm 8mm 12mm; }
   .receipt-page { width: 100%; max-width: none; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
