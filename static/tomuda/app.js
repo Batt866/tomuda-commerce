@@ -659,7 +659,7 @@ function receiptSettleNoteText(o) {
     "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!"
   );
 }
-/** RewardTable — Урамшуулал under Нэгж; product name to its right. */
+/** RewardTable — Урамшуулал under Барааны нэр; product name under Баркод (left). */
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   const settleNote = receiptPromoSettleNote(o);
@@ -671,9 +671,9 @@ function receiptPromoRowsHtml(o) {
     .map((i, idx) => {
       const labelCell =
         idx === 0
-          ? `<td class="receipt-items__unit receipt-items__promo-label">Урамшуулал</td>`
-          : `<td class="receipt-items__unit">&nbsp;</td>`;
-      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name">&nbsp;</td>${labelCell}<td class="receipt-items__barcode receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+          ? `<td class="receipt-items__name receipt-items__promo-label">Урамшуулал</td>`
+          : `<td class="receipt-items__name">&nbsp;</td>`;
+      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td>${labelCell}<td class="receipt-items__unit">&nbsp;</td><td class="receipt-items__barcode receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
     })
     .join("");
   return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${itemRows}</table></td></tr>`;
@@ -6307,7 +6307,7 @@ function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 8mm 12mm; }
+@page { size: A4 portrait; margin: 12mm 10mm 10mm 16mm; }
 body {
   margin: 0;
   padding: 0;
@@ -6325,7 +6325,8 @@ td, th { border: none; }
   width: 210mm;
   max-width: 210mm;
   margin: 0 auto;
-  padding: 4mm 12mm 6mm;
+  /* Extra top/left padding = staple gutter (stores clip receipts there). */
+  padding: 10mm 10mm 8mm 16mm;
   box-sizing: border-box;
   font-size: 10px;
   line-height: 1.15;
@@ -6372,12 +6373,14 @@ td, th { border: none; }
 .receipt-info {
   display: grid;
   grid-template-columns: 50% 50%;
-  column-gap: 12px;
+  column-gap: 10px;
   width: 100%;
   box-sizing: border-box;
+  border: 1px solid ${RECEIPT_BORDER};
+  padding: 4px 6px;
 }
 .receipt-info__col { width: 100%; border-collapse: collapse; table-layout: auto; }
-.receipt-info__row td { padding-top: 0; padding-bottom: 1px; vertical-align: top; line-height: 1.15; }
+.receipt-info__row td { padding-top: 1px; padding-bottom: 2px; vertical-align: top; line-height: 1.2; }
 .receipt-info__row:last-child td { padding-bottom: 0; }
 .receipt-info__label {
   width: 1%;
@@ -6388,7 +6391,7 @@ td, th { border: none; }
   padding-right: 6px;
   white-space: nowrap;
   overflow: visible;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 .receipt-info__value {
   width: auto;
@@ -6397,7 +6400,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
   word-break: break-word;
   overflow-wrap: anywhere;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 .receipt-info__value--address { white-space: normal; line-height: 1.2; font-weight: 700; }
 .receipt-items {
@@ -6431,10 +6434,10 @@ td, th { border: none; }
 .receipt-items__row { page-break-inside: avoid; break-inside: avoid; }
 .receipt-items__row td { font-size: 11px; }
 .receipt-items__num { width: 5%; text-align: center; }
-.receipt-items__name { width: 33%; text-align: left; }
+.receipt-items__name { width: 30%; text-align: left; }
 .receipt-items__unit { width: 13%; text-align: center; white-space: nowrap; overflow: visible; }
 .receipt-items__barcode {
-  width: 19%;
+  width: 18%;
   text-align: center;
   white-space: nowrap;
   word-break: normal;
@@ -6443,8 +6446,8 @@ td, th { border: none; }
   letter-spacing: 0.02em;
 }
 .receipt-items__qty { width: 8%; text-align: center; }
-.receipt-items__price { width: 10%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.receipt-items__total { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-items__price { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.receipt-items__total { width: 14%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .receipt-items--promo { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .receipt-items--promo th,
 .receipt-items--promo td {
@@ -6464,25 +6467,25 @@ td, th { border: none; }
 }
 .receipt-items--promo .receipt-items__promo-settle { font-weight: 600; font-size: 10px; }
 .receipt-items--promo .receipt-items__num { width: 5%; }
-.receipt-items--promo .receipt-items__name { width: 18%; text-align: left; }
-.receipt-items--promo .receipt-items__unit { width: 14%; }
-.receipt-items--promo .receipt-items__barcode { width: 33%; }
+.receipt-items--promo .receipt-items__name { width: 30%; text-align: left; }
+.receipt-items--promo .receipt-items__unit { width: 13%; }
+.receipt-items--promo .receipt-items__barcode { width: 18%; }
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
-  text-align: center;
+  text-align: left;
   white-space: nowrap;
   vertical-align: middle;
-  padding-left: 0;
-  padding-right: 2px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
-.receipt-items--promo .receipt-items__price { width: 10%; text-align: right; white-space: nowrap; }
-.receipt-items--promo .receipt-items__total { width: 12%; text-align: right; white-space: nowrap; }
+.receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; }
+.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; }
 .receipt-items--promo .receipt-items__promo-name {
-  text-align: right;
+  text-align: left;
   padding-left: 4px;
-  padding-right: 6px;
+  padding-right: 4px;
   white-space: nowrap;
 }
 .receipt-items--promo .receipt-items__promo td {
@@ -6771,11 +6774,11 @@ function exportOrderReceiptsExcelCsv(orders) {
 }
 const RECEIPT_XLSX_LAST_COL = "G";
 const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
+/** Empty rows before header = top staple gutter (stores clip receipts there). */
+const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
-// Widths sized so "ширхэг", 13-digit barcodes, and money fully show on A4.
-// A logo/№; C нэгж / Урамшуулал; D баркод / promo нэр.
-/* A–G: №, нэр (spacer), нэгж/Урамшуулал, нэр→тоо руу, тоо, үнэ, нийт */
-const RECEIPT_XLSX_COL_WIDTHS = [8, 16, 14, 24, 10, 10, 12];
+// №, нэр/Урамшуулал, нэгж, баркод/promo нэр, тоо, үнэ, нийт — meta E keeps label room.
+const RECEIPT_XLSX_COL_WIDTHS = [5, 26, 12, 15, 13, 10, 11];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6815,11 +6818,12 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Receipt logo ~16mm, flush toward brand text within col A.
+  // Receipt logo ~16mm; anchor after top staple pad rows.
   const logoMm = 16;
   const emu = Math.round((logoMm / 25.4) * 914400);
   const colOff = Math.round((0.6 / 25.4) * 914400);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>8000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>8000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -6901,29 +6905,6 @@ function xlsxZipWriteUtf8(zip, path, xml) {
 function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const { si } = ctx;
   let rowNum = startRow;
-  const hr1 = rowNum;
-  const hr2 = rowNum + 1;
-  const hr3 = rowNum + 2;
-  // Header merges stay inside A–G (same as items table).
-  merges.push(
-    `A${hr1}:A${hr2}`,
-    `B${hr1}:C${hr1}`,
-    `F${hr1}:G${hr1}`,
-    `B${hr2}:C${hr2}`,
-    `F${hr2}:G${hr2}`,
-    `A${hr3}:G${hr3}`,
-  );
-  const pushRow = (height, cells) => {
-    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
-    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
-    rowNum += 1;
-  };
-  // Item table: only anchor cells per merge — avoids inner box borders in Excel.
-  const pushItemTableRow = (height, cells) => {
-    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
-    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
-    rowNum += 1;
-  };
   const emptyCells = (
     row,
     from = "A",
@@ -6938,16 +6919,43 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
+  const pushRow = (height, cells) => {
+    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
+    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
+    rowNum += 1;
+  };
+  // Item table: only anchor cells per merge — avoids inner box borders in Excel.
+  const pushItemTableRow = (height, cells) => {
+    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
+    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
+    rowNum += 1;
+  };
+  // Top staple gutter (stores clip receipts into the empty band).
+  for (let i = 0; i < RECEIPT_XLSX_TOP_PAD_ROWS; i += 1) {
+    pushRow(12, emptyCells(rowNum));
+  }
+  const hr1 = rowNum;
+  const hr2 = rowNum + 1;
+  const hr3 = rowNum + 2;
+  // Header merges stay inside A–G (same as items table).
+  merges.push(
+    `A${hr1}:A${hr2}`,
+    `B${hr1}:C${hr1}`,
+    `F${hr1}:G${hr1}`,
+    `B${hr2}:C${hr2}`,
+    `F${hr2}:G${hr2}`,
+    `A${hr3}:G${hr3}`,
+  );
   const pushMetaPairRow = (
     leftLabel,
     leftValue,
     rightLabel = "",
     rightValue = "",
   ) => {
-    // A:B = left label (урт монгол шошго), C:D = value, E = right label, F:G = value
+    // A:B = left label, C:D = value, E = right label, F:G = value (boxed merges).
     const row = rowNum;
     merges.push(`A${row}:B${row}`, `C${row}:D${row}`, `F${row}:G${row}`);
-    pushRow(16, [
+    pushRow(15, [
       xlsxCellXml(`A${row}`, 5, si(leftLabel), "s"),
       xlsxCellXml(`C${row}`, 4, si(leftValue), "s"),
       xlsxCellXml(`E${row}`, 5, si(rightLabel), "s"),
@@ -7123,14 +7131,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    // C = Урамшуулал (under Нэгж); D = name right-aligned against Тоо/ш.
+    // B = Урамшуулал (under Барааны нэр); D = name left under Баркод.
     pushItemTableRow(18, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
-      xlsxCellXml(`B${r}`, 36, null, "empty"),
       index === 0
-        ? xlsxCellXml(`C${r}`, 37, si("Урамшуулал"), "s")
-        : xlsxCellXml(`C${r}`, 37, null, "empty"),
-      xlsxCellXml(`D${r}`, 39, si(nameText), "s"),
+        ? xlsxCellXml(`B${r}`, 37, si("Урамшуулал"), "s")
+        : xlsxCellXml(`B${r}`, 36, null, "empty"),
+      xlsxCellXml(`C${r}`, 37, null, "empty"),
+      xlsxCellXml(`D${r}`, 36, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
       xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
@@ -7257,7 +7265,8 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
     : "";
   // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.4" right="0.4" top="0.45" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  // Wider left/top margins = staple gutter (reference invoice).
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.75" right="0.4" top="0.65" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -16014,7 +16023,7 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: A4 portrait; margin: 8mm 12mm; }
+  @page { size: A4 portrait; margin: 12mm 10mm 10mm 16mm; }
   .receipt-page { width: 100%; max-width: none; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
