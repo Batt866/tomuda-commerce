@@ -6355,8 +6355,8 @@ td, th { border: none; }
   line-height: 1.2;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid__a { width: 9%; } .receipt-grid__b { width: 8.5%; } .receipt-grid__c { width: 12.5%; } .receipt-grid__d { width: 9%; } .receipt-grid__e { width: 7.5%; }
-.receipt-grid__f { width: 10.5%; } .receipt-grid__g { width: 8%; } .receipt-grid__h { width: 8%; } .receipt-grid__i { width: 5.5%; } .receipt-grid__j { width: 10%; } .receipt-grid__k { width: 11.5%; }
+.receipt-grid__a { width: 12%; } .receipt-grid__b { width: 8%; } .receipt-grid__c { width: 12%; } .receipt-grid__d { width: 9%; } .receipt-grid__e { width: 7%; }
+.receipt-grid__f { width: 10%; } .receipt-grid__g { width: 8%; } .receipt-grid__h { width: 8%; } .receipt-grid__i { width: 5.5%; } .receipt-grid__j { width: 10%; } .receipt-grid__k { width: 10.5%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__info-wrap td,
@@ -6555,25 +6555,32 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 20px; }
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
 .receipt-grid__logo-cell {
-  width: 18mm;
-  max-width: 18mm;
-  vertical-align: middle;
-  text-align: center;
-  padding: 0 2.5mm 0 0 !important;
+  width: 20mm;
+  min-width: 20mm;
+  max-width: 22mm;
+  height: 18mm;
+  min-height: 18mm;
+  vertical-align: top;
+  text-align: left;
+  padding: 0 3mm 0 0 !important;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 .receipt-logo {
   width: 16mm;
   height: 16mm;
+  max-width: 16mm;
+  max-height: 16mm;
   object-fit: contain;
   display: block;
-  margin: 0 auto;
+  margin: 0;
 }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT};
   font-size: 12px;
   font-weight: 700;
   vertical-align: bottom;
-  padding: 0 0 1px 2mm !important;
+  padding: 0 0 1px 1mm !important;
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
 }
@@ -6582,16 +6589,21 @@ td, th { border: none; }
   line-height: 1.15;
   vertical-align: top;
   white-space: normal;
-  padding: 0 0 0 2mm !important;
+  padding: 0 0 0 1mm !important;
   color: ${RECEIPT_TEXT};
 }
 .receipt-grid__phone {
   font-size: 8px;
   line-height: 1.15;
   vertical-align: top;
-  padding: 0 0 0 2mm !important;
+  padding: 0 0 0 1mm !important;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
+}
+.receipt-grid--sheet tr.receipt-grid__header td.receipt-grid__brand,
+.receipt-grid--sheet tr.receipt-grid__header td.receipt-grid__address,
+.receipt-grid--sheet tr.receipt-grid__header td.receipt-grid__phone {
+  min-height: 5mm;
 }
 .receipt-grid__date-label,
 .receipt-grid__date {
@@ -6810,8 +6822,8 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 2;
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
 // A = logo gutter; meta labels all start in B (same left edge). No fitToWidth crush.
 // Meta: A empty, B:C label, D value, E:F right label, G right value.
-/* A gutter; B+C wide enough for full company-info labels; D/G values. */
-const RECEIPT_XLSX_COL_WIDTHS = [10, 16, 14, 14, 12, 12, 12];
+/* A = logo gutter (wide enough that 16mm logo never covers B text). */
+const RECEIPT_XLSX_COL_WIDTHS = [14, 14, 13, 13, 12, 12, 12];
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -6851,12 +6863,12 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // 16mm logo; col A widened so drawing stays left of brand text in B.
+  // Keep 16mm logo, but clamp drawing to col A so brand/address in B stay clear.
   const logoMm = 16;
   const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.5 / 25.4) * 914400);
+  const colOff = Math.round((0.6 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>4000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>2000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -7008,14 +7020,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const payable = orderPayableTotal(o);
   const sub = payable / 1.1;
   const vat = payable - sub;
-  pushRow(16, [
+  // Header rows tall enough that 16mm logo fits above party-info text.
+  pushRow(18, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 21, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`E${hr1}`, 6, si("Хүргэлтийн огноо:"), "s"),
     xlsxCellXml(`F${hr1}`, 18, si(receiptDeliveryDateValue(o)), "s"),
     ...emptyCells(hr1, "C", "D", 21),
   ]);
-  pushRow(12, [
+  pushRow(15, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
@@ -7025,7 +7038,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ),
     ...emptyCells(hr2, "C", "D", 3),
   ]);
-  pushRow(12, [
+  pushRow(15, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
     xlsxCellXml(`B${hr3}`, 3, si(RECEIPT_COMPANY_ADDRESS_LINE2), "s"),
     ...emptyCells(hr3, "C", "D", 3),
