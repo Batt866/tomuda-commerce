@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v294";
+const CACHE = "tomuda-v295";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",

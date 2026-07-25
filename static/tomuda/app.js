@@ -9071,9 +9071,22 @@ function productsView() {
 function productListHead() {
   const actions = canManageProducts(),
     showCost = canViewProductCost();
-  return actions
-    ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>`
-    : "";
+  const cols = [
+    `<span class="product-list__col product-list__col--name">Бараа</span>`,
+    `<span class="product-list__col product-list__col--cat">Төрөл</span>`,
+    `<span class="product-list__col product-list__col--price">Үнэ</span>`,
+    showCost
+      ? `<span class="product-list__col product-list__col--cost">Өртөг</span>`
+      : "",
+    `<span class="product-list__col product-list__col--stock">Үлдэгдэл</span>`,
+    `<span class="product-list__col product-list__col--barcode">Баркод</span>`,
+    actions
+      ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  return `<div class="product-list__head" aria-hidden="true">${cols}</div>`;
 }
 function productDetailRow(label, valueHtml) {
   return `<div class="customer-detail__row"><div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
