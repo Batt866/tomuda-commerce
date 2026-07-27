@@ -845,7 +845,7 @@ function receiptSignatureRowsHtml(opts = {}) {
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
-  return `${fill}<tr class="receipt-grid__sign"><td colspan="3" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="8" class="receipt-grid__sign-line"></td></tr>${gap}<tr class="receipt-grid__sign"><td colspan="3" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="8" class="receipt-grid__sign-line"></td></tr>`;
+  return `${fill}<tr class="receipt-grid__sign"><td colspan="4" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="7" class="receipt-grid__sign-line"></td></tr>${gap}<tr class="receipt-grid__sign"><td colspan="4" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="7" class="receipt-grid__sign-line"></td></tr>`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -6882,11 +6882,11 @@ td, th { border: none; }
   font-size: 10px;
   font-weight: 400;
   font-family: ${RECEIPT_FONT};
-  padding: 2px 2px 1px;
+  padding: 2px 4px 1px 0;
   vertical-align: bottom;
   white-space: nowrap;
+  overflow: visible;
   color: ${RECEIPT_TEXT};
-  width: 28%;
 }
 .receipt-grid__sign-line {
   border-bottom: 1px dotted #666 !important;
@@ -7568,22 +7568,22 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
   pushRow(8, emptyCells(rowNum));
   const sign1 = rowNum;
-  // Short label + long signature line (C–G), matching print layout.
-  merges.push(`A${sign1}:B${sign1}`, `C${sign1}:G${sign1}`);
+  // Label needs A–C (~40 chars wide); line on D–G. A–B alone clips the Mongolian text.
+  merges.push(`A${sign1}:C${sign1}`, `D${sign1}:G${sign1}`);
   pushRow(18, [
     xlsxCellXml(`A${sign1}`, 5, si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"), "s"),
-    xlsxCellXml(`C${sign1}`, 17, null, "empty"),
-    ...emptyCells(sign1, "B", "B", 5),
-    ...emptyCells(sign1, "D", "G", 17),
+    xlsxCellXml(`D${sign1}`, 17, null, "empty"),
+    ...emptyCells(sign1, "B", "C", 5),
+    ...emptyCells(sign1, "E", "G", 17),
   ]);
   pushRow(8, emptyCells(rowNum));
   const sign2 = rowNum;
-  merges.push(`A${sign2}:B${sign2}`, `C${sign2}:G${sign2}`);
+  merges.push(`A${sign2}:C${sign2}`, `D${sign2}:G${sign2}`);
   pushRow(18, [
     xlsxCellXml(`A${sign2}`, 5, si("Хүлээн авсан ажилтны гарын үсэг:"), "s"),
-    xlsxCellXml(`C${sign2}`, 17, null, "empty"),
-    ...emptyCells(sign2, "B", "B", 5),
-    ...emptyCells(sign2, "D", "G", 17),
+    xlsxCellXml(`D${sign2}`, 17, null, "empty"),
+    ...emptyCells(sign2, "B", "C", 5),
+    ...emptyCells(sign2, "E", "G", 17),
   ]);
   pushRow(6, emptyCells(rowNum));
   return rowNum;
