@@ -6589,14 +6589,14 @@ td, th { border: none; }
 .receipt-items__row td { font-size: 10px; }
 .receipt-items__num { width: 4%; text-align: center; }
 .receipt-items__name {
-  width: 38%;
+  width: 40%;
   text-align: left;
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
   overflow: visible;
-  vertical-align: top;
-  line-height: 1.15;
+  vertical-align: middle;
+  line-height: 1.12;
 }
 .receipt-items__unit { width: 10%; text-align: center; white-space: nowrap; overflow: visible; }
 .receipt-items__barcode {
@@ -7030,22 +7030,54 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
 // A = logo gutter; meta labels all start in B (same left edge). No fitToWidth crush.
 // Meta: A empty, B:C label, D value, E:F right label, G right value.
 /* A logo; B labels/names; C bank values + units; D barcode/address; E–G numbers. */
-const RECEIPT_XLSX_COL_WIDTHS = [9, 17, 14, 13, 8, 11, 12];
-/** Estimate Excel row height so wrapText names stay fully above the dotted border. */
+const RECEIPT_XLSX_COL_WIDTHS = [8, 19, 13, 13, 8, 11, 12];
+/** Word-aware wrap line count — matches Excel better than raw char ceil. */
+function receiptXlsxWrapLineCount(text, charsPerLine) {
+  const limit = Math.max(6, Number(charsPerLine) || 12);
+  let total = 0;
+  for (const part of String(text ?? "").split(/\r?\n/)) {
+    const words = part.trim() ? part.trim().split(/\s+/) : [""];
+    let cur = 0;
+    let lines = 1;
+    for (const word of words) {
+      const wlen = [...word].length || 1;
+      if (cur === 0) {
+        if (wlen <= limit) {
+          cur = wlen;
+        } else {
+          const full = Math.ceil(wlen / limit);
+          lines += full - 1;
+          cur = wlen % limit || limit;
+        }
+        continue;
+      }
+      if (cur + 1 + wlen <= limit) {
+        cur += 1 + wlen;
+        continue;
+      }
+      lines += 1;
+      if (wlen <= limit) {
+        cur = wlen;
+      } else {
+        const full = Math.ceil(wlen / limit);
+        lines += full - 1;
+        cur = wlen % limit || limit;
+      }
+    }
+    total += lines;
+  }
+  return Math.max(1, total);
+}
+/** Compact single-line rows; multi-line only as tall as needed for full text. */
 function receiptXlsxWrappedRowHeight(
   text,
-  colWidth = 15,
-  { min = 14, linePt = 14, pad = 3, max = 64 } = {},
+  colWidth = 18,
+  { min = 14, linePt = 12, pad = 2, max = 52 } = {},
 ) {
   const raw = String(text ?? "").trim() || "-";
-  // Conservative wrap: Excel wraps earlier than raw col width (padding + font).
-  const charsPerLine = Math.max(7, Math.floor(Number(colWidth) || 15) - 2);
-  let lines = 0;
-  for (const part of raw.split(/\r?\n/)) {
-    const len = [...part].length;
-    lines += Math.max(1, Math.ceil(Math.max(len, 1) / charsPerLine));
-  }
-  // Single-line rows stay compact; multi-line get full clearance for every line.
+  // Excel customWidth ≈ max Latin chars for default font; Arial 9 fits ~full width.
+  const charsPerLine = Math.max(8, Math.floor(Number(colWidth) || 18));
+  const lines = receiptXlsxWrapLineCount(raw, charsPerLine);
   if (lines <= 1) return min;
   return Math.max(min, Math.min(max, lines * linePt + pad));
 }
@@ -7396,7 +7428,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const unitText = promo
       ? ""
       : String(p.unit || item.unit || "ш").trim() || "ш";
-    // Col B width 15 — grow row so wrapped names clear the dotted bottom border.
+    // Col B — grow only when the name actually wraps; keep text fully visible.
     const nameRowH = receiptXlsxWrappedRowHeight(
       nameText,
       RECEIPT_XLSX_COL_WIDTHS[1],
@@ -7430,7 +7462,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const promoH = receiptXlsxWrappedRowHeight(
       nameText,
       RECEIPT_XLSX_COL_WIDTHS[3],
-      { min: 14, linePt: 14, pad: 3, max: 56 },
+      { min: 14, linePt: 12, pad: 2, max: 44 },
     );
     // B = Урамшуулал; D = name tight against qty (E). Dotted bottom separates promo lines.
     pushItemTableRow(promoH, [
