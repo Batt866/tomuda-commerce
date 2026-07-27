@@ -7075,8 +7075,12 @@ function receiptXlsxWrappedRowHeight(
   { min = 14, linePt = 12, pad = 2, max = 52 } = {},
 ) {
   const raw = String(text ?? "").trim() || "-";
-  // Excel customWidth ≈ max Latin chars for default font; Arial 9 fits ~full width.
-  const charsPerLine = Math.max(8, Math.floor(Number(colWidth) || 18));
+  // Numbers/Excel fit ~15–25% more Arial-9 glyphs than raw customWidth units.
+  // Too-low limit made mid-length names (Цайны лаа…, Алчуур…) get empty 2-line height.
+  const charsPerLine = Math.max(
+    10,
+    Math.round((Number(colWidth) || 18) * 1.15),
+  );
   const lines = receiptXlsxWrapLineCount(raw, charsPerLine);
   if (lines <= 1) return min;
   return Math.max(min, Math.min(max, lines * linePt + pad));
