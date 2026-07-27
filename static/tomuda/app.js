@@ -7016,6 +7016,22 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
 // Meta: A empty, B:C label, D value, E:F right label, G right value.
 /* A logo; B labels/names; C bank values + units; D barcode/address; E–G numbers. */
 const RECEIPT_XLSX_COL_WIDTHS = [10, 15, 16, 13, 8, 11, 12];
+/** Estimate Excel row height so wrapText names sit above the dotted bottom border. */
+function receiptXlsxWrappedRowHeight(
+  text,
+  colWidth = 15,
+  { min = 20, linePt = 15, max = 56 } = {},
+) {
+  const raw = String(text ?? "").trim() || "-";
+  // Slightly under column width — Excel wraps earlier than the raw character count.
+  const charsPerLine = Math.max(8, Math.floor(Number(colWidth) || 15) - 1);
+  let lines = 0;
+  for (const part of raw.split(/\r?\n/)) {
+    const len = [...part].length;
+    lines += Math.max(1, Math.ceil(Math.max(len, 1) / charsPerLine));
+  }
+  return Math.max(min, Math.min(max, lines * linePt + 2));
+}
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
@@ -7364,8 +7380,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const unitText = promo
       ? ""
       : String(p.unit || item.unit || "ш").trim() || "ш";
-    // Wider name column still wraps long Mongolian titles — give them height.
-    const nameRowH = nameText.length > 28 ? 32 : nameText.length > 18 ? 24 : 20;
+    // Col B width 15 — grow row so wrapped names clear the dotted bottom border.
+    const nameRowH = receiptXlsxWrappedRowHeight(
+      nameText,
+      RECEIPT_XLSX_COL_WIDTHS[1],
+    );
     pushItemTableRow(nameRowH, [
       promo
         ? xlsxCellXml(`A${r}`, numStyle, null, "empty")
@@ -7391,7 +7410,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    const promoH = nameText.length > 16 ? 28 : 20;
+    // Col D width 13 — same wrap clearance as paid item names.
+    const promoH = receiptXlsxWrappedRowHeight(
+      nameText,
+      RECEIPT_XLSX_COL_WIDTHS[3],
+      { min: 20, linePt: 15, max: 48 },
+    );
     // B = Урамшуулал; D = name tight against qty (E). Dotted bottom separates promo lines.
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
