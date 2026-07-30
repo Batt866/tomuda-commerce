@@ -10162,6 +10162,25 @@ textarea::placeholder {
     z-index: 90;
   }
 
+  /* Keep the open list in document flow so it does not cover the next filter
+     (Түгээгч label/trigger was sitting on top of ХТ picker panel). */
+  .wh-receipt-picker.is-open .wh-receipt-picker__panel {
+    position: static;
+    left: auto;
+    right: auto;
+    width: 100%;
+    max-height: min(50vh, 360px);
+    margin-top: 6px;
+    z-index: auto;
+    -webkit-transform: none;
+    transform: none;
+    animation: none;
+  }
+
+  .wh-receipt-field--picker + .wh-receipt-field--picker {
+    margin-top: 4px;
+  }
+
   .wh-receipt-picker__panel {
     left: 0;
     right: 0;
