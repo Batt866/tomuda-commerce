@@ -1,9 +1,15 @@
-ТОМУДА — Deploy link (HTTPS)
+ТОМУДА — Deploy link
 
-✅ ҮНДСЭН (production, 24/7):
-https://tomuda.jobbox.mn
+✅ ҮНДСЭН (шинэ VPS, 24/7):
+http://202.179.6.110
+
+API health:
+http://202.179.6.110/api/health
+
+Нэвтрэх (seed):
+admin@tomuda.mn / admin
+
+⚠ Хуучин: https://tomuda.jobbox.mn (өмнөх сервер)
 
 🔧 Локал хөгжүүлэлт:
 ./scripts/start-tomuda.sh
-
-Шалгах: ./scripts/check-deploy-link.sh
