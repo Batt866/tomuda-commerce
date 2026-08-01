@@ -544,10 +544,8 @@ function receiptInfoRows(o) {
     receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
     receiptInfoFieldRow("Регистрийн дугаар:", "5397987"),
     receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
-    receiptInfoFieldRow(
-      "IBAN:",
-      `<b>${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b>`,
-    ),
+    // IBAN: on the left; both account parts stacked together on the right.
+    `<tr class="receipt-info__row receipt-info__row--iban"><td colspan="2" class="receipt-info__iban"><span class="receipt-info__iban-label">IBAN:</span><span class="receipt-info__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b></span></td></tr>`,
   ].join("");
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 40)
     .map((line) => `<div class="receipt-info__address-line">${esc(line)}</div>`)
@@ -6524,6 +6522,28 @@ td, th { border: none; }
   overflow-wrap: anywhere;
   overflow: visible;
   line-height: 1.3;
+}
+.receipt-info__iban {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+  padding: 0;
+  border: none !important;
+}
+.receipt-info__iban-label {
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: ${RECEIPT_TEXT};
+  padding-top: 0;
+}
+.receipt-info__iban-nums {
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.35;
+  color: ${RECEIPT_TEXT};
 }
 .receipt-info__address-block {
   vertical-align: top;
