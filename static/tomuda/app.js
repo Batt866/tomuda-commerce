@@ -416,7 +416,7 @@ const RECEIPT_HEADER_BG = "#F3F3F3";
 const RECEIPT_GRAND_BG = "#E8EBEE";
 const RECEIPT_SETTLE_BG = "#FFFFCC";
 const RECEIPT_SETTLE_BORDER = "#E6E6A8";
-const RECEIPT_WARN_BG = "#FFFFCC";
+const RECEIPT_WARN_BG = "#F0F0F0";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
@@ -7417,21 +7417,39 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const perBankRowH = Math.ceil(addrBlockH / bankRowCount);
   for (let i = 0; i < bankRowCount; i += 1) {
     const r = rowNum;
-    merges.push(`A${r}:B${r}`);
     const [leftLabel, leftValue] = bankLeft[i];
     const isIban = leftLabel === "IBAN:";
     const valueStyle = isIban || leftValue === "ТОМУДА групп" ? 4 : 5;
     const labelStyle = isIban ? 4 : 5;
-    const rowH = isIban ? Math.max(perBankRowH, 28) : perBankRowH;
-    pushRow(rowH, [
-      xlsxCellXml(`A${r}`, labelStyle, si(leftLabel), "s"),
-      xlsxCellXml(`C${r}`, valueStyle, si(leftValue), "s"),
+    const rowH = isIban ? Math.max(perBankRowH, 30) : perBankRowH;
+    const addrCell =
       i === 0
         ? xlsxCellXml(`D${r}`, 4, si(addressBlock), "s")
-        : xlsxCellXml(`D${r}`, 4, null, "empty"),
-      ...emptyCells(r, "B", "B", labelStyle),
-      ...emptyCells(r, "E", "G", 4),
-    ]);
+        : xlsxCellXml(`D${r}`, 4, null, "empty");
+    if (isIban) {
+      // B = "IBAN:", C = both numbers stacked (inlineStr keeps the line break).
+      pushRow(rowH, [
+        xlsxCellXml(`A${r}`, 1, null, "empty"),
+        xlsxCellXml(`B${r}`, labelStyle, si("IBAN:"), "s"),
+        xlsxCellXml(
+          `C${r}`,
+          valueStyle,
+          `${RECEIPT_BANK_IBAN_SHORT}\n${RECEIPT_BANK_ACCOUNT}`,
+          "inlineStr",
+        ),
+        addrCell,
+        ...emptyCells(r, "E", "G", 4),
+      ]);
+    } else {
+      merges.push(`A${r}:B${r}`);
+      pushRow(rowH, [
+        xlsxCellXml(`A${r}`, labelStyle, si(leftLabel), "s"),
+        xlsxCellXml(`C${r}`, valueStyle, si(leftValue), "s"),
+        addrCell,
+        ...emptyCells(r, "B", "B", labelStyle),
+        ...emptyCells(r, "E", "G", 4),
+      ]);
+    }
   }
   pushRow(4, emptyCells(rowNum));
   const headerRow = rowNum;
@@ -7571,7 +7589,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     : "Таны нийт төлөх дүн";
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
   pushSummaryTextRow("Төлбөрийн нөхцөл", receiptPaymentTermDisplay(o));
-  // Style 24 = bold + yellow warn fill (same band as settle).
+  // Style 25 = light gray warn band (not yellow settle fill).
   [
     "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
     "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
@@ -7583,8 +7601,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const warnH =
       index === 0 ? Math.max(28, Math.ceil(text.length / 52) * 12) : 14;
     pushRow(warnH, [
-      xlsxCellXml(`A${r}`, 24, si(text), "s"),
-      ...emptyCells(r, "B", "G", 24),
+      xlsxCellXml(`A${r}`, 25, si(text), "s"),
+      ...emptyCells(r, "B", "G", 25),
     ]);
   });
   pushRow(8, emptyCells(rowNum));
