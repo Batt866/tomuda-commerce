@@ -545,8 +545,8 @@ function receiptInfoRows(o) {
     receiptInfoFieldRow("Регистрийн дугаар:", "5397987"),
     receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
     receiptInfoFieldRow(
-      "Дансны дугаар:",
-      `<b>IBAN: ${RECEIPT_BANK_IBAN_SHORT} ${RECEIPT_BANK_ACCOUNT}</b>`,
+      "IBAN:",
+      `<b>${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b>`,
     ),
   ].join("");
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 40)
@@ -7385,10 +7385,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ["Дансны нэр:", "ТОМУДА групп"],
     ["Регистрийн дугаар:", "5397987"],
     ["Банкны нэр:", "Хаан банк"],
-    [
-      "Дансны дугаар:",
-      `IBAN: ${RECEIPT_BANK_IBAN_SHORT} ${RECEIPT_BANK_ACCOUNT}`,
-    ],
+    // Label left (IBAN:), both account parts together in C (two lines).
+    ["IBAN:", `${RECEIPT_BANK_IBAN_SHORT}\n${RECEIPT_BANK_ACCOUNT}`],
   ];
   const bankRowCount = bankLeft.length;
   const addrStart = rowNum;
@@ -7401,15 +7399,17 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const r = rowNum;
     merges.push(`A${r}:B${r}`);
     const [leftLabel, leftValue] = bankLeft[i];
-    const isIbanValue = String(leftValue || "").startsWith("IBAN:");
-    const valueStyle = isIbanValue || leftValue === "ТОМУДА групп" ? 4 : 5;
-    pushRow(perBankRowH, [
-      xlsxCellXml(`A${r}`, 5, si(leftLabel), "s"),
+    const isIban = leftLabel === "IBAN:";
+    const valueStyle = isIban || leftValue === "ТОМУДА групп" ? 4 : 5;
+    const labelStyle = isIban ? 4 : 5;
+    const rowH = isIban ? Math.max(perBankRowH, 28) : perBankRowH;
+    pushRow(rowH, [
+      xlsxCellXml(`A${r}`, labelStyle, si(leftLabel), "s"),
       xlsxCellXml(`C${r}`, valueStyle, si(leftValue), "s"),
       i === 0
         ? xlsxCellXml(`D${r}`, 4, si(addressBlock), "s")
         : xlsxCellXml(`D${r}`, 4, null, "empty"),
-      ...emptyCells(r, "B", "B", 5),
+      ...emptyCells(r, "B", "B", labelStyle),
       ...emptyCells(r, "E", "G", 4),
     ]);
   }
