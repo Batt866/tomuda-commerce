@@ -91,10 +91,10 @@ const API_BASE = window.TOMUDA_API_BASE || "/api";
 const BRAND = {
   logoWhite: "/static/tomuda/branding/logo-white.png",
   logoBlue: "/static/tomuda/branding/logo-blue.png",
-  receiptLogo: "/static/tomuda/branding/receipt-logo.png",
+  receiptLogo: "/static/tomuda/branding/receipt-logo.png?v=20260801-logo-clean",
 };
 const RECEIPT_LOGO_DATA_URI =
-  "data:image/png;base64,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";
+  "data:image/png;base64,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";
 const MN_PROVINCES = [
   "Улаанбаатар",
   "Архангай",
@@ -4834,11 +4834,14 @@ function qtyStepperApply(btn) {
   const min = Number(btn.closest(".qty-stepper")?.dataset?.qtyMin || 0);
   let q = getWorkerQty(id);
   if (action === "inc") {
-    if (q >= p.stock) {
-      if (inPicker) showStockLimitToast();
+    const maxOk = maxWorkerPaidQty(id);
+    if (q >= maxOk) {
+      showStockLimitToast(
+        `${p.name}: урамшуулалтай нийт тоо үлдэгдлээс хэтэрнэ`,
+      );
       return;
     }
-    q = Math.min(p.stock, q + 1);
+    q = Math.min(maxOk, q + 1);
   } else if (action === "dec") q = Math.max(min, q - 1);
   else return;
   if (inPicker) pickerQtyChange(id, q);
@@ -4853,7 +4856,7 @@ function pickerQtyFromParts(packs, pieces, p) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
   const total = packSize ? pk * packSize + pc : pc;
-  return Math.min(p.stock, total);
+  return Math.min(maxWorkerPaidQty(p.id), total);
 }
 function pickerQtyToParts(q, p) {
   const packSize = productPackSize(p);
@@ -4865,13 +4868,15 @@ function pickerPackMax(p, pieces) {
   const packSize = productPackSize(p);
   if (!packSize) return 0;
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
-  return Math.floor(Math.max(0, p.stock - pc) / packSize);
+  const maxTotal = maxWorkerPaidQty(p.id);
+  return Math.floor(Math.max(0, maxTotal - pc) / packSize);
 }
 function pickerPieceMax(p, packs) {
   const packSize = productPackSize(p);
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
-  if (!packSize) return p.stock;
-  return Math.max(0, p.stock - pk * packSize);
+  const maxTotal = maxWorkerPaidQty(p.id);
+  if (!packSize) return maxTotal;
+  return Math.max(0, maxTotal - pk * packSize);
 }
 function readPickerQtyParts(id) {
   const p = state.products.find((x) => x.id === id);
@@ -5026,12 +5031,13 @@ function pickerQtyStepperHtml(p, q, { min = 0, sheet = false } = {}) {
   const idAttr = esc(p.id);
   const nameLabel = esc(p.name);
   const groupId = `picker-qty-label-${idAttr}`;
+  const maxOk = maxWorkerPaidQty(p.id);
   const decDisabled = q <= min;
-  const incDisabled = q >= p.stock;
+  const incDisabled = q >= maxOk;
   const stepperCls = sheet
     ? "picker-qty-stepper--sheet"
     : "picker-qty-stepper--compact";
-  return `<div class="qty-stepper picker-qty-stepper ${stepperCls}" data-qty-min="${min}" role="group" aria-labelledby="${groupId}"><span id="${groupId}" class="sr-only">${nameLabel} — тоо ширхэг сонгох</span><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${nameLabel} багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${nameLabel} тоо ширхэг" aria-valuenow="${q}" aria-valuemin="${min}" aria-valuemax="${p.stock}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${nameLabel} нэмэх">+</button></div>`;
+  return `<div class="qty-stepper picker-qty-stepper ${stepperCls}" data-qty-min="${min}" role="group" aria-labelledby="${groupId}"><span id="${groupId}" class="sr-only">${nameLabel} — тоо ширхэг сонгох</span><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${nameLabel} багасгах">−</button><input data-picker-qty-input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${nameLabel} тоо ширхэг" aria-valuenow="${q}" aria-valuemin="${min}" aria-valuemax="${maxOk}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${nameLabel} нэмэх">+</button></div>`;
 }
 function ensurePickerActiveId() {
   if (
@@ -5058,8 +5064,9 @@ function finishPickerEditFor(id) {
 }
 function workerQtyStepperHtml(p, q) {
   const idAttr = esc(p.id);
+  const maxOk = maxWorkerPaidQty(p.id);
   const decDisabled = q <= 1;
-  const incDisabled = q >= p.stock;
+  const incDisabled = q >= maxOk;
   return `<div class="qty-stepper worker-order-qty-stepper" data-qty-min="1"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
 }
 function setWorkerOrderActive(id) {
@@ -5103,9 +5110,9 @@ function qtyDraft(el) {
   if (digits !== el.value) el.value = digits;
   if (!digits) return;
   const n = Number(digits);
-  if (n > p.stock && el.hasAttribute("data-picker-qty-input"))
-    showStockLimitToast();
-  const capped = Math.min(n, p.stock);
+  const maxOk = maxWorkerPaidQty(id);
+  if (n > maxOk) showStockLimitToast(`${p.name}: урамшуулалтай нийт үлдэгдлээс хэтэрнэ`);
+  const capped = Math.min(n, maxOk);
   if (capped < min) return;
   state.workerQty[id] = capped;
   if (String(capped) !== digits) el.value = String(capped);
@@ -5122,10 +5129,10 @@ function qtyCommit(el) {
   const min = Number(el.closest(".qty-stepper")?.dataset?.qtyMin ?? 0);
   const digits = String(el.value || "").replace(/\D/g, "");
   let v = digits ? Number(digits) : 0;
-  if (v > p.stock && el.hasAttribute("data-picker-qty-input"))
-    showStockLimitToast();
+  const maxOk = maxWorkerPaidQty(id);
+  if (v > maxOk) showStockLimitToast(`${p.name}: урамшуулалтай нийт үлдэгдлээс хэтэрнэ`);
   if (v < min) v = min;
-  v = Math.min(v, p.stock);
+  v = Math.min(v, maxOk);
   el.value = String(v);
   el.setAttribute("aria-valuenow", String(v));
   setWorkerQty(id, v);
@@ -5455,8 +5462,11 @@ function isNativeApp() {
 function showInstallToast(msg) {
   showAppToast(msg, "success");
 }
-function showStockLimitToast() {
-  showAppToast("Үлдэгдэл хүрэхгүй байна", "error");
+function showStockLimitToast(detail = "") {
+  const msg = detail
+    ? `Үлдэгдэл хүрэлцэхгүй байна. ${detail}`
+    : "Үлдэгдэл хүрэлцэхгүй байна (урамшуулал орсон нийт тоо)";
+  showAppToast(msg, "error");
 }
 async function triggerNativeInstallPrompt() {
   if (!pwaInstallPrompt) return false;
@@ -12882,8 +12892,13 @@ function pricePromotionDiscountAmount(gross, rule) {
   if (!isPercent) return 0;
   return Math.round((gross * Number(rule.discountPercent || 0)) / 100);
 }
+/**
+ * Add free promo lines for the full grant qty.
+ * Stock is NOT truncated here — paid+promo must fit warehouse via orderStockIssues / maxWorkerPaidQty.
+ */
 function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
-  const grant = Number(freeQty) || 1;
+  const grantWanted = Math.max(0, Math.floor(Number(freeQty) || 0));
+  if (grantWanted < 1) return result;
   (Array.isArray(freeIds) ? freeIds : []).forEach((freeId) => {
     const product = state.products.find((p) => p.id === freeId);
     if (!product) return;
@@ -12891,12 +12906,13 @@ function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
       (l) => l.productId === freeId && l.isPromoFree,
     );
     if (existing) {
-      existing.quantity += grant;
+      existing.quantity += grantWanted;
+      existing.total = 0;
     } else {
       result.push({
         productId: freeId,
         productName: product.name,
-        quantity: grant,
+        quantity: grantWanted,
         price: 0,
         catalogPrice: Number(product.price ?? product.sellPrice ?? 0) || 0,
         total: 0,
@@ -12972,44 +12988,26 @@ function workerPaidProductsInCart() {
 }
 function applyQuantityPromotions(lines) {
   const result = lines.map((line) => ({ ...line }));
+  // Only paid lines count toward buy thresholds (never count free grants).
   const qtyByProduct = {};
   result.forEach((line) => {
+    if (line.isPromoFree) return;
     qtyByProduct[line.productId] =
-      (qtyByProduct[line.productId] || 0) + line.quantity;
+      (qtyByProduct[line.productId] || 0) + (Number(line.quantity) || 0);
   });
   (state.promotionRules.quantity || []).forEach((rule) => {
     const buyIds = promotionBuyProductIds(rule),
       freeIds = promotionFreeProductIds(rule),
-      buyQty = Number(rule.buyQty) || 0,
-      freeQty = Number(rule.freeQty) || 1;
-    if (!buyIds.length || !freeIds.length || buyQty < 1) return;
+      buyQty = Math.floor(Number(rule.buyQty) || 0),
+      freeQty = Math.floor(Number(rule.freeQty) || 0);
+    if (!buyIds.length || !freeIds.length || buyQty < 1 || freeQty < 1) return;
     const combinedQty = buyIds.reduce(
       (sum, id) => sum + (qtyByProduct[id] || 0),
       0,
     );
     const sets = Math.floor(combinedQty / buyQty);
     if (sets < 1) return;
-    const grant = sets * freeQty;
-    freeIds.forEach((freeId) => {
-      const product = state.products.find((p) => p.id === freeId);
-      if (!product) return;
-      const existing = result.find(
-        (l) => l.productId === freeId && l.isPromoFree,
-      );
-      if (existing) {
-        existing.quantity += grant;
-        existing.total = 0;
-      } else {
-        result.push({
-          productId: freeId,
-          productName: product.name,
-          quantity: grant,
-          price: 0,
-          total: 0,
-          isPromoFree: true,
-        });
-      }
-    });
+    appendPromoFreeLines(result, freeIds, sets * freeQty);
   });
   return result;
 }
@@ -16580,13 +16578,68 @@ function refreshPickerList() {
   updatePickerClearBtn();
   return true;
 }
-function getWorkerQty(productId) {
-  const raw = state.workerQty[productId];
-  const n = Number(raw);
+function workerLinesWithPaidQty(productId, qty) {
+  const targetId = String(productId || "");
+  const paid = state.products
+    .map((p) => {
+      const stockHave = Math.max(0, Math.floor(Number(p.stock) || 0));
+      const q =
+        String(p.id) === targetId
+          ? Math.max(0, Math.min(Math.floor(Number(qty) || 0), stockHave))
+          : Math.min(getWorkerQtyRaw(p.id), stockHave);
+      if (q < 1) return null;
+      return {
+        productId: p.id,
+        productName: p.name,
+        quantity: q,
+        price: p.price,
+        total: p.price * q,
+      };
+    })
+    .filter(Boolean);
+  const gross = paid.reduce((s, l) => s + l.total, 0);
+  return applyPaymentPromotions(
+    applyPricePromotions(applyQuantityPromotions(paid), gross),
+    gross,
+    state.paymentTerm,
+  );
+}
+/** Raw cart qty without stock clamp (avoids recursion in max search). */
+function getWorkerQtyRaw(productId) {
+  const n = Number(state.workerQty[productId]);
   if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
+}
+/**
+ * Largest paid qty for a product such that paid + урамшуулал still fits stock
+ * for every SKU in the cart.
+ */
+function maxWorkerPaidQty(productId) {
   const p = state.products.find((x) => x.id === productId);
   if (!p) return 0;
-  return Math.min(Math.floor(n), p.stock);
+  const stockHave = Math.max(0, Math.floor(Number(p.stock) || 0));
+  if (stockHave < 1) return 0;
+  let lo = 0;
+  let hi = stockHave;
+  let best = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const issues = orderStockIssues(workerLinesWithPaidQty(productId, mid));
+    if (!issues.length) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best;
+}
+function getWorkerQty(productId) {
+  const raw = getWorkerQtyRaw(productId);
+  if (raw < 1) return 0;
+  const p = state.products.find((x) => x.id === productId);
+  if (!p) return 0;
+  return Math.min(raw, Math.max(0, Math.floor(Number(p.stock) || 0)));
 }
 function resetWorkerCart() {
   state.workerQty = {};
@@ -16601,8 +16654,14 @@ function resetWorkerCart() {
 function setWorkerQty(id, qty) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  const q = Math.max(0, Math.min(Number(qty) || 0, p.stock));
-  if (q > 0) state.workerQty[id] = Math.floor(q);
+  const wanted = Math.max(0, Math.floor(Number(qty) || 0));
+  const maxOk = maxWorkerPaidQty(id);
+  const q = Math.min(wanted, maxOk);
+  if (wanted > maxOk) {
+    const have = Math.max(0, Math.floor(Number(p.stock) || 0));
+    showStockLimitToast(`${p.name}: үлд ${have}, урамшуулалтай нийлээд хүрэхгүй`);
+  }
+  if (q > 0) state.workerQty[id] = q;
   else {
     delete state.workerQty[id];
     if (state.workerOrderActiveId === id) state.workerOrderActiveId = "";
@@ -16628,12 +16687,15 @@ function applyPickerBarcode(value, scanned = false) {
   );
   if (product) {
     const current = getWorkerQty(product.id);
-    if (current < (Number(product.stock) || 0)) {
+    const maxOk = maxWorkerPaidQty(product.id);
+    if (current < maxOk) {
       setWorkerQty(product.id, current + 1);
       state.pickerActiveId = product.id;
       return;
     }
-    showStockLimitToast();
+    showStockLimitToast(
+      `${product.name}: урамшуулалтай нийт тоо үлдэгдлээс хэтэрнэ`,
+    );
   } else if (scanned) {
     showAppToast("Баркод олдсонгүй", "error");
   }
@@ -16974,7 +17036,13 @@ async function saveWorker() {
   if (state.settlementAgreed && !settlementText)
     return alert("Тайлбар оруулна уу");
   const stockIssues = orderStockIssues(items);
-  if (alertOrderStockIssues(stockIssues)) return;
+  if (stockIssues.length) {
+    alertOrderStockIssues(stockIssues);
+    showStockLimitToast(
+      "Захиалга + урамшуулал үлдэгдлээс хэтэрсэн тул хадгалах боломжгүй",
+    );
+    return;
+  }
   orderSubmitLock = true;
   render();
   try {
