@@ -546,7 +546,7 @@ function receiptInfoRows(o) {
     receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
     receiptInfoFieldRow(
       "Дансны дугаар:",
-      `<b>IBAN: ${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b>`,
+      `<b>IBAN: ${RECEIPT_BANK_IBAN_SHORT} ${RECEIPT_BANK_ACCOUNT}</b>`,
     ),
   ].join("");
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 40)
@@ -7375,9 +7375,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ["Дансны нэр:", "ТОМУДА групп"],
     ["Регистрийн дугаар:", "5397987"],
     ["Банкны нэр:", "Хаан банк"],
+    // Whole IBAN line lives in C with other bank values (not "IBAN:" alone in A:B).
     [
       "Дансны дугаар:",
-      `IBAN: ${RECEIPT_BANK_IBAN_SHORT}\n${RECEIPT_BANK_ACCOUNT}`,
+      `IBAN: ${RECEIPT_BANK_IBAN_SHORT} ${RECEIPT_BANK_ACCOUNT}`,
     ],
   ];
   const bankRowCount = Math.max(bankLeft.length, rightAddrLines.length);
@@ -7387,10 +7388,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const [leftLabel, leftValue] = bankLeft[i] || ["", ""];
     const rightText = rightAddrLines[i] || "";
     const rightStyle = rightText ? 4 : 5;
-    const valueMultiline = String(leftValue || "").includes("\n");
-    // Bold wrap for account block; normal wrap for other bank values.
-    const valueStyle = valueMultiline || leftValue === "ТОМУДА групп" ? 4 : 5;
-    const rowH = valueMultiline ? 26 : rightText.length > 34 ? 16 : 14;
+    const isIbanValue = String(leftValue || "").startsWith("IBAN:");
+    // Bold for IBAN + company name; keep IBAN on one row so it stays in C.
+    const valueStyle = isIbanValue || leftValue === "ТОМУДА групп" ? 4 : 5;
+    const rowH = rightText.length > 34 ? 16 : 14;
     pushRow(rowH, [
       xlsxCellXml(`A${r}`, 5, si(leftLabel), "s"),
       xlsxCellXml(
