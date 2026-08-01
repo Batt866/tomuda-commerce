@@ -416,7 +416,7 @@ const RECEIPT_HEADER_BG = "#F3F3F3";
 const RECEIPT_GRAND_BG = "#E8EBEE";
 const RECEIPT_SETTLE_BG = "#FFFFCC";
 const RECEIPT_SETTLE_BORDER = "#E6E6A8";
-const RECEIPT_WARN_BG = "#F0F0F0";
+const RECEIPT_WARN_BG = "#FFFFCC";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
@@ -783,15 +783,15 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
       const valueClass = grand
         ? "receipt-grid__summary-value receipt-grid__summary-value--grand"
         : "receipt-grid__summary-value";
-      // Right-side stack: wider left pad so labels sit closer to amounts.
-      return `<tr class="${rowClass}"><td colspan="6" class="receipt-grid__summary-pad"></td><td colspan="3" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td colspan="2" class="${valueClass}">${value}</td></tr>`;
+      // Forward of the amounts (not flush-right): pad | label | value.
+      return `<tr class="${rowClass}"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td colspan="2" class="${valueClass}">${value}</td></tr>`;
     })
     .join("");
   // Settle agreement sits as the yellow band above Урамшуулал (source zarlaga) — not repeated here.
   const fPay = receiptPartyFields(o);
   const payChecks = receiptPaymentChecksHtml(!!fPay.paid, !!fPay.bank);
   const payHtml = `${payChecks.cash}&nbsp;&nbsp;${payChecks.bank}`;
-  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="6" class="receipt-grid__summary-pad"></td><td colspan="3" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
+  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
   return summaryPart + payRow;
 }
 function SummarySection(sub, vat, payable, payTerm, o) {
@@ -6717,13 +6717,13 @@ td, th { border: none; }
 .receipt-header-brand {
   display: grid;
   grid-template-columns: 16mm minmax(0, 1fr) auto;
-  column-gap: 0.6mm;
+  column-gap: 1mm;
   align-items: start;
   width: 100%;
   box-sizing: border-box;
   border: 1px solid #666;
   border-bottom: none;
-  padding: 3px 4px 4px;
+  padding: 4px 4px 6px;
 }
 .receipt-logo {
   /* Fixed 16mm — same as reference PDF; never rescale. */
@@ -6741,14 +6741,16 @@ td, th { border: none; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 3px;
   padding-left: 0;
 }
 .receipt-header-date {
   white-space: nowrap;
   font-size: 8px;
-  line-height: 1.15;
+  line-height: 1.2;
   padding-top: 1px;
+  text-align: right;
+  justify-self: end;
 }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT_TITLE};
@@ -7252,15 +7254,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
-  const hr4 = rowNum + 3;
-  // Logo in A only (overflows visually); brand/text start in B so they sit next to the logo.
+  // Logo left edge (A), date right edge (F:G), brand beside logo (B:E).
   merges.push(
     `A${hr1}:A${hr3}`,
-    `B${hr1}:D${hr1}`,
-    `E${hr1}:G${hr1}`,
+    `B${hr1}:E${hr1}`,
+    `F${hr1}:G${hr1}`,
     `B${hr2}:G${hr2}`,
     `B${hr3}:G${hr3}`,
-    `A${hr4}:G${hr4}`,
   );
   const plain = (value) =>
     String(value ?? "")
@@ -7304,21 +7304,22 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   //   Хаяг: ...
   //   Нийслэл...
   const deliveryDateText = `${receiptDeliveryDateValue(o)}`;
-  // Logo spans ~16mm from A into B; indent header copy so it sits just beside the logo.
-  const hdrPad = "   ";
-  pushRow(15, [
+  // Logo left / date right; taller rows = эгнээ хоорондын зай in the header band.
+  const hdrPad = "  ";
+  pushRow(20, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 39, si(`${hdrPad}ТОМУДА ГРУПП`), "s"),
+    // Style 3 = right-aligned — pin date to the top-right edge.
     xlsxCellXml(
-      `E${hr1}`,
-      5,
+      `F${hr1}`,
+      3,
       si(`Хүргэлтийн огноо: ${deliveryDateText}`),
       "s",
     ),
-    ...emptyCells(hr1, "C", "D", 39),
-    ...emptyCells(hr1, "F", "G", 5),
+    ...emptyCells(hr1, "C", "E", 39),
+    ...emptyCells(hr1, "G", "G", 3),
   ]);
-  pushRow(14, [
+  pushRow(17, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
@@ -7328,7 +7329,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ),
     ...emptyCells(hr2, "C", "G", 5),
   ]);
-  pushRow(14, [
+  pushRow(17, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr3}`,
@@ -7338,11 +7339,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ),
     ...emptyCells(hr3, "C", "G", 5),
   ]);
-  pushRow(20, [
-    xlsxCellXml(`A${hr4}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr4, "B", "G", 40),
+  pushRow(5, emptyCells(rowNum));
+  const titleRow = rowNum;
+  merges.push(`A${titleRow}:G${titleRow}`);
+  pushRow(22, [
+    xlsxCellXml(`A${titleRow}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(titleRow, "B", "G", 40),
   ]);
-  pushRow(3, emptyCells(rowNum));
+  pushRow(4, emptyCells(rowNum));
   pushMetaPairRow(
     "Худалдааны төлөөлөгч:",
     f.salesName,
@@ -7368,46 +7372,39 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     f.customerPhone,
   );
   pushRow(4, emptyCells(rowNum));
-  // Bank left + delivery address. Bank VALUES live in wide col C so IBAN never clips.
+  // Bank left + delivery address in ONE right cell (not one Excel row per line).
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 36);
-  const rightAddrLines = ["Хүргэлтийн хаяг:", ...addressLines];
+  const addressBlock = ["Хүргэлтийн хаяг:", ...addressLines].join("\n");
   const bankLeft = [
     ["Дансны нэр:", "ТОМУДА групп"],
     ["Регистрийн дугаар:", "5397987"],
     ["Банкны нэр:", "Хаан банк"],
-    // Whole IBAN line lives in C with other bank values (not "IBAN:" alone in A:B).
     [
       "Дансны дугаар:",
       `IBAN: ${RECEIPT_BANK_IBAN_SHORT} ${RECEIPT_BANK_ACCOUNT}`,
     ],
   ];
-  const bankRowCount = Math.max(bankLeft.length, rightAddrLines.length);
+  const bankRowCount = bankLeft.length;
+  const addrStart = rowNum;
+  const addrEnd = addrStart + bankRowCount - 1;
+  merges.push(`D${addrStart}:G${addrEnd}`);
+  const addrLineCount = 1 + addressLines.length;
+  const addrBlockH = Math.max(bankRowCount * 14, addrLineCount * 13 + 6);
+  const perBankRowH = Math.ceil(addrBlockH / bankRowCount);
   for (let i = 0; i < bankRowCount; i += 1) {
     const r = rowNum;
-    merges.push(`A${r}:B${r}`, `D${r}:G${r}`);
-    const [leftLabel, leftValue] = bankLeft[i] || ["", ""];
-    const rightText = rightAddrLines[i] || "";
-    const rightStyle = rightText ? 4 : 5;
+    merges.push(`A${r}:B${r}`);
+    const [leftLabel, leftValue] = bankLeft[i];
     const isIbanValue = String(leftValue || "").startsWith("IBAN:");
-    // Bold for IBAN + company name; keep IBAN on one row so it stays in C.
     const valueStyle = isIbanValue || leftValue === "ТОМУДА групп" ? 4 : 5;
-    const rowH = rightText.length > 34 ? 16 : 14;
-    pushRow(rowH, [
+    pushRow(perBankRowH, [
       xlsxCellXml(`A${r}`, 5, si(leftLabel), "s"),
-      xlsxCellXml(
-        `C${r}`,
-        valueStyle,
-        leftValue ? si(leftValue) : null,
-        leftValue ? "s" : "empty",
-      ),
-      xlsxCellXml(
-        `D${r}`,
-        rightStyle,
-        rightText ? si(rightText) : null,
-        rightText ? "s" : "empty",
-      ),
+      xlsxCellXml(`C${r}`, valueStyle, si(leftValue), "s"),
+      i === 0
+        ? xlsxCellXml(`D${r}`, 4, si(addressBlock), "s")
+        : xlsxCellXml(`D${r}`, 4, null, "empty"),
       ...emptyCells(r, "B", "B", 5),
-      ...emptyCells(r, "E", "G", rightStyle),
+      ...emptyCells(r, "E", "G", 4),
     ]);
   }
   pushRow(4, emptyCells(rowNum));
@@ -7504,29 +7501,27 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     { grand = false, decimals = false } = {},
   ) => {
     const r = rowNum;
-    // Right-side stack: label D–F (closer to amounts), value G.
-    merges.push(`D${r}:F${r}`);
+    // Forward of amounts: label C–F, value G (not flush against G only).
+    merges.push(`C${r}:F${r}`);
     const labelStyle = grand ? 31 : 30;
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
     pushRow(15, [
       xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, 1, null, "empty"),
-      xlsxCellXml(`C${r}`, 1, null, "empty"),
-      xlsxCellXml(`D${r}`, labelStyle, si(label), "s"),
+      xlsxCellXml(`C${r}`, labelStyle, si(label), "s"),
       xlsxCellXml(`G${r}`, valueStyle, Number(amount) || 0, "n"),
-      ...emptyCells(r, "E", "F", labelStyle),
+      ...emptyCells(r, "D", "F", labelStyle),
     ]);
   };
   const pushSummaryTextRow = (label, value) => {
     const r = rowNum;
-    merges.push(`D${r}:F${r}`);
+    merges.push(`C${r}:F${r}`);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, 1, null, "empty"),
-      xlsxCellXml(`C${r}`, 1, null, "empty"),
-      xlsxCellXml(`D${r}`, 30, si(label), "s"),
+      xlsxCellXml(`C${r}`, 30, si(label), "s"),
       xlsxCellXml(`G${r}`, 3, si(String(value ?? "")), "s"),
-      ...emptyCells(r, "E", "F", 30),
+      ...emptyCells(r, "D", "F", 30),
     ]);
   };
   items.forEach((item, index) => pushItemLikeRow(item, index));
@@ -7553,28 +7548,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     "Төлбөрийн нөхцөл",
     receiptPaymentChecksText(!!f.paid, !!f.bank),
   );
+  // Style 24 = bold + yellow warn fill (same band as settle).
   [
-    [
-      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
-      22,
-    ],
-    ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.", 23],
-    [
-      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
-      22,
-    ],
-    [
-      "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
-      22,
-    ],
-  ].forEach(([text, style], index) => {
+    "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
+    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
+    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
+    "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
+  ].forEach((text, index) => {
     const r = rowNum;
     merges.push(`A${r}:G${r}`);
     const warnH =
-      index === 0 ? Math.max(28, Math.ceil(text.length / 52) * 12) : 13;
+      index === 0 ? Math.max(28, Math.ceil(text.length / 52) * 12) : 14;
     pushRow(warnH, [
-      xlsxCellXml(`A${r}`, style, si(text), "s"),
-      ...emptyCells(r, "B", "G", style),
+      xlsxCellXml(`A${r}`, 24, si(text), "s"),
+      ...emptyCells(r, "B", "G", 24),
     ]);
   });
   pushRow(8, emptyCells(rowNum));
