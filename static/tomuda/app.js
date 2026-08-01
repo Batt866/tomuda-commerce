@@ -573,6 +573,14 @@ function receiptPaymentChecksHtml(paid, bank) {
 function receiptPaymentChecksText(paid, bank) {
   return `${paid ? "☑" : "☐"} Бэлэн   ${bank ? "☑" : "☐"} Зээлээр`;
 }
+/** Receipt payment term: cash → ШУУД ТӨЛӨХ, otherwise → ЗЭЭЛЭЭР. */
+function receiptPaymentTermDisplay(o) {
+  const term = o?.paymentTerm || (receiptPartyFields(o).bank ? "credit" : "cash");
+  if (term === "credit" || (!isCashPayment(term) && term !== "cash")) {
+    return "ЗЭЭЛЭЭР";
+  }
+  return "ШУУД ТӨЛӨХ";
+}
 /** InvoiceHeader — logo + company block (address clear of logo), delivery date, title. */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateValue(o);
@@ -788,9 +796,7 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
     })
     .join("");
   // Settle agreement sits as the yellow band above Урамшуулал (source zarlaga) — not repeated here.
-  const fPay = receiptPartyFields(o);
-  const payChecks = receiptPaymentChecksHtml(!!fPay.paid, !!fPay.bank);
-  const payHtml = `${payChecks.cash}&nbsp;&nbsp;${payChecks.bank}`;
+  const payHtml = esc(receiptPaymentTermDisplay(o));
   const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
   return summaryPart + payRow;
 }
@@ -798,8 +804,7 @@ function SummarySection(sub, vat, payable, payTerm, o) {
   return receiptSummaryRowsHtml(sub, vat, payable, payTerm, o);
 }
 function receiptPaymentTermText(f, o) {
-  if (f.bank || o.paymentTerm === "credit") return "Зээлээр";
-  return "Шууд төлөх";
+  return receiptPaymentTermDisplay(o);
 }
 function receiptShouldShowGross(o) {
   return true;
@@ -6537,6 +6542,7 @@ td, th { border: none; }
 .receipt-info__address-text {
   font-weight: 700;
   font-size: 9px;
+  /* Keep delivery address as one block (not a row per fragment). */
   line-height: 1.4;
   color: ${RECEIPT_TEXT};
   white-space: normal !important;
@@ -7544,10 +7550,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ? `Таны нийт төлөх дүн ${grandNote}`
     : "Таны нийт төлөх дүн";
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
-  pushSummaryTextRow(
-    "Төлбөрийн нөхцөл",
-    receiptPaymentChecksText(!!f.paid, !!f.bank),
-  );
+  pushSummaryTextRow("Төлбөрийн нөхцөл", receiptPaymentTermDisplay(o));
   // Style 24 = bold + yellow warn fill (same band as settle).
   [
     "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
