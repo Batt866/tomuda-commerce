@@ -33,7 +33,7 @@
         { id: "employeeAdd", label: "Ажилтан нэмэх", actions: CRUD },
         { id: "stockIn", label: "Орлого", actions: CRUD },
         { id: "stockOut", label: "Зарлага", actions: CRUD },
-        { id: "reports", label: "Борлуулалтын тайлан", actions: CRUD },
+        { id: "reports", label: "Борлуулалтын мэдээ", actions: CRUD },
         { id: "receipts", label: "Баримтууд", actions: CRUD },
         { id: "promotions", label: "Урамшуулал", actions: CRUD },
         { id: "stockAlert", label: "Үлдэгдлийн мэдэгдэл", actions: CRUD },
@@ -64,7 +64,7 @@
   /** Kept for role templates / legacy saves; not shown in grant UI. */
   const HIDDEN_MODULES = [
     { id: "dashboard", label: "Админ самбар", actions: ["view"] },
-    { id: "orders", label: "Захиалга", actions: CRUD },
+    { id: "orders", label: "Захиалга", actions: [...CRUD, "markDelivered"] },
     { id: "settings", label: "Тохиргоо", actions: ["view"] },
   ];
 
@@ -78,6 +78,7 @@
     create: "нэмэх",
     edit: "засах",
     delete: "устгах",
+    markDelivered: "хүргэлт тэмдэглэх",
   };
 
   function permissionKey(moduleId, actionId) {
@@ -237,8 +238,9 @@
       "count.create",
       "count.edit",
       "receipts.view",
+      "orders.markDelivered",
     ],
-    delivery: ["orders.view"],
+    delivery: ["orders.view", "orders.markDelivered"],
   };
 
   const VIEW_PERMISSION = {
@@ -265,7 +267,7 @@
     ["warehouse", "Агуулах", "warehouse.view"],
     ["employees", "Ажилтан", "employees.view"],
     ["inventory", "Агуулахын бүртгэл", "warehouse.view"],
-    ["reports", "Борлуулалтын тайлан", "reports.view"],
+    ["reports", "Борлуулалтын мэдээ", "reports.view"],
     ["promotions", "Урамшуулал", "promotions.view"],
     ["admin", "Админ", "dashboard.view"],
   ];

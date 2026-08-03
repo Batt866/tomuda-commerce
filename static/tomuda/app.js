@@ -2631,14 +2631,139 @@ const status = (s) =>
     confirmed: "Баталсан",
     delivered: "Хүргэсэн",
     cancelled: "Цуцалсан",
+    delivery_pending: "Хүргэсэн (баталгаажуулах)",
   })[s];
 const badge = (s) =>
   ({
     confirmed: "tone tone--success",
     pending: "tone tone--warning",
     delivered: "tone tone--info",
+    delivery_pending: "tone tone--info",
     cancelled: "tone tone--danger",
   })[s] || "tone tone--danger";
+function isOrderDeliveryMarked(o) {
+  return !!(o && o.deliveryMarkedAt);
+}
+function isOrderFullyDelivered(o) {
+  return o?.status === "delivered";
+}
+function isOrderUndelivered(o) {
+  if (!o || o.status === "cancelled" || o.status === "delivered") return false;
+  if (o.status !== "confirmed") return false;
+  return !isOrderDeliveryMarked(o);
+}
+function orderDisplayStatus(o) {
+  if (!o) return "";
+  if (o.status === "confirmed" && isOrderDeliveryMarked(o))
+    return "delivery_pending";
+  return o.status;
+}
+function orderStatusText(o) {
+  if (!o || typeof o === "string") return status(o);
+  return status(orderDisplayStatus(o));
+}
+function orderStatusBadgeClass(o) {
+  if (!o || typeof o === "string") return badge(o);
+  return badge(orderDisplayStatus(o));
+}
+function undeliveredOrders(scope = "all") {
+  const empId = state.currentEmployee?.id || "";
+  return state.orders.filter((o) => {
+    if (!isOrderUndelivered(o) || !o.customerId) return false;
+    if (scope !== "delivery") return true;
+    const delId = o.deliveryEmployeeId || "";
+    return !empId || !delId || delId === empId;
+  });
+}
+function undeliveredOrderCount(scope = "all") {
+  return undeliveredOrders(scope).length;
+}
+function deliveryUndeliveredBanner(scope = "all") {
+  const count = undeliveredOrderCount(scope);
+  if (!count) return "";
+  const text =
+    count === 1
+      ? "Хүргэгдээгүй 1 баримт байна"
+      : `Хүргэгдээгүй ${count} баримт байна`;
+  return `<div class="delivery-alert" role="alert"><span class="delivery-alert__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><p class="delivery-alert__text"><strong>${esc(text)}</strong></p></div>`;
+}
+function canMarkOrderDelivered(o) {
+  if (!o || o.status !== "confirmed") return false;
+  if (isOrderDeliveryMarked(o) || isOrderFullyDelivered(o)) return false;
+  if (isAdmin() || hasPermission("orders.edit")) return true;
+  if (
+    hasPermission("orders.markDelivered") ||
+    currentRole() === "delivery"
+  ) {
+    const empId = state.currentEmployee?.id || "";
+    const delId = o.deliveryEmployeeId || "";
+    return !empId || !delId || delId === empId;
+  }
+  if (
+    hasPermission("stockOut.edit") ||
+    hasPermission("stockOut.create") ||
+    hasPermission("warehouse.edit")
+  ) {
+    return true;
+  }
+  return false;
+}
+function canConfirmOrderDelivery(o) {
+  if (!isAdmin()) return false;
+  if (!o || o.status !== "confirmed" || !isOrderDeliveryMarked(o)) return false;
+  return true;
+}
+function markOrderDelivered(id) {
+  const o = state.orders.find((x) => x.id === id);
+  if (!o || !canMarkOrderDelivered(o)) {
+    return alertModal("Эрхгүй", "Энэ захиалгыг хүргэсэн гэж тэмдэглэх эрхгүй.");
+  }
+  o.deliveryMarkedAt = new Date().toISOString();
+  o.deliveryMarkedBy = state.currentEmployee?.id || "";
+  render();
+  criticalBackendSave();
+  showInstallToast("Хүргэлт тэмдэглэгдлээ");
+}
+function confirmMarkOrderDelivered(id) {
+  const o = state.orders.find((x) => x.id === id);
+  if (!o || !canMarkOrderDelivered(o)) return;
+  confirmModal(
+    "Хүргэлт",
+    `${esc(o.customerName || "Захиалга")} хүргэгдсэн гэж тэмдэглэх үү?`,
+    {
+      confirmLabel: "Хүргэсэн",
+      onConfirm: () => markOrderDelivered(id),
+    },
+  );
+}
+function confirmOrderDelivery(id) {
+  if (!isAdmin()) {
+    return alertModal(
+      "Эрхгүй",
+      "Зөвхөн админ хүргэлтийг баталгаажуулж болно.",
+    );
+  }
+  const o = state.orders.find((x) => x.id === id);
+  if (!o || !canConfirmOrderDelivery(o)) return;
+  o.status = "delivered";
+  o.deliveryConfirmedAt = new Date().toISOString();
+  o.deliveryConfirmedBy = state.currentEmployee?.id || "";
+  render();
+  criticalBackendSave();
+  showInstallToast("Хүргэлт баталгаажлаа");
+}
+function confirmOrderDeliveryModal(id) {
+  const o = state.orders.find((x) => x.id === id);
+  if (!o || !canConfirmOrderDelivery(o)) return;
+  confirmModal(
+    "Хүргэлт баталгаажуулах",
+    `${esc(o.customerName || "Захиалга")} захиалгын хүргэлтийг баталгаажуулах уу?`,
+    {
+      confirmLabel: "Баталгаажуулах",
+      onConfirm: () => confirmOrderDelivery(id),
+    },
+  );
+}
 const metricsNotifyIcon = (active = false) =>
   `<span class="metrics-bar__notify${active ? " metrics-bar__notify--active" : ""}" aria-hidden="true"><svg class="ui-icon metrics-bar__notify-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>`;
 const ADMIN_METRIC_ICONS = {
@@ -2703,7 +2828,7 @@ const MOBILE_NAV_SHORT = {
   count: "Тооллого",
   employees: "Ажилтан",
   inventory: "Бүртгэл",
-  reports: "Борлуулалтын тайлан",
+  reports: "Борлуулалтын мэдээ",
   promotions: "Урамшуулал",
   admin: "Админ",
 };
@@ -2744,7 +2869,7 @@ function sidebarNavForRole(role) {
       ["warehouse", "Нярав"],
       ["employees", "Ажилтан"],
       ["inventory", "Агуулахын бүртгэл"],
-      ["reports", "Борлуулалтын тайлан"],
+      ["reports", "Борлуулалтын мэдээ"],
       ["promotions", "Урамшуулал"],
       ["admin", "Админ"],
     ];
@@ -2822,7 +2947,7 @@ function currentPageTitle(nav) {
     employees: "Ажилтан",
     employeePermissions: "Эрхийн тохиргоо",
     inventory: "Нярав",
-    reports: "Борлуулалтын тайлан",
+    reports: "Борлуулалтын мэдээ",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
     count: "Тооллого",
@@ -6075,7 +6200,7 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["inventory", "Нярав", "inventory", "warehouse.view"],
-    ["reports", "Борлуулалтын тайлан", "reports", "reports.view"],
+    ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
     ["count", "Тооллого", "count", "count.view"],
@@ -6125,7 +6250,7 @@ function adminView() {
   const alertOn = state.settings.stockAlertEnabled !== false;
   const metrics = adminMetricsBar(
     adminMetricCard(
-      "Таталт хийх шаардлагатай бараа",
+      "Татан авалт хийх шаардлагатай бараа",
       low,
       low && alertOn ? "text-tone-warning" : "text-tone-success",
       {
@@ -6261,7 +6386,7 @@ function stockAlertModal() {
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
     "Үлдэгдэл сануулах",
-    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Таталт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Татан авалт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-xl",
   );
 }
@@ -8039,8 +8164,16 @@ function warehouseOrderStatusActions(o) {
       html += `<button type="button" onclick="confirmCancelOrder('${o.id}')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
     return html;
   }
-  if (o.status === "confirmed")
-    return `<button type="button" onclick="setOrder('${o.id}','delivered')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
+  if (o.status === "confirmed") {
+    let html = "";
+    if (canMarkOrderDelivered(o)) {
+      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
+    }
+    if (canConfirmOrderDelivery(o)) {
+      html += `<button type="button" onclick="confirmOrderDeliveryModal('${o.id}')" class="btn btn--sm tone tone--success">Баталгаажуулах</button>`;
+    }
+    return html;
+  }
   return "";
 }
 function warehouseReceiptListItem(o) {
@@ -8111,7 +8244,8 @@ function warehouseOrderDetail(o) {
   ensureReceiptScreenStyles();
   const snap = orderReceiptSnapshot(o);
   const docHtml = receiptSheetHtml(snap, RECEIPT_LOGO_DATA_URI);
-  return `<div class="wh-receipt-detail wh-receipt-preview"><div class="wh-receipt-preview__scroll"><div class="wh-receipt-preview__doc receipt-page">${docHtml}</div></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns"><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
+  const statusActions = warehouseOrderStatusActions(o);
+  return `<div class="wh-receipt-detail wh-receipt-preview"><div class="wh-receipt-preview__scroll"><div class="wh-receipt-preview__doc receipt-page">${docHtml}</div></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns">${statusActions ? `<div class="wh-receipt-detail__status">${statusActions}</div>` : ""}<button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
 }
 function ensureReceiptScreenStyles() {
   let el = document.getElementById("tomuda-receipt-screen-styles");
@@ -8159,7 +8293,7 @@ function ensureReceiptScreenStyles() {
 `;
 }
 function orderRow(o) {
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${badge(o.status)}">${status(o.status)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
 }
 function customerAvatarHtml(c, className = "customer-card__avatar") {
   const src = entityImageSrc(c?.image);
@@ -9379,7 +9513,7 @@ function productCard(p) {
     : "";
   const low = isLowStock(p);
   const stock = p.stock ?? 0;
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__hint"><span class="product-card__hint-cat">${esc(catLine)}</span><span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-code">${esc(p.barcode || "—")}</span></p></div></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл">Үлд ${stock}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span>${adminActions}</article>`;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__hint"><span class="product-card__hint-cat">${esc(catLine)}</span><span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-code">${esc(p.barcode || "—")}</span></p></div></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд </span>${stock}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -12107,7 +12241,7 @@ function reportsView() {
         commission: (sum * e.commissionRate) / 100,
       };
     });
-  return `<div class="space-y-4">${pageHead("Борлуулалтын тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
   const paid = orderIsPaid(o),
@@ -13864,10 +13998,24 @@ function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";
   return state.orders.filter((o) => {
     if (o.status === "cancelled" || o.status === "delivered") return false;
+    if (isOrderDeliveryMarked(o)) return false;
     const delId = o.deliveryEmployeeId || "";
     if (empId && delId && delId !== empId) return false;
     return !!o.customerId;
   });
+}
+function deliveryOrderRowActions(o) {
+  if (canMarkOrderDelivered(o)) {
+    return `<button type="button" onclick="event.stopPropagation();confirmMarkOrderDelivered('${esc(o.id)}')" class="delivery-order-row__mark btn btn--sm tone tone--info">Хүргэсэн</button>`;
+  }
+  if (isOrderDeliveryMarked(o)) {
+    return `<span class="delivery-order-row__marked">Хүргэсэн</span>`;
+  }
+  return "";
+}
+function deliveryOrderRowHtml(o) {
+  const actions = deliveryOrderRowActions(o);
+  return `<div class="delivery-order-row"><button type="button" class="delivery-order-row__open" onclick="orderReceiptModal('${esc(o.id)}')"><div class="delivery-order-row__main"><span class="delivery-order-row__no">${receiptNo(o, "xs")}</span><span class="delivery-order-row__meta">${dte(orderDeliveryDay(o))} · ${o.items.length} бараа</span></div><b class="delivery-order-row__total">${fmt(orderAmount(o))}</b></button>${actions}</div>`;
 }
 function deliveryStoresWithOrders() {
   const byCustomer = {};
@@ -13941,8 +14089,11 @@ function deliveryStoreCard(entry, active = false) {
 }
 function deliveryStorePickStep() {
   const q = state.searches.deliveryStore || "",
-    rows = filterDeliveryStores(deliveryStoresWithOrders(), q);
-  return `<section class="delivery-view"><div class="delivery-view__head">${pageHead("Хүргэлт")}<p class="delivery-view__lead">Захиалгатай дэлгүүр сонгоно уу</p></div><div class="delivery-view__toolbar"><input data-focus="deliveryStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Нэр, утас, хаягаар хайх..." class="delivery-view__search app-input" autocomplete="off" aria-label="Дэлгүүр хайх"></div>${rows.length ? `<div class="delivery-store-grid">${rows.map((entry) => deliveryStoreCard(entry, state.deliveryStoreId === entry.customer.id)).join("")}</div>` : `<p class="delivery-view__empty">${q ? "Олдсонгүй" : "Захиалгатай дэлгүүр байхгүй"}</p>`}</section>`;
+    rows = filterDeliveryStores(deliveryStoresWithOrders(), q),
+    banner = deliveryUndeliveredBanner(
+      currentRole() === "delivery" ? "delivery" : "all",
+    );
+  return `<section class="delivery-view"><div class="delivery-view__head">${pageHead("Хүргэлт")}<p class="delivery-view__lead">Захиалгатай дэлгүүр сонгоно уу</p></div>${banner}<div class="delivery-view__toolbar"><input data-focus="deliveryStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Нэр, утас, хаягаар хайх..." class="delivery-view__search app-input" autocomplete="off" aria-label="Дэлгүүр хайх"></div>${rows.length ? `<div class="delivery-store-grid">${rows.map((entry) => deliveryStoreCard(entry, state.deliveryStoreId === entry.customer.id)).join("")}</div>` : `<p class="delivery-view__empty">${q ? "Олдсонгүй" : "Захиалгатай дэлгүүр байхгүй"}</p>`}</section>`;
 }
 function deliveryOrdersForStore(customerId) {
   return deliveryRelevantOrders()
@@ -13968,18 +14119,16 @@ function deliveryStoreMapStep() {
     rows.find((r) => r.customer.id === selected.id) ||
     deliveryStoresWithOrders().find((r) => r.customer.id === selected.id);
   const orderList = orders.length
-    ? orders
-        .map(
-          (o) =>
-            `<button type="button" class="delivery-order-row" onclick="orderReceiptModal('${esc(o.id)}')"><div class="delivery-order-row__main"><span class="delivery-order-row__no">${receiptNo(o, "xs")}</span><span class="delivery-order-row__meta">${dte(orderDeliveryDay(o))} · ${o.items.length} бараа</span></div><b class="delivery-order-row__total">${fmt(orderAmount(o))}</b></button>`,
-        )
-        .join("")
+    ? orders.map((o) => deliveryOrderRowHtml(o)).join("")
     : `<p class="delivery-view__empty">Захиалга алга</p>`;
+  const banner = deliveryUndeliveredBanner(
+    currentRole() === "delivery" ? "delivery" : "all",
+  );
   const otherStores = rows
     .filter((entry) => entry.customer.id !== selected.id)
     .map((entry) => deliveryStoreCard(entry, false))
     .join("");
-  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(selected.name)}</h2></div><div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}${maps ? `<a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps нээх</a>` : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
+  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(selected.name)}</h2></div>${banner}<div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}${maps ? `<a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps нээх</a>` : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
 }
 function deliveryView() {
   if (!state.deliveryStoreReady || !state.deliveryStoreId) {
@@ -16599,7 +16748,7 @@ function orderReceiptModal(id, keepDraft = false) {
   const draft = receiptEditDraftOrder();
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${badge(o.status)}">${status(o.status)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
+    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
@@ -17837,6 +17986,15 @@ function delProduct(id) {
 }
 function setOrder(id, s) {
   if (s === "cancelled" && !canDelete()) return;
+  if (s === "delivered") {
+    const o = state.orders.find((x) => x.id === id);
+    if (o && canConfirmOrderDelivery(o)) return confirmOrderDeliveryModal(id);
+    if (o && canMarkOrderDelivered(o)) return confirmMarkOrderDelivered(id);
+    return alertModal(
+      "Эрхгүй",
+      "Хүргэлтийг эхлээд түгээгч тэмдэглээд, админ баталгаажуулна.",
+    );
+  }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
   if (s === "cancelled" && o.status !== "cancelled") {
@@ -18074,6 +18232,10 @@ Object.assign(window, {
   storePickerSearch,
   selectWorkerCustomer,
   pickDeliveryStore,
+  confirmMarkOrderDelivered,
+  confirmOrderDeliveryModal,
+  markOrderDelivered,
+  confirmOrderDelivery,
   clearDeliveryStore,
   pickWorkerStore,
   confirmWorkerStore,

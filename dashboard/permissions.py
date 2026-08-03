@@ -36,7 +36,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
             {"id": "employeeAdd", "label": "Ажилтан нэмэх", "actions": CRUD},
             {"id": "stockIn", "label": "Орлого", "actions": CRUD},
             {"id": "stockOut", "label": "Зарлага", "actions": CRUD},
-            {"id": "reports", "label": "Борлуулалтын тайлан", "actions": CRUD},
+            {"id": "reports", "label": "Борлуулалтын мэдээ", "actions": CRUD},
             {"id": "receipts", "label": "Баримтууд", "actions": CRUD},
             {"id": "promotions", "label": "Урамшуулал", "actions": CRUD},
             {"id": "stockAlert", "label": "Үлдэгдлийн мэдэгдэл", "actions": CRUD},
@@ -66,7 +66,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
 
 HIDDEN_MODULES: list[dict[str, Any]] = [
     {"id": "dashboard", "label": "Админ самбар", "actions": ["view"]},
-    {"id": "orders", "label": "Захиалга", "actions": CRUD},
+    {"id": "orders", "label": "Захиалга", "actions": [*CRUD, "markDelivered"]},
     {"id": "settings", "label": "Тохиргоо", "actions": ["view"]},
 ]
 
@@ -80,6 +80,7 @@ ACTION_LABELS: dict[str, str] = {
     "create": "нэмэх",
     "edit": "засах",
     "delete": "устгах",
+    "markDelivered": "хүргэлт тэмдэглэх",
 }
 
 
@@ -253,8 +254,9 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "count.create",
         "count.edit",
         "receipts.view",
+        "orders.markDelivered",
     ],
-    "delivery": ["orders.view"],
+    "delivery": ["orders.view", "orders.markDelivered"],
 }
 
 
@@ -363,6 +365,56 @@ def _order_within_retention(
     expires = created + timedelta(days=days)
     expires = expires.replace(hour=23, minute=59, second=59, microsecond=999999)
     return expires >= (now or datetime.utcnow())
+
+
+DELIVERY_MARK_KEYS = {"deliveryMarkedAt", "deliveryMarkedBy"}
+DELIVERY_CONFIRM_KEYS = {
+    "status",
+    "deliveryConfirmedAt",
+    "deliveryConfirmedBy",
+    "deliveryMarkedAt",
+    "deliveryMarkedBy",
+}
+
+
+def _order_keys_equal(
+    old_order: dict[str, Any],
+    new_order: dict[str, Any],
+    ignored: set[str],
+) -> bool:
+    keys = set(old_order.keys()) | set(new_order.keys())
+    for key in keys:
+        if key in ignored:
+            continue
+        if old_order.get(key) != new_order.get(key):
+            return False
+    return True
+
+
+def _is_delivery_mark_only_update(
+    old_order: dict[str, Any], new_order: dict[str, Any]
+) -> bool:
+    if str(old_order.get("status") or "") != "confirmed":
+        return False
+    if str(new_order.get("status") or "") != "confirmed":
+        return False
+    if not new_order.get("deliveryMarkedAt"):
+        return False
+    if old_order.get("deliveryMarkedAt"):
+        return False
+    return _order_keys_equal(old_order, new_order, DELIVERY_MARK_KEYS)
+
+
+def _is_delivery_confirm_update(
+    old_order: dict[str, Any], new_order: dict[str, Any]
+) -> bool:
+    if str(old_order.get("status") or "") != "confirmed":
+        return False
+    if str(new_order.get("status") or "") != "delivered":
+        return False
+    if not old_order.get("deliveryMarkedAt"):
+        return False
+    return _order_keys_equal(old_order, new_order, DELIVERY_CONFIRM_KEYS)
 
 
 def _created_order_stock_usage(
@@ -602,9 +654,17 @@ def validate_state_mutation(
             if not _has_any_permission(perms, "orders.create"):
                 return False, "Захиалга үүсгэх эрхгүй"
             continue
-        if old_order != new_order and not _has_any_permission(
-            perms, "orders.edit", "orders.delete"
-        ):
+        if old_order == new_order:
+            continue
+        if _is_delivery_mark_only_update(old_order, new_order):
+            if not _has_any_permission(perms, "orders.markDelivered", "orders.edit"):
+                return False, "Захиалга хүргэлт тэмдэглэх эрхгүй"
+            continue
+        if _is_delivery_confirm_update(old_order, new_order):
+            if not _has_any_permission(perms, "orders.edit"):
+                return False, "Захиалга баталгаажуулах эрхгүй"
+            continue
+        if not _has_any_permission(perms, "orders.edit", "orders.delete"):
             return False, "Захиалга засах эрхгүй"
 
     old_products = _by_id(old_state.get("products") or [])
