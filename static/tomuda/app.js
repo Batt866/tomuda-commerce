@@ -3310,7 +3310,7 @@ function readCustomerImageFromForm(form) {
   let image = String(hidden?.value || "").trim();
   if (image.startsWith("data:image/svg")) image = "";
   if (!image) {
-    const preview = form.querySelector("#customerImagePreview");
+    const preview = form.querySelector("#productImagePreview");
     const src = String(preview?.currentSrc || preview?.src || "").trim();
     if (
       src.startsWith("data:image/") ||
