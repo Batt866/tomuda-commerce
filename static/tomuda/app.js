@@ -441,6 +441,7 @@ function receiptPartyFields(o) {
     customerReg: esc(c.registrationNumber || "-"),
     companyName: esc(c.companyName || "-"),
     customerPhone: esc(customerPhonesList(c).join(", ") || "-"),
+    customerEmail: esc(c.email || "-"),
     address: esc(addr),
     addressPlain: addr,
     paid,
@@ -540,6 +541,7 @@ function receiptInfoRows(o) {
       "Утасны дугаар:",
       f.customerPhone,
     ),
+    receiptInfoPairRow("", "", "И-мэйл:", f.customerEmail),
   ].join("");
   const bank = [
     receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
@@ -6253,7 +6255,7 @@ function stockAlertModal() {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
           const limitAttr = limit > 0 ? `value="${limit}" ` : "";
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${p}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
@@ -6371,6 +6373,7 @@ function buildOrderReceiptExcelRows(o) {
       ["Регистр", c.registrationNumber || "-"],
       ["Компани", c.companyName || "-"],
       ["Утас", customerPhonesList(c).join(", ") || "-"],
+      ["И-мэйл", c.email || "-"],
       ["Хаяг", addr === "-" ? "" : addr],
       ["Төлбөр", paid ? "Шууд төлөх" : "Дансаар"],
       ["Төлөв", status(o.status)],
@@ -7439,6 +7442,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     "Утасны дугаар:",
     f.customerPhone,
   );
+  pushMetaPairRow("", "", "И-мэйл:", f.customerEmail);
   pushRow(4, emptyCells(rowNum));
   // Bank left + delivery address in ONE right cell (not one Excel row per line).
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 36);
@@ -8277,6 +8281,9 @@ function clearCustomerImage() {
 function customerDetailIdIcon() {
   return `<svg class="ui-icon customer-detail__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h5M7 13h8"/></svg>`;
 }
+function customerDetailEmailIcon() {
+  return `<svg class="ui-icon customer-detail__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+}
 function customerDetailRow(label, valueHtml, iconHtml) {
   return `<div class="customer-detail__row">${iconHtml}<div class="customer-detail__row-body"><span class="customer-detail__label">${label}</span><div class="customer-detail__value">${valueHtml}</div></div></div>`;
 }
@@ -8404,6 +8411,13 @@ function customerDetailHtml(c) {
       "Утас",
       customerDetailPhonesHtml(c),
       customerCardPhoneIcon(),
+    ),
+    customerDetailRow(
+      "И-мэйл",
+      c.email
+        ? esc(c.email)
+        : `<span class="customer-detail__muted">—</span>`,
+      customerDetailEmailIcon(),
     ),
     customerDetailRow(
       "Хаяг",
@@ -9195,6 +9209,7 @@ function customerExcel() {
       "РД",
       "Байгууллагын нэр",
       ...phoneHeaders,
+      "И-мэйл",
       "Аймаг/Хот",
       "Дүүрэг/Сум",
       "Хороо",
@@ -9210,6 +9225,7 @@ function customerExcel() {
         c.registrationNumber || "",
         c.companyName || "",
         ...Array.from({ length: phoneCount }, (_, n) => phones[n] || ""),
+        c.email || "",
         c.province || "",
         c.district || "",
         c.khoroo || "",
@@ -12110,7 +12126,8 @@ function confirmSetPaid(id) {
     onConfirm: () => setPaid(id, true),
   });
 }
-const PROMO_PRODUCT_LABEL = "Урамшууллын бараа";
+const PROMO_PRODUCT_LABEL = "Урамшуулалд олгох бараа";
+const PROMO_BUY_PRODUCT_LABEL = "Авах бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
 const PROMO_PAYMENT_LABEL = "Шууд төлөлтийн урамшуулал оруулах";
 const PROMO_QUANTITY_LABEL = "Багц худалдан авалтын хөнгөлөлт";
@@ -12173,7 +12190,7 @@ function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
     ? promotionQtyField(qtyOpts.name, qtyOpts.label, qtyOpts.defaultValue, true)
     : "";
   return qtyHtml
-    ? `<div class="promo-input-row">${searchInputHtml}${qtyHtml}</div>`
+    ? `<div class="promo-input-row promo-input-row--stack">${searchInputHtml}${qtyHtml}</div>`
     : `<div class="mb-2">${searchInputHtml}</div>`;
 }
 function promoFormDraftVal(name, fallback = "") {
@@ -12278,7 +12295,7 @@ function promoProductSearchListInnerHtml({
         addAction === "select"
           ? `selectPromoProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})`
           : `addPromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})`;
-      return `<button type="button" onclick="${onclick}" class="promo-product-row ${selectedId === p.id ? "is-active" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 text-left"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`;
+      return `<button type="button" onclick="${onclick}" class="promo-product-row ${selectedId === p.id ? "is-active" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 text-left promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`;
     })
     .join(
       "",
@@ -12425,7 +12442,7 @@ function promotionQtyField(name, label, defaultValue, inline = false) {
 }
 function promotionProductPickRow(p, fieldName, selectedId) {
   const active = selectedId === p.id;
-  return `<button type="button" onclick="selectPromoProduct('${fieldName}','${p.id}')" class="promo-product-row ${active ? "is-active" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 text-left"><p class="text-sm font-medium truncate">${p.name}</p><p class="text-xs text-muted-foreground">${p.category} · ${p.barcode}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${p.unit}</p></div></button>`;
+  return `<button type="button" onclick="selectPromoProduct('${fieldName}','${p.id}')" class="promo-product-row ${active ? "is-active" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 text-left promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`;
 }
 function promotionBuyProductIds(rule) {
   if (Array.isArray(rule.buyProductIds) && rule.buyProductIds.length) {
@@ -12682,7 +12699,7 @@ function promotionMultiProductPickerBlock({
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
     selectedHtml = selectedProducts.length
-      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
+      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1 promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
       : `<p class="promo-section-hint">Хайлтаар бараа нэмнэ</p>`,
     searchHtml = promoProductSearchListHtml({
       pickKey,
@@ -12707,7 +12724,7 @@ function promotionMultiBuyPickerBlock(selectedIds) {
     fieldName: "buyProductIds",
     selectedIds,
     excludeIds: [],
-    title: "Сонгосон бараа",
+    title: PROMO_BUY_PRODUCT_LABEL,
     hint: "Олон бараа сонгож болно · төрөл бүрээс эсвэл нийт тоо",
     placeholder: "Бараа хайж нэмэх...",
     variant: "buy",
@@ -12834,7 +12851,7 @@ function promotionQtyRuleText(r) {
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцад хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">${PROMO_QUANTITY_LABEL}-ийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Авах бараа болон ${PROMO_PRODUCT_LABEL}-аа сонгоод багцын дүрэм үүсгэнэ.</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="promo-qty-rule-list">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="promo-qty-rule-list__empty">${PROMO_QUANTITY_LABEL}-ийн дүрэм байхгүй</div>`}</div></div>`;
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -12859,24 +12876,29 @@ function promotionQtyRuleCard(r, i) {
             .join(", ")} +${freeProducts.length - 2}`
         : freeProducts.map((p) => p.name).join(", ") || "-",
     buyThumbs = buyProducts
-      .slice(0, 3)
       .map(
         (p) =>
-          `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb promo-qty-rule-thumb" alt="">`,
+          `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join(""),
     freeThumbs = freeProducts
-      .slice(0, 3)
       .map(
         (p) =>
-          `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb promo-qty-rule-thumb" alt="">`,
+          `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
   const buyDesc =
     quantityPromoBuyMode(r) === "each" && buyIds.length > 1
       ? `төрөл бүрээс ${r.buyQty} ш`
       : `нийт ${r.buyQty} ш авахад`;
-  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">${buyDesc}</p><p class="text-xs text-muted-foreground">${esc(quantityPromoRuleFormulaExtended(r))}</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${promoProductQtyLabel(r.freeQty)}</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
+  const deleteBtn = canDelete()
+    ? deleteIconButton({
+        className: "icon-action-btn icon-action-btn--neutral promo-qty-rule-card__delete",
+        attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`,
+        label: "Дүрэм устгах",
+      })
+    : "";
+  return `<article class="promo-qty-rule-card"><header class="promo-qty-rule-card__head"><span class="promo-qty-rule-card__num" aria-hidden="true">${i + 1}</span><div class="promo-qty-rule-card__head-text min-w-0"><p class="promo-qty-rule-card__title">Дүрэм ${i + 1}</p><p class="promo-qty-rule-card__summary">${esc(quantityPromoRuleFormula(r))}</p></div>${deleteBtn}</header><div class="promo-qty-rule-card__stack"><section class="promo-qty-rule-card__block"><p class="promo-qty-rule-card__label">${PROMO_BUY_PRODUCT_LABEL}</p><div class="promo-qty-rule-buys">${buyThumbs}</div><p class="promo-qty-rule-card__names">${esc(buyLabel)}</p><p class="promo-qty-rule-card__meta">${buyDesc}</p><p class="promo-qty-rule-card__meta promo-qty-rule-card__meta--sub">${esc(quantityPromoRuleFormulaExtended(r))}</p></section><div class="promo-qty-rule-card__arrow" aria-hidden="true">↓</div><section class="promo-qty-rule-card__block promo-qty-rule-card__block--free"><p class="promo-qty-rule-card__label">${PROMO_PRODUCT_LABEL}</p><div class="promo-qty-rule-buys">${freeThumbs}</div><p class="promo-qty-rule-card__names">${esc(freeLabel)}</p><p class="promo-qty-rule-card__gift">${Number(r.freeQty) || 1} ш үнэгүй</p></section></div></article>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -12954,7 +12976,7 @@ function promotionQtyModal() {
     freeIds = state.promoPick.freeProductIds;
   box(
     PROMO_QUANTITY_LABEL,
-    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto space-y-3 flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно · сонгосон бараатай ижил байж болно", placeholder: `${PROMO_PRODUCT_LABEL} хайж нэмэх...`, badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="promo-qty-form p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto promo-qty-form__body flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно · авах бараатай ижил байж болно", placeholder: `${PROMO_PRODUCT_LABEL} хайж нэмэх...`, badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="promo-qty-form__foot pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
 }
@@ -15390,6 +15412,7 @@ function customerFromDraft(id, draft) {
     name: draft.name ?? saved.name,
     registrationNumber: draft.registrationNumber ?? saved.registrationNumber,
     companyName: draft.companyName ?? saved.companyName,
+    email: draft.email ?? saved.email,
     province: draft.province ?? saved.province,
     district: draft.district ?? saved.district,
     khoroo: draft.khoroo ?? saved.khoroo,
@@ -15474,7 +15497,7 @@ function customerModal(id, draft = null) {
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);

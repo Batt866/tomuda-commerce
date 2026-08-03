@@ -17,6 +17,7 @@ CUSTOMER_HEADERS = [
     "Регистр",
     "Утас 1",
     "Утас 2",
+    "И-мэйл",
     "Аймаг / Хот",
     "Дүүрэг",
     "Хороо",
@@ -55,6 +56,11 @@ CUSTOMER_HEADER_ALIASES: dict[str, str] = {
     "утас 2": "phone2",
     "утас2": "phone2",
     "phone2": "phone2",
+    "и-мэйл": "email",
+    "имэйл": "email",
+    "email": "email",
+    "e-mail": "email",
+    "mail": "email",
     "аймаг / хот": "province",
     "аймаг/хот": "province",
     "аймаг": "province",
@@ -480,6 +486,7 @@ def build_customer_template_bytes() -> bytes:
         "1234567",
         "99112233",
         "",
+        "info@example.mn",
         "Улаанбаатар",
         "Баянзүрх",
         "1",
@@ -491,10 +498,10 @@ def build_customer_template_bytes() -> bytes:
         ws,
         CUSTOMER_HEADERS,
         example,
-        text_columns={2, 3, 4},
-        min_col_widths=[18, 14, 14, 14, 20, 16, 12, 34, 14, 14],
+        text_columns={2, 3, 4, 5},
+        min_col_widths=[18, 14, 14, 14, 22, 20, 16, 12, 34, 14, 14],
     )
-    for col_idx in (9, 10):
+    for col_idx in (10, 11):
         ws.cell(row=2, column=col_idx).number_format = "0.000000"
     for row_idx in range(3, 8):
         ws.append([""] * len(CUSTOMER_HEADERS))
@@ -582,6 +589,7 @@ def import_customers_into_state(
         reg_digits = _registration_digits(reg_raw)
         phone1 = _cell_text(data.get("phone1"))
         phone2 = _cell_text(data.get("phone2"))
+        email = _cell_text(data.get("email"))
 
         if _is_template_example_customer(name, reg_raw):
             continue
@@ -612,6 +620,7 @@ def import_customers_into_state(
             existing["registrationNumber"] = reg_raw
             existing["phone1"] = phone1
             existing["phone2"] = phone2
+            existing["email"] = email
             existing["province"] = _cell_text(data.get("province")) or "Улаанбаатар"
             existing["district"] = _cell_text(data.get("district"))
             existing["khoroo"] = _cell_text(data.get("khoroo"))
@@ -630,6 +639,7 @@ def import_customers_into_state(
                 "companyName": name,
                 "phone1": phone1,
                 "phone2": phone2,
+                "email": email,
                 "province": _cell_text(data.get("province")) or "Улаанбаатар",
                 "district": _cell_text(data.get("district")),
                 "khoroo": _cell_text(data.get("khoroo")),

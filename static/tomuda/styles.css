@@ -6731,10 +6731,12 @@ textarea::placeholder {
 }
 
 .promo-section-arrow-text {
+  max-width: 240px;
   font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  word-break: break-word;
 }
 
 .promo-section--buy .promo-product-row.is-active {
@@ -6841,49 +6843,178 @@ textarea::placeholder {
   padding: 8px 10px;
 }
 
-.promo-qty-rule-buys {
+.promo-product-row__text {
+  min-width: 0;
+}
+
+.promo-product-row__name {
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.promo-qty-form__body {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.promo-qty-form__foot {
   flex-shrink: 0;
 }
 
-.promo-qty-rule-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--phi-1) var(--phi-1) var(--phi-1) 0;
-  font-size: 15px;
+.promo-input-row--stack {
+  flex-direction: column;
+  align-items: stretch;
 }
 
-.promo-qty-rule-card__body {
+.promo-input-row--stack .promo-qty-field.promo-qty-field--inline {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.promo-qty-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promo-qty-rule-list__empty {
+  padding: 24px 16px;
+  border-radius: 10px;
+  background: var(--hex-card);
+  color: var(--muted-foreground);
+  font-size: 14px;
+  text-align: center;
+}
+
+.promo-qty-rule-buys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.promo-qty-rule-card {
+  padding: 14px 16px;
+  font-size: 15px;
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  background: var(--hex-card);
+}
+
+.promo-qty-rule-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.promo-qty-rule-card__num {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary);
+  border-radius: 999px;
+}
+
+.promo-qty-rule-card__head-text {
+  flex: 1;
   min-width: 0;
+}
+
+.promo-qty-rule-card__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.promo-qty-rule-card__summary {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  word-break: break-word;
+}
+
+.promo-qty-rule-card__delete {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.promo-qty-rule-card__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.promo-qty-rule-card__block {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--secondary);
+}
+
+.promo-qty-rule-card__block--free {
+  background: color-mix(in srgb, var(--hex-success) 8%, var(--secondary));
+}
+
+.promo-qty-rule-card__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.promo-qty-rule-card__names {
+  margin: 8px 0 0;
+  font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.promo-qty-rule-card__meta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  word-break: break-word;
+}
+
+.promo-qty-rule-card__meta--sub {
+  font-size: 12px;
+}
+
+.promo-qty-rule-card__gift {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hex-success-text);
 }
 
 .promo-qty-rule-card__arrow {
   flex-shrink: 0;
-}
-
-.promo-qty-rule-card__buy,
-.promo-qty-rule-card__free {
-  min-width: 0;
-}
-
-.promo-qty-rule-card__actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  align-self: center;
+  text-align: center;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted-foreground);
 }
 
 .promo-qty-rule-thumb {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 .promo-product-row.is-active {
