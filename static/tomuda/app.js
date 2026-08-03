@@ -2269,7 +2269,13 @@ function canExportExcel() {
   return (
     hasPermission("excelExport.view") ||
     hasPermission("excelExport.create") ||
-    hasPermission("reports.view")
+    hasPermission("reports.view") ||
+    hasPermission("warehouse.view") ||
+    hasPermission("warehouse.edit") ||
+    hasPermission("receipts.view") ||
+    hasPermission("stockOut.view") ||
+    hasPermission("stockOut.create") ||
+    hasPermission("count.view")
   );
 }
 function canImportExcel() {
@@ -8115,7 +8121,15 @@ function confirmWarehouseReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
 ) {
-  if (!requireReceiptPrintDelivery("татах")) return;
+  if (!canExportExcel()) {
+    return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  }
+  if (
+    state.currentView === "warehouseReceipts" &&
+    !requireReceiptPrintDelivery("татах")
+  ) {
+    return;
+  }
   confirmOrderReceiptsExcel(searchKey, employeeIds, {
     workerIds: receiptPrintWorkerIds(),
     deliveryIds: receiptPrintDeliveryIds(),
@@ -8127,6 +8141,9 @@ function confirmOrderReceiptsExcel(
   employeeIds = [],
   opts = {},
 ) {
+  if (!canExportExcel()) {
+    return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  }
   if (
     state.currentView === "warehouseReceipts" &&
     !requireReceiptPrintDelivery("татах")
@@ -8930,6 +8947,7 @@ function receiptPrintDeliverySelected() {
 }
 function requireReceiptPrintDelivery(action = "татах") {
   if (receiptPrintDeliverySelected()) return true;
+  if (action === "татах" && currentRole() === "warehouse") return true;
   const step =
     action === "хэвлэх" ? "Баримт хэвлэхийн" : "Баримт татахын";
   alertModal(
@@ -12592,7 +12610,7 @@ function promotionProductPickerBlock(
   return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block"><input type="hidden" name="${fieldName}" id="promo-${fieldName}" value="${esc(selectedId)}" required>${head}${inputRow}${promoCategoryFilterHtml(fieldName)}${warn}${selectedHtml}${listHtml}</div></div>`;
 }
 function promoSectionArrow() {
-  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">жишээ: 16 ш захиалгад → 3 ш урамшуулал</span></div>`;
+  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">жишээ: төмөр 50 + газан 50 + энгийн 50 → төмөр 50 урамшуулал</span></div>`;
 }
 function promotionQtyField(name, label, defaultValue, inline = false) {
   const draftVal = promoFormDraftVal(name, "");
@@ -12646,18 +12664,34 @@ function promotionFreeProductIds(rule) {
   if (rule.paymentFreeProductId) return [rule.paymentFreeProductId];
   return [];
 }
+function normalizeQuantityPromotionRule(rule) {
+  if (!rule || typeof rule !== "object") return rule;
+  const buyIds = promotionBuyProductIds(rule);
+  if (buyIds.length <= 1) return rule;
+  if (rule.buyQtyByProduct && typeof rule.buyQtyByProduct === "object") {
+    return { ...rule, buyMode: rule.buyMode === "total" ? "total" : "each" };
+  }
+  const buyQty = Math.floor(Number(rule.buyQty) || 0);
+  if (buyQty < 1) return rule;
+  const buyQtyByProduct = {};
+  buyIds.forEach((id) => {
+    buyQtyByProduct[id] = buyQty;
+  });
+  return { ...rule, buyQtyByProduct, buyMode: "each" };
+}
 function normalizePromotionRuleShape(rule) {
   if (!rule || typeof rule !== "object") return rule;
-  const freeIds = promotionFreeProductIds(rule);
-  if (!freeIds.length) return rule;
+  let next = normalizeQuantityPromotionRule(rule);
+  const freeIds = promotionFreeProductIds(next);
+  if (!freeIds.length) return next;
   if (
-    Array.isArray(rule.freeProductIds) &&
-    rule.freeProductIds.length === freeIds.length
+    Array.isArray(next.freeProductIds) &&
+    next.freeProductIds.length === freeIds.length
   ) {
-    return rule;
+    return next;
   }
   return {
-    ...rule,
+    ...next,
     freeProductIds: freeIds,
     freeProductId: freeIds[0],
   };
@@ -12694,22 +12728,55 @@ function promotionProductLabels(ids) {
     .filter(Boolean)
     .join(", ");
 }
+function quantityPromoBuyQtyMap(rule) {
+  const buyIds = promotionBuyProductIds(rule);
+  const fallback = Math.floor(Number(rule?.buyQty) || 0);
+  if (rule?.buyQtyByProduct && typeof rule.buyQtyByProduct === "object") {
+    const map = {};
+    buyIds.forEach((id) => {
+      const q = Math.floor(Number(rule.buyQtyByProduct[id]) || 0);
+      map[id] = q >= 1 ? q : fallback >= 1 ? fallback : 0;
+    });
+    return map;
+  }
+  const map = {};
+  buyIds.forEach((id) => {
+    map[id] = fallback;
+  });
+  return map;
+}
+function quantityPromoBuyQtyForProduct(rule, productId) {
+  const map = quantityPromoBuyQtyMap(rule);
+  const q = Math.floor(Number(map[productId]) || 0);
+  if (q >= 1) return q;
+  return Math.floor(Number(rule?.buyQty) || 0);
+}
 function quantityPromoBuyMode(rule) {
   if (rule?.buyMode === "each" || rule?.buyMode === "total") return rule.buyMode;
   const buyIds = promotionBuyProductIds(rule);
+  if (rule?.buyQtyByProduct && buyIds.length > 1) return "each";
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
   if (buyIds.length > 1 && buyQty === 1) return "each";
   return "total";
 }
 function quantityPromoSets(rule, qtyByProduct) {
   const buyIds = promotionBuyProductIds(rule);
-  const buyQty = Math.floor(Number(rule.buyQty) || 0);
-  if (!buyIds.length || buyQty < 1) return 0;
+  if (!buyIds.length) return 0;
   if (quantityPromoBuyMode(rule) === "each") {
+    const thresholds = buyIds.map((id) =>
+      quantityPromoBuyQtyForProduct(rule, id),
+    );
+    if (thresholds.some((q) => q < 1)) return 0;
     return Math.min(
-      ...buyIds.map((id) => Math.floor((qtyByProduct[id] || 0) / buyQty)),
+      ...buyIds.map((id) =>
+        Math.floor(
+          (qtyByProduct[id] || 0) / quantityPromoBuyQtyForProduct(rule, id),
+        ),
+      ),
     );
   }
+  const buyQty = Math.floor(Number(rule.buyQty) || 0);
+  if (buyQty < 1) return 0;
   const combinedQty = buyIds.reduce(
     (sum, id) => sum + (qtyByProduct[id] || 0),
     0,
@@ -12717,13 +12784,17 @@ function quantityPromoSets(rule, qtyByProduct) {
   return Math.floor(combinedQty / buyQty);
 }
 function quantityPromoOrderQty(rule, sets = 1) {
-  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
   const buyIds = promotionBuyProductIds(rule);
   const n = Math.max(1, Math.floor(Number(sets) || 0));
-  if (buyQty < 1) return 0;
-  if (quantityPromoBuyMode(rule) === "each" && buyIds.length > 1) {
-    return buyIds.length * buyQty * n;
+  const buyMode = quantityPromoBuyMode(rule);
+  if (buyMode === "each" && buyIds.length) {
+    return buyIds.reduce(
+      (sum, id) => sum + quantityPromoBuyQtyForProduct(rule, id) * n,
+      0,
+    );
   }
+  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  if (buyQty < 1) return 0;
   return buyQty * n;
 }
 function quantityPromoFreeQty(rule, sets = 1) {
@@ -12738,12 +12809,38 @@ function quantityPromoExampleLine(rule, sets = 1) {
   return `${order} ш захиалгад ${promo} ш урамшуулал`;
 }
 function quantityPromoRuleFormula(rule) {
+  const buyIds = promotionBuyProductIds(rule);
+  const freeIds = promotionFreeProductIds(rule);
+  const freeQty = Math.floor(Number(rule?.freeQty) || 0);
+  if (buyIds.length && freeIds.length && freeQty >= 1) {
+    const buyPart = promotionQtyBuyPartText(rule);
+    const freeNames = promotionProductLabels(freeIds);
+    return `${buyPart} → ${freeNames} ${freeQty} ш`;
+  }
   return quantityPromoExampleLine(rule, 1);
 }
 function quantityPromoRuleFormulaExtended(rule) {
-  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  const buyIds = promotionBuyProductIds(rule);
+  const freeIds = promotionFreeProductIds(rule);
   const freeQty = Math.floor(Number(rule?.freeQty) || 0);
-  if (buyQty < 1 || freeQty < 1) return "";
+  if (!buyIds.length || !freeIds.length || freeQty < 1) return "";
+  const buyMode = quantityPromoBuyMode(rule);
+  if (buyMode === "each" && buyIds.length > 1) {
+    const qtys = buyIds.map((id) => quantityPromoBuyQtyForProduct(rule, id));
+    const allSame = qtys.length && qtys.every((q) => q === qtys[0]) && qtys[0] >= 1;
+    if (allSame) {
+      const freeNames = promotionProductLabels(freeIds);
+      return [1, 2, 3]
+        .map((sets) => {
+          const perType = qtys[0] * sets;
+          const promo = freeQty * sets;
+          return `төрөл бүр ${perType} ш → ${freeNames} ${promo} ш`;
+        })
+        .join(" · ");
+    }
+  }
+  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  if (buyQty < 1) return "";
   return [1, 2, 3]
     .map((sets) => quantityPromoExampleLine(rule, sets))
     .filter(Boolean)
@@ -12760,10 +12857,23 @@ function workerQtyByProduct() {
 function quantityPromoRuleProgress(rule, qtyByProduct) {
   const buyIds = promotionBuyProductIds(rule);
   const freeIds = promotionFreeProductIds(rule);
-  const buyQty = Math.floor(Number(rule.buyQty) || 0);
   const freeQty = Math.floor(Number(rule.freeQty) || 0);
-  if (!buyIds.length || !freeIds.length || buyQty < 1 || freeQty < 1) return null;
   const buyMode = quantityPromoBuyMode(rule);
+  const buyQtyMap = quantityPromoBuyQtyMap(rule);
+  const buyQty =
+    buyMode === "each"
+      ? Math.min(
+          ...buyIds.map((id) => quantityPromoBuyQtyForProduct(rule, id)).filter((q) => q >= 1),
+          Infinity,
+        ) || Math.floor(Number(rule.buyQty) || 0)
+      : Math.floor(Number(rule.buyQty) || 0);
+  if (!buyIds.length || !freeIds.length || freeQty < 1) return null;
+  if (buyMode === "each") {
+    if (buyIds.some((id) => quantityPromoBuyQtyForProduct(rule, id) < 1))
+      return null;
+  } else if (buyQty < 1) {
+    return null;
+  }
   const combinedQty = buyIds.reduce(
     (sum, id) => sum + (qtyByProduct[id] || 0),
     0,
@@ -12771,7 +12881,7 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   const sets = quantityPromoSets(rule, qtyByProduct);
   const grantedFree = sets * freeQty;
   const readyTypes = buyIds.filter(
-    (id) => (qtyByProduct[id] || 0) >= buyQty,
+    (id) => (qtyByProduct[id] || 0) >= quantityPromoBuyQtyForProduct(rule, id),
   ).length;
   const missingTypes = Math.max(0, buyIds.length - readyTypes);
   const remainder = buyMode === "each" ? 0 : combinedQty % buyQty;
@@ -12790,6 +12900,7 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
     buyIds,
     freeIds,
     buyQty,
+    buyQtyMap,
     freeQty,
     buyMode,
     combinedQty,
@@ -12864,6 +12975,18 @@ function pickerQtySheetPromoHtml(p) {
     .join("");
   return `<div class="picker-qty-sheet__promo-wrap">${lines}</div>`;
 }
+function promoBuyQtyFieldName(productId) {
+  return `buyQty_${productId}`;
+}
+function promotionSelectedProductRowHtml(p, pickKey, { perProductQty = false } = {}) {
+  const qtyHtml = perProductQty
+    ? promotionQtyField(promoBuyQtyFieldName(p.id), "Ширхэг", "1", true)
+    : "";
+  const rowCls = perProductQty
+    ? "promo-product-row promo-product-row--selected promo-product-row--with-qty"
+    : "promo-product-row promo-product-row--selected";
+  return `<div class="${rowCls}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1 promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div>${qtyHtml}<button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`;
+}
 function promotionMultiProductPickerBlock({
   pickKey,
   fieldName,
@@ -12875,6 +12998,7 @@ function promotionMultiProductPickerBlock({
   variant = "",
   badge = "",
   qty = null,
+  perProductQty = false,
 }) {
   const ids = Array.isArray(selectedIds) ? selectedIds : [],
     exclude = new Set([...excludeIds, ...ids].filter(Boolean)),
@@ -12884,7 +13008,7 @@ function promotionMultiProductPickerBlock({
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
     selectedHtml = selectedProducts.length
-      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => `<div class="promo-product-row promo-product-row--selected"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1 promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div><button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`).join("")}</div>`
+      ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => promotionSelectedProductRowHtml(p, pickKey, { perProductQty })).join("")}</div>`
       : `<p class="promo-section-hint">Хайлтаар бараа нэмнэ</p>`,
     searchHtml = promoProductSearchListHtml({
       pickKey,
@@ -12898,10 +13022,13 @@ function promotionMultiProductPickerBlock({
       )
       .join(""),
     searchInput = `<input data-promo-pick="${pickKey}" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
+    inputRow = perProductQty
+      ? `<div class="mb-2">${searchInput}</div>`
+      : promotionSearchQtyRow(searchInput, qty),
     head = badge
       ? `<div class="promo-section-head"><span class="promo-section-badge">${badge}</span><div><p class="promo-section-title">${title}</p>${hint ? `<p class="promo-section-hint">${hint}</p>` : ""}</div></div>`
       : `<span class="block text-sm font-medium mb-2">${title}</span>`;
-  return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block">${hiddenInputs}${head}${promotionSearchQtyRow(searchInput, qty)}${promoCategoryFilterHtml(pickKey)}${selectedHtml}${searchHtml}</div></div>`;
+  return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block">${hiddenInputs}${head}${inputRow}${promoCategoryFilterHtml(pickKey)}${selectedHtml}${searchHtml}</div></div>`;
 }
 function promotionMultiBuyPickerBlock(selectedIds) {
   return promotionMultiProductPickerBlock({
@@ -12910,11 +13037,11 @@ function promotionMultiBuyPickerBlock(selectedIds) {
     selectedIds,
     excludeIds: [],
     title: "Захиалгад оруулах бараа",
-    hint: "Олон бараа сонгож болно · төрөл бүрээс эсвэл нийт тоо",
+    hint: "Бараа бүрт ширхэг тоо оруулна · жишээ: төмөр 50, газан 50, энгийн 50",
     placeholder: "Бараа хайж нэмэх...",
     variant: "buy",
     badge: "1",
-    qty: { name: "buyQty", label: "Ширхэг" },
+    perProductQty: true,
   });
 }
 function promotionMultiFreePickerBlock({
@@ -12972,6 +13099,11 @@ function addPromoPickProduct(pickKey, id) {
   const idStr = String(id || "").trim();
   if (!idStr || ids.includes(idStr)) return;
   state.promoPick = { ...pick, [pickKey]: [...ids, idStr] };
+  if (pickKey === "buyProductIds") {
+    state.promoFormDraft = state.promoFormDraft || {};
+    const qtyKey = promoBuyQtyFieldName(idStr);
+    if (!state.promoFormDraft[qtyKey]) state.promoFormDraft[qtyKey] = "1";
+  }
   const searchKey = promoPickSearchKey(pickKey);
   if (searchKey) state.searches[searchKey] = "";
   refreshPromoModal({ focusPickKey: pickKey });
@@ -13021,17 +13153,33 @@ function refreshPromoModal(opts = {}) {
 function selectPromoProduct(fieldName, id) {
   addPromoPickProduct(fieldName, id);
 }
+function promotionQtyBuyPartText(r) {
+  const buyIds = promotionBuyProductIds(r);
+  if (!buyIds.length) return "-";
+  const buyMode = quantityPromoBuyMode(r);
+  const qtyMap = quantityPromoBuyQtyMap(r);
+  const qtys = buyIds.map((id) => quantityPromoBuyQtyForProduct(r, id));
+  const allSame = qtys.length && qtys.every((q) => q === qtys[0]);
+  if (buyMode === "each" && buyIds.length > 1) {
+    if (allSame) {
+      return `${promotionProductLabels(buyIds)} — төрөл бүрээс ${qtys[0]} ш`;
+    }
+    return buyIds
+      .map((id) => {
+        const name = productLabel(id);
+        return `${name} ${qtyMap[id] || qtys[0]} ш`;
+      })
+      .join(", ");
+  }
+  const buyQty = Math.floor(Number(r.buyQty) || qtys[0] || 0);
+  return `${promotionProductLabels(buyIds)}-аас нийт ${buyQty} ш авахад`;
+}
 function promotionQtyRuleText(r) {
   const buyIds = promotionBuyProductIds(r),
     freeIds = promotionFreeProductIds(r);
   if (buyIds.length && freeIds.length) {
-    const buyNames = promotionProductLabels(buyIds),
-      freeNames = promotionProductLabels(freeIds);
-    const buyPart =
-      quantityPromoBuyMode(r) === "each" && buyIds.length > 1
-        ? `${buyNames} — төрөл бүрээс ${r.buyQty} ш`
-        : `${buyNames}-аас нийт ${r.buyQty} ш авахад`;
-    return `${buyPart} → ${freeNames} ${promoProductQtyLabel(r.freeQty)}`;
+    const freeNames = promotionProductLabels(freeIds);
+    return `${promotionQtyBuyPartText(r)} → ${freeNames} ${promoProductQtyLabel(r.freeQty)}`;
   }
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
@@ -13050,9 +13198,17 @@ function promotionQtyRuleCard(r, i) {
       buyProducts.length > 2
         ? `${buyProducts
             .slice(0, 2)
-            .map((p) => p.name)
+            .map((p) => {
+              const q = quantityPromoBuyQtyForProduct(r, p.id);
+              return q > 0 ? `${p.name} ×${q}` : p.name;
+            })
             .join(", ")} +${buyProducts.length - 2}`
-        : buyProducts.map((p) => p.name).join(", ") || "-",
+        : buyProducts
+            .map((p) => {
+              const q = quantityPromoBuyQtyForProduct(r, p.id);
+              return q > 0 ? `${p.name} ×${q}` : p.name;
+            })
+            .join(", ") || "-",
     freeLabel =
       freeProducts.length > 2
         ? `${freeProducts
@@ -13298,12 +13454,30 @@ function savePromotionQty(e) {
       alert("Авах болон урамшууллын бараа сонгоно уу");
       return;
     }
-    const buyQtyNum = Math.floor(Number(f.get("buyQty")) || 0);
+    const draft = state.promoFormDraft || {};
+    const buyQtyByProduct = {};
+    for (const id of finalBuyProductIds) {
+      const qtyKey = promoBuyQtyFieldName(id);
+      const q = Math.floor(
+        Number(f.get(qtyKey)) || Number(draft[qtyKey]) || 0,
+      );
+      if (q < 1) {
+        alert("Захиалгын бараа бүрт 1-с дээш тоо оруулна уу");
+        return;
+      }
+      buyQtyByProduct[id] = q;
+    }
+    const buyQtyValues = Object.values(buyQtyByProduct);
+    const buyQtyNum = buyQtyValues.length
+      ? Math.min(...buyQtyValues)
+      : 0;
+    const buyMode =
+      finalBuyProductIds.length > 1 ? "each" : "total";
     const added = appendPromotionRule("quantity", {
       buyProductIds: finalBuyProductIds,
       buyQty: buyQtyNum,
-      buyMode:
-        finalBuyProductIds.length > 1 && buyQtyNum === 1 ? "each" : "total",
+      buyQtyByProduct,
+      buyMode,
       freeProductIds: finalFreeProductIds,
       freeProductId: finalFreeProductIds[0],
       freeQty: Number(f.get("freeQty")) || 1,
@@ -14357,7 +14531,7 @@ function workerChooser(orders) {
     pickerHtml = canPick
       ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${chooserLabel === "Сонгох" ? " is-placeholder" : ""}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
       : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></span></div>`;
-  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: excelDownloadBtn("confirmEmployeeExcel()", { disabled: !hasOrders }) })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
+  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: canExportExcel() ? excelDownloadBtn("confirmEmployeeExcel()") : "" })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -16820,6 +16994,9 @@ function printRootEl() {
   return root;
 }
 async function downloadOrderReceiptExcelNow(id) {
+  if (!canExportExcel()) {
+    return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  }
   if (
     state.currentView === "warehouseReceipts" &&
     !requireReceiptPrintDelivery("татах")

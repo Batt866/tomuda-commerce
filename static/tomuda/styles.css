@@ -6831,6 +6831,15 @@ textarea::placeholder {
   background: color-mix(in srgb, var(--hex-primary-soft) 55%, var(--hex-card));
 }
 
+.promo-product-row--selected.promo-product-row--with-qty {
+  grid-template-columns: 48px minmax(0, 1fr) 96px auto;
+  align-items: center;
+}
+
+.promo-product-row--with-qty .promo-qty-field--inline {
+  align-self: center;
+}
+
 .promo-product-row__remove {
   flex-shrink: 0;
   width: 32px;
