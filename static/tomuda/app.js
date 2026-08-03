@@ -7967,6 +7967,7 @@ function confirmWarehouseReceiptsExcel(
   searchKey = "warehouseOrders",
   employeeIds = [],
 ) {
+  if (!requireReceiptPrintDelivery("татах")) return;
   confirmOrderReceiptsExcel(searchKey, employeeIds, {
     workerIds: receiptPrintWorkerIds(),
     deliveryIds: receiptPrintDeliveryIds(),
@@ -7978,6 +7979,12 @@ function confirmOrderReceiptsExcel(
   employeeIds = [],
   opts = {},
 ) {
+  if (
+    state.currentView === "warehouseReceipts" &&
+    !requireReceiptPrintDelivery("татах")
+  ) {
+    return;
+  }
   const rows = orderReceiptExportSnapshots(searchKey, employeeIds, opts);
   if (!rows.length) {
     return alert(
@@ -8745,8 +8752,21 @@ function receiptFilterOptions() {
   };
 }
 function receiptPrintDeliveryIds() {
-  const id = state.receiptPrintDeliveryId || "";
-  return id ? [id] : receiptDeliveryIds();
+  const id = String(state.receiptPrintDeliveryId || "").trim();
+  return id ? [id] : [];
+}
+function receiptPrintDeliverySelected() {
+  return receiptPrintDeliveryIds().length > 0;
+}
+function requireReceiptPrintDelivery(action = "татах") {
+  if (receiptPrintDeliverySelected()) return true;
+  const step =
+    action === "хэвлэх" ? "Баримт хэвлэхийн" : "Баримт татахын";
+  alertModal(
+    "Түгээгч сонгох",
+    `${step} өмнө дээрээс <b>Түгээгч</b> сонгоно уу.`,
+  );
+  return false;
 }
 function receiptPrintWorkerOrders(workerIds = receiptPrintWorkerIds()) {
   const ids = new Set(workerIds);
@@ -8790,9 +8810,9 @@ function receiptPrintWorkerSelectHtml() {
 function receiptPrintDeliverySummary(
   deliveryId = state.receiptPrintDeliveryId || "",
 ) {
-  if (!deliveryId) return "Бүгд";
+  if (!deliveryId) return "Сонгох";
   const emp = state.employees.find((e) => e.id === deliveryId);
-  return emp?.name || "Бүгд";
+  return emp?.name || "Сонгосон";
 }
 function receiptPrintDeliverySelectHtml() {
   const deliveries = deliveryEmployees(),
@@ -16562,6 +16582,12 @@ function printRootEl() {
   return root;
 }
 async function downloadOrderReceiptExcelNow(id) {
+  if (
+    state.currentView === "warehouseReceipts" &&
+    !requireReceiptPrintDelivery("татах")
+  ) {
+    return;
+  }
   const hadChanges =
     state.receiptEditOrderId === id &&
     state.receiptEditItems &&
@@ -16610,6 +16636,12 @@ function printOrderReceipt(id, ev) {
   if (ev) {
     ev.preventDefault();
     ev.stopPropagation();
+  }
+  if (
+    state.currentView === "warehouseReceipts" &&
+    !requireReceiptPrintDelivery("хэвлэх")
+  ) {
+    return;
   }
   if (
     state.receiptEditOrderId === id &&
@@ -16663,6 +16695,7 @@ function printSelectedOrderReceipts() {
   const ids = idList(state.receiptPrintOrderIds);
   if (!receiptPrintWorkerIds().length)
     return alert("Худалдааны төлөөлөгч сонгоно уу");
+  if (!requireReceiptPrintDelivery("хэвлэх")) return;
   if (!ids.length) return alert("Хэвлэх захиалга сонгоно уу");
   confirmPrintExport("Баримт хэвлэх", () => {
     void printOrderReceiptsNow(ids);
