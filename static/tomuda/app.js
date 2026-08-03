@@ -5043,6 +5043,9 @@ function pickerPieceCommit(el) {
 function syncPickerQtySheetUi(id) {
   const totalEl = document.querySelector("[data-picker-qty-total]");
   if (totalEl) totalEl.textContent = `${getWorkerQty(id)} ш`;
+  const p = state.products.find((x) => x.id === id);
+  const promoWrap = document.querySelector(".picker-qty-sheet__promo-wrap");
+  if (promoWrap && p) promoWrap.outerHTML = pickerQtySheetPromoHtml(p);
   if (pickerOpen()) {
     refreshPickerList();
     updatePickerClearBtn();
@@ -12482,6 +12485,109 @@ function promotionProductLabels(ids) {
     .filter(Boolean)
     .join(", ");
 }
+function quantityPromoRuleFormula(rule) {
+  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  const freeQty = Math.floor(Number(rule?.freeQty) || 0);
+  if (buyQty < 1 || freeQty < 1) return "";
+  return `${buyQty} ш авахад ${freeQty} үнэгүй`;
+}
+function quantityPromoRuleFormulaExtended(rule) {
+  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  const freeQty = Math.floor(Number(rule?.freeQty) || 0);
+  if (buyQty < 1 || freeQty < 1) return "";
+  return `${buyQty} ш → ${freeQty} үнэгүй · ${buyQty * 2} ш → ${freeQty * 2} үнэгүй`;
+}
+function workerQtyByProduct() {
+  const qtyByProduct = {};
+  state.products.forEach((p) => {
+    const q = getWorkerQty(p.id);
+    if (q > 0) qtyByProduct[p.id] = q;
+  });
+  return qtyByProduct;
+}
+function quantityPromoRuleProgress(rule, qtyByProduct) {
+  const buyIds = promotionBuyProductIds(rule);
+  const freeIds = promotionFreeProductIds(rule);
+  const buyQty = Math.floor(Number(rule.buyQty) || 0);
+  const freeQty = Math.floor(Number(rule.freeQty) || 0);
+  if (!buyIds.length || !freeIds.length || buyQty < 1 || freeQty < 1) return null;
+  const combinedQty = buyIds.reduce(
+    (sum, id) => sum + (qtyByProduct[id] || 0),
+    0,
+  );
+  const sets = Math.floor(combinedQty / buyQty);
+  const grantedFree = sets * freeQty;
+  const remainder = combinedQty % buyQty;
+  const needForNext =
+    remainder === 0
+      ? combinedQty > 0
+        ? buyQty
+        : buyQty - combinedQty
+      : buyQty - remainder;
+  return {
+    rule,
+    buyIds,
+    freeIds,
+    buyQty,
+    freeQty,
+    combinedQty,
+    sets,
+    grantedFree,
+    needForNext,
+  };
+}
+function productQuantityPromoRules(productId) {
+  return (state.promotionRules.quantity || []).filter((rule) =>
+    promotionBuyProductIds(rule).includes(productId),
+  );
+}
+function workerQuantityPromoHintsHtml(cart) {
+  const qtyByProduct = {};
+  (cart?.paid || []).forEach((line) => {
+    qtyByProduct[line.productId] =
+      (qtyByProduct[line.productId] || 0) + (Number(line.quantity) || 0);
+  });
+  const items = (state.promotionRules.quantity || [])
+    .map((rule) => {
+      const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+      if (!prog || prog.combinedQty < 1) return "";
+      const formula = quantityPromoRuleFormula(rule);
+      const freeNames = promotionProductLabels(prog.freeIds);
+      if (prog.grantedFree > 0) {
+        return `<li class="worker-promo-hint worker-promo-hint--active"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">Нийт ${prog.combinedQty} ш → <b>${prog.grantedFree} үнэгүй</b>${freeNames ? ` · ${esc(freeNames)}` : ""}</span></li>`;
+      }
+      return `<li class="worker-promo-hint worker-promo-hint--pending"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">${prog.combinedQty}/${prog.buyQty} ш · ${prog.needForNext} ш нэмбэл ${prog.freeQty} үнэгүй</span></li>`;
+    })
+    .filter(Boolean);
+  if (!items.length) return "";
+  return `<ul class="worker-promo-hints" aria-label="Урамшууллын тооцоо">${items.join("")}</ul>`;
+}
+function pickerProductPromoHintHtml(p) {
+  const rules = productQuantityPromoRules(p.id);
+  if (!rules.length) return "";
+  return `<span class="picker-row__promo">${esc(quantityPromoRuleFormula(rules[0]))}</span>`;
+}
+function pickerQtySheetPromoHtml(p) {
+  const rules = productQuantityPromoRules(p.id);
+  if (!rules.length) return "";
+  const qtyByProduct = workerQtyByProduct();
+  const lines = rules
+    .map((rule) => {
+      const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+      if (!prog) return "";
+      const formula = quantityPromoRuleFormula(rule);
+      const scale = quantityPromoRuleFormulaExtended(rule);
+      if (prog.grantedFree > 0) {
+        return `<p class="picker-qty-sheet__promo picker-qty-sheet__promo--active">${esc(formula)} · Одоо <b>${prog.grantedFree} үнэгүй</b></p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
+      }
+      if (prog.combinedQty > 0) {
+        return `<p class="picker-qty-sheet__promo">${esc(formula)} · ${prog.combinedQty}/${prog.buyQty} ш (${prog.needForNext} ш дутуу)</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
+      }
+      return `<p class="picker-qty-sheet__promo">${esc(formula)}</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
+    })
+    .join("");
+  return `<div class="picker-qty-sheet__promo-wrap">${lines}</div>`;
+}
 function promotionMultiProductPickerBlock({
   pickKey,
   fieldName,
@@ -12688,7 +12794,7 @@ function promotionQtyRuleCard(r, i) {
           `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
-  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${promoProductQtyLabel(r.freeQty)}</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
+  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p><p class="text-xs text-muted-foreground">${esc(quantityPromoRuleFormulaExtended(r))}</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${promoProductQtyLabel(r.freeQty)}</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -13047,7 +13153,6 @@ function workerPaidProductsInCart() {
 }
 function applyQuantityPromotions(lines) {
   const result = lines.map((line) => ({ ...line }));
-  // Only paid lines count toward buy thresholds (never count free grants).
   const qtyByProduct = {};
   result.forEach((line) => {
     if (line.isPromoFree) return;
@@ -13055,18 +13160,9 @@ function applyQuantityPromotions(lines) {
       (qtyByProduct[line.productId] || 0) + (Number(line.quantity) || 0);
   });
   (state.promotionRules.quantity || []).forEach((rule) => {
-    const buyIds = promotionBuyProductIds(rule),
-      freeIds = promotionFreeProductIds(rule),
-      buyQty = Math.floor(Number(rule.buyQty) || 0),
-      freeQty = Math.floor(Number(rule.freeQty) || 0);
-    if (!buyIds.length || !freeIds.length || buyQty < 1 || freeQty < 1) return;
-    const combinedQty = buyIds.reduce(
-      (sum, id) => sum + (qtyByProduct[id] || 0),
-      0,
-    );
-    const sets = Math.floor(combinedQty / buyQty);
-    if (sets < 1) return;
-    appendPromoFreeLines(result, freeIds, sets * freeQty);
+    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+    if (!prog || prog.sets < 1) return;
+    appendPromoFreeLines(result, prog.freeIds, prog.grantedFree);
   });
   return result;
 }
@@ -14133,7 +14229,7 @@ function workerNew(cart) {
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${PROMO_PRODUCT_LABEL}</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${PROMO_PRODUCT_LABEL} · ${line.quantity} ш үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
@@ -14160,7 +14256,8 @@ function setPaymentTerm(term) {
 }
 function workerOrderStatsHtml(cart) {
   if (!cart.skuCount) return "";
-  return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
+  const promoHints = workerQuantityPromoHintsHtml(cart);
+  return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${promoHints}${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
 }
 function workerNewOrderStep(cart) {
   ensureOrderEmployeeSelection();
@@ -17024,16 +17121,18 @@ function pickerQtySheetHtml(productId) {
   const qtyBody = packSize
     ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
     : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
-  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
+  const promoHtml = pickerQtySheetPromoHtml(p);
+  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
     inCart = q > 0,
     left = p.stock - q,
+    promoHint = pickerProductPromoHintHtml(p),
     qtyBadge = inCart
       ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
       : "";
-  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="picker-row__thumb" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span></span></div>${qtyBadge}</button>`;
+  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="picker-row__thumb" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${promoHint}</span></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
