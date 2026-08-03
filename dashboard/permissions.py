@@ -51,6 +51,12 @@ PERM_GROUPS: list[dict[str, Any]] = [
                 "label": "Захиалгын түүх шалгах",
                 "actions": CRUD,
             },
+            {"id": "orderDeliveryMark", "label": "Хүргэлт тэмдэглэх", "actions": ["view"]},
+            {
+                "id": "orderDeliveryConfirm",
+                "label": "Хүргэлт баталгаажуулах",
+                "actions": ["view"],
+            },
         ],
     },
     {
@@ -66,7 +72,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
 
 HIDDEN_MODULES: list[dict[str, Any]] = [
     {"id": "dashboard", "label": "Админ самбар", "actions": ["view"]},
-    {"id": "orders", "label": "Захиалга", "actions": [*CRUD, "markDelivered"]},
+    {"id": "orders", "label": "Захиалга", "actions": [*CRUD, "markDelivered", "confirmDelivery"]},
     {"id": "settings", "label": "Тохиргоо", "actions": ["view"]},
 ]
 
@@ -81,6 +87,7 @@ ACTION_LABELS: dict[str, str] = {
     "edit": "засах",
     "delete": "устгах",
     "markDelivered": "хүргэлт тэмдэглэх",
+    "confirmDelivery": "хүргэлт баталгаажуулах",
 }
 
 
@@ -178,6 +185,8 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "products.create": ["productAdd.create", "productAdd.view"],
     "employees.create": ["employeeAdd.create", "employeeAdd.view"],
     "dashboard.view": ["settings.view", "permissions.view"],
+    "orders.markDelivered": ["orderDeliveryMark.view", "orders.edit"],
+    "orders.confirmDelivery": ["orderDeliveryConfirm.view", "orders.edit"],
 }
 
 
@@ -254,9 +263,8 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "count.create",
         "count.edit",
         "receipts.view",
-        "orders.markDelivered",
     ],
-    "delivery": ["orders.view", "orders.markDelivered"],
+    "delivery": ["orders.view", "orderDeliveryMark.view"],
 }
 
 
@@ -394,9 +402,11 @@ def _order_keys_equal(
 def _is_delivery_mark_only_update(
     old_order: dict[str, Any], new_order: dict[str, Any]
 ) -> bool:
-    if str(old_order.get("status") or "") != "confirmed":
+    old_status = str(old_order.get("status") or "")
+    new_status = str(new_order.get("status") or "")
+    if old_status not in {"confirmed", "pending"}:
         return False
-    if str(new_order.get("status") or "") != "confirmed":
+    if new_status != old_status:
         return False
     if not new_order.get("deliveryMarkedAt"):
         return False
@@ -408,7 +418,7 @@ def _is_delivery_mark_only_update(
 def _is_delivery_confirm_update(
     old_order: dict[str, Any], new_order: dict[str, Any]
 ) -> bool:
-    if str(old_order.get("status") or "") != "confirmed":
+    if str(old_order.get("status") or "") not in {"confirmed", "pending"}:
         return False
     if str(new_order.get("status") or "") != "delivered":
         return False
@@ -661,7 +671,9 @@ def validate_state_mutation(
                 return False, "Захиалга хүргэлт тэмдэглэх эрхгүй"
             continue
         if _is_delivery_confirm_update(old_order, new_order):
-            if not _has_any_permission(perms, "orders.edit"):
+            if not _has_any_permission(
+                perms, "orders.confirmDelivery", "orders.edit"
+            ):
                 return False, "Захиалга баталгаажуулах эрхгүй"
             continue
         if not _has_any_permission(perms, "orders.edit", "orders.delete"):

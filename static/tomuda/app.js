@@ -2647,9 +2647,12 @@ function isOrderDeliveryMarked(o) {
 function isOrderFullyDelivered(o) {
   return o?.status === "delivered";
 }
+function isOrderReadyForDeliveryMark(o) {
+  return o?.status === "confirmed" || o?.status === "pending";
+}
 function isOrderUndelivered(o) {
   if (!o || o.status === "cancelled" || o.status === "delivered") return false;
-  if (o.status !== "confirmed") return false;
+  if (!isOrderReadyForDeliveryMark(o)) return false;
   return !isOrderDeliveryMarked(o);
 }
 function orderDisplayStatus(o) {
@@ -2668,9 +2671,10 @@ function orderStatusBadgeClass(o) {
 }
 function undeliveredOrders(scope = "all") {
   const empId = state.currentEmployee?.id || "";
+  const scoped = scope === "delivery" && deliveryScopedToAssignee();
   return state.orders.filter((o) => {
     if (!isOrderUndelivered(o) || !o.customerId) return false;
-    if (scope !== "delivery") return true;
+    if (!scoped) return true;
     const delId = o.deliveryEmployeeId || "";
     return !empId || !delId || delId === empId;
   });
@@ -2687,14 +2691,23 @@ function deliveryUndeliveredBanner(scope = "all") {
       : `Хүргэгдээгүй ${count} баримт байна`;
   return `<div class="delivery-alert" role="alert"><span class="delivery-alert__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><p class="delivery-alert__text"><strong>${esc(text)}</strong></p></div>`;
 }
+function deliveryScopedToAssignee() {
+  return (
+    currentRole() === "delivery" &&
+    !hasPermission("orders.edit") &&
+    !isAdmin()
+  );
+}
 function canMarkOrderDelivered(o) {
-  if (!o || o.status !== "confirmed") return false;
+  if (!o || !isOrderReadyForDeliveryMark(o)) return false;
   if (isOrderDeliveryMarked(o) || isOrderFullyDelivered(o)) return false;
   if (isAdmin() || hasPermission("orders.edit")) return true;
   if (
     hasPermission("orders.markDelivered") ||
+    hasPermission("orderDeliveryMark.view") ||
     currentRole() === "delivery"
   ) {
+    if (!deliveryScopedToAssignee()) return true;
     const empId = state.currentEmployee?.id || "";
     const delId = o.deliveryEmployeeId || "";
     return !empId || !delId || delId === empId;
@@ -2709,8 +2722,14 @@ function canMarkOrderDelivered(o) {
   return false;
 }
 function canConfirmOrderDelivery(o) {
-  if (!isAdmin()) return false;
-  if (!o || o.status !== "confirmed" || !isOrderDeliveryMarked(o)) return false;
+  if (!hasPermission("orders.confirmDelivery")) return false;
+  if (
+    !o ||
+    !isOrderReadyForDeliveryMark(o) ||
+    !isOrderDeliveryMarked(o)
+  ) {
+    return false;
+  }
   return true;
 }
 function markOrderDelivered(id) {
@@ -2737,10 +2756,10 @@ function confirmMarkOrderDelivered(id) {
   );
 }
 function confirmOrderDelivery(id) {
-  if (!isAdmin()) {
+  if (!hasPermission("orders.confirmDelivery")) {
     return alertModal(
       "Эрхгүй",
-      "Зөвхөн админ хүргэлтийг баталгаажуулж болно.",
+      "Хүргэлт баталгаажуулах эрхгүй. Админ → Эрхийн тохиргооноос олгоно.",
     );
   }
   const o = state.orders.find((x) => x.id === id);
@@ -8160,6 +8179,9 @@ function orderReceiptsPanel({
 function warehouseOrderStatusActions(o) {
   if (o.status === "pending") {
     let html = `<button type="button" onclick="setOrder('${o.id}','confirmed')" class="btn btn--sm tone tone--success">Батлах</button>`;
+    if (canMarkOrderDelivered(o)) {
+      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
+    }
     if (canDelete())
       html += `<button type="button" onclick="confirmCancelOrder('${o.id}')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
     return html;
@@ -13996,13 +14018,28 @@ function warehouseView() {
 }
 function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";
+  const scoped = deliveryScopedToAssignee();
   return state.orders.filter((o) => {
     if (o.status === "cancelled" || o.status === "delivered") return false;
     if (isOrderDeliveryMarked(o)) return false;
-    const delId = o.deliveryEmployeeId || "";
-    if (empId && delId && delId !== empId) return false;
+    if (scoped) {
+      const delId = o.deliveryEmployeeId || "";
+      if (empId && delId && delId !== empId) return false;
+    }
     return !!o.customerId;
   });
+}
+function markableOrdersForStore(customerId) {
+  return deliveryOrdersForStore(customerId).filter(canMarkOrderDelivered);
+}
+function deliveryStoreCardMarkAction(customerId) {
+  const markable = markableOrdersForStore(customerId);
+  if (!markable.length) return "";
+  if (markable.length === 1) {
+    const id = esc(markable[0].id);
+    return `<button type="button" class="delivery-store-card__mark btn btn--sm tone tone--info" onclick="event.stopPropagation();confirmMarkOrderDelivered('${id}')">Хүргэсэн</button>`;
+  }
+  return `<span class="delivery-store-card__mark-note">${markable.length} захиалга хүлээж байна</span>`;
 }
 function deliveryOrderRowActions(o) {
   if (canMarkOrderDelivered(o)) {
@@ -14084,8 +14121,9 @@ function deliveryStoreCard(entry, active = false) {
     addr = customerAddress(c),
     meta = [customerPhonesList(c)[0] || "", addr !== "-" ? addr : ""]
       .filter(Boolean)
-      .join(" · ");
-  return `<button type="button" class="delivery-store-card${active ? " is-active" : ""}" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><div class="delivery-store-card__media"><img src="${customerStoreImage(c)}" alt="" class="delivery-store-card__img" loading="lazy" decoding="async"><span class="delivery-store-card__pin" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>${entry.orderCount ? `<span class="delivery-store-card__badge">${entry.orderCount} захиалга</span>` : ""}</div><div class="delivery-store-card__body"><p class="delivery-store-card__name">${esc(c.name)}</p>${c.companyName ? `<p class="delivery-store-card__company">${esc(c.companyName)}</p>` : ""}<p class="delivery-store-card__meta">${esc(meta || "—")}</p><p class="delivery-store-card__total">${fmt(entry.total)}</p></div></button>`;
+      .join(" · "),
+    markAction = deliveryStoreCardMarkAction(c.id);
+  return `<div class="delivery-store-card-wrap${active ? " is-active" : ""}"><button type="button" class="delivery-store-card${active ? " is-active" : ""}" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><div class="delivery-store-card__media"><img src="${customerStoreImage(c)}" alt="" class="delivery-store-card__img" loading="lazy" decoding="async"><span class="delivery-store-card__pin" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>${entry.orderCount ? `<span class="delivery-store-card__badge">${entry.orderCount} захиалга</span>` : ""}</div><div class="delivery-store-card__body"><p class="delivery-store-card__name">${esc(c.name)}</p>${c.companyName ? `<p class="delivery-store-card__company">${esc(c.companyName)}</p>` : ""}<p class="delivery-store-card__meta">${esc(meta || "—")}</p><p class="delivery-store-card__total">${fmt(entry.total)}</p></div></button>${markAction}</div>`;
 }
 function deliveryStorePickStep() {
   const q = state.searches.deliveryStore || "",

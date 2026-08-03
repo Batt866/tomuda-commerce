@@ -48,6 +48,12 @@
           label: "Захиалгын түүх шалгах",
           actions: CRUD,
         },
+        { id: "orderDeliveryMark", label: "Хүргэлт тэмдэглэх", actions: ["view"] },
+        {
+          id: "orderDeliveryConfirm",
+          label: "Хүргэлт баталгаажуулах",
+          actions: ["view"],
+        },
       ],
     },
     {
@@ -64,7 +70,7 @@
   /** Kept for role templates / legacy saves; not shown in grant UI. */
   const HIDDEN_MODULES = [
     { id: "dashboard", label: "Админ самбар", actions: ["view"] },
-    { id: "orders", label: "Захиалга", actions: [...CRUD, "markDelivered"] },
+    { id: "orders", label: "Захиалга", actions: [...CRUD, "markDelivered", "confirmDelivery"] },
     { id: "settings", label: "Тохиргоо", actions: ["view"] },
   ];
 
@@ -79,6 +85,7 @@
     edit: "засах",
     delete: "устгах",
     markDelivered: "хүргэлт тэмдэглэх",
+    confirmDelivery: "хүргэлт баталгаажуулах",
   };
 
   function permissionKey(moduleId, actionId) {
@@ -168,6 +175,8 @@
     "products.create": ["productAdd.create", "productAdd.view"],
     "employees.create": ["employeeAdd.create", "employeeAdd.view"],
     "dashboard.view": ["settings.view", "permissions.view"],
+    "orders.markDelivered": ["orderDeliveryMark.view", "orders.edit"],
+    "orders.confirmDelivery": ["orderDeliveryConfirm.view", "orders.edit"],
   };
 
   function expandLegacyKeys(list) {
@@ -238,9 +247,8 @@
       "count.create",
       "count.edit",
       "receipts.view",
-      "orders.markDelivered",
     ],
-    delivery: ["orders.view", "orders.markDelivered"],
+    delivery: ["orders.view", "orderDeliveryMark.view"],
   };
 
   const VIEW_PERMISSION = {
