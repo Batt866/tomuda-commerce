@@ -822,7 +822,7 @@ function receiptGrandNote(o) {
 }
 /** PaymentInformation — gray instruction box. */
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td colspan="11" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return `<tr class="receipt-grid__warn"><td colspan="11" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
 }
 function PaymentInformation() {
   return receiptWarningRowsHtml();
@@ -7651,7 +7651,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       22,
     ],
     [
-      "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
+      "Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!",
       22,
     ],
   ].forEach(([text, style], index) => {
@@ -12485,16 +12485,46 @@ function promotionProductLabels(ids) {
     .filter(Boolean)
     .join(", ");
 }
+function quantityPromoBuyMode(rule) {
+  if (rule?.buyMode === "each" || rule?.buyMode === "total") return rule.buyMode;
+  const buyIds = promotionBuyProductIds(rule);
+  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  if (buyIds.length > 1 && buyQty === 1) return "each";
+  return "total";
+}
+function quantityPromoSets(rule, qtyByProduct) {
+  const buyIds = promotionBuyProductIds(rule);
+  const buyQty = Math.floor(Number(rule.buyQty) || 0);
+  if (!buyIds.length || buyQty < 1) return 0;
+  if (quantityPromoBuyMode(rule) === "each") {
+    return Math.min(
+      ...buyIds.map((id) => Math.floor((qtyByProduct[id] || 0) / buyQty)),
+    );
+  }
+  const combinedQty = buyIds.reduce(
+    (sum, id) => sum + (qtyByProduct[id] || 0),
+    0,
+  );
+  return Math.floor(combinedQty / buyQty);
+}
 function quantityPromoRuleFormula(rule) {
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
   const freeQty = Math.floor(Number(rule?.freeQty) || 0);
+  const buyIds = promotionBuyProductIds(rule);
   if (buyQty < 1 || freeQty < 1) return "";
+  if (quantityPromoBuyMode(rule) === "each" && buyIds.length > 1) {
+    return `${buyIds.length} төрлөөс тус бүр ${buyQty} ш → ${freeQty} үнэгүй`;
+  }
   return `${buyQty} ш авахад ${freeQty} үнэгүй`;
 }
 function quantityPromoRuleFormulaExtended(rule) {
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
   const freeQty = Math.floor(Number(rule?.freeQty) || 0);
+  const buyIds = promotionBuyProductIds(rule);
   if (buyQty < 1 || freeQty < 1) return "";
+  if (quantityPromoBuyMode(rule) === "each" && buyIds.length > 1) {
+    return `2 багц → ${freeQty * 2} үнэгүй · 3 багц → ${freeQty * 3} үнэгүй`;
+  }
   return `${buyQty} ш → ${freeQty} үнэгүй · ${buyQty * 2} ш → ${freeQty * 2} үнэгүй`;
 }
 function workerQtyByProduct() {
@@ -12511,26 +12541,38 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   const buyQty = Math.floor(Number(rule.buyQty) || 0);
   const freeQty = Math.floor(Number(rule.freeQty) || 0);
   if (!buyIds.length || !freeIds.length || buyQty < 1 || freeQty < 1) return null;
+  const buyMode = quantityPromoBuyMode(rule);
   const combinedQty = buyIds.reduce(
     (sum, id) => sum + (qtyByProduct[id] || 0),
     0,
   );
-  const sets = Math.floor(combinedQty / buyQty);
+  const sets = quantityPromoSets(rule, qtyByProduct);
   const grantedFree = sets * freeQty;
-  const remainder = combinedQty % buyQty;
+  const readyTypes = buyIds.filter(
+    (id) => (qtyByProduct[id] || 0) >= buyQty,
+  ).length;
+  const missingTypes = Math.max(0, buyIds.length - readyTypes);
+  const remainder = buyMode === "each" ? 0 : combinedQty % buyQty;
   const needForNext =
-    remainder === 0
-      ? combinedQty > 0
-        ? buyQty
-        : buyQty - combinedQty
-      : buyQty - remainder;
+    buyMode === "each"
+      ? missingTypes > 0
+        ? missingTypes
+        : buyQty
+      : remainder === 0
+        ? combinedQty > 0
+          ? buyQty
+          : buyQty - combinedQty
+        : buyQty - remainder;
   return {
     rule,
     buyIds,
     freeIds,
     buyQty,
     freeQty,
+    buyMode,
     combinedQty,
+    readyTypes,
+    missingTypes,
     sets,
     grantedFree,
     needForNext,
@@ -12554,9 +12596,17 @@ function workerQuantityPromoHintsHtml(cart) {
       const formula = quantityPromoRuleFormula(rule);
       const freeNames = promotionProductLabels(prog.freeIds);
       if (prog.grantedFree > 0) {
-        return `<li class="worker-promo-hint worker-promo-hint--active"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">Нийт ${prog.combinedQty} ш → <b>${prog.grantedFree} үнэгүй</b>${freeNames ? ` · ${esc(freeNames)}` : ""}</span></li>`;
+        const status =
+          prog.buyMode === "each" && prog.buyIds.length > 1
+            ? `${prog.readyTypes}/${prog.buyIds.length} төрөл → <b>${prog.grantedFree} үнэгүй</b>`
+            : `Нийт ${prog.combinedQty} ш → <b>${prog.grantedFree} үнэгүй</b>`;
+        return `<li class="worker-promo-hint worker-promo-hint--active"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">${status}${freeNames ? ` · ${esc(freeNames)}` : ""}</span></li>`;
       }
-      return `<li class="worker-promo-hint worker-promo-hint--pending"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">${prog.combinedQty}/${prog.buyQty} ш · ${prog.needForNext} ш нэмбэл ${prog.freeQty} үнэгүй</span></li>`;
+      const pendingStatus =
+        prog.buyMode === "each" && prog.buyIds.length > 1
+          ? `${prog.readyTypes}/${prog.buyIds.length} төрөл · ${prog.missingTypes} төрөл дутуу`
+          : `${prog.combinedQty}/${prog.buyQty} ш · ${prog.needForNext} ш нэмбэл ${prog.freeQty} үнэгүй`;
+      return `<li class="worker-promo-hint worker-promo-hint--pending"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">${pendingStatus}</span></li>`;
     })
     .filter(Boolean);
   if (!items.length) return "";
@@ -12581,7 +12631,11 @@ function pickerQtySheetPromoHtml(p) {
         return `<p class="picker-qty-sheet__promo picker-qty-sheet__promo--active">${esc(formula)} · Одоо <b>${prog.grantedFree} үнэгүй</b></p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
       }
       if (prog.combinedQty > 0) {
-        return `<p class="picker-qty-sheet__promo">${esc(formula)} · ${prog.combinedQty}/${prog.buyQty} ш (${prog.needForNext} ш дутуу)</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
+        const progress =
+          prog.buyMode === "each" && prog.buyIds.length > 1
+            ? `${prog.readyTypes}/${prog.buyIds.length} төрөл`
+            : `${prog.combinedQty}/${prog.buyQty} ш`;
+        return `<p class="picker-qty-sheet__promo">${esc(formula)} · ${progress}${prog.missingTypes > 0 ? ` (${prog.missingTypes} төрөл дутуу)` : ""}</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
       }
       return `<p class="picker-qty-sheet__promo">${esc(formula)}</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
     })
@@ -12634,7 +12688,7 @@ function promotionMultiBuyPickerBlock(selectedIds) {
     selectedIds,
     excludeIds: [],
     title: "Сонгосон бараа",
-    hint: "Олон бараа сонгож болно · нийт тоо шалгана",
+    hint: "Олон бараа сонгож болно · төрөл бүрээс эсвэл нийт тоо",
     placeholder: "Бараа хайж нэмэх...",
     variant: "buy",
     badge: "1",
@@ -12751,7 +12805,11 @@ function promotionQtyRuleText(r) {
   if (buyIds.length && freeIds.length) {
     const buyNames = promotionProductLabels(buyIds),
       freeNames = promotionProductLabels(freeIds);
-    return `${buyNames}-аас нийт ${r.buyQty} ш авахад → ${freeNames} ${promoProductQtyLabel(r.freeQty)}`;
+    const buyPart =
+      quantityPromoBuyMode(r) === "each" && buyIds.length > 1
+        ? `${buyNames} — төрөл бүрээс ${r.buyQty} ш`
+        : `${buyNames}-аас нийт ${r.buyQty} ш авахад`;
+    return `${buyPart} → ${freeNames} ${promoProductQtyLabel(r.freeQty)}`;
   }
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
@@ -12794,7 +12852,11 @@ function promotionQtyRuleCard(r, i) {
           `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
-  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">нийт ${r.buyQty} ш авахад</p><p class="text-xs text-muted-foreground">${esc(quantityPromoRuleFormulaExtended(r))}</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${promoProductQtyLabel(r.freeQty)}</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
+  const buyDesc =
+    quantityPromoBuyMode(r) === "each" && buyIds.length > 1
+      ? `төрөл бүрээс ${r.buyQty} ш`
+      : `нийт ${r.buyQty} ш авахад`;
+  return `<div class="promo-qty-rule-card"><div class="promo-qty-rule-card__body"><div class="promo-qty-rule-buys">${buyThumbs}</div><div class="promo-qty-rule-card__buy min-w-0"><p class="text-xs text-muted-foreground">Дүрэм ${i + 1}</p><p class="font-medium truncate">${esc(buyLabel)}</p><p class="text-muted-foreground">${buyDesc}</p><p class="text-xs text-muted-foreground">${esc(quantityPromoRuleFormulaExtended(r))}</p></div><span class="promo-qty-rule-card__arrow text-muted-foreground">→</span><div class="promo-qty-rule-buys">${freeThumbs}</div><div class="promo-qty-rule-card__free min-w-0"><p class="font-medium truncate">${esc(freeLabel)}</p><p class="text-tone-success">${promoProductQtyLabel(r.freeQty)}</p></div></div>${canDelete() ? `<div class="promo-qty-rule-card__actions">${deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral", attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`, label: "Дүрэм устгах" })}</div>` : ""}</div>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -13010,9 +13072,12 @@ function savePromotionQty(e) {
       alert("Авах болон урамшууллын бараа сонгоно уу");
       return;
     }
+    const buyQtyNum = Math.floor(Number(f.get("buyQty")) || 0);
     const added = appendPromotionRule("quantity", {
       buyProductIds: finalBuyProductIds,
-      buyQty: Number(f.get("buyQty")),
+      buyQty: buyQtyNum,
+      buyMode:
+        finalBuyProductIds.length > 1 && buyQtyNum === 1 ? "each" : "total",
       freeProductIds: finalFreeProductIds,
       freeProductId: finalFreeProductIds[0],
       freeQty: Number(f.get("freeQty")) || 1,
