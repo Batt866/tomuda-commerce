@@ -4728,6 +4728,7 @@ button:focus-visible,
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   .app-shell--bottom-nav {
@@ -6065,6 +6066,16 @@ textarea::placeholder {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.worker-view--ordering .worker-order-card__body > .worker-order-stats {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-top: 2px;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  background: var(--hex-card);
 }
 
 .worker-order-stats__note {
@@ -7724,6 +7735,7 @@ textarea::placeholder {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   padding: 0 var(--picker-h-inset, 6px);
   display: flex;
   flex-direction: column;
@@ -7744,6 +7756,18 @@ textarea::placeholder {
 
 .picker-step2__bottom--actions {
   gap: 0;
+}
+
+.picker-cart-summary {
+  padding-bottom: 10px;
+}
+
+.picker-cart-summary .worker-order-stats {
+  margin-bottom: 0;
+}
+
+.picker-cart-summary--empty {
+  display: none;
 }
 
 .picker-list {
@@ -8643,7 +8667,7 @@ textarea::placeholder {
   .app-shell--bottom-nav .worker-order-lines-wrap {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: auto;
+    overscroll-behavior-y: contain;
     max-height: min(
       52dvh,
       calc(

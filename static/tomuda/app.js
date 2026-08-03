@@ -4712,11 +4712,21 @@ function handleAppBack() {
     state.filters.worker === "new" &&
     state.workerStoreReady
   ) {
-    state.workerStoreReady = false;
-    state.workerCustomer = "";
-    state.searches.workerStore = "";
-    resetWorkerCart();
-    render();
+    const hasCart = workerPaidProductsInCart().length > 0;
+    if (hasCart) {
+      confirmModal(
+        "Захиалгыг зогсоох",
+        "Та захиалгыг зогсоох уу? Сонгосон бараа устгагдана.",
+        {
+          confirmLabel: "Зогсоох",
+          cancelLabel: "Үгүй",
+          danger: true,
+          onConfirm: () => abortWorkerOrder(),
+        },
+      );
+      return true;
+    }
+    abortWorkerOrder();
     return true;
   }
 
@@ -5348,7 +5358,9 @@ function initNestedScrollChain() {
       const atTop = el.scrollTop <= 0;
       const atBottom =
         Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight;
-      if (!((atTop && dy < 0) || (atBottom && dy > 0))) return;
+      // Pull-down at top chains to parent and can trigger browser refresh.
+      if (atTop && dy < 0) return;
+      if (!(atBottom && dy > 0)) return;
       const parent = nestedScrollChainTarget(el);
       if (parent && parent !== el) {
         parent.scrollTop += dy;
@@ -12923,20 +12935,33 @@ function pricePromotionDiscountAmount(gross, rule) {
 function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
   const grantWanted = Math.max(0, Math.floor(Number(freeQty) || 0));
   if (grantWanted < 1) return result;
-  (Array.isArray(freeIds) ? freeIds : []).forEach((freeId) => {
+  const ids = (Array.isArray(freeIds) ? freeIds : []).filter(Boolean);
+  if (!ids.length) return result;
+  // Multiple freeProductIds are alternatives in one pool — grant total freeQty once.
+  const targets =
+    ids.length === 1
+      ? ids
+      : [ids.find((id) => state.products.some((p) => p.id === id))].filter(
+          Boolean,
+        );
+  let remaining = grantWanted;
+  for (const freeId of targets) {
+    if (remaining < 1) break;
     const product = state.products.find((p) => p.id === freeId);
-    if (!product) return;
+    if (!product) continue;
+    const addQty = remaining;
+    remaining = 0;
     const existing = result.find(
       (l) => l.productId === freeId && l.isPromoFree,
     );
     if (existing) {
-      existing.quantity += grantWanted;
+      existing.quantity += addQty;
       existing.total = 0;
     } else {
       result.push({
         productId: freeId,
         productName: product.name,
-        quantity: grantWanted,
+        quantity: addQty,
         price: 0,
         catalogPrice: Number(product.price ?? product.sellPrice ?? 0) || 0,
         total: 0,
@@ -12944,7 +12969,7 @@ function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
         ...extra,
       });
     }
-  });
+  }
   return result;
 }
 function applyPricePromotions(lines, gross) {
@@ -14070,6 +14095,13 @@ function confirmWorkerStore() {
   resetWorkerCart();
   render();
   pushAppHistory();
+}
+function abortWorkerOrder() {
+  state.workerStoreReady = false;
+  state.workerCustomer = "";
+  state.searches.workerStore = "";
+  resetWorkerCart();
+  render();
 }
 function clearWorkerStore() {
   state.workerStoreReady = false;
@@ -16588,9 +16620,33 @@ function updatePickerClearBtn() {
   clearBtn.classList.toggle("is-disabled", !hasSelected);
   clearBtn.disabled = !hasSelected;
 }
+function capturePickerScroll() {
+  const scroll = modal.querySelector(".picker-step2__scroll");
+  return { top: scroll?.scrollTop ?? 0 };
+}
+function restorePickerScroll(snap) {
+  if (!snap) return;
+  requestAnimationFrame(() => {
+    const scroll = modal.querySelector(".picker-step2__scroll");
+    if (scroll) scroll.scrollTop = snap.top;
+  });
+}
+function updatePickerCartSummary() {
+  const bar = modal.querySelector("[data-picker-cart-summary]");
+  if (!bar) return;
+  bar.outerHTML = pickerCartSummaryBarHtml();
+}
+function pickerCartSummaryBarHtml() {
+  const cart = workerCartSummary();
+  if (!cart.skuCount) {
+    return `<div class="picker-cart-summary picker-cart-summary--empty" data-picker-cart-summary hidden></div>`;
+  }
+  return `<div class="picker-cart-summary" data-picker-cart-summary>${workerOrderStatsHtml(cart)}</div>`;
+}
 function refreshPickerList() {
   const list = modal.querySelector("[data-picker-products]");
   if (!list || !pickerOpen()) return false;
+  const scrollSnap = capturePickerScroll();
   ensurePickerActiveId();
   updatePickerModalTitle();
   const chips = modal.querySelector(".picker-cat-chips");
@@ -16600,6 +16656,8 @@ function refreshPickerList() {
     ? products.map((p) => pickerRow(p)).join("")
     : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`;
   updatePickerClearBtn();
+  updatePickerCartSummary();
+  restorePickerScroll(scrollSnap);
   return true;
 }
 function workerLinesWithPaidQty(productId, qty) {
@@ -16692,6 +16750,7 @@ function setWorkerQty(id, qty) {
   }
   const keepPicker = pickerOpen();
   scheduleBackendSave();
+  saveAuthSession();
   if (keepPicker) {
     if (state.pickerQtyProductId) {
       pickerModal();
@@ -16891,6 +16950,7 @@ function openPickerModal() {
   pickerModal();
 }
 function pickerModal() {
+  const scrollSnap = pickerOpen() ? capturePickerScroll() : null;
   const hasSelected = state.products.some(
       (p) => (state.workerQty[p.id] || 0) > 0,
     ),
@@ -16901,7 +16961,7 @@ function pickerModal() {
     : "";
   box(
     pickerModalTitleHtml(),
-    `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions"><div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
+    `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions">${pickerCartSummaryBarHtml()}<div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
     "max-w-2xl",
     {
       titleId: "picker-order-title",
@@ -16910,6 +16970,7 @@ function pickerModal() {
       panelClass: "modal-panel--picker",
     },
   );
+  restorePickerScroll(scrollSnap);
 }
 function backToPickerCategories() {
   setPickerCategory("");
