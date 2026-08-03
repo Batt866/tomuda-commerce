@@ -250,7 +250,11 @@ html {
 
 body {
   touch-action: manipulation;
-  overscroll-behavior-y: none;
+  overscroll-behavior-y: contain;
+}
+
+#app {
+  overscroll-behavior-y: contain;
 }
 
 input,
