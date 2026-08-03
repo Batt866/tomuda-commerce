@@ -768,7 +768,7 @@ function receiptPromoRowsHtml(o) {
 function RewardTable(o) {
   return receiptPromoRowsHtml(o);
 }
-/** SummarySection — subtotal / VAT / grand total + pay term checkboxes. */
+/** SummarySection — subtotal / VAT / grand total + settle + pay term. */
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
   const grandLabel = grandNote
@@ -789,10 +789,11 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
       const valueClass = grand
         ? "receipt-grid__summary-value receipt-grid__summary-value--grand"
         : "receipt-grid__summary-value";
-      // Source zarlaga: label left (6 cols), amount right (5 cols).
+      // Source zarlaga: label left (A–D), amount right (E–G).
       return `<tr class="${rowClass}"><td colspan="6" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td colspan="5" class="${valueClass}">${value}</td></tr>`;
     })
     .join("");
+  // Settle agreement sits as the yellow band above Урамшуулал (source zarlaga) — not repeated here.
   const fPay = receiptPartyFields(o);
   const payChecks = receiptPaymentChecksHtml(!!fPay.paid, !!fPay.bank);
   const payHtml = `${payChecks.cash}&nbsp;&nbsp;${payChecks.bank}`;
@@ -863,7 +864,7 @@ function stockInSignatureRowsHtml() {
   });
 }
 function receiptUpperFooterRows(o) {
-  // Source zarlaga: return-note row under paid items (before yellow settle / promo).
+  // Source zarlaga: return-note row sits under the paid item table (before yellow settle/promo).
   return `<tr class="receipt-grid__return"><td colspan="3" class="receipt-grid__return-label">Буцаалтын тэмдэглэгээ:</td><td colspan="8" class="receipt-grid__return-line"></td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
@@ -6883,8 +6884,7 @@ td, th { border: none; }
   font-size: 11px;
   text-align: left;
   color: ${RECEIPT_TEXT};
-  padding-left: 4px !important;
-  padding-right: 8px !important;
+  padding-right: 6px !important;
   white-space: nowrap;
   border: none !important;
 }
@@ -7562,7 +7562,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     { grand = false, decimals = false } = {},
   ) => {
     const r = rowNum;
-    // Source zarlaga: label left (A–D), amount right (E–G).
+    // Source zarlaga: label on left (A–D), amount on right (E–G).
     merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
     const labelStyle = grand ? 31 : 30;
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
