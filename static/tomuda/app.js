@@ -57,6 +57,7 @@ const state = {
   workerQty: {},
   pickerActiveId: "",
   pickerQtyProductId: "",
+  pickerQtyRevertQty: null,
   workerOrderActiveId: "",
   workerOrdersArrived: false,
   workerHighlightOrderId: "",
@@ -4673,6 +4674,17 @@ function leaveWorkerOrdersTab() {
   render();
   return true;
 }
+function workerOrderHasCart() {
+  return workerPaidProductsInCart().length > 0;
+}
+function confirmAbortWorkerOrder(onConfirm) {
+  confirmModal("Захиалгыг зогсоох", "Та захиалгыг зогсоох уу?", {
+    confirmLabel: "Зогсоох",
+    cancelLabel: "Үгүй",
+    danger: true,
+    onConfirm: onConfirm || (() => abortWorkerOrder()),
+  });
+}
 function handleAppBack() {
   if (!state.isLoggedIn) return false;
 
@@ -4694,8 +4706,15 @@ function handleAppBack() {
     return true;
   }
 
+  if (state.pickerQtyProductId && pickerOpen()) {
+    closePickerQtySheet();
+    return true;
+  }
+
   if (modal.innerHTML.trim()) {
+    const wasPicker = pickerOpen();
     closeModal();
+    if (wasPicker) render();
     return true;
   }
 
@@ -4712,18 +4731,8 @@ function handleAppBack() {
     state.filters.worker === "new" &&
     state.workerStoreReady
   ) {
-    const hasCart = workerPaidProductsInCart().length > 0;
-    if (hasCart) {
-      confirmModal(
-        "Захиалгыг зогсоох",
-        "Та захиалгыг зогсоох уу? Сонгосон бараа устгагдана.",
-        {
-          confirmLabel: "Зогсоох",
-          cancelLabel: "Үгүй",
-          danger: true,
-          onConfirm: () => abortWorkerOrder(),
-        },
-      );
+    if (workerOrderHasCart()) {
+      confirmAbortWorkerOrder();
       return true;
     }
     abortWorkerOrder();
@@ -5246,6 +5255,7 @@ function initPickerModalActions() {
         qtyDone.getAttribute("data-product-id") || state.pickerQtyProductId;
       if (id) finishPickerEditFor(id);
       state.pickerQtyProductId = "";
+      state.pickerQtyRevertQty = null;
       if (pickerOpen()) pickerModal();
       return;
     }
@@ -6138,7 +6148,7 @@ function percentDiscountSettingsModal() {
   const rate = percentDiscountRate();
   box(
     "Шууд төлөлтийн хувь оруулах",
-    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">(Харилцагч хүлээн авсан барааны төлбөрийг шууд төлөх үед хөнгөлөлтийн хэмжээ)</p><label class="block text-sm font-medium">Шууд төлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="savePercentDiscountSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">(Харилцагч хүлээн авсан барааны төлбөрийг шууд төлөх үед хөнгөлөлтийн хэмжээ)</p><label class="block text-sm font-medium">Шууд төлөлтийн хувь (%)</label><input name="percentDiscountRate" type="tel" inputmode="decimal" autocomplete="off" min="0" max="100" step="0.1" required value="${rate}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -6163,7 +6173,7 @@ function orderRetentionSettingsModal() {
   const days = orderRetentionDays();
   box(
     "Захиалгын түүх хадгалах",
-    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалгын түүхэнд тохируулсан хугацааны дотор системээс автоматаар устана.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалгын түүхэнд тохируулсан хугацааны дотор системээс автоматаар устана.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -6246,7 +6256,7 @@ function stockAlertModal() {
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
     "Үлдэгдэл сануулах",
-    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Таталт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Болих</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Таталт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-xl",
   );
 }
@@ -9858,7 +9868,7 @@ function stockInEntryModal(id) {
   const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
   box(
     "Орлого оруулах",
-    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -10062,7 +10072,7 @@ function stockOutModal(id) {
   if (!p) return;
   box(
     "Зарлага гаргах",
-    `<form onsubmit="applyStockOutModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${Number(p.stock) || 0} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо ширхэг</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required autofocus class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn btn--danger">Зарлага</button></div></form>`,
+    `<form onsubmit="applyStockOutModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${Number(p.stock) || 0} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо ширхэг</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required autofocus class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--danger">Зарлага</button></div></form>`,
     "max-w-md",
   );
 }
@@ -10107,7 +10117,7 @@ function inventoryStockModal(id, tab) {
       : "";
   box(
     title,
-    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required ${isIn ? "" : "autofocus"} class="field-input app-input"></label>${costField}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Болих</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
+    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required ${isIn ? "" : "autofocus"} class="field-input app-input"></label>${costField}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
     "max-w-md",
   );
 }
@@ -14392,6 +14402,7 @@ function closeModal() {
   if (state.pickerActiveId) finishPickerEditFor(state.pickerActiveId);
   state.pickerActiveId = "";
   state.pickerQtyProductId = "";
+  state.pickerQtyRevertQty = null;
   destroyCustomerMap();
   state.promoPick = null;
   state.promoFormDraft = null;
@@ -14644,7 +14655,7 @@ function showCustomerLocationFailure(err) {
       `<p>${detail.text}</p><p class="text-sm text-muted-foreground mt-2">${isSamsungDevice() ? "Samsung" : "Android"}-ийн <b>Тохиргоо → Байршил</b> хэсэг рүү шилжиж GPS-ээ асаана уу.</p>`,
       {
         confirmLabel: "Тохиргоо нээх",
-        cancelLabel: "Болих",
+        cancelLabel: "Буцах",
         closable: true,
         onConfirm: () => {
           closeConfirmCard();
@@ -16727,6 +16738,7 @@ function resetWorkerCart() {
   state.workerQty = {};
   state.pickerActiveId = "";
   state.pickerQtyProductId = "";
+  state.pickerQtyRevertQty = null;
   state.workerOrderActiveId = "";
   state.pickerStatus = "";
   state.pickerBarcode = "";
@@ -16990,14 +17002,17 @@ function openPickerQtySheet(productId) {
   }
   state.pickerQtyProductId = productId;
   state.pickerActiveId = productId;
+  state.pickerQtyRevertQty = getWorkerQty(productId);
   pickerModal();
 }
 function closePickerQtySheet() {
   const id = state.pickerQtyProductId;
+  const revertQty = state.pickerQtyRevertQty;
   state.pickerQtyProductId = "";
   state.pickerActiveId = "";
-  if (id) setWorkerQty(id, 0);
-  if (pickerOpen()) pickerModal();
+  state.pickerQtyRevertQty = null;
+  if (id) setWorkerQty(id, revertQty ?? 0);
+  else if (pickerOpen()) pickerModal();
 }
 function pickerQtySheetHtml(productId) {
   const p = state.products.find((x) => x.id === productId);
@@ -17009,7 +17024,7 @@ function pickerQtySheetHtml(productId) {
   const qtyBody = packSize
     ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
     : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
-  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Болих</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
+  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
