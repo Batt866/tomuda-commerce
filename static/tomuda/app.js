@@ -6753,7 +6753,7 @@ td, th { border: none; }
 .receipt-header-brand {
   display: grid;
   grid-template-columns: 16mm minmax(0, 1fr) auto;
-  column-gap: 1mm;
+  column-gap: 2.5mm;
   align-items: start;
   width: 100%;
   box-sizing: border-box;
@@ -6770,6 +6770,8 @@ td, th { border: none; }
   object-fit: contain;
   display: block;
   margin: 0;
+  position: relative;
+  z-index: 0;
 }
 .receipt-header-copy {
   min-width: 0;
@@ -6778,7 +6780,9 @@ td, th { border: none; }
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  padding-left: 0;
+  padding-left: 1mm;
+  position: relative;
+  z-index: 1;
 }
 .receipt-header-date {
   white-space: nowrap;
@@ -7074,10 +7078,9 @@ const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
-// A = logo gutter; meta labels all start in B (same left edge). No fitToWidth crush.
-// Meta: A empty, B:C label, D value, E:F right label, G right value.
-/* A logo; B labels/names; C bank values + units; D barcode/address; E–G numbers. */
-const RECEIPT_XLSX_COL_WIDTHS = [4, 20, 12, 13, 8, 11, 14];
+// A = logo gutter (must fit 16mm mark; was 4 and logo covered header text).
+// B labels/names; C bank values + units; D barcode/address; E–G numbers.
+const RECEIPT_XLSX_COL_WIDTHS = [11, 18, 11, 12, 8, 11, 14];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
   const limit = Math.max(6, Number(charsPerLine) || 12);
@@ -7171,12 +7174,14 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Exact 16mm logo size (never rescale). Col A is wide enough that text in B stays clear.
+  // 16mm logo anchored in col A only. Col A width (~11) leaves B text clear.
   const logoMm = 16;
   const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.5 / 25.4) * 914400);
+  // Small inset from left edge of column A (not into B).
+  const colOff = Math.round((0.3 / 25.4) * 914400);
+  const rowOff = Math.round((0.4 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>2000</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -7340,9 +7345,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   //   Хаяг: ...
   //   Нийслэл...
   const deliveryDateText = `${receiptDeliveryDateValue(o)}`;
-  // Logo left / date right; taller rows = эгнээ хоорондын зай in the header band.
-  const hdrPad = "  ";
-  pushRow(20, [
+  // Logo left / date right; taller rows so 16mm logo fits the A merge band.
+  const hdrPad = "";
+  pushRow(22, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 39, si(`${hdrPad}ТОМУДА ГРУПП`), "s"),
     // Style 3 = right-aligned — pin date to the top-right edge.
@@ -7355,7 +7360,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(hr1, "C", "E", 39),
     ...emptyCells(hr1, "G", "G", 3),
   ]);
-  pushRow(17, [
+  pushRow(18, [
     xlsxCellXml(`A${hr2}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr2}`,
@@ -7365,7 +7370,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ),
     ...emptyCells(hr2, "C", "G", 5),
   ]);
-  pushRow(17, [
+  pushRow(18, [
     xlsxCellXml(`A${hr3}`, 1, null, "empty"),
     xlsxCellXml(
       `B${hr3}`,
