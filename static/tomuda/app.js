@@ -768,7 +768,7 @@ function receiptPromoRowsHtml(o) {
 function RewardTable(o) {
   return receiptPromoRowsHtml(o);
 }
-/** SummarySection — subtotal / VAT / grand total + settle + pay term. */
+/** SummarySection — subtotal / VAT / grand total + pay term checkboxes. */
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
   const grandLabel = grandNote
@@ -789,13 +789,14 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
       const valueClass = grand
         ? "receipt-grid__summary-value receipt-grid__summary-value--grand"
         : "receipt-grid__summary-value";
-      // Forward of the amounts (not flush-right): pad | label | value.
-      return `<tr class="${rowClass}"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td colspan="2" class="${valueClass}">${value}</td></tr>`;
+      // Source zarlaga: label left (6 cols), amount right (5 cols).
+      return `<tr class="${rowClass}"><td colspan="6" class="receipt-grid__summary-label${grand ? " receipt-grid__summary-label--grand" : ""}">${esc(label)}</td><td colspan="5" class="${valueClass}">${value}</td></tr>`;
     })
     .join("");
-  // Settle agreement sits as the yellow band above Урамшуулал (source zarlaga) — not repeated here.
-  const payHtml = esc(receiptPaymentTermDisplay(o));
-  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="4" class="receipt-grid__summary-pad"></td><td colspan="5" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
+  const fPay = receiptPartyFields(o);
+  const payChecks = receiptPaymentChecksHtml(!!fPay.paid, !!fPay.bank);
+  const payHtml = `${payChecks.cash}&nbsp;&nbsp;${payChecks.bank}`;
+  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="6" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="5" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
   return summaryPart + payRow;
 }
 function SummarySection(sub, vat, payable, payTerm, o) {
@@ -862,8 +863,8 @@ function stockInSignatureRowsHtml() {
   });
 }
 function receiptUpperFooterRows(o) {
-  // No "Буцаалтын тэмдэглэгээ" — omitted from receipt.
-  return "";
+  // Source zarlaga: return-note row under paid items (before yellow settle / promo).
+  return `<tr class="receipt-grid__return"><td colspan="3" class="receipt-grid__return-label">Буцаалтын тэмдэглэгээ:</td><td colspan="8" class="receipt-grid__return-line"></td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
   const f = receiptPartyFields(o);
@@ -6880,9 +6881,10 @@ td, th { border: none; }
   background: transparent;
   font-weight: 400;
   font-size: 11px;
-  text-align: right;
+  text-align: left;
   color: ${RECEIPT_TEXT};
-  padding-right: 6px !important;
+  padding-left: 4px !important;
+  padding-right: 8px !important;
   white-space: nowrap;
   border: none !important;
 }
@@ -7560,31 +7562,37 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     { grand = false, decimals = false } = {},
   ) => {
     const r = rowNum;
-    // Forward of amounts: label C–F, value G (not flush against G only).
-    merges.push(`C${r}:F${r}`);
+    // Source zarlaga: label left (A–D), amount right (E–G).
+    merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
     const labelStyle = grand ? 31 : 30;
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
     pushRow(15, [
-      xlsxCellXml(`A${r}`, 1, null, "empty"),
-      xlsxCellXml(`B${r}`, 1, null, "empty"),
-      xlsxCellXml(`C${r}`, labelStyle, si(label), "s"),
-      xlsxCellXml(`G${r}`, valueStyle, Number(amount) || 0, "n"),
-      ...emptyCells(r, "D", "F", labelStyle),
+      xlsxCellXml(`A${r}`, labelStyle, si(label), "s"),
+      xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"),
+      ...emptyCells(r, "B", "D", labelStyle),
+      ...emptyCells(r, "F", "G", valueStyle),
     ]);
   };
   const pushSummaryTextRow = (label, value) => {
     const r = rowNum;
-    merges.push(`C${r}:F${r}`);
+    merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
     pushRow(15, [
-      xlsxCellXml(`A${r}`, 1, null, "empty"),
-      xlsxCellXml(`B${r}`, 1, null, "empty"),
-      xlsxCellXml(`C${r}`, 30, si(label), "s"),
-      xlsxCellXml(`G${r}`, 3, si(String(value ?? "")), "s"),
-      ...emptyCells(r, "D", "F", 30),
+      xlsxCellXml(`A${r}`, 30, si(label), "s"),
+      xlsxCellXml(`E${r}`, 3, si(String(value ?? "")), "s"),
+      ...emptyCells(r, "B", "D", 30),
+      ...emptyCells(r, "F", "G", 3),
     ]);
   };
   items.forEach((item, index) => pushItemLikeRow(item, index));
-  // No return-note row. Yellow settle then Урамшуулал.
+  // Source zarlaga: return note, then yellow settle, then Урамшуулал.
+  const returnRow = rowNum;
+  merges.push(`A${returnRow}:B${returnRow}`, `C${returnRow}:G${returnRow}`);
+  pushRow(15, [
+    xlsxCellXml(`A${returnRow}`, 5, si("Буцаалтын тэмдэглэгээ:"), "s"),
+    xlsxCellXml(`C${returnRow}`, 17, null, "empty"),
+    ...emptyCells(returnRow, "B", "B", 5),
+    ...emptyCells(returnRow, "D", "G", 17),
+  ]);
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
   const promoSettleNote = receiptPromoSettleNote(o);
   if (promoSettleNote) {
@@ -7603,21 +7611,32 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ? `Таны нийт төлөх дүн ${grandNote}`
     : "Таны нийт төлөх дүн";
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
-  pushSummaryTextRow("Төлбөрийн нөхцөл", receiptPaymentTermDisplay(o));
-  // Style 25 = light gray warn band (not yellow settle fill).
+  pushSummaryTextRow(
+    "Төлбөрийн нөхцөл",
+    receiptPaymentChecksText(!!f.paid, !!f.bank),
+  );
   [
-    "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
-    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
-    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
-    "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
-  ].forEach((text, index) => {
+    [
+      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
+      22,
+    ],
+    ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.", 23],
+    [
+      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
+      22,
+    ],
+    [
+      "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
+      22,
+    ],
+  ].forEach(([text, style], index) => {
     const r = rowNum;
     merges.push(`A${r}:G${r}`);
     const warnH =
-      index === 0 ? Math.max(28, Math.ceil(text.length / 52) * 12) : 14;
+      index === 0 ? Math.max(28, Math.ceil(text.length / 52) * 12) : 13;
     pushRow(warnH, [
-      xlsxCellXml(`A${r}`, 25, si(text), "s"),
-      ...emptyCells(r, "B", "G", 25),
+      xlsxCellXml(`A${r}`, style, si(text), "s"),
+      ...emptyCells(r, "B", "G", style),
     ]);
   });
   pushRow(8, emptyCells(rowNum));
