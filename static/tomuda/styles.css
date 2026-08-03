@@ -4231,12 +4231,13 @@ button:focus-visible,
   flex: 1;
   min-width: 0;
   font-size: calc(var(--font-md) + 1px);
-  font-weight: 800;
+  font-weight: 700;
   line-height: var(--phi);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: center;
+  text-transform: none;
 }
 
 .mobile-top-bar__back,
@@ -4954,9 +4955,10 @@ button:focus-visible,
 
   .page-head__title {
     font-size: var(--font-xl);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: -0.02em;
     margin-bottom: var(--phi-neg-1);
+    text-transform: none;
   }
 
   .stat-card {
@@ -6972,8 +6974,15 @@ textarea::placeholder {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
   color: var(--muted-foreground);
+}
+
+.promo-qty-rule-card__label--example {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--hex-foreground);
 }
 
 .promo-qty-rule-card__names {
@@ -11945,6 +11954,7 @@ textarea::placeholder {
   flex: 1;
   min-width: 0;
   line-height: 1.35;
+  font-weight: 500;
 }
 
 .promo-type-menu__count {

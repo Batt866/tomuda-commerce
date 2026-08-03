@@ -12127,27 +12127,43 @@ function confirmSetPaid(id) {
   });
 }
 const PROMO_PRODUCT_LABEL = "Урамшуулалд олгох бараа";
-const PROMO_BUY_PRODUCT_LABEL = "Авах бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
-const PROMO_PAYMENT_LABEL = "Шууд төлөлтийн урамшуулал оруулах";
+const PROMO_PAYMENT_LABEL = "Шууд төлөлтийн урамшуулал";
 const PROMO_QUANTITY_LABEL = "Багц худалдан авалтын хөнгөлөлт";
+const PROMO_EMPTY_RULES_TEXT = "Дүрэм байхгүй";
+const PROMO_PAGE_TITLES = {
+  quantity: "Багц худалдан авалт",
+  price: "Нийт дүнгээс хөнгөлөлт",
+  payment: PROMO_PAYMENT_LABEL,
+};
+function promotionPageTitle(type) {
+  return PROMO_PAGE_TITLES[type] || "Урамшуулал";
+}
+function labelInline(text) {
+  const s = String(text || "").trim();
+  if (!s) return s;
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+function promoProductLabelInline() {
+  return labelInline(PROMO_PRODUCT_LABEL);
+}
 function promoProductQtyLabel(qty) {
-  return `${Number(qty) || 1} ш · ${PROMO_PRODUCT_LABEL}`;
+  return `${Number(qty) || 1} ш · ${promoProductLabelInline()}`;
 }
 function promotionTypeLabel(type) {
   return (
     {
-      quantity: PROMO_QUANTITY_LABEL,
-      price: "Нийт үнийн дүнгээс хөнгөлөлт олгох",
-      payment: PROMO_PAYMENT_LABEL,
+      quantity: promotionPageTitle("quantity"),
+      price: promotionPageTitle("price"),
+      payment: promotionPageTitle("payment"),
     }[type] || "Урамшуулал"
   );
 }
 function promotionMenuHtml() {
   const items = [
-    ["price", "Нийт үнийн дүнгээс хөнгөлөлт олгох"],
-    ["quantity", PROMO_QUANTITY_LABEL],
-    ["payment", PROMO_PAYMENT_LABEL],
+    ["price", promotionPageTitle("price")],
+    ["quantity", promotionPageTitle("quantity")],
+    ["payment", promotionPageTitle("payment")],
   ];
   return `<nav class="admin-menu promo-type-menu" aria-label="Урамшууллын төрөл">${items
     .map(([id, label]) => {
@@ -12420,7 +12436,7 @@ function promotionProductPickerBlock(
   return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block"><input type="hidden" name="${fieldName}" id="promo-${fieldName}" value="${esc(selectedId)}" required>${head}${inputRow}${promoCategoryFilterHtml(fieldName)}${warn}${selectedHtml}${listHtml}</div></div>`;
 }
 function promoSectionArrow() {
-  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">${PROMO_PRODUCT_LABEL}</span></div>`;
+  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">жишээ: 16 ш захиалгад → 3 ш урамшуулал</span></div>`;
 }
 function promotionQtyField(name, label, defaultValue, inline = false) {
   const draftVal = promoFormDraftVal(name, "");
@@ -12544,25 +12560,38 @@ function quantityPromoSets(rule, qtyByProduct) {
   );
   return Math.floor(combinedQty / buyQty);
 }
-function quantityPromoRuleFormula(rule) {
+function quantityPromoOrderQty(rule, sets = 1) {
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
-  const freeQty = Math.floor(Number(rule?.freeQty) || 0);
   const buyIds = promotionBuyProductIds(rule);
-  if (buyQty < 1 || freeQty < 1) return "";
+  const n = Math.max(1, Math.floor(Number(sets) || 0));
+  if (buyQty < 1) return 0;
   if (quantityPromoBuyMode(rule) === "each" && buyIds.length > 1) {
-    return `${buyIds.length} төрлөөс тус бүр ${buyQty} ш → ${freeQty} үнэгүй`;
+    return buyIds.length * buyQty * n;
   }
-  return `${buyQty} ш авахад ${freeQty} үнэгүй`;
+  return buyQty * n;
+}
+function quantityPromoFreeQty(rule, sets = 1) {
+  const freeQty = Math.floor(Number(rule?.freeQty) || 0);
+  const n = Math.max(1, Math.floor(Number(sets) || 0));
+  return freeQty < 1 ? 0 : freeQty * n;
+}
+function quantityPromoExampleLine(rule, sets = 1) {
+  const order = quantityPromoOrderQty(rule, sets);
+  const promo = quantityPromoFreeQty(rule, sets);
+  if (!order || !promo) return "";
+  return `${order} ш захиалгад ${promo} ш урамшуулал`;
+}
+function quantityPromoRuleFormula(rule) {
+  return quantityPromoExampleLine(rule, 1);
 }
 function quantityPromoRuleFormulaExtended(rule) {
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
   const freeQty = Math.floor(Number(rule?.freeQty) || 0);
-  const buyIds = promotionBuyProductIds(rule);
   if (buyQty < 1 || freeQty < 1) return "";
-  if (quantityPromoBuyMode(rule) === "each" && buyIds.length > 1) {
-    return `2 багц → ${freeQty * 2} үнэгүй · 3 багц → ${freeQty * 3} үнэгүй`;
-  }
-  return `${buyQty} ш → ${freeQty} үнэгүй · ${buyQty * 2} ш → ${freeQty * 2} үнэгүй`;
+  return [1, 2, 3]
+    .map((sets) => quantityPromoExampleLine(rule, sets))
+    .filter(Boolean)
+    .join(" · ");
 }
 function workerQtyByProduct() {
   const qtyByProduct = {};
@@ -12724,7 +12753,7 @@ function promotionMultiBuyPickerBlock(selectedIds) {
     fieldName: "buyProductIds",
     selectedIds,
     excludeIds: [],
-    title: PROMO_BUY_PRODUCT_LABEL,
+    title: "Захиалгад оруулах бараа",
     hint: "Олон бараа сонгож болно · төрөл бүрээс эсвэл нийт тоо",
     placeholder: "Бараа хайж нэмэх...",
     variant: "buy",
@@ -12851,7 +12880,7 @@ function promotionQtyRuleText(r) {
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Авах бараа болон ${PROMO_PRODUCT_LABEL}-аа сонгоод багцын дүрэм үүсгэнэ.</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="promo-qty-rule-list">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="promo-qty-rule-list__empty">${PROMO_QUANTITY_LABEL}-ийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцын дүрэм үүсгэнэ · жишээ нь: 16 ш захиалгад 3 ш урамшуулал.</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="promo-qty-rule-list">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="promo-qty-rule-list__empty">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -12887,10 +12916,9 @@ function promotionQtyRuleCard(r, i) {
           `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-thumb promo-qty-rule-thumb" alt="">`,
       )
       .join("");
-  const buyDesc =
-    quantityPromoBuyMode(r) === "each" && buyIds.length > 1
-      ? `төрөл бүрээс ${r.buyQty} ш`
-      : `нийт ${r.buyQty} ш авахад`;
+  const exampleSets = 3;
+  const buyExampleLabel = `${quantityPromoOrderQty(r, exampleSets)} ш захиалгад`;
+  const freeExampleLabel = `${quantityPromoFreeQty(r, exampleSets)} ш урамшуулал`;
   const deleteBtn = canDelete()
     ? deleteIconButton({
         className: "icon-action-btn icon-action-btn--neutral promo-qty-rule-card__delete",
@@ -12898,7 +12926,7 @@ function promotionQtyRuleCard(r, i) {
         label: "Дүрэм устгах",
       })
     : "";
-  return `<article class="promo-qty-rule-card"><header class="promo-qty-rule-card__head"><span class="promo-qty-rule-card__num" aria-hidden="true">${i + 1}</span><div class="promo-qty-rule-card__head-text min-w-0"><p class="promo-qty-rule-card__title">Дүрэм ${i + 1}</p><p class="promo-qty-rule-card__summary">${esc(quantityPromoRuleFormula(r))}</p></div>${deleteBtn}</header><div class="promo-qty-rule-card__stack"><section class="promo-qty-rule-card__block"><p class="promo-qty-rule-card__label">${PROMO_BUY_PRODUCT_LABEL}</p><div class="promo-qty-rule-buys">${buyThumbs}</div><p class="promo-qty-rule-card__names">${esc(buyLabel)}</p><p class="promo-qty-rule-card__meta">${buyDesc}</p><p class="promo-qty-rule-card__meta promo-qty-rule-card__meta--sub">${esc(quantityPromoRuleFormulaExtended(r))}</p></section><div class="promo-qty-rule-card__arrow" aria-hidden="true">↓</div><section class="promo-qty-rule-card__block promo-qty-rule-card__block--free"><p class="promo-qty-rule-card__label">${PROMO_PRODUCT_LABEL}</p><div class="promo-qty-rule-buys">${freeThumbs}</div><p class="promo-qty-rule-card__names">${esc(freeLabel)}</p><p class="promo-qty-rule-card__gift">${Number(r.freeQty) || 1} ш үнэгүй</p></section></div></article>`;
+  return `<article class="promo-qty-rule-card"><header class="promo-qty-rule-card__head"><span class="promo-qty-rule-card__num" aria-hidden="true">${i + 1}</span><div class="promo-qty-rule-card__head-text min-w-0"><p class="promo-qty-rule-card__title">Дүрэм ${i + 1}</p><p class="promo-qty-rule-card__summary">${esc(quantityPromoRuleFormulaExtended(r))}</p></div>${deleteBtn}</header><div class="promo-qty-rule-card__stack"><section class="promo-qty-rule-card__block"><p class="promo-qty-rule-card__label promo-qty-rule-card__label--example">${esc(buyExampleLabel)}</p><div class="promo-qty-rule-buys">${buyThumbs}</div><p class="promo-qty-rule-card__names">${esc(buyLabel)}</p></section><div class="promo-qty-rule-card__arrow" aria-hidden="true">↓</div><section class="promo-qty-rule-card__block promo-qty-rule-card__block--free"><p class="promo-qty-rule-card__label promo-qty-rule-card__label--example">${esc(freeExampleLabel)}</p><div class="promo-qty-rule-buys">${freeThumbs}</div><p class="promo-qty-rule-card__names">${esc(freeLabel)}</p></section></div></article>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -12920,7 +12948,7 @@ function promotionPricePanel(rows) {
   const sorted = [...rows].sort(
     (a, b) => (Number(a.minAmount) || 0) - (Number(b.minAmount) || 0),
   );
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд ${PROMO_PRODUCT_LABEL} эсвэл хувийн хөнгөлөлт олгон.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">Нийт үнийн дүнгийн хөнгөлөлтийн дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд ${promoProductLabelInline()} эсвэл хувийн хөнгөлөлт олгоно.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
 }
 function promotionPaymentRuleText(r) {
   const term = r.paymentTerm === "credit" ? "Зээлээр" : "Шууд төлөх",
@@ -12936,7 +12964,7 @@ function promotionPaymentRuleText(r) {
   return `${term}${minText} · ${freeNames || "-"} ${promoProductQtyLabel(r.freeQty)}`;
 }
 function promotionPaymentPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Төлбөрийн нөхцлөөс хамаарах ${PROMO_PRODUCT_LABEL} сонгох</p><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">Шууд төлбөрийн урамшууллын дүрэм байхгүй</div>`}</div></div>`;
+  return `<div class="space-y-3"><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
 }
 function promotionPaymentRuleCard(r, i) {
   return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('payment',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
@@ -12975,8 +13003,8 @@ function promotionQtyModal() {
   const buyIds = state.promoPick.buyProductIds,
     freeIds = state.promoPick.freeProductIds;
   box(
-    PROMO_QUANTITY_LABEL,
-    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="promo-qty-form p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto promo-qty-form__body flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: PROMO_PRODUCT_LABEL, hint: "Олон бараа сонгож болно · авах бараатай ижил байж болно", placeholder: `${PROMO_PRODUCT_LABEL} хайж нэмэх...`, badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="promo-qty-form__foot pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    promotionPageTitle("quantity"),
+    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="promo-qty-form p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto promo-qty-form__body flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: "Урамшуулал", hint: "Олон бараа сонгож болно · захиалгын бараатай ижил байж болно", placeholder: "урамшуулал хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="promo-qty-form__foot pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
 }
@@ -13025,7 +13053,7 @@ function promotionPriceModal() {
         ? `<label class="block"><span class="block text-sm font-medium mb-2">${PROMO_PERCENT_TAB_LABEL} (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
         : "";
   box(
-    "Нийт үнийн дүнгээс хөнгөлөлт олгох",
+    promotionPageTitle("price"),
     `<form data-promo-modal="price" onsubmit="savePromotionPrice(event)" class="p-5 flex flex-col max-h-[85vh]"><input type="hidden" name="type" value="${type}"><div class="modal-scroll overflow-y-auto space-y-4 flex-1">${amountFields}${typeToggle}${freeBlock}${percentBlock}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
@@ -13083,7 +13111,7 @@ function promotionPaymentModal() {
         ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
         : "";
   box(
-    PROMO_PAYMENT_LABEL,
+    promotionPageTitle("payment"),
     `<form data-promo-modal="payment" onsubmit="savePromotionPayment(event)" class="p-5 flex flex-col max-h-[85vh]"><input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="${term}"><div class="modal-scroll overflow-y-auto space-y-4 flex-1">${termToggle}${minField}${typeToggle}${freeBlock}${percentBlock}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
   );
@@ -14336,7 +14364,7 @@ function workerNew(cart) {
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${PROMO_PRODUCT_LABEL} · ${line.quantity} ш үнэгүй</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${line.quantity} ш урамшуулал</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
