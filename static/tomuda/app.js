@@ -3310,7 +3310,7 @@ function readCustomerImageFromForm(form) {
   let image = String(hidden?.value || "").trim();
   if (image.startsWith("data:image/svg")) image = "";
   if (!image) {
-    const preview = form.querySelector("#productImagePreview");
+    const preview = form.querySelector("#customerImagePreview");
     const src = String(preview?.currentSrc || preview?.src || "").trim();
     if (
       src.startsWith("data:image/") ||
@@ -7607,9 +7607,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Style 25 = light gray warn band (not yellow settle fill).
   [
     "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
-    "    Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
-    "    Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
-    "    Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
+    "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
+    "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
+    "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
   ].forEach((text, index) => {
     const r = rowNum;
     merges.push(`A${r}:G${r}`);
