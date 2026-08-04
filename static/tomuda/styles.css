@@ -6964,7 +6964,7 @@ textarea::placeholder {
 
 .promo-qty-rule-card__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -6982,6 +6982,91 @@ textarea::placeholder {
   background: var(--hex-primary-soft);
   color: var(--hex-primary);
   border-radius: 999px;
+}
+
+.promo-qty-rule-card__formula {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.promo-qty-rule-card__delete {
+  flex-shrink: 0;
+}
+
+.promo-qty-rule-card__flow {
+  display: flex;
+  flex-direction: column;
+}
+
+.promo-qty-rule-card__lane-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.promo-qty-rule-card__lane--free .promo-qty-rule-card__lane-label {
+  color: var(--hex-success-text);
+}
+
+.promo-qty-rule-card__divider {
+  height: 1px;
+  margin: 10px 0;
+  background: var(--hex-border);
+}
+
+.promo-qty-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.promo-qty-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.promo-qty-chip__img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--secondary);
+}
+
+.promo-qty-chip__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.promo-qty-chip__qty {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hex-primary);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--hex-primary-soft);
+}
+
+.promo-qty-rule-card__empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-foreground);
 }
 
 .promo-qty-rule-card__head-text {
@@ -7002,11 +7087,6 @@ textarea::placeholder {
   line-height: 1.4;
   color: var(--muted-foreground);
   word-break: break-word;
-}
-
-.promo-qty-rule-card__delete {
-  flex-shrink: 0;
-  margin-top: 2px;
 }
 
 .promo-qty-rule-card__stack {
@@ -8126,7 +8206,9 @@ textarea::placeholder {
 }
 
 .picker-cart-summary--empty {
-  display: none;
+  min-height: 52px;
+  visibility: hidden;
+  padding-bottom: 10px;
 }
 
 .picker-list {

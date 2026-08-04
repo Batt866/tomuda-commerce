@@ -565,14 +565,15 @@ function CustomerInformation(o) {
 function receiptExcelInfoGridHtml(o) {
   return receiptInfoSectionHtml(o);
 }
-function receiptPaymentChecksHtml(paid, bank) {
-  return {
-    cash: `<span class="receipt-check">${paid ? "☑" : "☐"}</span> Бэлэн`,
-    bank: `<span class="receipt-check">${bank ? "☑" : "☐"}</span> Зээлээр`,
-  };
+function receiptPaymentTermReceiptText(o) {
+  return o?.paymentTerm === "credit" ? "Зээлээр" : "Бэлэн";
 }
-function receiptPaymentChecksText(paid, bank) {
-  return `${paid ? "☑" : "☐"} Бэлэн   ${bank ? "☑" : "☐"} Зээлээр`;
+function receiptPaymentChecksHtml(paid, bank, o) {
+  const text = o ? receiptPaymentTermReceiptText(o) : bank ? "Зээлээр" : "Бэлэн";
+  return { cash: text, bank: "" };
+}
+function receiptPaymentChecksText(paid, bank, o) {
+  return o ? receiptPaymentTermReceiptText(o) : bank ? "Зээлээр" : "Бэлэн";
 }
 /** Receipt payment term: cash → ШУУД ТӨЛӨХ, otherwise → ЗЭЭЛЭЭР. */
 function receiptPaymentTermDisplay(o) {
@@ -747,7 +748,7 @@ function receiptSettleNoteText(o) {
     "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!"
   );
 }
-/** RewardTable — Урамшуулал under Барааны нэр; product name under Баркод (left). */
+/** RewardTable — Урамшуулал header, then product names in the wide name band. */
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
   const settleNote = receiptPromoSettleNote(o);
@@ -756,17 +757,16 @@ function receiptPromoRowsHtml(o) {
   const settleRow = settleNote
     ? `<tr class="receipt-items__promo-settle-row"><td colspan="7"><span class="receipt-items__promo-settle">${esc(settleNote)}</span></td></tr>`
     : "";
+  const promoHeader = promoItems.length
+    ? `<tr class="receipt-items__promo-header"><td class="receipt-items__num">&nbsp;</td><td colspan="3" class="receipt-items__name receipt-items__promo-label">Урамшуулал</td><td class="receipt-items__qty">&nbsp;</td><td class="receipt-items__price">&nbsp;</td><td class="receipt-items__total">&nbsp;</td></tr>`
+    : "";
   const itemRows = promoItems
-    .map((i, idx) => {
-      const labelCell =
-        idx === 0
-          ? `<td class="receipt-items__name receipt-items__promo-label">Урамшуулал</td>`
-          : `<td class="receipt-items__name">&nbsp;</td>`;
-      // Name sits in barcode col (tight against qty) — no wide empty middle gap.
-      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td>${labelCell}<td class="receipt-items__unit">&nbsp;</td><td class="receipt-items__barcode receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
-    })
+    .map(
+      (i) =>
+        `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td colspan="3" class="receipt-items__name receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`,
+    )
     .join("");
-  return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${itemRows}</table></td></tr>`;
+  return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${promoHeader}${itemRows}</table></td></tr>`;
 }
 function RewardTable(o) {
   return receiptPromoRowsHtml(o);
@@ -797,9 +797,7 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
     })
     .join("");
   // Settle agreement sits as the yellow band above Урамшуулал (source zarlaga) — not repeated here.
-  const fPay = receiptPartyFields(o);
-  const payChecks = receiptPaymentChecksHtml(!!fPay.paid, !!fPay.bank);
-  const payHtml = `${payChecks.cash}&nbsp;&nbsp;${payChecks.bank}`;
+  const payHtml = esc(receiptPaymentTermReceiptText(o));
   const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="6" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="5" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
   return summaryPart + payRow;
 }
@@ -846,14 +844,17 @@ function documentSignatureBlockHtml(opts = {}) {
     `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" rowspan="2" class="doc-sign__role">${esc(role)}</td><td class="doc-sign__hint">Нэр</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr><tr class="${rowClass}">${padCell}<td class="doc-sign__hint">Гарын үсэг</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
   return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
 }
-/** SignatureSection — delivered / received signature lines. */
+/** SignatureSection — centered title, name/signature dotted lines. */
 function receiptSignatureRowsHtml(opts = {}) {
   const pushDown = !!opts.pushDown;
   const fill = pushDown
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
-  const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
-  return `${fill}<tr class="receipt-grid__sign"><td colspan="5" class="receipt-grid__sign-label">Хүлээлгэн өгсөн ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>${gap}<tr class="receipt-grid__sign"><td colspan="5" class="receipt-grid__sign-label">Хүлээн авсан ажилтны гарын үсэг:</td><td colspan="6" class="receipt-grid__sign-line"></td></tr>`;
+  const title = `<tr class="receipt-grid__sign-title"><td colspan="11" class="receipt-grid__sign-heading">Гарын үсэг зурах хэсэг</td></tr>`;
+  const block = (role) =>
+    `<tr class="receipt-grid__sign"><td colspan="2" class="receipt-grid__sign-label">${esc(role)}</td><td class="receipt-grid__sign-hint">Нэр</td><td colspan="8" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__sign"><td colspan="2"></td><td class="receipt-grid__sign-hint">Гарын үсэг</td><td colspan="8" class="receipt-grid__sign-line"></td></tr>`;
+  const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
+  return `${fill}${title}${block("Хүлээлгэн өгсөн:")}${gap}${block("Хүлээн авсан:")}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -5195,12 +5196,11 @@ function pickerPieceCommit(el) {
 function syncPickerQtySheetUi(id) {
   const totalEl = document.querySelector("[data-picker-qty-total]");
   if (totalEl) totalEl.textContent = `${getWorkerQty(id)} ш`;
-  const p = state.products.find((x) => x.id === id);
-  const promoWrap = document.querySelector(".picker-qty-sheet__promo-wrap");
-  if (promoWrap && p) promoWrap.outerHTML = pickerQtySheetPromoHtml(p);
+  updatePickerQtySteppers(id);
   if (pickerOpen()) {
-    refreshPickerList();
+    refreshPickerList({ singleProductId: id });
     updatePickerClearBtn();
+    updatePickerCartSummary();
   }
 }
 function pickerQtyStepperHtml(p, q, { min = 0, sheet = false } = {}) {
@@ -5411,7 +5411,8 @@ function initPickerModalActions() {
       if (id) finishPickerEditFor(id);
       state.pickerQtyProductId = "";
       state.pickerQtyRevertQty = null;
-      if (pickerOpen()) pickerModal();
+      unmountPickerQtySheet();
+      if (pickerOpen()) refreshPickerList();
       return;
     }
   });
@@ -6215,7 +6216,7 @@ function adminHubCard(view, label, iconKey) {
     ADMIN_METRIC_ICONS[iconKey] ||
     MOBILE_NAV_SVG[view] ||
     ADMIN_METRIC_ICONS.stock;
-  return `<button type="button" onclick="event.preventDefault();go('${view}')" class="admin-hub-card"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+  return `<button type="button" onclick="event.preventDefault();go('${view}')" class="admin-hub-card admin-hub-card--settings"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
 }
 function adminHubActionCard(action, label, iconKey) {
   const svg = ADMIN_METRIC_ICONS[iconKey] || ADMIN_METRIC_ICONS.stock;
@@ -6265,7 +6266,7 @@ function adminHubHtml() {
   if (!main.length && !settingsHtml) {
     return `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`;
   }
-  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__grid">${main.map(([id, label, icon]) => adminHubCard(id, label, icon)).join("")}</div>` : ""}${settingsHtml}</section>`;
+  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => adminHubCard(id, label, icon)).join("")}</div>` : ""}${settingsHtml}</section>`;
 }
 function adminView() {
   ensureSettings();
@@ -6804,7 +6805,7 @@ td, th { border: none; }
 }
 .receipt-items__row { page-break-inside: avoid; break-inside: avoid; }
 .receipt-items__row td { font-size: 10px; }
-.receipt-items__num { width: 3%; text-align: center; max-width: 28px; }
+.receipt-items__num { width: 2%; text-align: right; max-width: 20px; padding-right: 2px; font-size: 9px; color: #555; }
 .receipt-items__name {
   width: 41%;
   text-align: left;
@@ -6859,8 +6860,14 @@ td, th { border: none; }
   display: block;
   width: 100%;
 }
-.receipt-items--promo .receipt-items__num { width: 5%; }
+.receipt-items--promo .receipt-items__num { width: 2%; max-width: 20px; }
 .receipt-items--promo .receipt-items__name { width: 34%; text-align: left; }
+.receipt-items--promo .receipt-items__promo-header td {
+  border: none !important;
+  border-bottom: 1px dotted #666 !important;
+  background: #fff !important;
+  padding: 2px 6px;
+}
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
@@ -6871,18 +6878,17 @@ td, th { border: none; }
   padding-right: 4px;
 }
 .receipt-items--promo .receipt-items__unit { width: 11%; }
-.receipt-items--promo .receipt-items__barcode,
 .receipt-items--promo .receipt-items__promo-name {
-  width: 16%;
   text-align: left !important;
-  padding-left: 2px;
-  padding-right: 2px;
+  padding-left: 6px;
+  padding-right: 6px;
   white-space: normal !important;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
   overflow: visible;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 10px;
+  line-height: 1.2;
   letter-spacing: 0;
   font-variant-numeric: normal;
 }
@@ -7109,6 +7115,22 @@ td, th { border: none; }
 .receipt-grid__warn-line:last-child,
 .receipt-grid__warn-line--last { margin-bottom: 0; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
+.receipt-grid__sign-heading {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 0 6px;
+  color: ${RECEIPT_TEXT};
+}
+.receipt-grid__sign-hint {
+  font-size: 10px;
+  font-weight: 400;
+  padding: 0 4px 1px 0;
+  vertical-align: bottom;
+  white-space: nowrap;
+  width: 1%;
+  color: ${RECEIPT_TEXT};
+}
 .receipt-grid__sign-label {
   font-size: 10px;
   font-weight: 400;
@@ -7121,11 +7143,11 @@ td, th { border: none; }
 }
 .receipt-grid__sign-line {
   border-bottom: 1px dotted #666 !important;
-  height: 14px;
-  min-height: 14px;
-  min-width: 55%;
+  height: 16px;
+  min-height: 16px;
   vertical-align: bottom;
 }
+.receipt-grid__spacer--sign-gap td { height: 6px; padding: 0; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 @media print {
   html, body {
@@ -7258,9 +7280,9 @@ const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
 const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
 // A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
-// A = logo gutter (must fit 16mm mark; was 4 and logo covered header text).
+// A = logo gutter + compact row № (narrow so names get room).
 // B labels/names; C bank values + units; D barcode/address; E–G numbers.
-const RECEIPT_XLSX_COL_WIDTHS = [11, 18, 11, 12, 8, 11, 14];
+const RECEIPT_XLSX_COL_WIDTHS = [4.5, 26, 9, 10, 8, 11, 14];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
   const limit = Math.max(6, Number(charsPerLine) || 12);
@@ -7354,8 +7376,8 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // 16mm logo anchored in col A only. Col A width (~11) leaves B text clear.
-  const logoMm = 16;
+  // Logo anchored in col A; keep mark small so the № column stays narrow.
+  const logoMm = 11;
   const emu = Math.round((logoMm / 25.4) * 914400);
   // Small inset from left edge of column A (not into B).
   const colOff = Math.round((0.3 / 25.4) * 914400);
@@ -7710,26 +7732,37 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       xlsxCellXml(`G${r}`, moneyStyle, Number(lineTotal) || 0, "n"),
     ]);
   };
-  const pushPromoProductRow = (item, index = 0) => {
+  const pushPromoSectionLabelRow = () => {
+    const r = rowNum;
+    merges.push(`B${r}:D${r}`);
+    pushItemTableRow(14, [
+      xlsxCellXml(`A${r}`, 37, null, "empty"),
+      xlsxCellXml(`B${r}`, 36, si("Урамшуулал"), "s"),
+      xlsxCellXml(`E${r}`, 37, null, "empty"),
+      xlsxCellXml(`F${r}`, 37, null, "empty"),
+      xlsxCellXml(`G${r}`, 37, null, "empty"),
+    ]);
+  };
+  const pushPromoProductRow = (item) => {
     const r = rowNum;
     const unitPrice = receiptPromoDisplayPrice(item);
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    // Col D width 13 — same wrap clearance as paid item names.
-    const promoH = receiptXlsxWrappedRowHeight(
-      nameText,
-      RECEIPT_XLSX_COL_WIDTHS[3],
-      { min: 14, linePt: 12, pad: 2, max: 44 },
-    );
-    // B = Урамшуулал; D = name tight against qty (E). Dotted bottom separates promo lines.
+    merges.push(`B${r}:D${r}`);
+    const promoNameWidth =
+      RECEIPT_XLSX_COL_WIDTHS[1] +
+      RECEIPT_XLSX_COL_WIDTHS[2] +
+      RECEIPT_XLSX_COL_WIDTHS[3];
+    const promoH = receiptXlsxWrappedRowHeight(nameText, promoNameWidth, {
+      min: 14,
+      linePt: 12,
+      pad: 2,
+      max: 52,
+    });
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
-      index === 0
-        ? xlsxCellXml(`B${r}`, 36, si("Урамшуулал"), "s")
-        : xlsxCellXml(`B${r}`, 37, null, "empty"),
-      xlsxCellXml(`C${r}`, 37, null, "empty"),
-      xlsxCellXml(`D${r}`, 36, si(nameText), "s"),
+      xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
       xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
@@ -7741,26 +7774,55 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     { grand = false, decimals = false } = {},
   ) => {
     const r = rowNum;
-    // Source zarlaga: label on left (A–D), amount on right (E–G).
-    merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
+    // Label A–B, amount E–G (skip unit/barcode gap — tighter vs item table).
+    merges.push(`A${r}:B${r}`, `E${r}:G${r}`);
     const labelStyle = grand ? 31 : 30;
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
     pushRow(15, [
       xlsxCellXml(`A${r}`, labelStyle, si(label), "s"),
       xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"),
-      ...emptyCells(r, "B", "D", labelStyle),
+      ...emptyCells(r, "C", "D", labelStyle),
       ...emptyCells(r, "F", "G", valueStyle),
     ]);
   };
   const pushSummaryTextRow = (label, value) => {
     const r = rowNum;
-    merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
+    merges.push(`A${r}:B${r}`, `E${r}:G${r}`);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 30, si(label), "s"),
       xlsxCellXml(`E${r}`, 3, si(String(value ?? "")), "s"),
-      ...emptyCells(r, "B", "D", 30),
+      ...emptyCells(r, "C", "D", 30),
       ...emptyCells(r, "F", "G", 3),
     ]);
+  };
+  const pushReceiptXlsxSignatureSection = () => {
+    const titleRow = rowNum;
+    merges.push(`A${titleRow}:G${titleRow}`);
+    pushRow(16, [
+      xlsxCellXml(`A${titleRow}`, 18, si("Гарын үсэг зурах хэсэг"), "s"),
+      ...emptyCells(titleRow, "B", "G", 18),
+    ]);
+    const pushSignRole = (role) => {
+      const nameRow = rowNum;
+      merges.push(`A${nameRow}:B${nameRow}`, `C${nameRow}:G${nameRow}`);
+      pushRow(16, [
+        xlsxCellXml(`A${nameRow}`, 41, si(role), "s"),
+        xlsxCellXml(`C${nameRow}`, 17, si("Нэр"), "s"),
+        ...emptyCells(nameRow, "D", "G", 17),
+      ]);
+      const signRow = rowNum;
+      merges.push(`C${signRow}:G${signRow}`);
+      pushRow(18, [
+        xlsxCellXml(`A${signRow}`, 1, null, "empty"),
+        xlsxCellXml(`B${signRow}`, 35, si("Гарын үсэг"), "s"),
+        xlsxCellXml(`C${signRow}`, 17, null, "empty"),
+        ...emptyCells(signRow, "D", "G", 17),
+      ]);
+    };
+    pushRow(4, emptyCells(rowNum));
+    pushSignRole("Хүлээлгэн өгсөн:");
+    pushRow(6, emptyCells(rowNum));
+    pushSignRole("Хүлээн авсан:");
   };
   items.forEach((item, index) => pushItemLikeRow(item, index));
   // Source zarlaga: return note, then yellow settle, then Урамшуулал.
@@ -7769,7 +7831,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushRow(15, [
     xlsxCellXml(`A${returnRow}`, 5, si("Буцаалтын тэмдэглэгээ:"), "s"),
     xlsxCellXml(`C${returnRow}`, 17, null, "empty"),
-    ...emptyCells(returnRow, "B", "B", 5),
     ...emptyCells(returnRow, "D", "G", 17),
   ]);
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
@@ -7782,7 +7843,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       ...emptyCells(noteRow, "B", "G", 24),
     ]);
   }
-  promoLines.forEach((item, index) => pushPromoProductRow(item, index));
+  if (promoLines.length) {
+    pushPromoSectionLabelRow();
+    promoLines.forEach((item) => pushPromoProductRow(item));
+  }
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
   const grandNote = receiptGrandNote(o);
@@ -7790,10 +7854,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ? `Таны нийт төлөх дүн ${grandNote}`
     : "Таны нийт төлөх дүн";
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
-  pushSummaryTextRow(
-    "Төлбөрийн нөхцөл",
-    receiptPaymentChecksText(!!f.paid, !!f.bank),
-  );
+  pushSummaryTextRow("Төлбөрийн нөхцөл", receiptPaymentTermReceiptText(o));
   [
     [
       "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
@@ -7818,26 +7879,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       ...emptyCells(r, "B", "G", style),
     ]);
   });
-  pushRow(8, emptyCells(rowNum));
-  const sign1 = rowNum;
-  // Source: label left (A–C), dotted signature line on the right (D–G).
-  merges.push(`A${sign1}:C${sign1}`, `D${sign1}:G${sign1}`);
-  pushRow(20, [
-    xlsxCellXml(`A${sign1}`, 41, si("Хүлээлгэн өгсөн ажилтны гарын үсэг:"), "s"),
-    xlsxCellXml(`D${sign1}`, 17, null, "empty"),
-    ...emptyCells(sign1, "B", "C", 41),
-    ...emptyCells(sign1, "E", "G", 17),
-  ]);
-  pushRow(10, emptyCells(rowNum));
-  const sign2 = rowNum;
-  merges.push(`A${sign2}:C${sign2}`, `D${sign2}:G${sign2}`);
-  pushRow(20, [
-    xlsxCellXml(`A${sign2}`, 41, si("Хүлээн авсан ажилтны гарын үсэг:"), "s"),
-    xlsxCellXml(`D${sign2}`, 17, null, "empty"),
-    ...emptyCells(sign2, "B", "C", 41),
-    ...emptyCells(sign2, "E", "G", 17),
-  ]);
-  pushRow(6, emptyCells(rowNum));
+  pushRow(4, emptyCells(rowNum));
+  pushReceiptXlsxSignatureSection();
+  pushRow(4, emptyCells(rowNum));
   return rowNum;
 }
 function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
@@ -9121,12 +9165,15 @@ function orderDeliveryEmployeeId(o = {}) {
   );
 }
 function compareOrdersNewestFirst(a, b) {
-  const seqA = Number(a?.receiptSeq) || 0;
-  const seqB = Number(b?.receiptSeq) || 0;
-  if (seqB !== seqA) return seqB - seqA;
   const at = new Date(a?.createdAt || 0).getTime();
   const bt = new Date(b?.createdAt || 0).getTime();
   if (Number.isFinite(bt) && Number.isFinite(at) && bt !== at) return bt - at;
+  const monthA = a?.receiptMonth || receiptMonthKey(a);
+  const monthB = b?.receiptMonth || receiptMonthKey(b);
+  if (monthB !== monthA) return monthB.localeCompare(monthA);
+  const seqA = Number(a?.receiptSeq) || 0;
+  const seqB = Number(b?.receiptSeq) || 0;
+  if (seqB !== seqA) return seqB - seqA;
   return String(b?.id || "").localeCompare(String(a?.id || ""), "mn");
 }
 function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
@@ -12917,63 +12964,13 @@ function productQuantityPromoRules(productId) {
   );
 }
 function workerQuantityPromoHintsHtml(cart) {
-  const qtyByProduct = {};
-  (cart?.paid || []).forEach((line) => {
-    qtyByProduct[line.productId] =
-      (qtyByProduct[line.productId] || 0) + (Number(line.quantity) || 0);
-  });
-  const items = (state.promotionRules.quantity || [])
-    .map((rule) => {
-      const prog = quantityPromoRuleProgress(rule, qtyByProduct);
-      if (!prog || prog.combinedQty < 1) return "";
-      const formula = quantityPromoRuleFormula(rule);
-      const freeNames = promotionProductLabels(prog.freeIds);
-      if (prog.grantedFree > 0) {
-        const status =
-          prog.buyMode === "each" && prog.buyIds.length > 1
-            ? `${prog.readyTypes}/${prog.buyIds.length} төрөл → <b>${prog.grantedFree} үнэгүй</b>`
-            : `Нийт ${prog.combinedQty} ш → <b>${prog.grantedFree} үнэгүй</b>`;
-        return `<li class="worker-promo-hint worker-promo-hint--active"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">${status}${freeNames ? ` · ${esc(freeNames)}` : ""}</span></li>`;
-      }
-      const pendingStatus =
-        prog.buyMode === "each" && prog.buyIds.length > 1
-          ? `${prog.readyTypes}/${prog.buyIds.length} төрөл · ${prog.missingTypes} төрөл дутуу`
-          : `${prog.combinedQty}/${prog.buyQty} ш · ${prog.needForNext} ш нэмбэл ${prog.freeQty} үнэгүй`;
-      return `<li class="worker-promo-hint worker-promo-hint--pending"><span class="worker-promo-hint__rule">${esc(formula)}</span><span class="worker-promo-hint__status">${pendingStatus}</span></li>`;
-    })
-    .filter(Boolean);
-  if (!items.length) return "";
-  return `<ul class="worker-promo-hints" aria-label="Урамшууллын тооцоо">${items.join("")}</ul>`;
+  return "";
 }
 function pickerProductPromoHintHtml(p) {
-  const rules = productQuantityPromoRules(p.id);
-  if (!rules.length) return "";
-  return `<span class="picker-row__promo">${esc(quantityPromoRuleFormula(rules[0]))}</span>`;
+  return "";
 }
 function pickerQtySheetPromoHtml(p) {
-  const rules = productQuantityPromoRules(p.id);
-  if (!rules.length) return "";
-  const qtyByProduct = workerQtyByProduct();
-  const lines = rules
-    .map((rule) => {
-      const prog = quantityPromoRuleProgress(rule, qtyByProduct);
-      if (!prog) return "";
-      const formula = quantityPromoRuleFormula(rule);
-      const scale = quantityPromoRuleFormulaExtended(rule);
-      if (prog.grantedFree > 0) {
-        return `<p class="picker-qty-sheet__promo picker-qty-sheet__promo--active">${esc(formula)} · Одоо <b>${prog.grantedFree} үнэгүй</b></p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
-      }
-      if (prog.combinedQty > 0) {
-        const progress =
-          prog.buyMode === "each" && prog.buyIds.length > 1
-            ? `${prog.readyTypes}/${prog.buyIds.length} төрөл`
-            : `${prog.combinedQty}/${prog.buyQty} ш`;
-        return `<p class="picker-qty-sheet__promo">${esc(formula)} · ${progress}${prog.missingTypes > 0 ? ` (${prog.missingTypes} төрөл дутуу)` : ""}</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
-      }
-      return `<p class="picker-qty-sheet__promo">${esc(formula)}</p><p class="picker-qty-sheet__promo-note">${esc(scale)}</p>`;
-    })
-    .join("");
-  return `<div class="picker-qty-sheet__promo-wrap">${lines}</div>`;
+  return "";
 }
 function promoBuyQtyFieldName(productId) {
   return `buyQty_${productId}`;
@@ -13183,8 +13180,15 @@ function promotionQtyRuleText(r) {
   }
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
+function promoQtyProductChipHtml(p, qty = 0) {
+  const qtyBadge =
+    qty > 0
+      ? `<span class="promo-qty-chip__qty">${qty} ш</span>`
+      : "";
+  return `<div class="promo-qty-chip"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="promo-qty-chip__img" alt=""><span class="promo-qty-chip__name">${esc(p.name)}</span>${qtyBadge}</div>`;
+}
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Багцын дүрэм үүсгэнэ · жишээ нь: 16 ш захиалгад 3 ш урамшуулал.</p><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="promo-qty-rule-list">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="promo-qty-rule-list__empty">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
+  return `<div class="space-y-3"><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="promo-qty-rule-list">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="promo-qty-rule-list__empty">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -13194,51 +13198,35 @@ function promotionQtyRuleCard(r, i) {
     freeProducts = promotionFreeProductIds(r)
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
+    buyMode = quantityPromoBuyMode(r),
+    buyQty = Math.floor(Number(r.buyQty) || 0),
+    freeQty = Math.floor(Number(r.freeQty) || 0),
+    formula =
+      quantityPromoExampleLine(r, 1) ||
+      promotionQtyRuleText(r).replace(" (хуучин дүрэм)", ""),
     buyLabel =
-      buyProducts.length > 2
-        ? `${buyProducts
-            .slice(0, 2)
-            .map((p) => {
-              const q = quantityPromoBuyQtyForProduct(r, p.id);
-              return q > 0 ? `${p.name} ×${q}` : p.name;
-            })
-            .join(", ")} +${buyProducts.length - 2}`
-        : buyProducts
-            .map((p) => {
-              const q = quantityPromoBuyQtyForProduct(r, p.id);
-              return q > 0 ? `${p.name} ×${q}` : p.name;
-            })
-            .join(", ") || "-",
-    freeLabel =
-      freeProducts.length > 2
-        ? `${freeProducts
-            .slice(0, 2)
-            .map((p) => p.name)
-            .join(", ")} +${freeProducts.length - 2}`
-        : freeProducts.map((p) => p.name).join(", ") || "-",
-    buyThumbs = buyProducts
-      .map(
-        (p) =>
-          `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-thumb promo-qty-rule-thumb" alt="">`,
+      buyMode === "total" && buyQty > 0
+        ? `Захиалах · нийт ${buyQty} ш`
+        : "Захиалах",
+    freeLabel = freeQty > 0 ? `Урамшуулал · ${freeQty} ш` : "Урамшуулал",
+    buyRows = buyProducts
+      .map((p) =>
+        promoQtyProductChipHtml(
+          p,
+          buyMode === "each" ? quantityPromoBuyQtyForProduct(r, p.id) : 0,
+        ),
       )
       .join(""),
-    freeThumbs = freeProducts
-      .map(
-        (p) =>
-          `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-thumb promo-qty-rule-thumb" alt="">`,
-      )
-      .join("");
-  const exampleSets = 3;
-  const buyExampleLabel = `${quantityPromoOrderQty(r, exampleSets)} ш захиалгад`;
-  const freeExampleLabel = `${quantityPromoFreeQty(r, exampleSets)} ш урамшуулал`;
-  const deleteBtn = canDelete()
-    ? deleteIconButton({
-        className: "icon-action-btn icon-action-btn--neutral promo-qty-rule-card__delete",
-        attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`,
-        label: "Дүрэм устгах",
-      })
-    : "";
-  return `<article class="promo-qty-rule-card"><header class="promo-qty-rule-card__head"><span class="promo-qty-rule-card__num" aria-hidden="true">${i + 1}</span><div class="promo-qty-rule-card__head-text min-w-0"><p class="promo-qty-rule-card__title">Дүрэм ${i + 1}</p><p class="promo-qty-rule-card__summary">${esc(quantityPromoRuleFormulaExtended(r))}</p></div>${deleteBtn}</header><div class="promo-qty-rule-card__stack"><section class="promo-qty-rule-card__block"><p class="promo-qty-rule-card__label promo-qty-rule-card__label--example">${esc(buyExampleLabel)}</p><div class="promo-qty-rule-buys">${buyThumbs}</div><p class="promo-qty-rule-card__names">${esc(buyLabel)}</p></section><div class="promo-qty-rule-card__arrow" aria-hidden="true">↓</div><section class="promo-qty-rule-card__block promo-qty-rule-card__block--free"><p class="promo-qty-rule-card__label promo-qty-rule-card__label--example">${esc(freeExampleLabel)}</p><div class="promo-qty-rule-buys">${freeThumbs}</div><p class="promo-qty-rule-card__names">${esc(freeLabel)}</p></section></div></article>`;
+    freeRows = freeProducts.map((p) => promoQtyProductChipHtml(p)).join(""),
+    deleteBtn = canDelete()
+      ? deleteIconButton({
+          className:
+            "icon-action-btn icon-action-btn--neutral promo-qty-rule-card__delete",
+          attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`,
+          label: "Дүрэм устгах",
+        })
+      : "";
+  return `<article class="promo-qty-rule-card"><header class="promo-qty-rule-card__head"><span class="promo-qty-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-qty-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-qty-rule-card__flow"><section class="promo-qty-rule-card__lane"><p class="promo-qty-rule-card__lane-label">${esc(buyLabel)}</p><div class="promo-qty-chips">${buyRows || `<p class="promo-qty-rule-card__empty">—</p>`}</div></section><div class="promo-qty-rule-card__divider" aria-hidden="true"></div><section class="promo-qty-rule-card__lane promo-qty-rule-card__lane--free"><p class="promo-qty-rule-card__lane-label">${esc(freeLabel)}</p><div class="promo-qty-chips">${freeRows || `<p class="promo-qty-rule-card__empty">—</p>`}</div></section></div></article>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -17247,10 +17235,82 @@ function capturePickerScroll() {
 }
 function restorePickerScroll(snap) {
   if (!snap) return;
-  requestAnimationFrame(() => {
+  const apply = () => {
     const scroll = modal.querySelector(".picker-step2__scroll");
     if (scroll) scroll.scrollTop = snap.top;
-  });
+  };
+  requestAnimationFrame(() => requestAnimationFrame(apply));
+}
+function pickerRowButton(list, productId) {
+  if (!list || !productId) return null;
+  const escaped =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(String(productId))
+      : String(productId).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return list.querySelector(`[data-picker-open="${escaped}"]`);
+}
+function unmountPickerQtySheet() {
+  const root = modal.querySelector("[data-picker-root]");
+  root?.querySelector("[data-picker-qty-sheet]")?.remove();
+  root?.classList.remove("picker-step2--qty-open");
+}
+function mountPickerQtySheet(productId) {
+  const root = modal.querySelector("[data-picker-root]");
+  if (!root) return false;
+  unmountPickerQtySheet();
+  root.classList.add("picker-step2--qty-open");
+  root.insertAdjacentHTML("beforeend", pickerQtySheetHtml(productId));
+  return true;
+}
+function updatePickerQtySteppers(id) {
+  const p = state.products.find((x) => x.id === id);
+  if (!p || !pickerOpen()) return;
+  const q = getWorkerQty(id);
+  const maxOk = maxWorkerPaidQty(id);
+  const packSize = productPackSize(p);
+  if (!packSize) {
+    modal
+      .querySelectorAll(`[data-picker-qty-input][data-product-id="${id}"]`)
+      .forEach((input) => {
+        input.value = String(q);
+        input.setAttribute("aria-valuenow", String(q));
+      });
+    modal
+      .querySelectorAll(
+        `.qty-stepper__btn[data-qty-action][data-product-id="${id}"]`,
+      )
+      .forEach((btn) => {
+        const action = btn.getAttribute("data-qty-action");
+        if (action === "dec") btn.disabled = q <= 0;
+        if (action === "inc") btn.disabled = q >= maxOk;
+      });
+    return;
+  }
+  const { packs, pieces } = pickerQtyToParts(q, p);
+  const packMax = pickerPackMax(p, pieces);
+  const pieceMax = pickerPieceMax(p, packs);
+  const packInput = modal.querySelector(
+    `[data-picker-pack-input][data-product-id="${id}"]`,
+  );
+  const pieceInput = modal.querySelector(
+    `[data-picker-piece-input][data-product-id="${id}"]`,
+  );
+  if (packInput) packInput.value = String(packs);
+  if (pieceInput) pieceInput.value = String(pieces);
+  modal
+    .querySelectorAll(`[data-picker-pack-action][data-product-id="${id}"]`)
+    .forEach((btn) => {
+      const action = btn.getAttribute("data-picker-pack-action");
+      if (action === "dec") btn.disabled = packs <= 0;
+      if (action === "inc") btn.disabled = packs >= packMax;
+    });
+  modal
+    .querySelectorAll(`[data-picker-piece-action][data-product-id="${id}"]`)
+    .forEach((btn) => {
+      const action = btn.getAttribute("data-picker-piece-action");
+      if (action === "dec") btn.disabled = pieces <= 0;
+      if (action === "inc") btn.disabled = pieces >= pieceMax;
+    });
 }
 function updatePickerCartSummary() {
   const bar = modal.querySelector("[data-picker-cart-summary]");
@@ -17264,7 +17324,7 @@ function pickerCartSummaryBarHtml() {
   }
   return `<div class="picker-cart-summary" data-picker-cart-summary>${workerOrderStatsHtml(cart)}</div>`;
 }
-function refreshPickerList() {
+function refreshPickerList(opts = {}) {
   const list = modal.querySelector("[data-picker-products]");
   if (!list || !pickerOpen()) return false;
   const scrollSnap = capturePickerScroll();
@@ -17273,6 +17333,18 @@ function refreshPickerList() {
   const chips = modal.querySelector(".picker-cat-chips");
   if (chips) chips.outerHTML = pickerCategoryChipsHtml();
   const products = pickerProductsInView();
+  const singleId = opts.singleProductId || "";
+  if (singleId) {
+    const product = products.find((p) => p.id === singleId);
+    const rowBtn = pickerRowButton(list, singleId);
+    if (product && rowBtn) {
+      rowBtn.outerHTML = pickerRow(product);
+      updatePickerClearBtn();
+      updatePickerCartSummary();
+      restorePickerScroll(scrollSnap);
+      return true;
+    }
+  }
   list.innerHTML = products.length
     ? products.map((p) => pickerRow(p)).join("")
     : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`;
@@ -17375,10 +17447,10 @@ function setWorkerQty(id, qty) {
   saveAuthSession();
   if (keepPicker) {
     if (state.pickerQtyProductId) {
-      pickerModal();
+      syncPickerQtySheetUi(id);
       return;
     }
-    if (refreshPickerList()) return;
+    if (refreshPickerList({ singleProductId: id })) return;
   }
   render();
   if (keepPicker) pickerModal();
@@ -17613,6 +17685,7 @@ function openPickerQtySheet(productId) {
   state.pickerQtyProductId = productId;
   state.pickerActiveId = productId;
   state.pickerQtyRevertQty = getWorkerQty(productId);
+  if (pickerOpen() && mountPickerQtySheet(productId)) return;
   pickerModal();
 }
 function closePickerQtySheet() {
@@ -17621,8 +17694,8 @@ function closePickerQtySheet() {
   state.pickerQtyProductId = "";
   state.pickerActiveId = "";
   state.pickerQtyRevertQty = null;
+  unmountPickerQtySheet();
   if (id) setWorkerQty(id, revertQty ?? 0);
-  else if (pickerOpen()) pickerModal();
 }
 function pickerQtySheetHtml(productId) {
   const p = state.products.find((x) => x.id === productId);
@@ -17634,7 +17707,7 @@ function pickerQtySheetHtml(productId) {
   const qtyBody = packSize
     ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
     : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
-  const promoHtml = pickerQtySheetPromoHtml(p);
+  const promoHtml = "";
   return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
@@ -17793,6 +17866,7 @@ async function saveWorker() {
     state.settlementDay = "";
     state.applyPercentDiscount = false;
     state.filters.worker = "orders";
+    state.filters.workerDate = todayIso();
     state.workerOrdersArrived = true;
     state.workerHighlightOrderId = order.id;
     persistOrderSnapshot();
