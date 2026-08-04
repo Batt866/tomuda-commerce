@@ -456,6 +456,13 @@ function receiptGridColgroup() {
 function receiptDeliveryDateValue(o) {
   return orderDeliveryDay(o) || "";
 }
+/** ҮНДСЭН sample displays delivery date as DD/MM/YYYY. */
+function receiptDeliveryDateDisplay(o) {
+  const iso = receiptDeliveryDateValue(o);
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso || "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 function receiptPrintedDateValue() {
   return todayIso();
 }
@@ -553,7 +560,7 @@ function receiptInfoRows(o) {
   }
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА», «Регистрийн».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__label">Дансны дугаар: IBAN:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}</b></td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_ACCOUNT}</b></td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__label">Дансны дугаар:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>IBAN:</b></td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b></td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -585,7 +592,7 @@ function receiptPaymentTermDisplay(o) {
 }
 /** InvoiceHeader — logo A:B (2 rows only), brand C:F, address C:H, title C:J, date K. */
 function receiptHeaderRows(logoSrc, o) {
-  const deliveryDate = receiptDeliveryDateValue(o);
+  const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
   return `<tr class="receipt-grid__header receipt-grid__header--r1"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="4"></td><td class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="6" class="receipt-grid__address">${addr}</td><td colspan="2"></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
 }
@@ -773,7 +780,7 @@ function receiptGrossRowHtml(o) {
   // ҮНДСЭН: label B:D, underline E:K (amount in K) — line must reach past Тоо/ш.
   return `<tr class="receipt-grid__gross"><td></td><td colspan="3" class="receipt-grid__gross-label">Хувь хасагдаагүй нийт үнийн дүн</td><td colspan="6" class="receipt-grid__gross-rule"></td><td class="receipt-grid__money receipt-grid__money--strong">${receiptMoney(gross)}</td></tr>`;
 }
-/** SummarySection — ҮНДСЭН: sub/VAT E:K; grand label + note + amount; pay term single value. */
+/** SummarySection — grand → pay term (right under) → cash settle note (cash only). */
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
   const subRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">Бараа ажил үйлчилгээний дүн</td><td colspan="7" class="receipt-grid__summary-value">${receiptMoneyDetailed(sub)}</td></tr>`;
@@ -782,12 +789,12 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
     ? `<td colspan="6" class="receipt-grid__summary-note">${esc(grandNote)}</td><td class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`
     : `<td colspan="7" class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`;
   const grandRow = `<tr class="receipt-grid__summary receipt-grid__summary--grand"><td></td><td colspan="3" class="receipt-grid__summary-label receipt-grid__summary-label--grand">Таны нийт төлөх дүн</td>${noteCell}</tr>`;
-  const settleText =
-    "Барааг хүлээн авсан өдөртөө төлбөрөө барагдуулаагүй тохиолдолд хувь хасагдаагүй дүнгээр тооцохыг анхаарна уу!";
-  const settleRow = `<tr class="receipt-grid__settle-note"><td></td><td colspan="10" class="receipt-grid__settle-note-text">${esc(settleText)}</td></tr>`;
   const term = payTerm || receiptPaymentTermDisplay(o);
   const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td></td><td colspan="3" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="3"></td><td colspan="4" class="receipt-grid__pay-opt receipt-grid__pay-opt--on">${esc(term)}</td></tr>`;
-  return `${subRow}${vatRow}${grandRow}${settleRow}${payRow}`;
+  const settleRow = receiptShouldShowCashSettleNote(o)
+    ? `<tr class="receipt-grid__settle-note"><td></td><td colspan="10" class="receipt-grid__settle-note-text">${esc(receiptCashSettleNoteText())}</td></tr>`
+    : "";
+  return `${subRow}${vatRow}${grandRow}${payRow}${settleRow}`;
 }
 function SummarySection(sub, vat, payable, payTerm, o) {
   return receiptSummaryRowsHtml(sub, vat, payable, payTerm, o);
@@ -796,7 +803,8 @@ function receiptPaymentTermText(f, o) {
   return receiptPaymentTermDisplay(o);
 }
 function receiptShouldShowGross(o) {
-  return true;
+  // «Хувь хасагдаагүй…» зөвхөн шууд төлөлт (бэлэн) үед.
+  return isCashPayment(o?.paymentTerm);
 }
 function receiptGrandNote(o) {
   const discount = orderDiscountAmount(o);
@@ -808,9 +816,16 @@ function receiptGrandNote(o) {
   if (discount) return `(Хөнгөлөлт ${percentDiscountRate()}%)`;
   return "";
 }
+/** Settle warning under grand total — cash / Шууд төлөх only. */
+function receiptShouldShowCashSettleNote(o) {
+  return isCashPayment(o?.paymentTerm);
+}
+function receiptCashSettleNoteText() {
+  return "Барааг хүлээн авсан өдөртөө төлбөрөө барагдуулаагүй тохиолдолд хувь хасагдаагүй дүнгээр тооцохыг анхаарна уу!";
+}
 /** PaymentInformation — ҮНДСЭН wording (нийлүүлэгч тал). */
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр,<br>ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
 }
 function PaymentInformation() {
   return receiptWarningRowsHtml();
@@ -858,12 +873,12 @@ function receiptNoteText(o) {
   return String(o?.settlementText || "").trim();
 }
 function receiptUpperFooterRows(o) {
-  // ҮНДСЭН R26: B:K note band — order «Тэмдэглэл» text when present.
+  // Зөвхөн захиалга дээр тэмдэглэл бичсэн үед; барааны жагсаалтаас 1 мөр зайтай.
   const note = receiptNoteText(o);
-  const label = note
-    ? `Тэмдэглэл бичих хэсэг: ${note}`
-    : "Тэмдэглэл бичих хэсэг";
-  return `<tr class="receipt-grid__return"><td></td><td colspan="10" class="receipt-grid__return-label">${esc(label)}</td></tr>`;
+  if (!note) return "";
+  const spacer = `<tr class="receipt-grid__spacer receipt-grid__spacer--note"><td colspan="11"></td></tr>`;
+  const label = `Тэмдэглэл бичих хэсэг: ${note}`;
+  return `${spacer}<tr class="receipt-grid__return"><td></td><td colspan="10" class="receipt-grid__return-label">${esc(label)}</td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
   const f = receiptPartyFields(o);
@@ -871,7 +886,10 @@ function receiptLowerFooterRows(o, opts = {}) {
   const sub = payable / 1.1;
   const vat = payable - sub;
   const payTerm = receiptPaymentTermText(f, o);
-  const gross = receiptShouldShowGross(o) ? receiptGrossRowHtml(o) : "";
+  const grossHtml = receiptShouldShowGross(o) ? receiptGrossRowHtml(o) : "";
+  const gross = grossHtml
+    ? `<tr class="receipt-grid__spacer receipt-grid__spacer--note"><td colspan="11"></td></tr>${grossHtml}`
+    : "";
   return `${gross}${receiptPromoRowsHtml(o)}${receiptSummaryRowsHtml(sub, vat, payable, payTerm, o)}${receiptWarningRowsHtml()}${receiptSignatureRowsHtml(opts)}`;
 }
 function receiptFooterRows(o, opts = {}) {
@@ -1180,14 +1198,16 @@ function orderReceiptNum(o) {
   return o.id;
 }
 function formatReceiptNumber(o) {
+  // ҮНДСЭН sample: №260817 (YY + MM + 2-digit seq) — no dashes.
   const day = isoDay(o?.createdAt || o?.deliveryDate || "");
   const seq = Number(o?.receiptSeq);
   if (day) {
     const [y, m, d] = day.split("-");
-    const base = `${String(y).slice(-2)}${m}-${d}`;
-    if (seq > 0) return `${base}-${seq}`;
-    return base;
+    const yy = String(y).slice(-2);
+    const tail = String(seq > 0 ? seq : Number(d)).padStart(2, "0");
+    return `${yy}${m}${tail}`;
   }
+  if (seq > 0) return String(seq);
   return String(orderReceiptNum(o));
 }
 function receiptMoney(n) {
@@ -7414,6 +7434,7 @@ td, th { border: none; }
   font-family: ${RECEIPT_FONT};
 }
 .receipt-grid__spacer td { height: 1px; padding: 0; }
+.receipt-grid__spacer--note td { height: 14px; padding: 0; }
 .receipt-grid__spacer--sign td { height: 2mm; }
 .receipt-grid__fill td { height: 1.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -7866,7 +7887,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const sub = payable / 1.1;
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
-  const deliveryDateText = `${receiptDeliveryDateValue(o)}`;
+  const deliveryDateText = receiptDeliveryDateDisplay(o);
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}                                             ${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
   // Header R1–R3: logo A:B (2 rows only — never overlaps title), brand C:F, addr C:H, title C:J, date K
@@ -7971,8 +7992,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR3, "E", "E", 5),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(`B${bankR4}`, 5, si("Дансны дугаар:                     IBAN:"), "s"),
-    xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
+    xlsxCellXml(`B${bankR4}`, 5, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(`D${bankR4}`, 4, si(`IBAN:  ${RECEIPT_BANK_IBAN_SHORT}`), "s"),
     ...emptyCells(bankR4, "C", "C", 5),
     ...emptyCells(bankR4, "E", "E", 4),
   ]);
@@ -8051,42 +8072,47 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   });
 
-  // Тэмдэглэл бичих хэсэг — order note text when present
+  // Тэмдэглэл — зөвхөн захиалга дээр бичсэн үед; бараанаас 1 мөр зайтай.
   const orderNote = String(o?.settlementText || "").trim();
-  const noteLabel = orderNote
-    ? `Тэмдэглэл бичих хэсэг: ${orderNote}`
-    : "Тэмдэглэл бичих хэсэг";
-  const noteRow = rowNum;
-  merges.push(`B${noteRow}:K${noteRow}`);
-  const noteH = orderNote
-    ? Math.max(14.25, receiptXlsxWrappedRowHeight(noteLabel, 70, { min: 14.25, linePt: 11, pad: 2, max: 42 }))
-    : 14.25;
-  pushRow(noteH, [
-    xlsxCellXml(`B${noteRow}`, 16, si(noteLabel), "s"),
-    ...emptyCells(noteRow, "C", "K", 16),
-  ]);
+  if (orderNote) {
+    pushRow(14.25, emptyCells(rowNum));
+    const noteLabel = `Тэмдэглэл бичих хэсэг: ${orderNote}`;
+    const noteRow = rowNum;
+    merges.push(`B${noteRow}:K${noteRow}`);
+    const noteH = Math.max(
+      14.25,
+      receiptXlsxWrappedRowHeight(noteLabel, 70, {
+        min: 14.25,
+        linePt: 11,
+        pad: 2,
+        max: 42,
+      }),
+    );
+    pushRow(noteH, [
+      xlsxCellXml(`B${noteRow}`, 16, si(noteLabel), "s"),
+      ...emptyCells(noteRow, "C", "K", 16),
+    ]);
+  }
 
   pushRow(14.25, emptyCells(rowNum));
 
-  // Хувь хасагдаагүй нийт үнийн дүн — ҮНДСЭН: underline E:K (not only K)
-  const grossRow = rowNum;
-  merges.push(`B${grossRow}:D${grossRow}`);
-  pushRow(14.25, [
-    xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
-    // Style 12 = top+bottom + #,##0 number band through Тоо/ш
-    xlsxCellXml(`E${grossRow}`, 12, null, "empty"),
-    xlsxCellXml(`F${grossRow}`, 12, null, "empty"),
-    xlsxCellXml(`G${grossRow}`, 12, null, "empty"),
-    xlsxCellXml(`H${grossRow}`, 12, null, "empty"),
-    xlsxCellXml(`I${grossRow}`, 12, null, "empty"),
-    xlsxCellXml(`J${grossRow}`, 12, null, "empty"),
-    // Style 32 = gray fill + top/bottom + #,##0 (not 33 = green badge)
-    xlsxCellXml(`K${grossRow}`, 32, Number(gross) || 0, "n"),
-    ...emptyCells(grossRow, "C", "D", 19),
-  ]);
-
-  pushRow(14.25, emptyCells(rowNum));
-
+  // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн шууд төлөлт
+  if (receiptShouldShowGross(o)) {
+    const grossRow = rowNum;
+    merges.push(`B${grossRow}:D${grossRow}`);
+    pushRow(14.25, [
+      xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
+      xlsxCellXml(`E${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`F${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`G${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`H${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`I${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`J${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`K${grossRow}`, 32, Number(gross) || 0, "n"),
+      ...emptyCells(grossRow, "C", "D", 19),
+    ]);
+    pushRow(14.25, emptyCells(rowNum));
+  }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
   promoLines.forEach((item, idx) => {
     const r = rowNum;
@@ -8154,17 +8180,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     note: grandNote || "",
   });
 
-  const settleText =
-    "Барааг хүлээн авсан өдөртөө төлбөрөө барагдуулаагүй тохиолдолд хувь хасагдаагүй дүнгээр тооцохыг анхаарна уу!";
-  {
-    const r = rowNum;
-    merges.push(`B${r}:K${r}`);
-    pushRow(12, [
-      xlsxCellXml(`B${r}`, 2, si(settleText), "s"),
-      ...emptyCells(r, "C", "K", 2),
-    ]);
-  }
-
+  // Төлбөрийн нөхцөл — яг нийт төлөх дүнгийн доор
   {
     const r = rowNum;
     const term = receiptPaymentTermDisplay(o);
@@ -8179,11 +8195,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
 
+  // Шууд төлөлтийн анхааруулга — зөвхөн бэлэн/шууд
+  if (receiptShouldShowCashSettleNote(o)) {
+    const r = rowNum;
+    merges.push(`B${r}:K${r}`);
+    pushRow(12, [
+      xlsxCellXml(`B${r}`, 2, si(receiptCashSettleNoteText()), "s"),
+      ...emptyCells(r, "C", "K", 2),
+    ]);
+  }
+
   pushRow(14.25, emptyCells(rowNum));
 
   [
     [
-      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр,      ААН-ийн РЕГИСТР-ийг бичээрэй.",
+      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр,\nААН-ийн РЕГИСТР-ийг бичээрэй.",
       42,
     ],
     ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай. ", 43],
