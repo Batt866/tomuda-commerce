@@ -1600,8 +1600,16 @@ function nextOrderId() {
     const n = Number(raw);
     if (Number.isFinite(n) && n > max) max = n;
   }
+  for (const entry of state.deletionLog || []) {
+    if (entry?.type !== "order") continue;
+    const n = Number(entry.id);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
   let next = max + 1;
-  while ((state.orders || []).some((o) => String(o?.id) === String(next))) {
+  while (
+    (state.orders || []).some((o) => String(o?.id) === String(next)) ||
+    deletionLogHas(state.deletionLog || [], "order", String(next))
+  ) {
     next += 1;
   }
   return String(next);
@@ -3837,8 +3845,16 @@ function mergeArrayById(remote = [], local = [], opts = {}) {
   });
   const tombstones = opts.deletionLog || [];
   if (opts.deletionType) {
+    const remoteIds = new Set(
+      (remote || []).map((item) => String(item?.id)).filter(Boolean),
+    );
+    const localIds = new Set(
+      (local || []).map((item) => String(item?.id)).filter(Boolean),
+    );
     for (const id of [...map.keys()]) {
-      if (deletionLogHas(tombstones, opts.deletionType, id)) map.delete(id);
+      if (!deletionLogHas(tombstones, opts.deletionType, id)) continue;
+      if (!remoteIds.has(id) && localIds.has(id)) continue;
+      map.delete(id);
     }
   }
   return Array.from(map.values());
@@ -18191,6 +18207,21 @@ function employeeExcel() {
     );
   return exportWarehousePrepareExcel(orders, workerIds);
 }
+function ensureSavedOrderVisible(order) {
+  if (!order?.id) return true;
+  const exists = (state.orders || []).some(
+    (o) => String(o.id) === String(order.id),
+  );
+  if (exists) return true;
+  state.orders = [...(state.orders || []), order];
+  normalizeOrderReceiptNumbers();
+  normalizeOrderPayments();
+  normalizeOrderDeliveryDates();
+  normalizeOrderTotals();
+  persistOrderSnapshot();
+  scheduleBackendSave();
+  return false;
+}
 async function saveWorker() {
   if (orderSubmitLock) return;
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
@@ -18263,6 +18294,7 @@ async function saveWorker() {
     render();
     pushAppHistory();
     const saved = await criticalBackendSave();
+    if (!ensureSavedOrderVisible(order)) render();
     if (saved) {
       showAppToast("Захиалга хадгалагдлаа", "success");
     } else {
