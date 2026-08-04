@@ -10008,6 +10008,11 @@ function normalizeStockInReceiptTotals(receipt) {
 function stockInHasEntries() {
   return state.products.some((p) => stockInLineQty(p) > 0);
 }
+function stockInCanFinish() {
+  if (stockInSaveLock) return false;
+  if (!state.stockInEmployeeId) return false;
+  return stockInHasEntries();
+}
 function stockInEntryProducts(list) {
   return list.filter((p) => stockInLineQty(p) > 0);
 }
@@ -10115,8 +10120,13 @@ function stockInReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
   return no ? `Орлого авах баримт №${no}` : "Орлого авах баримт";
 }
-function buildStockInReceiptSnapshot() {
-  const lines = stockInEntryProducts(state.products).map((p) => {
+function buildStockInReceiptSnapshot(productIds = null) {
+  let products = stockInEntryProducts(state.products);
+  if (productIds?.length) {
+    const idSet = new Set(productIds.map(String));
+    products = products.filter((p) => idSet.has(String(p.id)));
+  }
+  const lines = products.map((p) => {
     const d = state.stockInDraft[p.id] || {};
     const qty = stockInLineQty(p);
     const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
@@ -10184,8 +10194,10 @@ function confirmFinishStockIn() {
   if (!canManageStockIn()) {
     return alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
   }
-  if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
-  if (!stockInHasEntries()) return alert("Орлого оруулна уу");
+  if (!stockInCanFinish()) {
+    if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
+    return alert("Орлого оруулна уу");
+  }
   const receipt = buildStockInReceiptSnapshot();
   if (!receipt?.lines?.length) return;
   const normalized = normalizeStockInReceiptTotals(receipt);
@@ -10199,12 +10211,22 @@ function confirmFinishStockIn() {
       void finishStockInReceipt(receipt, { downloadExcel: false }),
   });
 }
-async function finishStockInReceipt(receipt, { downloadExcel = false } = {}) {
+async function finishStockInReceipt(
+  receipt,
+  { downloadExcel = false, clearDraftOnly = null } = {},
+) {
   if (!receipt?.lines?.length || stockInSaveLock) return;
   stockInSaveLock = true;
   try {
     const saved = applyStockInReceipt(receipt);
-    startStockInSession();
+    if (clearDraftOnly?.length) {
+      for (const id of clearDraftOnly) delete state.stockInDraft[id];
+      state.stockInDone = false;
+      state.stockInReceipt = null;
+      if (!stockInHasEntries()) state.stockInHighlightId = "";
+    } else {
+      startStockInSession();
+    }
     render();
     const ok = await criticalBackendSave();
     if (!ok) {
@@ -10386,12 +10408,16 @@ function stockInEntryModal(id) {
   const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
   box(
     "Орлого оруулах",
-    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--primary">Хадгалах</button></div></form>`,
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--primary">Дуусгах</button></div></form>`,
     "max-w-md",
   );
 }
 function applyStockInEntryModal(e, id) {
   e.preventDefault();
+  if (!canManageStockIn()) {
+    return alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
+  }
+  if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   const formData = new FormData(e.target);
@@ -10429,8 +10455,13 @@ function applyStockInEntryModal(e, id) {
   }
   state.stockInDone = false;
   state.stockInReceipt = null;
+  const receipt = buildStockInReceiptSnapshot([id]);
   closeModal();
-  render();
+  if (!receipt?.lines?.length) {
+    render();
+    return;
+  }
+  void finishStockInReceipt(receipt, { downloadExcel: false, clearDraftOnly: [id] });
 }
 function stockInReceiptRow(line) {
   const unitPrice = stockInReceiptLineUnitPrice(line);
@@ -10452,7 +10483,7 @@ function stockInEntryList(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Баркод scan эсвэл бараа дээр дарж тоо ширхэг оруулна уу.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа дээр дарж тоо оруулаад «Дуусгах» дарвал орлого шууд нэмэгдэнэ. Олон бараа scan хийсэн бол доорх «Дуусгах»-аар бүгдийг нь хадгална.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -10498,7 +10529,8 @@ function stockInReceiptPanel(receipt) {
 }
 function stockInPanel(list) {
   ensureStockInSession();
-  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
+  const canFinish = stockInCanFinish();
+  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
 function stockOutPanel(list) {
   ensureStockOutSession();
