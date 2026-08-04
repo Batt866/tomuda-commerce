@@ -11866,6 +11866,17 @@ function xlsxBarcodeCell(ref, styleId, barcode, si) {
   return xlsxCellXml(ref, XLSX_BARCODE_CELL_STYLE, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [22, 11, 14, 6, 7, 12];
+function warehousePrepareColsXml() {
+  return WAREHOUSE_PREPARE_COL_WIDTHS.map(
+    (width, index) =>
+      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+  ).join("");
+}
+function warehousePrepareWorksheetXml(rows, merges, lastRow) {
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${warehousePrepareColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.5" right="0.5" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+}
 function buildWarehousePrepareSheetXml(orders, workerIds) {
   const strings = [];
   const strIndex = new Map();
@@ -12054,8 +12065,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
   const lastRow = rowNum;
-  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.125" customWidth="1"/><col min="2" max="2" width="12.75" customWidth="1"/><col min="3" max="3" width="16.5" customWidth="1"/><col min="4" max="4" width="7.375" customWidth="1"/><col min="5" max="5" width="8.125" customWidth="1"/><col min="6" max="6" width="14.625" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = warehousePrepareWorksheetXml(rows, merges, lastRow);
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
@@ -12067,17 +12077,13 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     orders,
     workerIds,
   );
-  const tpl = await fetch(staticAssetUrl(WAREHOUSE_PREPARE_TEMPLATE)).then(
-    (r) => {
-      if (!r.ok) throw new Error("template missing");
-      return r.arrayBuffer();
-    },
-  );
-  const zip = await JSZip.loadAsync(tpl);
-  zip.file("xl/sharedStrings.xml", sharedStringsXml);
-  zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", warehousePrepareStylesXml());
-  const blob = await zipToExcelBlob(zip);
+  const sheetName = xlsxSafeSheetName("Бэлдэх", "Sheet1");
+  const built = {
+    sharedStringsXml,
+    workbookXml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView windowWidth="18000" windowHeight="12000"/></bookViews><sheets><sheet name="${xlsxXmlEsc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+    sheets: [{ id: 1, name: sheetName, sheetXml }],
+  };
+  const blob = await assembleStyledXlsxZip(built, { hasLogo: false });
   await downloadBlobFile(blob, `aguulah-beldeh-${stamp}.xlsx`);
 }
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
