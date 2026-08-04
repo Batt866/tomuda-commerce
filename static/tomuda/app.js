@@ -1503,7 +1503,7 @@ function workerReceivableHtml(customerId, opts = {}) {
     .map((o) => {
       const actions =
         opts.withPayActions && !orderIsPaid(o)
-          ? `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="btn btn--primary btn--sm worker-receivable__action">Тооцоо дууссан</button>`
+          ? `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="btn btn--primary btn--sm worker-receivable__action">Төлбөр баталгаажуулах</button>`
           : "";
       return workerReceivableItemHtml(o, { actions });
     })
@@ -1516,7 +1516,7 @@ function reportCustomerReceivableRow(customerName, unpaidOrders) {
     items = unpaidOrders
       .map((o) => {
         return workerReceivableItemHtml(o, {
-          actions: `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="btn btn--primary btn--sm worker-receivable__action">Тооцоо дууссан</button>`,
+          actions: `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="btn btn--primary btn--sm worker-receivable__action">Төлбөр баталгаажуулах</button>`,
         });
       })
       .join("");
@@ -1525,7 +1525,7 @@ function reportCustomerReceivableRow(customerName, unpaidOrders) {
 function reportPaymentListHtml(orders, emptyText = "Захиалга байхгүй") {
   if (!orders.length)
     return `<div class="line-panel__empty">${esc(emptyText)}</div>`;
-  // One row per order so credit unpaid always shows «Тооцоо дууссан».
+  // One row per order so credit unpaid always shows «Төлбөр баталгаажуулах».
   return orders.map((o) => paymentRow(o)).join("");
 }
 function normalizeOrderPayments() {
@@ -12690,13 +12690,13 @@ function paymentRow(o) {
     term = paymentTermLabel(o.paymentTerm),
     actions = paid
       ? ""
-      : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Тооцоо дууссан</button>`;
-  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Тооцоо дууссан" : "Төлөөгүй"}</span><div class="payment-row__actions">${actions}</div></div>`;
+      : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Төлбөр баталгаажуулах</button>`;
+  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Тооцоо дууссан" : "Төлбөрийн үлдэгдэлтэй"}</span><div class="payment-row__actions">${actions}</div></div>`;
 }
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || orderIsPaid(o)) return;
-  confirmModal("Төлбөр баталгаажуулах", "Тооцоо дууссаныг баталгаажуулах уу?", {
+  confirmModal("Төлбөр баталгаажуулах", "Төлбөр баталгаажуулах уу?", {
     confirmLabel: "Тийм",
     onConfirm: () => setPaid(id, true),
   });
