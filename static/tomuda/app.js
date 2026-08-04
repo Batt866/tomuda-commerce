@@ -11865,8 +11865,31 @@ function xlsxBarcodeCell(ref, styleId, barcode, si) {
   if (!text) return xlsxCellXml(ref, styleId, null, "empty");
   return xlsxCellXml(ref, XLSX_BARCODE_CELL_STYLE, text, "inlineStr");
 }
+function warehousePrepareBarcodeCell(ref, barcode, si) {
+  const text = String(barcode ?? "").trim();
+  if (!text) return xlsxCellXml(ref, 9, null, "empty");
+  if (/^\d+$/.test(text)) {
+    const asNum = Number(text);
+    if (Number.isFinite(asNum) && String(asNum) === text) {
+      return xlsxCellXml(ref, 9, asNum, "n");
+    }
+  }
+  return xlsxCellXml(ref, 9, si(text), "s");
+}
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
-const WAREHOUSE_PREPARE_COL_WIDTHS = [22, 11, 14, 6, 7, 12];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [
+  25.12890625, 12.74609375, 13.73046875, 7.35546875, 8.08984375, 14.5859375,
+];
+function warehousePreparePatchStylesXml(stylesXml) {
+  const numStyle =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
+  const numStyleRight = numStyle.replace(
+    'horizontal="left"',
+    'horizontal="right"',
+  );
+  if (!stylesXml.includes(numStyle)) return stylesXml;
+  return stylesXml.replace(numStyle, numStyleRight);
+}
 function warehousePrepareColsXml() {
   return WAREHOUSE_PREPARE_COL_WIDTHS.map(
     (width, index) =>
@@ -11875,7 +11898,7 @@ function warehousePrepareColsXml() {
 }
 function warehousePrepareWorksheetXml(rows, merges, lastRow) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${warehousePrepareColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.5" right="0.5" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${warehousePrepareColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildWarehousePrepareSheetXml(orders, workerIds) {
   const strings = [];
@@ -11900,20 +11923,22 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     .map((e) => e.name);
   const sections = warehouseOrderPrepareSections(orders);
   const rows = [];
-  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`, `C2:E2`, `C3:E3`];
+  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`];
   let rowNum = 1;
   let catIndex = 0;
   const pushRow = (height, cells) => {
-    rows.push(xlsxRowXml(rowNum, height, cells, WAREHOUSE_PREPARE_LAST_COL));
+    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
+    rows.push(
+      xlsxRowXml(rowNum, height, filtered, WAREHOUSE_PREPARE_LAST_COL),
+    );
     rowNum += 1;
   };
-  const warehousePrepareMetaRow = (row, label, value, dateLabel, dateValue) => [
+  const warehousePrepareMetaRow = (row, label, value, dateText) => [
     xlsxCellXml(`A${row}`, 3, si(label), "s"),
     xlsxCellXml(`B${row}`, 4, si(value), "s"),
-    xlsxCellXml(`C${row}`, 14, si(dateLabel), "s"),
-    xlsxCellXml(`D${row}`, 14, null, "empty"),
-    xlsxCellXml(`E${row}`, 14, null, "empty"),
-    xlsxCellXml(`F${row}`, 14, si(dateValue), "s"),
+    xlsxCellXml(`C${row}`, 5, null, "empty"),
+    xlsxCellXml(`D${row}`, 6, null, "empty"),
+    xlsxCellXml(`E${row}`, 14, si(dateText), "s"),
   ];
   const warehousePrepareWorkerExtraRow = (row, name) => [
     xlsxCellXml(`A${row}`, 6, null, "empty"),
@@ -11949,39 +11974,42 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml("A1", 13, si("Бараа бэлдэж ачуулах хуудас"), "s"),
     ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
   ]);
+  const metaRow1 = rowNum;
+  merges.push(`E${metaRow1}:F${metaRow1}`);
   pushRow(
     28.5,
     warehousePrepareMetaRow(
-      2,
+      metaRow1,
       "Агуулахын ажилтан:",
       warehouseEmp,
-      "Захиалгын огноо:",
-      orderDateValue,
+      `Захиалгын огноо:${orderDateValue}`,
     ),
   );
   if (workerNames.length) {
+    const metaRow2 = rowNum;
+    merges.push(`E${metaRow2}:F${metaRow2}`);
     pushRow(
       20.25,
       warehousePrepareMetaRow(
-        3,
+        metaRow2,
         "Захиалга авсан ажилтан:",
         workerNames[0],
-        "Хэвлэсэн огноо:",
-        printedDateValue,
+        `Хэвлэсэн огноо:${printedDateValue}`,
       ),
     );
     for (let i = 1; i < workerNames.length; i += 1) {
       pushRow(16.5, warehousePrepareWorkerExtraRow(rowNum, workerNames[i]));
     }
   } else {
+    const metaRow2 = rowNum;
+    merges.push(`E${metaRow2}:F${metaRow2}`);
     pushRow(
       20.25,
       warehousePrepareMetaRow(
-        3,
+        metaRow2,
         "Захиалга авсан ажилтан:",
         "-",
-        "Хэвлэсэн огноо:",
-        printedDateValue,
+        `Хэвлэсэн огноо:${printedDateValue}`,
       ),
     );
   }
@@ -12017,10 +12045,10 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       pushRow(15, [
         xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
-        xlsxBarcodeCell(`C${r}`, 9, p.barcode, si),
+        warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
         xlsxOptionalNum(`D${r}`, 10, packs),
         xlsxOptionalNum(`E${r}`, 10, pieces),
-        xlsxCellXml(`F${r}`, 8, Number(p.stock) || 0, "n"),
+        xlsxCellXml(`F${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
   };
@@ -12040,25 +12068,19 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const nameRow = rowNum;
-    merges.push(`C${nameRow}:F${nameRow}`);
+    merges.push(`C${nameRow}:E${nameRow}`);
     pushRow(18, [
       xlsxCellXml(`A${nameRow}`, 3, si(role), "s"),
       xlsxCellXml(`B${nameRow}`, 4, si("Нэр"), "s"),
       xlsxCellXml(`C${nameRow}`, 17, null, "empty"),
-      xlsxCellXml(`D${nameRow}`, 17, null, "empty"),
-      xlsxCellXml(`E${nameRow}`, 17, null, "empty"),
-      xlsxCellXml(`F${nameRow}`, 17, null, "empty"),
     ]);
     pushRow(8.25, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
     const signRow = rowNum;
-    merges.push(`C${signRow}:F${signRow}`);
+    merges.push(`C${signRow}:E${signRow}`);
     pushRow(18, [
       xlsxCellXml(`A${signRow}`, 12, null, "empty"),
       xlsxCellXml(`B${signRow}`, 4, si("Гарын үсэг"), "s"),
       xlsxCellXml(`C${signRow}`, 17, null, "empty"),
-      xlsxCellXml(`D${signRow}`, 17, null, "empty"),
-      xlsxCellXml(`E${signRow}`, 17, null, "empty"),
-      xlsxCellXml(`F${signRow}`, 17, null, "empty"),
     ]);
   };
   pushWarehousePrepareSignatureBlock("Хүлээлгэн өгсөн ажилтан:");
@@ -12077,13 +12099,22 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     orders,
     workerIds,
   );
-  const sheetName = xlsxSafeSheetName("Бэлдэх", "Sheet1");
-  const built = {
-    sharedStringsXml,
-    workbookXml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView windowWidth="18000" windowHeight="12000"/></bookViews><sheets><sheet name="${xlsxXmlEsc(sheetName)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
-    sheets: [{ id: 1, name: sheetName, sheetXml }],
-  };
-  const blob = await assembleStyledXlsxZip(built, { hasLogo: false });
+  const tpl = await fetch(staticAssetUrl(WAREHOUSE_PREPARE_TEMPLATE)).then(
+    (r) => {
+      if (!r.ok) throw new Error("template missing");
+      return r.arrayBuffer();
+    },
+  );
+  const zip = await JSZip.loadAsync(tpl);
+  const stylesXml = warehousePreparePatchStylesXml(
+    await zip.file("xl/styles.xml").async("string"),
+  );
+  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  zip.file("xl/styles.xml", stylesXml);
+  zip.remove("xl/printerSettings/printerSettings1.bin");
+  zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
+  const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `aguulah-beldeh-${stamp}.xlsx`);
 }
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
