@@ -6329,7 +6329,7 @@ textarea::placeholder {
   border: none;
   border-top: 1px solid var(--hex-border);
   background: transparent;
-  overflow: hidden;
+  overflow: visible;
   min-height: 0;
 }
 
@@ -9114,17 +9114,8 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-order-lines-wrap {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    max-height: min(
-      52dvh,
-      calc(
-        100dvh - var(--mobile-top-bar-offset, 56px) - var(--mobile-nav-h) -
-          52px - env(safe-area-inset-top, 0px) -
-          env(safe-area-inset-bottom, 0px) - 300px
-      )
-    );
+    overflow: visible;
+    max-height: none;
   }
 
   .app-shell--bottom-nav .worker-order-card__foot {
@@ -9138,6 +9129,14 @@ textarea::placeholder {
     box-shadow: none;
   }
 
+  .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
+    position: sticky;
+    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+    z-index: 12;
+    background: var(--hex-background);
+    box-shadow: 0 -6px 16px rgba(16, 22, 35, 0.08);
+  }
+
   .app-shell--bottom-nav .worker-order-lines {
     overflow: visible;
     min-height: 0;
@@ -9146,6 +9145,10 @@ textarea::placeholder {
   .app-shell--bottom-nav .worker-view--ordering {
     align-items: stretch;
     gap: 8px;
+  }
+
+  .app-shell--bottom-nav .worker-view--ordering .worker-order-card__body > .worker-order-stats {
+    top: calc(var(--mobile-top-bar-offset, 56px) + env(safe-area-inset-top, 0px));
   }
 
   .worker-selected-row {
