@@ -9573,7 +9573,7 @@ function productListHead() {
     showCost
       ? `<span class="product-list__col product-list__col--cost">Өртөг</span>`
       : "",
-    `<span class="product-list__col product-list__col--stock">Үлдэгдэл</span>`,
+    `<span class="product-list__col product-list__col--stock" title="Үлдэгдэл">Үлд.</span>`,
     `<span class="product-list__col product-list__col--barcode">Баркод</span>`,
     actions
       ? `<span class="product-list__col product-list__col--actions">Үйлдэл</span>`

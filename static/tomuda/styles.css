@@ -2483,90 +2483,135 @@ img[data-product-img],
 /* Desktop / web only — compact golden-ratio product table */
 @media (min-width: 1024px) {
   .product-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+    display: grid;
+    grid-template-columns: var(--product-cols);
+    gap: 0 6px;
     padding: 0;
     --product-phi: 1.6180339887;
     --product-base: 6px;
-    --product-gutter: 8px;
+    --product-gutter: 6px;
     --product-pad-y: 6px;
     --product-pad-x: 10px;
     --product-thumb: 72px;
     --product-row-min: calc(var(--product-thumb) + var(--product-pad-y) * 2);
     --product-cols:
-      minmax(140px, 1.618fr)
-      minmax(0, 10ch)
-      max-content
-      max-content
-      max-content
-      minmax(84px, 11ch)
-      70px;
+      minmax(120px, 1fr)
+      minmax(0, 9ch)
+      minmax(0, 8ch)
+      minmax(0, 7ch)
+      minmax(0, 9ch)
+      minmax(72px, 10ch)
+      68px;
   }
 
   .product-list__head,
   .product-card {
     display: grid;
-    grid-template-columns: var(--product-cols);
-    grid-template-rows: minmax(var(--product-row-min), auto);
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     grid-template-areas: none;
-    gap: 0 var(--product-gutter);
     align-items: center;
-    padding: var(--product-pad-y) var(--product-pad-x);
   }
 
   .product-list--show-cost {
     --product-cols:
-      minmax(132px, 1.5fr)
-      minmax(0, 9ch)
-      max-content
-      max-content
-      max-content
-      max-content
-      minmax(80px, 10ch)
-      70px;
+      minmax(112px, 1fr)
+      minmax(0, 8ch)
+      minmax(0, 8ch)
+      minmax(0, 7ch)
+      minmax(0, 6ch)
+      minmax(0, 8ch)
+      minmax(72px, 10ch)
+      68px;
   }
 
   .product-list--readonly {
     --product-cols:
-      minmax(148px, 1.618fr)
-      minmax(0, 10ch)
-      max-content
-      max-content
-      max-content
-      minmax(84px, 11ch);
+      minmax(128px, 1fr)
+      minmax(0, 9ch)
+      minmax(0, 8ch)
+      minmax(0, 7ch)
+      minmax(0, 9ch)
+      minmax(72px, 10ch);
   }
 
   .product-list__head {
     display: grid;
-    grid-row: auto;
-    font-size: 10px;
+    grid-template-rows: auto;
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--hex-muted-foreground);
     background: var(--hex-secondary);
     border-bottom: 1px solid var(--hex-border);
-    min-height: 30px;
-    padding-top: 7px;
-    padding-bottom: 7px;
+    min-height: 22px;
+    padding: 4px var(--product-pad-x);
+  }
+
+  .product-list__col {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.1;
   }
 
   .product-list__col--name {
+    grid-column: 1;
     padding-left: calc(var(--product-thumb) + var(--product-gutter));
   }
 
-  .product-list__col--pack,
-  .product-list__col--price,
-  .product-list__col--cost,
-  .product-list__col--stock,
-  .product-list__col--barcode {
-    text-align: right;
-    padding-right: 4px;
+  .product-list__col--cat {
+    grid-column: 2;
+    padding-right: 2px;
   }
 
-  .product-list__col--cat {
+  .product-list__col--pack {
+    grid-column: 3;
+    text-align: right;
     padding-right: 2px;
+  }
+
+  .product-list__col--price {
+    grid-column: 4;
+    text-align: right;
+    padding-right: 2px;
+  }
+
+  .product-list__col--cost {
+    grid-column: 5;
+    text-align: right;
+    padding-right: 2px;
+  }
+
+  .product-list__col--stock {
+    grid-column: 5;
+    text-align: right;
+    padding-right: 2px;
+  }
+
+  .product-list--show-cost .product-list__col--stock {
+    grid-column: 6;
+  }
+
+  .product-list__col--barcode {
+    grid-column: 6;
+    text-align: right;
+    padding-right: 2px;
+  }
+
+  .product-list--show-cost .product-list__col--barcode {
+    grid-column: 7;
+  }
+
+  .product-list__col--actions {
+    grid-column: 7;
+    text-align: center;
+  }
+
+  .product-list--show-cost .product-list__col--actions {
+    grid-column: 8;
   }
 
   .product-card__subtitle {
@@ -2577,11 +2622,9 @@ img[data-product-img],
     display: contents;
   }
 
-  .product-list__col--actions {
-    text-align: center;
-  }
-
   .product-card {
+    grid-template-rows: minmax(var(--product-row-min), auto);
+    padding: var(--product-pad-y) var(--product-pad-x);
     min-height: var(--product-row-min);
     border: none;
     border-radius: 0;
