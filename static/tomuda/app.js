@@ -1285,6 +1285,17 @@ function orderCreatedDay(o) {
   if (created) return created;
   return orderDeliveryDay(o);
 }
+function orderInWorkerLiveSession(o) {
+  const today = todayIso();
+  if (orderCreatedDay(o) === today) return true;
+  return normalizeIsoDateInput(orderDay(o)) === today;
+}
+function orderMatchesWorkerDate(o, day = state.filters.workerDate) {
+  const targetDay = normalizeIsoDateInput(day) || "";
+  if (!targetDay) return true;
+  if (targetDay === todayIso()) return orderInWorkerLiveSession(o);
+  return orderCreatedDay(o) === targetDay;
+}
 function orderRetentionDays() {
   ensureSettings();
   const n = Number(state.settings.orderRetentionDays);
@@ -4135,7 +4146,7 @@ function mergePersistentStates(remote = {}, local = {}) {
         ? deletionKeyForCollection(key)
         : "",
       entityKind: key,
-      preferRemote: true,
+      preferRemote: key !== "orders",
     });
     if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
@@ -6058,6 +6069,39 @@ function warehouseLiveFilterBannerHtml() {
   const hidden = Math.max(0, total - visible);
   return `<div class="wh-date-banner" role="status"><strong>Зөвхөн өнөөдрийн захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Бүх захиалгыг Админ → Захиалга хэсгээс үзнэ үү.</span></div>`;
 }
+async function mergeServerStateBeforeSave() {
+  try {
+    const latest = await fetchBackendPayload();
+    if (!latest?.state) return false;
+    const session = captureSessionSnapshot();
+    const merged = mergePersistentStates(latest.state, persistentState());
+    if (JSON.stringify(merged) !== JSON.stringify(persistentState())) {
+      applyPersistentState(merged);
+      restoreSessionSnapshot(session);
+      if (!shouldDeferBackendSync()) safeRender();
+    }
+    if (latest.updatedAt) serverUpdatedAt = latest.updatedAt;
+    return true;
+  } catch (error) {
+    console.warn("Backend pre-save merge failed", error);
+    return false;
+  }
+}
+function pendingOrderDeletionsWithoutLog(data = persistentState()) {
+  try {
+    const baseline = JSON.parse(backendLastSaved).state;
+    const oldOrders = baseline?.orders || [];
+    if (!oldOrders.length) return [];
+    const newIds = new Set((data.orders || []).map((o) => String(o.id)));
+    const log = data.deletionLog || [];
+    return oldOrders
+      .filter((o) => o?.id != null && !newIds.has(String(o.id)))
+      .filter((o) => !deletionLogHas(log, "order", o.id))
+      .map((o) => String(o.id));
+  } catch {
+    return [];
+  }
+}
 async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
   if (!state.isLoggedIn || !state.currentEmployee?.id) return;
@@ -6075,23 +6119,21 @@ async function saveBackendState(retry = 0) {
     restoreSessionSnapshot(session);
     if (!shouldDeferBackendSync()) safeRender();
   }
-  if (!shouldDeferBackendSync()) {
-    try {
-      const latest = await fetchBackendPayload();
-      if (latest?.state) {
-        const merged = mergePersistentStates(latest.state, persistentState());
-        if (JSON.stringify(merged) !== JSON.stringify(persistentState())) {
-          const session = captureSessionSnapshot();
-          applyPersistentState(merged);
-          restoreSessionSnapshot(session);
-          safeRender();
-        }
-      }
-    } catch (error) {
-      console.warn("Backend pre-save merge failed", error);
-    }
+  await mergeServerStateBeforeSave();
+  let payloadState = stateForBackendSave();
+  let unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
+  if (unsafeDeletes.length) {
+    await mergeServerStateBeforeSave();
+    payloadState = stateForBackendSave();
+    unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
   }
-  const payloadState = stateForBackendSave();
+  if (unsafeDeletes.length) {
+    persistOrderSnapshot();
+    markBackendSaveFailed(
+      "Захиалга сервертэй sync хийгдээгүй байна. Дахин хадгална уу.",
+    );
+    return;
+  }
   const snapshot = backendStateSnapshot(payloadState);
   const body = JSON.stringify({
     state: payloadState,
@@ -6147,7 +6189,6 @@ async function saveBackendState(retry = 0) {
       }
       persistOrderSnapshot();
       markBackendSaveFailed(msg);
-      await revertBackendStateFromServer();
       if (!shouldDeferBackendSync()) safeRender();
     } else {
       persistOrderSnapshot();
@@ -9394,7 +9435,20 @@ function warehouseScopeWorkerIds() {
   if (emp.role === "sales") return [emp.id];
   return idList(state.selectedWorkers);
 }
+function ensureWarehouseWorkerSelection() {
+  const emp = state.currentEmployee;
+  if (!emp || emp.role === "sales") return;
+  if (idList(state.selectedWorkers).length) return;
+  const todayOrders = filterWarehouseOrders(
+    (state.orders || []).filter((o) => o.status !== "cancelled"),
+  );
+  const workerIds = [
+    ...new Set(todayOrders.map((o) => o.employeeId).filter(Boolean)),
+  ];
+  if (workerIds.length) state.selectedWorkers = workerIds;
+}
 function warehouseOrdersForSelectedWorkers() {
+  ensureWarehouseWorkerSelection();
   const scopeIds = warehouseScopeWorkerIds();
   if (!scopeIds.length) return [];
   const idSet = new Set(scopeIds);
@@ -14392,7 +14446,7 @@ function workerOrdersList() {
   if (pay === "paid") list = list.filter((o) => orderIsPaid(o));
   if (pay === "unpaid") list = list.filter((o) => !orderIsPaid(o));
   const day = state.filters.workerDate;
-  if (day) list = list.filter((o) => orderCreatedDay(o) === day);
+  if (day) list = list.filter((o) => orderMatchesWorkerDate(o, day));
   return list.sort(compareOrdersNewestFirst);
 }
 function workerViewTabsHtml(tab) {
@@ -18205,9 +18259,10 @@ async function saveWorker() {
     state.workerOrdersArrived = true;
     state.workerHighlightOrderId = order.id;
     persistOrderSnapshot();
+    saveAuthSession();
     render();
     pushAppHistory();
-    const saved = await flushBackendSave();
+    const saved = await criticalBackendSave();
     if (saved) {
       showAppToast("Захиалга хадгалагдлаа", "success");
     } else {

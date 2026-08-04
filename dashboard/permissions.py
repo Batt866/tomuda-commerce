@@ -704,6 +704,11 @@ def validate_state_mutation(
                 new_stock = float(new_product.get("stock") or 0)
             except (TypeError, ValueError):
                 return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+            allowed_decrease = created_order_stock.get(product_id, 0)
+            actual_decrease = old_stock - new_stock
+            if actual_decrease > 0 and allowed_decrease > 0:
+                if abs(actual_decrease - allowed_decrease) <= 0.0001:
+                    continue
             allowed_increase = stock_in_usage.get(product_id, 0)
             stock_increase = new_stock - old_stock
             if (
@@ -711,12 +716,13 @@ def validate_state_mutation(
                 and stock_increase > 0
                 and abs(stock_increase - allowed_increase) <= 0.0001
             ):
-                pass
-            else:
-                allowed_decrease = created_order_stock.get(product_id, 0)
-                actual_decrease = old_stock - new_stock
-                if actual_decrease < 0 or abs(actual_decrease - allowed_decrease) > 0.0001:
-                    return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+                continue
+            if not _has_any_permission(perms, "orders.create", "orders.edit"):
+                return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+            if actual_decrease > 0 and allowed_decrease <= 0:
+                return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
+            if actual_decrease < 0 or abs(actual_decrease - allowed_decrease) > 0.0001:
+                return False, "Агуулахын үлдэгдэл өөрчлөх эрхгүй"
         if (
             old_product.get("costPrice") != new_product.get("costPrice")
             and not _can_edit_warehouse(perms)
