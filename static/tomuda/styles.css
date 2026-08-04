@@ -7606,23 +7606,6 @@ textarea::placeholder {
   font-weight: 800;
 }
 
-.worker-selected-row__stock {
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--hex-muted-foreground);
-}
-
-.worker-selected-row__barcode {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--hex-muted-foreground);
-  opacity: 0.85;
-}
-
 .worker-selected-row__qty {
   align-self: center;
   flex-shrink: 0;
@@ -9620,15 +9603,6 @@ textarea::placeholder {
 
   .worker-selected-row__price {
     font-size: 11px;
-  }
-
-  .worker-selected-row__stock {
-    font-size: 10px;
-    margin-left: 6px;
-  }
-
-  .worker-selected-row__barcode {
-    font-size: 9px;
   }
 
   .worker-row-edit {

@@ -15170,18 +15170,15 @@ function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
   const remain = Math.max(0, (Number(p.stock) || 0) - p.qty);
   const packLabel = productPackLabel(p);
-  const barcode = String(p.barcode || "").trim();
   const lineTotal = p.price * p.qty;
   const tags = [
     p.category ? `<span>${esc(p.category)}</span>` : "",
     packLabel ? `<span>${esc(packLabel)}</span>` : "",
+    `<span>Үлд ${remain}</span>`,
   ]
     .filter(Boolean)
     .join('<span class="worker-selected-row__dot" aria-hidden="true">·</span>');
-  const barcodeHtml = barcode
-    ? `<p class="worker-selected-row__barcode">${esc(barcode)}</p>`
-    : "";
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price">${fmt(p.price)} × ${p.qty} = <b class="worker-selected-row__total">${fmt(lineTotal)}</b><span class="worker-selected-row__stock">Үлд ${remain}</span></p>${barcodeHtml}</div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
