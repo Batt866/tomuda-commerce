@@ -751,6 +751,11 @@ function receiptSettleNoteText(o) {
     "Барааг хүлээн авсан өдөртөө тооцоог дуусгаагүй тохиолдолд хувь хасагдаагүй дүнгээр шилжүүлэхийг анхаарна уу!"
   );
 }
+function receiptPromoBarcode(item) {
+  const p = productForReceiptLine(item);
+  const code = String(p.barcode || item.barcode || "").trim();
+  return code || "-";
+}
 /** RewardTable — Урамшуулал header, then product names in the wide name band. */
 function receiptPromoRowsHtml(o) {
   const promoItems = receiptPromoItems(o).map(enrichPromoLineForReceipt);
@@ -761,13 +766,13 @@ function receiptPromoRowsHtml(o) {
     ? `<tr class="receipt-items__promo-settle-row"><td colspan="7"><span class="receipt-items__promo-settle">${esc(settleNote)}</span></td></tr>`
     : "";
   const promoHeader = promoItems.length
-    ? `<tr class="receipt-items__promo-header"><td class="receipt-items__num">&nbsp;</td><td colspan="3" class="receipt-items__name receipt-items__promo-label">Урамшуулал</td><td class="receipt-items__qty">&nbsp;</td><td class="receipt-items__price">&nbsp;</td><td class="receipt-items__total">&nbsp;</td></tr>`
+    ? `<tr class="receipt-items__promo-header"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name receipt-items__promo-label">Урамшуулал</td><td class="receipt-items__unit">&nbsp;</td><td class="receipt-items__barcode">&nbsp;</td><td class="receipt-items__qty">&nbsp;</td><td class="receipt-items__price">&nbsp;</td><td class="receipt-items__total">&nbsp;</td></tr>`
     : "";
   const itemRows = promoItems
-    .map(
-      (i) =>
-        `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td colspan="3" class="receipt-items__name receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`,
-    )
+    .map((i) => {
+      const barcode = receiptPromoBarcode(i);
+      return `<tr class="receipt-items__promo"><td class="receipt-items__num">&nbsp;</td><td class="receipt-items__name receipt-items__promo-name">${esc(i.productName)}</td><td class="receipt-items__unit">&nbsp;</td><td class="receipt-items__barcode receipt-items__promo-barcode">${esc(barcode)}</td><td class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(receiptPromoDisplayPrice(i))}</td><td class="receipt-items__total">${receiptMoney(receiptPromoDisplayTotal(i))}</td></tr>`;
+    })
     .join("");
   return `<tr class="receipt-grid__items-wrap receipt-grid__items-wrap--promo"><td colspan="11" class="receipt-grid__items-cell"><table class="receipt-items receipt-items--promo" role="table"><colgroup><col class="receipt-items__num"><col class="receipt-items__name"><col class="receipt-items__unit"><col class="receipt-items__barcode"><col class="receipt-items__qty"><col class="receipt-items__price"><col class="receipt-items__total"></colgroup>${settleRow}${promoHeader}${itemRows}</table></td></tr>`;
 }
@@ -6893,7 +6898,7 @@ td, th { border: none; }
 .receipt-items--promo .receipt-items__promo-name {
   text-align: left !important;
   padding-left: 6px;
-  padding-right: 6px;
+  padding-right: 4px;
   white-space: normal !important;
   word-break: normal;
   overflow-wrap: break-word;
@@ -6903,6 +6908,17 @@ td, th { border: none; }
   line-height: 1.2;
   letter-spacing: 0;
   font-variant-numeric: normal;
+}
+.receipt-items--promo .receipt-items__promo-barcode {
+  text-align: right !important;
+  padding-right: 4px;
+  font-size: 8px;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; }
@@ -7293,7 +7309,7 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
 // A = logo gutter + compact row № (narrow so names get room).
 // B labels/names; C bank values + units; D barcode/address; E–G numbers.
-const RECEIPT_XLSX_COL_WIDTHS = [5.5, 23, 10, 15, 8, 11, 14];
+const RECEIPT_XLSX_COL_WIDTHS = [7, 21.5, 10, 15, 8, 11, 14];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
   const limit = Math.max(6, Number(charsPerLine) || 12);
@@ -7387,11 +7403,11 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // oneCellAnchor + size capped to column A so the logo stays visible without covering B.
-  const logoMm = 9.5;
+  // Logo in column A — sized to fill the gutter without overlapping column B text.
+  const logoMm = 12;
   const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.2 / 25.4) * 914400);
-  const rowOff = Math.round((0.35 / 25.4) * 914400);
+  const colOff = Math.round((0.15 / 25.4) * 914400);
+  const rowOff = Math.round((0.25 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
@@ -7753,10 +7769,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   };
   const pushPromoSectionLabelRow = () => {
     const r = rowNum;
-    merges.push(`B${r}:D${r}`);
     pushItemTableRow(14, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
       xlsxCellXml(`B${r}`, 36, si("Урамшуулал"), "s"),
+      xlsxCellXml(`C${r}`, 37, null, "empty"),
+      xlsxCellXml(`D${r}`, 37, null, "empty"),
       xlsxCellXml(`E${r}`, 37, null, "empty"),
       xlsxCellXml(`F${r}`, 37, null, "empty"),
       xlsxCellXml(`G${r}`, 37, null, "empty"),
@@ -7768,20 +7785,25 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    merges.push(`B${r}:D${r}`);
-    const promoNameWidth =
-      RECEIPT_XLSX_COL_WIDTHS[1] +
-      RECEIPT_XLSX_COL_WIDTHS[2] +
-      RECEIPT_XLSX_COL_WIDTHS[3];
-    const promoH = receiptXlsxWrappedRowHeight(nameText, promoNameWidth, {
-      min: 14,
-      linePt: 12,
-      pad: 2,
-      max: 52,
-    });
+    const barcodeText = receiptPromoBarcode(item);
+    const promoH = Math.max(
+      receiptXlsxWrappedRowHeight(nameText, RECEIPT_XLSX_COL_WIDTHS[1]),
+      barcodeText && barcodeText !== "-"
+        ? receiptXlsxWrappedRowHeight(barcodeText, RECEIPT_XLSX_COL_WIDTHS[3], {
+            min: 14,
+            linePt: 11,
+            pad: 2,
+            max: 24,
+          })
+        : 14,
+    );
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, 37, null, "empty"),
       xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
+      xlsxCellXml(`C${r}`, 37, null, "empty"),
+      barcodeText && barcodeText !== "-"
+        ? xlsxCellXml(`D${r}`, 35, barcodeText, "inlineStr")
+        : xlsxCellXml(`D${r}`, 37, null, "empty"),
       xlsxCellXml(`E${r}`, 37, qty, "n"),
       xlsxCellXml(`F${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`G${r}`, 38, Number(lineTotal) || 0, "n"),
