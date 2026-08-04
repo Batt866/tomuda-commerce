@@ -2299,78 +2299,79 @@ img[data-product-img],
     flex-direction: column;
     gap: 0;
     padding: 0;
-    --product-phi: 1.6180339887;
-    --product-gutter: calc(8px * var(--product-phi)); /* ≈ 13px */
-    --product-pad-y: 10px;
-    --product-pad-x: 16px;
-    --product-thumb: 108px;
-    --product-row-min: calc(var(--product-thumb) + var(--product-pad-y) * 2);
-    /* Name : rest ≈ φ : 1  → name ≈ 1.618fr of total flexible track */
+    --product-gutter: 12px;
+    --product-pad-y: 8px;
+    --product-pad-x: 14px;
+    --product-thumb: 56px;
+    --product-row-min: 56px;
     --product-cols:
-      minmax(260px, 1.618fr)
-      minmax(100px, 0.95fr)
-      minmax(68px, 0.55fr)
-      minmax(80px, 0.7fr)
-      minmax(72px, 0.62fr)
-      minmax(110px, 0.85fr)
-      88px;
+      minmax(220px, 2fr)
+      minmax(92px, 1fr)
+      minmax(76px, 0.7fr)
+      minmax(84px, 0.75fr)
+      minmax(88px, 0.8fr)
+      minmax(118px, 1fr)
+      72px;
   }
 
   .product-list__head,
   .product-card {
     display: grid;
     grid-template-columns: var(--product-cols);
-    gap: 8px var(--product-gutter);
+    grid-template-areas: none;
+    gap: 0 var(--product-gutter);
     align-items: center;
     padding: var(--product-pad-y) var(--product-pad-x);
   }
 
   .product-list--show-cost {
     --product-cols:
-      minmax(240px, 1.618fr)
-      minmax(96px, 0.9fr)
-      minmax(64px, 0.5fr)
-      minmax(76px, 0.68fr)
-      minmax(76px, 0.68fr)
-      minmax(68px, 0.58fr)
-      minmax(104px, 0.82fr)
-      88px;
+      minmax(210px, 1.9fr)
+      minmax(88px, 0.95fr)
+      minmax(72px, 0.65fr)
+      minmax(80px, 0.72fr)
+      minmax(72px, 0.65fr)
+      minmax(84px, 0.75fr)
+      minmax(118px, 1fr)
+      72px;
   }
 
   .product-list--readonly {
     --product-cols:
-      minmax(280px, 1.618fr)
-      minmax(110px, 1fr)
-      minmax(68px, 0.55fr)
-      minmax(80px, 0.7fr)
-      minmax(72px, 0.62fr)
-      minmax(120px, 0.9fr);
+      minmax(240px, 2fr)
+      minmax(100px, 1fr)
+      minmax(76px, 0.7fr)
+      minmax(84px, 0.75fr)
+      minmax(88px, 0.8fr)
+      minmax(118px, 1fr);
   }
 
   .product-list__head {
+    display: grid;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.02em;
-    text-transform: none;
     color: var(--hex-muted-foreground);
     background: var(--hex-secondary);
     border-bottom: 1px solid var(--hex-border);
-    min-height: var(--product-row-min);
+    min-height: 36px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .product-list__col--pack,
   .product-list__col--price,
   .product-list__col--cost,
-  .product-list__col--stock {
+  .product-list__col--stock,
+  .product-list__col--barcode {
     text-align: right;
   }
 
   .product-list__col--actions {
-    text-align: right;
+    text-align: center;
   }
 
   .product-card {
-    grid-template-areas: none;
     min-height: var(--product-row-min);
     border: none;
     border-radius: 0;
@@ -2386,36 +2387,47 @@ img[data-product-img],
 
   .product-card__name {
     grid-column: 1;
-    grid-area: auto;
+    grid-row: auto;
+    grid-area: unset;
     min-width: 0;
     display: grid;
     grid-template-columns: var(--product-thumb) minmax(0, 1fr);
-    gap: var(--product-gutter);
+    gap: 10px;
     align-items: center;
   }
 
   .product-card__img {
+    grid-area: unset;
+    grid-column: auto;
+    grid-row: auto;
     width: var(--product-thumb);
     height: var(--product-thumb);
-    border-radius: 0;
+    border-radius: 8px;
     border: 1px solid var(--hex-border);
     background: #fff;
+    padding: 3px;
+    align-self: center;
+    justify-self: start;
   }
 
   .product-card__copy {
+    grid-area: unset;
+    grid-column: auto;
+    grid-row: auto;
     min-width: 0;
+    padding-top: 0;
   }
 
   .product-card__title {
     font-size: 13px;
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.3;
     display: block;
-    -webkit-line-clamp: unset;
-    -webkit-box-orient: unset;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
   }
 
   .product-card__hint {
@@ -2431,20 +2443,22 @@ img[data-product-img],
     grid-column: 2;
     margin: 0;
     font-size: 12px;
-    line-height: 1.25;
+    line-height: 1.3;
     color: var(--hex-muted-foreground);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    align-self: center;
   }
 
   .product-card__pack {
     display: block;
     grid-column: 3;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     justify-self: end;
+    align-self: center;
     text-align: right;
     white-space: nowrap;
     color: var(--hex-primary);
@@ -2453,16 +2467,18 @@ img[data-product-img],
   .product-card__pack--empty {
     color: var(--hex-muted-foreground);
     font-weight: 500;
-    opacity: 0.55;
+    opacity: 0.45;
   }
 
   .product-card__price {
     grid-column: 4;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     justify-self: end;
+    align-self: center;
     text-align: right;
+    color: var(--hex-primary);
   }
 
   .product-card__cost {
@@ -2475,6 +2491,7 @@ img[data-product-img],
     font-size: 12px;
     font-variant-numeric: tabular-nums;
     justify-self: end;
+    align-self: center;
     text-align: right;
     color: var(--hex-muted-foreground);
   }
@@ -2486,6 +2503,7 @@ img[data-product-img],
   .product-card__stock {
     grid-column: 5;
     justify-self: end;
+    align-self: center;
     border-radius: 0;
     min-height: auto;
     padding: 0;
@@ -2494,6 +2512,7 @@ img[data-product-img],
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     text-align: right;
+    white-space: nowrap;
   }
 
   .product-card__stock-label {
@@ -2519,6 +2538,9 @@ img[data-product-img],
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    justify-self: end;
+    align-self: center;
+    text-align: right;
   }
 
   .product-list--show-cost .product-card__barcode {
@@ -2527,10 +2549,11 @@ img[data-product-img],
 
   .product-card__actions {
     grid-column: 7;
-    grid-area: auto;
+    grid-area: unset;
+    display: flex;
     flex-direction: row;
-    gap: 8px;
-    justify-self: end;
+    gap: 6px;
+    justify-self: center;
     align-self: center;
   }
 
@@ -2540,7 +2563,7 @@ img[data-product-img],
 
   .product-list__col--actions,
   .product-card__actions {
-    text-align: right;
+    text-align: center;
   }
 
   .product-card__action-btn {
