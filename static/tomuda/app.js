@@ -5034,6 +5034,10 @@ function productPackSize(p) {
   const n = Number(p?.boxQuantity);
   return Number.isFinite(n) && n > 1 ? Math.floor(n) : 0;
 }
+function productPackLabel(p) {
+  const packSize = productPackSize(p);
+  return packSize ? `${packSize}ш/багц` : "";
+}
 function pickerQtyFromParts(packs, pieces, p) {
   const packSize = productPackSize(p);
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
@@ -9564,6 +9568,7 @@ function productListHead() {
   const cols = [
     `<span class="product-list__col product-list__col--name">Бараа</span>`,
     `<span class="product-list__col product-list__col--cat">Төрөл</span>`,
+    `<span class="product-list__col product-list__col--pack">Багц</span>`,
     `<span class="product-list__col product-list__col--price">Үнэ</span>`,
     showCost
       ? `<span class="product-list__col product-list__col--cost">Өртөг</span>`
@@ -9630,7 +9635,15 @@ function productDetail(id) {
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
 function productCard(p) {
-  const catLine = [p.category, p.country].filter(Boolean).join(" · ") || "—";
+  const catLine = p.category || "—";
+  const packLabel = productPackLabel(p);
+  const packSize = productPackSize(p);
+  const packHint = packLabel
+    ? `<span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-pack">${esc(packLabel)}</span>`
+    : "";
+  const packCell = packLabel
+    ? `<span class="product-card__pack" title="1 багц = ${packSize} ширхэг">${esc(packLabel)}</span>`
+    : `<span class="product-card__pack product-card__pack--empty">—</span>`;
   const adminActions = canManageProducts()
     ? `<div class="product-card__actions" onclick="event.stopPropagation()">${editIconButton({ className: "product-card__action-btn product-card__action-btn--edit", attrs: `onclick="confirmEditProduct('${esc(p.id)}')"`, label: "Бараа засах" })}${deleteIconButton({ className: "product-card__action-btn product-card__action-btn--delete", attrs: `data-confirm-delete="product" data-id="${esc(p.id)}"`, label: "Бараа устгах" })}</div>`
     : "";
@@ -9639,7 +9652,8 @@ function productCard(p) {
     : "";
   const low = isLowStock(p);
   const stock = p.stock ?? 0;
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__hint"><span class="product-card__hint-cat">${esc(catLine)}</span><span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-code">${esc(p.barcode || "—")}</span></p></div></div><p class="product-card__cat">${esc(catLine)}</p><div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд </span>${stock}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span>${adminActions}</article>`;
+  const unit = esc(p.unit || "ш");
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__hint"><span class="product-card__hint-cat">${esc(catLine)}</span>${packHint}<span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-code">${esc(p.barcode || "—")}</span></p></div></div><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд </span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -17791,17 +17805,24 @@ function pickerQtySheetHtml(productId) {
     ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
     : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
   const promoHtml = "";
-  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
+  const packMeta = packSize
+    ? `<span class="picker-qty-sheet__meta-sep">·</span><span>1 багц = ${packSize}ш</span>`
+    : "";
+  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}${packMeta}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
     inCart = q > 0,
     left = p.stock - q,
     promoHint = pickerProductPromoHintHtml(p),
+    packLabel = productPackLabel(p),
+    packMeta = packLabel
+      ? `<span class="picker-row__meta-sep">·</span><span class="picker-row__value--pack">${esc(packLabel)}</span>`
+      : "",
     qtyBadge = inCart
       ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
       : "";
-  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="picker-row__thumb" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${promoHint}</span></div>${qtyBadge}</button>`;
+  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="picker-row__thumb" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${packMeta}${promoHint}</span></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";
