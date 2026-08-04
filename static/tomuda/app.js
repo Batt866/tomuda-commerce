@@ -1083,6 +1083,23 @@ const dteAt = (d) => {
   return `${dte(d)} ${hh}:${mm}`;
 };
 const isoDay = (d) => {
+  const text = String(d ?? "").trim();
+  if (!text) return "";
+  const dateOnly = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const y = Number(dateOnly[1]);
+    const mo = Number(dateOnly[2]);
+    const dayNum = Number(dateOnly[3]);
+    const dt = new Date(y, mo - 1, dayNum);
+    if (
+      dt.getFullYear() === y &&
+      dt.getMonth() === mo - 1 &&
+      dt.getDate() === dayNum
+    ) {
+      return dateOnly[0];
+    }
+    return "";
+  }
   const x = new Date(d);
   if (Number.isNaN(x.getTime())) return "";
   const y = x.getFullYear();
@@ -1143,7 +1160,8 @@ function orderInWarehouseLiveSession(o) {
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
   const targetDay = normalizeIsoDateInput(day) || todayIso();
-  // Warehouse/receipt date filters should follow delivery day shown on receipts.
+  // Today's warehouse view includes orders created today even if delivery is later.
+  if (targetDay === todayIso()) return orderInWarehouseLiveSession(o);
   return normalizeIsoDateInput(orderDay(o)) === targetDay;
 }
 function filterWarehouseOrders(orders) {
@@ -3677,7 +3695,6 @@ function saveLocalPendingState() {
     !backendSaving &&
     !backendSaveFailedMessage
   ) {
-    clearLocalPendingState();
     return;
   }
   try {
@@ -4384,13 +4401,28 @@ function syncBackendMarkers(payload, stateData) {
   syncBackendSaveMarker();
   if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
 }
-function applyBootBackendPayload(payload) {
+function bootPayloadMatchesState(payloadState, mergedState) {
+  return (
+    JSON.stringify(comparableBackendState(payloadState || {})) ===
+    JSON.stringify(comparableBackendState(mergedState || {}))
+  );
+}
+function applyBootBackendPayload(payload, opts = {}) {
   if (!payload?.state) return false;
-  const merged = mergeBootState(payload.state);
+  let serverState = payload.state;
+  if (opts.mergeWithCurrent) {
+    serverState = mergePersistentStates(serverState, persistentState());
+  }
+  const merged = mergeBootState(serverState);
   applyPersistentState(merged);
-  syncBackendSaveMarker();
+  if (bootPayloadMatchesState(payload.state, merged)) {
+    syncBackendSaveMarker(payload.state);
+    clearOrderPersistenceCache();
+  } else {
+    persistOrderSnapshot();
+    if (backendReady) scheduleBackendSave();
+  }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
-  if (!localStateDirty()) clearOrderPersistenceCache();
   return true;
 }
 function isEditingCountQty() {
@@ -4717,7 +4749,15 @@ function completeBootUiInit(options = {}) {
   normalizeOrderTotals();
   state.workerQty = {};
   restoreAuthSession();
-  syncBackendSaveMarker();
+  if (
+    !readLocalPendingState() &&
+    !readLocalOrdersBackup().length &&
+    !localStateDirty()
+  ) {
+    syncBackendSaveMarker();
+  } else if (localStateDirty() || readLocalPendingState()) {
+    scheduleBackendSave();
+  }
   initNoZoom();
   initNestedScrollChain();
   initScrollRenderGuard();
@@ -4751,7 +4791,7 @@ async function boot() {
 
     const payload = await fetchBackendStateWithRetry();
     if (payload?.state) {
-      applyBootBackendPayload(payload);
+      applyBootBackendPayload(payload, { mergeWithCurrent: bootUiReady });
       saveLocalBackendCache(payload);
       if (!bootUiReady) {
         completeBootUiInit();
@@ -5986,8 +6026,7 @@ function clearBackendSaveFailed() {
 }
 function hasUnsavedLocalData() {
   if (localStateDirty()) return true;
-  if (readLocalPendingState()) clearOrderPersistenceCache();
-  return false;
+  return !!readLocalPendingState();
 }
 function criticalBackendSave() {
   persistOrderSnapshot();
