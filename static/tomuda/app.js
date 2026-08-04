@@ -14741,6 +14741,11 @@ function workerOrderStatsHtml(cart) {
   const promoHints = workerQuantityPromoHintsHtml(cart);
   return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${promoHints}${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
 }
+function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = "", hasItems = false } = {}) {
+  const stats = hasItems ? workerOrderStatsHtml(cart) : "";
+  if (!stats && !agentMetaHtml && !receivableHtml) return "";
+  return `<div class="worker-order-summary">${stats}${receivableHtml}${agentMetaHtml}</div>`;
+}
 function workerNewOrderStep(cart) {
   ensureOrderEmployeeSelection();
   const customer = state.customers.find((c) => c.id === state.workerCustomer),
@@ -14751,12 +14756,17 @@ function workerNewOrderStep(cart) {
     receivableHtml = workerReceivableHtml(customer?.id),
     paidProducts = workerPaidProductsInCart(),
     hasItems = paidProducts.length > 0,
+    summaryHtml = workerOrderSummaryPanel(cart, {
+      agentMetaHtml,
+      receivableHtml,
+      hasItems,
+    }),
     listHtml = hasItems
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
       : "";
   const saving = orderSubmitLock;
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button></header><div class="worker-order-card__body">${hasItems ? workerOrderStatsHtml(cart) : ""}<div class="worker-order-card__tools">${receivableHtml}${agentMetaHtml}<button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saving ? "Хадгалж байна..." : "Хадгалах"}</button></footer></section>`;
+  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button></header><div class="worker-order-card__body">${summaryHtml}<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saving ? "Хадгалж байна..." : "Хадгалах"}</button></footer></section>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
