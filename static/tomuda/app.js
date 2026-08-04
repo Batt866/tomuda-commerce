@@ -55,6 +55,7 @@ const state = {
   deliveryName: "",
   deliveryPhone: "",
   workerQty: {},
+  workerQtyParts: {},
   pickerActiveId: "",
   pickerQtyProductId: "",
   pickerQtyRevertQty: null,
@@ -4265,6 +4266,8 @@ function applyPersistentState(data) {
   }
   if (!state.workerQty || typeof state.workerQty !== "object")
     state.workerQty = {};
+  if (!state.workerQtyParts || typeof state.workerQtyParts !== "object")
+    state.workerQtyParts = {};
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
   state.deletionLog = normalizeDeletionLog(state.deletionLog);
   state.promotionDeletionLog = normalizePromotionDeletionLog(
@@ -5038,6 +5041,55 @@ function productPackLabel(p) {
   const packSize = productPackSize(p);
   return packSize ? `${packSize}ш/багц` : "";
 }
+function ensureWorkerQtyParts() {
+  if (!state.workerQtyParts || typeof state.workerQtyParts !== "object") {
+    state.workerQtyParts = {};
+  }
+}
+function syncWorkerQtyParts(id, packs, pieces) {
+  const p = state.products.find((x) => x.id === id);
+  if (!p || !productPackSize(p)) {
+    if (state.workerQtyParts) delete state.workerQtyParts[id];
+    return;
+  }
+  ensureWorkerQtyParts();
+  state.workerQtyParts[id] = {
+    packs: Math.max(0, Math.floor(Number(packs) || 0)),
+    pieces: Math.max(0, Math.floor(Number(pieces) || 0)),
+  };
+}
+function workerQtyPartsForProduct(p, qty) {
+  const total = Math.max(0, Math.floor(Number(qty) || 0));
+  const packSize = productPackSize(p);
+  if (!packSize) return { packs: 0, loosePieces: total };
+  const stored = state.workerQtyParts?.[p.id];
+  if (stored) {
+    return {
+      packs: Math.max(0, Math.floor(Number(stored.packs) || 0)),
+      loosePieces: Math.max(0, Math.floor(Number(stored.pieces) || 0)),
+    };
+  }
+  const split = pickerQtyToParts(total, p);
+  return { packs: split.packs, loosePieces: split.pieces };
+}
+function orderItemPrepareParts(item, product) {
+  const totalQty = Math.max(0, Math.floor(Number(item.quantity) || 0));
+  const packSize =
+    Number(item.boxQuantity) > 1
+      ? Math.floor(Number(item.boxQuantity))
+      : productPackSize(product);
+  if (!packSize) return { packs: 0, loosePieces: totalQty, totalQty };
+  if (item.packs != null && item.packs !== "") {
+    const packs = Math.max(0, Math.floor(Number(item.packs) || 0));
+    const loosePieces =
+      item.loosePieces != null && item.loosePieces !== ""
+        ? Math.max(0, Math.floor(Number(item.loosePieces) || 0))
+        : Math.max(0, totalQty - packs * packSize);
+    return { packs, loosePieces, totalQty };
+  }
+  const split = pickerQtyToParts(totalQty, { ...product, boxQuantity: packSize });
+  return { packs: split.packs, loosePieces: split.pieces, totalQty };
+}
 function pickerQtyFromParts(packs, pieces, p) {
   const packSize = productPackSize(p);
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
@@ -5151,6 +5203,7 @@ function pickerPartStepperApply(btn, kind) {
     showStockLimitToast();
     return;
   }
+  syncWorkerQtyParts(id, packs, pieces);
   pickerQtyChange(id, nextTotal);
 }
 function pickerPartDraft(el, kind) {
@@ -5171,6 +5224,7 @@ function pickerPartDraft(el, kind) {
     pieces = Math.min(max, n);
   }
   const total = pickerQtyFromParts(packs, pieces, p);
+  syncWorkerQtyParts(id, packs, pieces);
   if (total > 0) state.workerQty[id] = total;
   else delete state.workerQty[id];
   el.value = String(kind === "pack" ? packs : pieces);
@@ -5192,6 +5246,7 @@ function pickerPartCommit(el, kind) {
     if (n > max) showStockLimitToast();
     pieces = Math.min(max, n);
   }
+  syncWorkerQtyParts(id, packs, pieces);
   pickerQtyChange(id, pickerQtyFromParts(packs, pieces, p));
 }
 function pickerPackDraft(el) {
@@ -11824,15 +11879,26 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
           productId: i.productId,
           productName: i.productName,
           qty: 0,
+          packs: 0,
+          loosePieces: 0,
         };
       }
       map[key].qty += i.quantity;
+      const prod = warehousePrepareProduct(map[key]);
+      const parts = orderItemPrepareParts(i, prod);
+      map[key].packs += parts.packs;
+      map[key].loosePieces += parts.loosePieces;
     }),
   );
   const items = Object.values(map)
     .map((row) => {
       const p = warehousePrepareProduct(row);
-      return { product: p, qty: row.qty };
+      return {
+        product: p,
+        qty: row.qty,
+        packs: row.packs,
+        loosePieces: row.loosePieces,
+      };
     })
     .sort(
       (a, b) =>
@@ -11853,7 +11919,13 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
       groups.push({ type: "cat", name: cat });
       cur = cat;
     }
-    groups.push({ type: "product", product: item.product, qty: item.qty });
+    groups.push({
+      type: "product",
+      product: item.product,
+      qty: item.qty,
+      packs: item.packs,
+      loosePieces: item.loosePieces,
+    });
   }
   return groups;
 }
@@ -12051,14 +12123,15 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         continue;
       }
       const p = item.product;
-      const { packs, pieces } = pickerQtyToParts(item.qty, p);
+      const totalQty = Math.max(0, Math.floor(Number(item.qty) || 0));
+      const packs = Math.max(0, Math.floor(Number(item.packs) || 0));
       const r = rowNum;
       pushRow(15, [
         xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
         xlsxOptionalNum(`D${r}`, 10, packs),
-        xlsxOptionalNum(`E${r}`, 10, pieces),
+        xlsxCellXml(`E${r}`, 10, totalQty, "n"),
         xlsxCellXml(`F${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
@@ -12153,8 +12226,9 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
           return `<tr><td colspan="6" class="cat">${h(item.name)}</td></tr>`;
         }
         const p = item.product;
-        const { packs, pieces } = pickerQtyToParts(item.qty, p);
-        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${packs || ""}</td><td class="num">${pieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
+        const totalQty = Math.max(0, Math.floor(Number(item.qty) || 0));
+        const packs = Math.max(0, Math.floor(Number(item.packs) || 0));
+        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${packs || ""}</td><td class="num">${totalQty || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
       })
       .join("");
   const promoRows = sections.promo.length
@@ -13671,15 +13745,18 @@ function workerPaidLines() {
   return state.products
     .map((p) => {
       const q = getWorkerQty(p.id);
-      return q
-        ? {
-            productId: p.id,
-            productName: p.name,
-            quantity: q,
-            price: p.price,
-            total: p.price * q,
-          }
-        : null;
+      if (!q) return null;
+      const parts = workerQtyPartsForProduct(p, q);
+      return {
+        productId: p.id,
+        productName: p.name,
+        quantity: q,
+        packs: parts.packs,
+        loosePieces: parts.loosePieces,
+        boxQuantity: productPackSize(p) || 0,
+        price: p.price,
+        total: p.price * q,
+      };
     })
     .filter(Boolean);
 }
@@ -14019,6 +14096,32 @@ function cleanSessionQtyMap(raw) {
   });
   return result;
 }
+function cleanSessionQtyParts(raw, qtyMap) {
+  const result = {};
+  if (!raw || typeof raw !== "object") return result;
+  Object.entries(raw).forEach(([id, value]) => {
+    const qty = Math.floor(Number(qtyMap?.[id]) || 0);
+    if (qty < 1) return;
+    const product = state.products.find((p) => p.id === id);
+    if (!product || !productPackSize(product)) return;
+    const packs = Math.max(0, Math.floor(Number(value?.packs) || 0));
+    const pieces = Math.max(0, Math.floor(Number(value?.pieces) || 0));
+    if (pickerQtyFromParts(packs, pieces, product) === qty) {
+      result[id] = { packs, pieces };
+    }
+  });
+  return result;
+}
+function restoreWorkerQtyPartsFromTotals() {
+  ensureWorkerQtyParts();
+  Object.entries(state.workerQty || {}).forEach(([id, qty]) => {
+    if (state.workerQtyParts[id]) return;
+    const product = state.products.find((p) => p.id === id);
+    if (!product || !productPackSize(product)) return;
+    const split = pickerQtyToParts(qty, product);
+    state.workerQtyParts[id] = { packs: split.packs, pieces: split.pieces };
+  });
+}
 function authSessionPayload() {
   return {
     employeeId: state.currentEmployee.id,
@@ -14028,6 +14131,7 @@ function authSessionPayload() {
     workerCustomer: state.workerCustomer || "",
     workerStoreReady: !!state.workerStoreReady,
     workerQty: { ...(state.workerQty || {}) },
+    workerQtyParts: { ...(state.workerQtyParts || {}) },
     paymentTerm: state.paymentTerm || "cash",
     isPaid: !!state.isPaid,
     settlementAgreed: !!state.settlementAgreed,
@@ -14107,6 +14211,11 @@ function restoreAuthSession() {
       : "";
     state.workerStoreReady = !!state.workerCustomer && !!data.workerStoreReady;
     state.workerQty = cleanSessionQtyMap(data.workerQty);
+    state.workerQtyParts = cleanSessionQtyParts(
+      data.workerQtyParts,
+      state.workerQty,
+    );
+    restoreWorkerQtyPartsFromTotals();
     state.paymentTerm = data.paymentTerm === "credit" ? "credit" : "cash";
     state.isPaid =
       typeof data.isPaid === "boolean"
@@ -17512,6 +17621,7 @@ function getWorkerQty(productId) {
 }
 function resetWorkerCart() {
   state.workerQty = {};
+  state.workerQtyParts = {};
   state.pickerActiveId = "";
   state.pickerQtyProductId = "";
   state.pickerQtyRevertQty = null;
@@ -17534,7 +17644,19 @@ function setWorkerQty(id, qty) {
   if (q > 0) state.workerQty[id] = q;
   else {
     delete state.workerQty[id];
+    if (state.workerQtyParts) delete state.workerQtyParts[id];
     if (state.workerOrderActiveId === id) state.workerOrderActiveId = "";
+  }
+  if (q > 0 && productPackSize(p)) {
+    if (state.pickerQtyProductId === id) {
+      const { packs, pieces } = readPickerQtyParts(id);
+      syncWorkerQtyParts(id, packs, pieces);
+    } else {
+      const split = pickerQtyToParts(q, p);
+      syncWorkerQtyParts(id, split.packs, split.pieces);
+    }
+  } else if (state.workerQtyParts) {
+    delete state.workerQtyParts[id];
   }
   const keepPicker = pickerOpen();
   scheduleBackendSave();
