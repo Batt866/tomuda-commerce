@@ -11820,14 +11820,11 @@ function xlsxOptionalNum(ref, styleId, value) {
   }
   return xlsxCellXml(ref, styleId, n, "n");
 }
+const XLSX_BARCODE_CELL_STYLE = 34; // numFmtId 49 (@) — full digits, no scientific notation
 function xlsxBarcodeCell(ref, styleId, barcode, si) {
-  const digits = String(barcode ?? "").replace(/\D/g, "");
-  if (!digits) return xlsxCellXml(ref, styleId, null, "empty");
-  const n = Number(digits);
-  if (!Number.isSafeInteger(n)) {
-    return xlsxCellXml(ref, styleId, si(digits), "s");
-  }
-  return xlsxCellXml(ref, styleId, n, "n");
+  const text = String(barcode ?? "").trim();
+  if (!text) return xlsxCellXml(ref, styleId, null, "empty");
+  return xlsxCellXml(ref, XLSX_BARCODE_CELL_STYLE, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 function buildWarehousePrepareSheetXml(orders, workerIds) {
@@ -12019,7 +12016,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.125" customWidth="1"/><col min="2" max="2" width="12.75" customWidth="1"/><col min="3" max="3" width="13.75" customWidth="1"/><col min="4" max="4" width="7.375" customWidth="1"/><col min="5" max="5" width="8.125" customWidth="1"/><col min="6" max="6" width="14.625" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="25.125" customWidth="1"/><col min="2" max="2" width="12.75" customWidth="1"/><col min="3" max="3" width="16.5" customWidth="1"/><col min="4" max="4" width="7.375" customWidth="1"/><col min="5" max="5" width="8.125" customWidth="1"/><col min="6" max="6" width="14.625" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
