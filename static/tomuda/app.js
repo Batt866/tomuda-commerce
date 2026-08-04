@@ -6804,8 +6804,14 @@ td, th { border: none; }
   font-size: 9px;
   text-align: center;
   color: ${RECEIPT_TEXT};
-  height: 15px;
-  padding: 1px 4px;
+  min-height: 18px;
+  height: auto;
+  padding: 2px 3px;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  vertical-align: middle;
 }
 .receipt-items__row { page-break-inside: avoid; break-inside: avoid; }
 .receipt-items__row td { font-size: 10px; }
@@ -6944,8 +6950,8 @@ td, th { border: none; }
 }
 .receipt-header-brand {
   display: grid;
-  grid-template-columns: 16mm minmax(0, 1fr) auto;
-  column-gap: 2.5mm;
+  grid-template-columns: 14mm minmax(0, 1fr) auto;
+  column-gap: 3mm;
   align-items: start;
   width: 100%;
   box-sizing: border-box;
@@ -6954,11 +6960,10 @@ td, th { border: none; }
   padding: 4px 4px 6px;
 }
 .receipt-logo {
-  /* Fixed 16mm — same as reference PDF; never rescale. */
-  width: 16mm !important;
-  height: 16mm !important;
-  min-width: 16mm !important;
-  max-width: 16mm !important;
+  width: 14mm !important;
+  height: 14mm !important;
+  min-width: 14mm !important;
+  max-width: 14mm !important;
   object-fit: contain;
   display: block;
   margin: 0;
@@ -6972,7 +6977,7 @@ td, th { border: none; }
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
-  padding-left: 1mm;
+  padding-left: 2mm;
   position: relative;
   z-index: 1;
 }
@@ -7288,7 +7293,7 @@ const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
 // №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
 // A = logo gutter + compact row № (narrow so names get room).
 // B labels/names; C bank values + units; D barcode/address; E–G numbers.
-const RECEIPT_XLSX_COL_WIDTHS = [4.5, 24, 9, 15, 8, 11, 14];
+const RECEIPT_XLSX_COL_WIDTHS = [5.5, 23, 10, 15, 8, 11, 14];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
   const limit = Math.max(6, Number(charsPerLine) || 12);
@@ -7382,14 +7387,11 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Logo anchored in col A; keep mark small so the № column stays narrow.
-  const logoMm = 11;
-  const emu = Math.round((logoMm / 25.4) * 914400);
-  // Small inset from left edge of column A (not into B).
-  const colOff = Math.round((0.3 / 25.4) * 914400);
-  const rowOff = Math.round((0.4 / 25.4) * 914400);
+  // Logo stays inside merged A1:A3 — twoCellAnchor prevents overlap into column B.
+  const padEmu = Math.round((0.25 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const logoRowEnd = logoRow + 2;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${padEmu}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${padEmu}</xdr:rowOff></xdr:from><xdr:to><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoRowEnd}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -7678,7 +7680,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushRow(4, emptyCells(rowNum));
   const headerRow = rowNum;
   // 7 real columns (no merges) so Excel/Numbers borders line up cleanly.
-  pushItemTableRow(14, [
+  pushItemTableRow(20, [
     xlsxCellXml(`A${headerRow}`, 7, si(""), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
@@ -7789,25 +7791,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     { grand = false, decimals = false } = {},
   ) => {
     const r = rowNum;
-    // Label A–B, amount E–G (skip unit/barcode gap — tighter vs item table).
-    merges.push(`A${r}:B${r}`, `E${r}:G${r}`);
+    // Full-width label (A–D) + amount (E–G) — no stray unit/barcode cells (avoids zigzag borders).
+    merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
     const labelStyle = grand ? 31 : 30;
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
     pushRow(15, [
       xlsxCellXml(`A${r}`, labelStyle, si(label), "s"),
       xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"),
-      ...emptyCells(r, "C", "D", labelStyle),
-      ...emptyCells(r, "F", "G", valueStyle),
     ]);
   };
   const pushSummaryTextRow = (label, value) => {
     const r = rowNum;
-    merges.push(`A${r}:B${r}`, `E${r}:G${r}`);
+    merges.push(`A${r}:D${r}`, `E${r}:G${r}`);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 30, si(label), "s"),
       xlsxCellXml(`E${r}`, 3, si(String(value ?? "")), "s"),
-      ...emptyCells(r, "C", "D", 30),
-      ...emptyCells(r, "F", "G", 3),
     ]);
   };
   const pushReceiptXlsxSignatureSection = () => {
