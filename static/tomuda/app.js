@@ -9638,9 +9638,6 @@ function productCard(p) {
   const catLine = p.category || "—";
   const packLabel = productPackLabel(p);
   const packSize = productPackSize(p);
-  const packHint = packLabel
-    ? `<span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-pack">${esc(packLabel)}</span>`
-    : "";
   const packCell = packLabel
     ? `<span class="product-card__pack" title="1 багц = ${packSize} ширхэг">${esc(packLabel)}</span>`
     : `<span class="product-card__pack product-card__pack--empty">—</span>`;
@@ -9653,7 +9650,7 @@ function productCard(p) {
   const low = isLowStock(p);
   const stock = p.stock ?? 0;
   const unit = esc(p.unit || "ш");
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__hint"><span class="product-card__hint-cat">${esc(catLine)}</span>${packHint}<span class="product-card__hint-sep" aria-hidden="true">·</span><span class="product-card__hint-code">${esc(p.barcode || "—")}</span></p></div></div><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд </span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span>${adminActions}</article>`;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл">${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
