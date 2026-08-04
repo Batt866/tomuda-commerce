@@ -7547,16 +7547,20 @@ textarea::placeholder {
   display: grid;
   grid-template-columns: var(--thumb-md) minmax(0, 1fr) auto;
   gap: 8px 10px;
-  align-items: center;
-  padding: 8px 0;
+  align-items: start;
+  padding: 10px 0;
 }
 
 .worker-selected-row__thumb {
-  align-self: center;
+  align-self: start;
+  margin-top: 2px;
 }
 
 .worker-selected-row__body {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .worker-selected-row__name {
@@ -7571,29 +7575,52 @@ textarea::placeholder {
   overflow: hidden;
 }
 
-.worker-selected-row__meta {
-  margin: 2px 0 0;
+.worker-selected-row__tags {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 2px;
   font-size: 11px;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--hex-muted-foreground);
 }
 
-.worker-selected-row__meta-sep {
-  margin: 0 3px;
-  opacity: 0.45;
+.worker-selected-row__dot {
+  margin: 0 4px;
+  opacity: 0.4;
+}
+
+.worker-selected-row__price {
+  margin: 1px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--hex-foreground);
+  font-variant-numeric: tabular-nums;
 }
 
 .worker-selected-row__total {
   color: var(--hex-primary);
-  font-weight: 700;
+  font-weight: 800;
+}
+
+.worker-selected-row__stock {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
 }
 
 .worker-selected-row__barcode {
+  margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  color: var(--hex-muted-foreground);
+  opacity: 0.85;
 }
 
 .worker-selected-row__qty {
@@ -9574,7 +9601,7 @@ textarea::placeholder {
   .worker-selected-row {
     grid-template-columns: 40px minmax(0, 1fr) minmax(44px, auto);
     gap: 6px 8px;
-    padding: 6px 0;
+    padding: 8px 0;
   }
 
   .worker-selected-row .worker-selected-row__thumb {
@@ -9587,9 +9614,21 @@ textarea::placeholder {
     -webkit-line-clamp: 2;
   }
 
-  .worker-selected-row__meta {
+  .worker-selected-row__tags {
     font-size: 10px;
-    line-height: 1.3;
+  }
+
+  .worker-selected-row__price {
+    font-size: 11px;
+  }
+
+  .worker-selected-row__stock {
+    font-size: 10px;
+    margin-left: 6px;
+  }
+
+  .worker-selected-row__barcode {
+    font-size: 9px;
   }
 
   .worker-row-edit {

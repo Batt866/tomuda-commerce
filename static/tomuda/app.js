@@ -15172,13 +15172,16 @@ function workerSelectedRow(p) {
   const packLabel = productPackLabel(p);
   const barcode = String(p.barcode || "").trim();
   const lineTotal = p.price * p.qty;
-  const packPart = packLabel
-    ? `<span class="worker-selected-row__meta-sep">·</span><span>${esc(packLabel)}</span>`
+  const tags = [
+    p.category ? `<span>${esc(p.category)}</span>` : "",
+    packLabel ? `<span>${esc(packLabel)}</span>` : "",
+  ]
+    .filter(Boolean)
+    .join('<span class="worker-selected-row__dot" aria-hidden="true">·</span>');
+  const barcodeHtml = barcode
+    ? `<p class="worker-selected-row__barcode">${esc(barcode)}</p>`
     : "";
-  const barcodePart = barcode
-    ? `<span class="worker-selected-row__meta-sep">·</span><span class="worker-selected-row__barcode">${esc(barcode)}</span>`
-    : "";
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p><p class="worker-selected-row__meta"><span>${esc(p.category || "—")}</span>${packPart}<span class="worker-selected-row__meta-sep">·</span><span>${fmt(p.price)} × ${p.qty} = <b class="worker-selected-row__total">${fmt(lineTotal)}</b></span><span class="worker-selected-row__meta-sep">·</span><span>Үлд ${remain}</span>${barcodePart}</p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price">${fmt(p.price)} × ${p.qty} = <b class="worker-selected-row__total">${fmt(lineTotal)}</b><span class="worker-selected-row__stock">Үлд ${remain}</span></p>${barcodeHtml}</div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
