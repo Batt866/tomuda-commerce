@@ -527,7 +527,7 @@ function receiptInfoRows(o) {
     receiptInfoPairRow(
       "Худалдааны төлөөлөгчийн утас:",
       f.salesPhone,
-      "Регистрийн дугаар:",
+      "Регистерийн дугаар:",
       f.customerReg,
     ),
     receiptInfoPairRow(
@@ -542,19 +542,21 @@ function receiptInfoRows(o) {
       "Утасны дугаар:",
       f.customerPhone,
     ),
-    receiptInfoPairRow("", "", "И-мэйл:", f.customerEmail),
-  ].join("");
+  ];
+  if (f.customerEmail && f.customerEmail !== "-") {
+    party.push(receiptInfoPairRow("", "", "И-мэйл:", f.customerEmail));
+  }
   const bank = [
     receiptInfoFieldRow("Дансны нэр:", "<b>ТОМУДА групп</b>"),
-    receiptInfoFieldRow("Регистрийн дугаар:", "5397987"),
+    receiptInfoFieldRow("Регистерийн дугаар:", "5397987"),
     receiptInfoFieldRow("Банкны нэр:", "Хаан банк"),
-    // IBAN: on the left; both account parts stacked together on the right.
-    `<tr class="receipt-info__row receipt-info__row--iban"><td colspan="2" class="receipt-info__iban"><span class="receipt-info__iban-label">IBAN:</span><span class="receipt-info__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b></span></td></tr>`,
+    // Sample: «Дансны дугаар: IBAN:» + two account lines.
+    `<tr class="receipt-info__row receipt-info__row--iban"><td colspan="2" class="receipt-info__iban"><span class="receipt-info__iban-label">Дансны дугаар: IBAN:</span><span class="receipt-info__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}<br>${RECEIPT_BANK_ACCOUNT}</b></span></td></tr>`,
   ].join("");
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 40)
     .map((line) => `<div class="receipt-info__address-line">${esc(line)}</div>`)
     .join("");
-  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label"><b>Хүргэлтийн хаяг:</b></div><div class="receipt-info__address-text">${addressLines}</div></div></div></div>`;
+  const info = `<div class="receipt-info" role="group" aria-label="Баримтын мэдээлэл"><div class="receipt-info__party">${party.join("")}</div><div class="receipt-info__bank"><table class="receipt-info__col receipt-info__col--left" role="presentation"><tbody>${bank}</tbody></table><div class="receipt-info__address-block"><div class="receipt-info__address-label"><b>Хүргэлтийн хаяг:</b></div><div class="receipt-info__address-text">${addressLines}</div></div></div></div>`;
   return `<tr class="receipt-grid__info-wrap"><td colspan="11" class="receipt-grid__info-cell">${info}</td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -806,8 +808,15 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
     })
     .join("");
   // Settle agreement sits as the yellow band above Урамшуулал (source zarlaga) — not repeated here.
-  const payHtml = esc(receiptPaymentTermReceiptText(o));
-  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="6" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="5" class="receipt-grid__summary-value receipt-grid__summary-value--pay">${payHtml}</td></tr>`;
+  // Sample jishee: both Бэлэн and Зээлээр shown; selected term is bold.
+  const isCredit = o?.paymentTerm === "credit";
+  const cashCls = isCredit
+    ? "receipt-grid__pay-opt"
+    : "receipt-grid__pay-opt receipt-grid__pay-opt--on";
+  const creditCls = isCredit
+    ? "receipt-grid__pay-opt receipt-grid__pay-opt--on"
+    : "receipt-grid__pay-opt";
+  const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td colspan="4" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="3" class="${cashCls}">Бэлэн</td><td colspan="4" class="${creditCls}">Зээлээр</td></tr>`;
   return summaryPart + payRow;
 }
 function SummarySection(sub, vat, payable, payTerm, o) {
@@ -829,9 +838,9 @@ function receiptGrandNote(o) {
   if (discount) return `(Хөнгөлөлт ${percentDiscountRate()}%)`;
   return "";
 }
-/** PaymentInformation — gray instruction box. */
+/** PaymentInformation — gray instruction box (source zarlaga jishee wording). */
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td colspan="11" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return `<tr class="receipt-grid__warn"><td colspan="11" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
 }
 function PaymentInformation() {
   return receiptWarningRowsHtml();
@@ -853,17 +862,16 @@ function documentSignatureBlockHtml(opts = {}) {
     `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" rowspan="2" class="doc-sign__role">${esc(role)}</td><td class="doc-sign__hint">Нэр</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr><tr class="${rowClass}">${padCell}<td class="doc-sign__hint">Гарын үсэг</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
   return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
 }
-/** SignatureSection — centered title, name/signature dotted lines. */
+/** SignatureSection — matches source zarlaga jishee (role + signature line). */
 function receiptSignatureRowsHtml(opts = {}) {
   const pushDown = !!opts.pushDown;
   const fill = pushDown
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
-  const title = `<tr class="receipt-grid__sign-title"><td colspan="11" class="receipt-grid__sign-heading">Гарын үсэг зурах хэсэг</td></tr>`;
   const block = (role) =>
-    `<tr class="receipt-grid__sign"><td colspan="2" class="receipt-grid__sign-label">${esc(role)}</td><td class="receipt-grid__sign-hint">Нэр</td><td colspan="8" class="receipt-grid__sign-line"></td></tr><tr class="receipt-grid__sign"><td colspan="2"></td><td class="receipt-grid__sign-hint">Гарын үсэг</td><td colspan="8" class="receipt-grid__sign-line"></td></tr>`;
+    `<tr class="receipt-grid__sign"><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
-  return `${fill}${title}${block("Хүлээлгэн өгсөн:")}${gap}${block("Хүлээн авсан:")}`;
+  return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -7157,6 +7165,16 @@ td, th { border: none; }
   font-size: 11px;
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; }
+.receipt-grid__pay-opt {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 400;
+  color: ${RECEIPT_TEXT};
+}
+.receipt-grid__pay-opt--on {
+  font-weight: 700;
+  text-decoration: underline;
+}
 .receipt-grid--sheet .receipt-grid__sign-line { border: none !important; border-bottom: 1px dotted #666 !important; }
 .receipt-grid__header-cell {
   padding: 0 0 4px !important;
@@ -7503,14 +7521,15 @@ function exportOrderReceiptsExcelCsv(orders) {
   excel(`zahialgiin-barimt-${stamp}.xlsx`, sheetRows);
 }
 const RECEIPT_XLSX_LAST_COL = "G";
-const RECEIPT_XLSX_TEMPLATE = "/static/tomuda/templates/receipt-template.xls";
+/** Canonical source layout (BIFF). Runtime Excel is generated to match this jishee. */
+const RECEIPT_XLSX_SOURCE_TEMPLATE =
+  "/static/tomuda/templates/zarlaga-receipt-jishee.xls";
+const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** Empty rows before header = top staple gutter (stores clip receipts there). */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 1;
-// A–G only (H–K removed). Extra empty columns were shrinking fit-to-page text.
-// №, нэр/Урамшуулал, нэгж, баркод, тоо, үнэ, нийт.
-// A = logo gutter + compact row № (narrow so names get room).
-// B labels/names; C bank values + units; D barcode/address; E–G numbers.
-const RECEIPT_XLSX_COL_WIDTHS = [9.5, 19.5, 10, 15, 8, 11, 14];
+// A–G mapped from source jishee logical columns (№, нэр, нэгж, баркод, тоо, үнэ, нийт).
+// Widths tuned from source col proportions (≈3+6+17+4+10+10+5+5+4+9+10 → 7 logical).
+const RECEIPT_XLSX_COL_WIDTHS = [3.5, 22, 10.5, 14, 6, 10, 11];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
   const limit = Math.max(6, Number(charsPerLine) || 12);
@@ -7826,7 +7845,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushMetaPairRow(
     "Худалдааны төлөөлөгчийн утас:",
     f.salesPhone,
-    "Регистрийн дугаар:",
+    "Регистерийн дугаар:",
     f.customerReg,
   );
   pushMetaPairRow(
@@ -7841,17 +7860,22 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     "Утасны дугаар:",
     f.customerPhone,
   );
-  pushMetaPairRow("", "", "И-мэйл:", f.customerEmail);
+  if (f.customerEmail && f.customerEmail !== "-" && plain(f.customerEmail)) {
+    pushMetaPairRow("", "", "И-мэйл:", f.customerEmail);
+  }
   pushRow(4, emptyCells(rowNum));
   // Bank left + delivery address in ONE right cell (not one Excel row per line).
   const addressLines = receiptWrapAddressLines(f.addressPlain || "-", 36);
   const addressBlock = ["Хүргэлтийн хаяг:", ...addressLines].join("\n");
   const bankLeft = [
     ["Дансны нэр:", "ТОМУДА групп"],
-    ["Регистрийн дугаар:", "5397987"],
+    ["Регистерийн дугаар:", "5397987"],
     ["Банкны нэр:", "Хаан банк"],
-    // Label left (IBAN:), both account parts together in C (two lines).
-    ["IBAN:", `${RECEIPT_BANK_IBAN_SHORT}\n${RECEIPT_BANK_ACCOUNT}`],
+    // Sample: label «Дансны дугаар: IBAN:», both account parts in C (two lines).
+    [
+      "Дансны дугаар: IBAN:",
+      `${RECEIPT_BANK_IBAN_SHORT}\n${RECEIPT_BANK_ACCOUNT}`,
+    ],
   ];
   const bankRowCount = bankLeft.length;
   const addrStart = rowNum;
@@ -7863,7 +7887,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   for (let i = 0; i < bankRowCount; i += 1) {
     const r = rowNum;
     const [leftLabel, leftValue] = bankLeft[i];
-    const isIban = leftLabel === "IBAN:";
+    const isIban = leftLabel.includes("IBAN");
     const valueStyle = isIban || leftValue === "ТОМУДА групп" ? 4 : 5;
     const labelStyle = isIban ? 4 : 5;
     const rowH = isIban ? Math.max(perBankRowH, 30) : perBankRowH;
@@ -7872,10 +7896,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         ? xlsxCellXml(`D${r}`, 4, si(addressBlock), "s")
         : xlsxCellXml(`D${r}`, 4, null, "empty");
     if (isIban) {
-      // B = "IBAN:", C = both numbers stacked (inlineStr keeps the line break).
+      // B = "Дансны дугаар: IBAN:", C = both numbers stacked.
       pushRow(rowH, [
         xlsxCellXml(`A${r}`, 1, null, "empty"),
-        xlsxCellXml(`B${r}`, labelStyle, si("IBAN:"), "s"),
+        xlsxCellXml(`B${r}`, labelStyle, si(leftLabel), "s"),
         xlsxCellXml(
           `C${r}`,
           valueStyle,
@@ -8034,33 +8058,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   };
   const pushReceiptXlsxSignatureSection = () => {
-    const titleRow = rowNum;
-    merges.push(`A${titleRow}:G${titleRow}`);
-    pushRow(16, [
-      xlsxCellXml(`A${titleRow}`, 18, si("Гарын үсэг зурах хэсэг"), "s"),
-      ...emptyCells(titleRow, "B", "G", 18),
-    ]);
+    // Source jishee: role label + blank signature line (no «Гарын үсэг зурах хэсэг»).
     const pushSignRole = (role) => {
-      const nameRow = rowNum;
-      merges.push(`A${nameRow}:B${nameRow}`, `C${nameRow}:G${nameRow}`);
-      pushRow(16, [
-        xlsxCellXml(`A${nameRow}`, 41, si(role), "s"),
-        xlsxCellXml(`C${nameRow}`, 17, si("Нэр"), "s"),
-        ...emptyCells(nameRow, "D", "G", 17),
-      ]);
-      const signRow = rowNum;
-      merges.push(`C${signRow}:G${signRow}`);
+      const r = rowNum;
+      merges.push(`A${r}:C${r}`, `D${r}:G${r}`);
       pushRow(18, [
-        xlsxCellXml(`A${signRow}`, 1, null, "empty"),
-        xlsxCellXml(`B${signRow}`, 35, si("Гарын үсэг"), "s"),
-        xlsxCellXml(`C${signRow}`, 17, null, "empty"),
-        ...emptyCells(signRow, "D", "G", 17),
+        xlsxCellXml(`A${r}`, 41, si(role), "s"),
+        xlsxCellXml(`D${r}`, 17, null, "empty"),
+        ...emptyCells(r, "B", "C", 41),
+        ...emptyCells(r, "E", "G", 17),
       ]);
     };
     pushRow(4, emptyCells(rowNum));
-    pushSignRole("Хүлээлгэн өгсөн:");
-    pushRow(6, emptyCells(rowNum));
-    pushSignRole("Хүлээн авсан:");
+    pushSignRole("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
+    pushRow(8, emptyCells(rowNum));
+    pushSignRole("Хүлээн авсан ажилтны гарын үсэг:");
   };
   items.forEach((item, index) => pushItemLikeRow(item, index));
   // Source zarlaga: return note, then yellow settle, then Урамшуулал.
@@ -8092,7 +8104,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ? `Таны нийт төлөх дүн ${grandNote}`
     : "Таны нийт төлөх дүн";
   pushSummaryAmountRow(grandLabel, payable, { grand: true });
-  pushSummaryTextRow("Төлбөрийн нөхцөл", receiptPaymentTermReceiptText(o));
+  {
+    // Source jishee: Төлбөрийн нөхцөл | Бэлэн | Зээлээр
+    const r = rowNum;
+    const isCredit = o.paymentTerm === "credit";
+    merges.push(`A${r}:C${r}`, `D${r}:E${r}`, `F${r}:G${r}`);
+    pushRow(15, [
+      xlsxCellXml(`A${r}`, 30, si("Төлбөрийн нөхцөл"), "s"),
+      xlsxCellXml(`D${r}`, isCredit ? 3 : 15, si("Бэлэн"), "s"),
+      xlsxCellXml(`F${r}`, isCredit ? 15 : 3, si("Зээлээр"), "s"),
+      ...emptyCells(r, "B", "C", 30),
+      ...emptyCells(r, "E", "E", isCredit ? 3 : 15),
+      ...emptyCells(r, "G", "G", isCredit ? 15 : 3),
+    ]);
+  }
   [
     [
       "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.",
@@ -8100,11 +8125,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ],
     ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.", 23],
     [
-      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно",
+      "Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч компани хариуцахгүй болно",
       22,
     ],
     [
-      "Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!",
+      "Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!",
       22,
     ],
   ].forEach(([text, style], index) => {
@@ -8377,11 +8402,30 @@ function orderReceiptExportSnapshots(
   employeeIds = [],
   opts = {},
 ) {
-  const filtered = orderReceiptRowsFiltered(searchKey, employeeIds, opts);
+  const filtered = orderReceiptRowsFiltered(searchKey, employeeIds, {
+    ...opts,
+    // Delivery is stamped onto the receipt at snapshot time — never use it to
+    // drop checked orders from the export list.
+    deliveryIds: [],
+  });
   const selectedIds = idList(state.receiptPrintOrderIds);
-  if (selectedIds.length) {
-    const picked = filtered.filter((o) => selectedIds.includes(String(o.id)));
+  const workerIds = idList(opts.workerIds || employeeIds);
+  const selectionMode =
+    !!opts.requireWorkerScope ||
+    !!opts.requireSelection ||
+    workerIds.length > 0 ||
+    selectedIds.length > 0;
+
+  if (selectionMode) {
+    if (!selectedIds.length) return [];
+    const selected = new Set(selectedIds);
+    const picked = filtered.filter((o) => selected.has(String(o.id)));
     if (picked.length) return picked.map(orderReceiptSnapshot);
+    // Fall back to raw order lookup so a stale filter cannot empty a valid check.
+    return selectedIds
+      .map((id) => state.orders.find((o) => String(o.id) === id))
+      .filter(Boolean)
+      .map(orderReceiptSnapshot);
   }
   return filtered.map(orderReceiptSnapshot);
 }
@@ -8412,10 +8456,15 @@ function confirmWarehouseReceiptsExcel(
   ) {
     return;
   }
+  const workerIds = receiptPrintWorkerIds();
+  if (workerIds.length && !idList(state.receiptPrintOrderIds).length) {
+    return alert("Мэдээлэл татах баримтуудаа ✓ check хийнэ үү");
+  }
   confirmOrderReceiptsExcel(searchKey, employeeIds, {
-    workerIds: receiptPrintWorkerIds(),
-    deliveryIds: receiptPrintDeliveryIds(),
-    requireWorkerScope: receiptPrintWorkerIds().length > 0,
+    workerIds,
+    // Do not filter by deliveryIds — түгээгч is applied when building each sheet.
+    requireWorkerScope: workerIds.length > 0,
+    requireSelection: workerIds.length > 0,
   });
 }
 function confirmOrderReceiptsExcel(
@@ -8435,12 +8484,16 @@ function confirmOrderReceiptsExcel(
   const rows = orderReceiptExportSnapshots(searchKey, employeeIds, opts);
   if (!rows.length) {
     return alert(
-      idList(state.receiptPrintOrderIds).length
-        ? "Мэдээлэл татах захиалга сонгоно уу"
+      idList(state.receiptPrintOrderIds).length || opts.requireSelection
+        ? "Мэдээлэл татах баримтуудаа ✓ check хийнэ үү"
         : "Захиалга олдсонгүй",
     );
   }
-  confirmDataExport("Мэдээлэл татах", () => exportOrderReceiptsExcel(rows));
+  confirmDataExport(
+    "Мэдээлэл татах",
+    () => exportOrderReceiptsExcel(rows),
+    `${rows.length} баримт татах уу?`,
+  );
 }
 function confirmSingleOrderReceiptExcel(orderId) {
   const o = state.orders.find((x) => x.id === orderId);

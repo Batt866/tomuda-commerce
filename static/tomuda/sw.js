@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v391";
+const CACHE = "tomuda-v393";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
@@ -6,6 +6,7 @@ const PRECACHE = [
   "/static/tomuda/vendor/tailwindcdn.js",
   "/static/tomuda/templates/warehouse-prepare-template.xls",
   "/static/tomuda/templates/receipt-template.xls",
+  "/static/tomuda/templates/zarlaga-receipt-jishee.xls",
   "/manifest.webmanifest",
   "/static/tomuda/icons/icon-192.png?v=20260630-logo",
   "/static/tomuda/icons/icon-512.png?v=20260630-logo",
