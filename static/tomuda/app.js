@@ -2632,6 +2632,7 @@ function orderEmailFields(emp) {
     createdByEmail: state.currentEmployee?.email || actor.email || "",
   };
 }
+const DELIVERY_MARK_ACTION_LABEL = "Хүргэлтийг баталгаажуулах";
 const status = (s) =>
   ({
     pending: "Хүлээгдэж буй",
@@ -2754,10 +2755,10 @@ function confirmMarkOrderDelivered(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || !canMarkOrderDelivered(o)) return;
   confirmModal(
-    "Хүргэлт",
-    `${esc(o.customerName || "Захиалга")} хүргэгдсэн гэж тэмдэглэх үү?`,
+    "",
+    `<strong>${esc(o.customerName || "Захиалга")}</strong> бараа хүргэснийг баталгаажуулах уу?`,
     {
-      confirmLabel: "Хүргэсэн",
+      confirmLabel: "Тийм",
       onConfirm: () => markOrderDelivered(id),
     },
   );
@@ -8241,7 +8242,7 @@ function warehouseOrderStatusActions(o) {
   if (o.status === "pending") {
     let html = `<button type="button" onclick="setOrder('${o.id}','confirmed')" class="btn btn--sm tone tone--success">Батлах</button>`;
     if (canMarkOrderDelivered(o)) {
-      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
+      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">${DELIVERY_MARK_ACTION_LABEL}</button>`;
     }
     if (canDelete())
       html += `<button type="button" onclick="confirmCancelOrder('${o.id}')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
@@ -8250,7 +8251,7 @@ function warehouseOrderStatusActions(o) {
   if (o.status === "confirmed") {
     let html = "";
     if (canMarkOrderDelivered(o)) {
-      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">Хүргэсэн</button>`;
+      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">${DELIVERY_MARK_ACTION_LABEL}</button>`;
     }
     if (canConfirmOrderDelivery(o)) {
       html += `<button type="button" onclick="confirmOrderDeliveryModal('${o.id}')" class="btn btn--sm tone tone--success">Баталгаажуулах</button>`;
@@ -14196,13 +14197,13 @@ function deliveryStoreCardMarkAction(customerId) {
   if (!markable.length) return "";
   if (markable.length === 1) {
     const id = esc(markable[0].id);
-    return `<button type="button" class="delivery-store-card__mark btn btn--sm tone tone--info" onclick="event.stopPropagation();confirmMarkOrderDelivered('${id}')">Хүргэсэн</button>`;
+    return `<button type="button" class="delivery-store-card__mark btn btn--sm tone tone--info" onclick="event.stopPropagation();confirmMarkOrderDelivered('${id}')">${DELIVERY_MARK_ACTION_LABEL}</button>`;
   }
   return `<span class="delivery-store-card__mark-note">${markable.length} захиалга хүлээж байна</span>`;
 }
 function deliveryOrderRowActions(o) {
   if (canMarkOrderDelivered(o)) {
-    return `<button type="button" onclick="event.stopPropagation();confirmMarkOrderDelivered('${esc(o.id)}')" class="delivery-order-row__mark btn btn--sm tone tone--info">Хүргэсэн</button>`;
+    return `<button type="button" onclick="event.stopPropagation();confirmMarkOrderDelivered('${esc(o.id)}')" class="delivery-order-row__mark btn btn--sm tone tone--info">${DELIVERY_MARK_ACTION_LABEL}</button>`;
   }
   if (isOrderDeliveryMarked(o)) {
     return `<span class="delivery-order-row__marked">Хүргэсэн</span>`;
@@ -18005,7 +18006,23 @@ function showConfirmCard({
   const noBtn = overlay.querySelector("#confirm-card-no");
   const closeBtn = overlay.querySelector("#confirm-card-close");
   const actions = overlay.querySelector(".confirm-card__actions");
-  if (titleEl) titleEl.textContent = title || "";
+  if (titleEl) {
+    titleEl.textContent = title || "";
+    titleEl.hidden = !String(title || "").trim();
+  }
+  const head = overlay.querySelector(".confirm-card__head");
+  if (head) {
+    head.hidden = !String(title || "").trim() && !closable;
+  }
+  const dialog = overlay.querySelector(".confirm-card");
+  if (dialog) {
+    if (String(title || "").trim()) {
+      dialog.setAttribute("aria-labelledby", "confirm-card-title");
+    } else {
+      dialog.removeAttribute("aria-labelledby");
+      dialog.setAttribute("aria-describedby", "confirm-card-message");
+    }
+  }
   if (messageEl) messageEl.innerHTML = message || "";
   if (yesBtn) {
     yesBtn.textContent = confirmLabel || "Тийм";
