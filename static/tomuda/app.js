@@ -15169,7 +15169,13 @@ function workerNewOrderStep(cart) {
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
   const remain = Math.max(0, (Number(p.stock) || 0) - p.qty);
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(p.name)}</p><p class="worker-row-meta text-xs text-muted-foreground">${esc(p.category)} · ${fmt(p.price)} × ${p.qty} = <b class="text-primary">${fmt(p.price * p.qty)}</b> · Үлд ${remain}</p></div>${workerOrderQtyHtml(p, p.qty)}</div>`;
+  const packLabel = productPackLabel(p);
+  const barcode = String(p.barcode || "").trim() || "—";
+  const lineTotal = p.price * p.qty;
+  const packStat = packLabel
+    ? `<div class="worker-selected-row__stat"><dt>Багц</dt><dd>${esc(packLabel)}</dd></div>`
+    : "";
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p><dl class="worker-selected-row__stats"><div class="worker-selected-row__stat"><dt>Ангилал</dt><dd>${esc(p.category || "—")}</dd></div>${packStat}<div class="worker-selected-row__stat"><dt>Үнэ</dt><dd>${fmt(p.price)}</dd></div><div class="worker-selected-row__stat"><dt>Тоо</dt><dd>${p.qty} ш</dd></div><div class="worker-selected-row__stat worker-selected-row__stat--total"><dt>Нийт</dt><dd>${fmt(lineTotal)}</dd></div><div class="worker-selected-row__stat"><dt>Үлд.</dt><dd>${remain} ш</dd></div><div class="worker-selected-row__stat worker-selected-row__stat--barcode"><dt>Баркод</dt><dd>${esc(barcode)}</dd></div></dl></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
