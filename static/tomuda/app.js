@@ -839,15 +839,15 @@ function receiptNoticeBoxHtml() {
 function documentSignatureBlockHtml(opts = {}) {
   const padLeft = opts.padLeft !== false;
   const roleColspan = Number(opts.roleColspan) || 2;
-  const lineColspan = Number(opts.lineColspan) || 7;
+  const lineColspan = Number(opts.lineColspan) || 8;
   const rowClass = esc(opts.rowClass || "doc-sign__row");
   const padCell = padLeft ? "<td></td>" : "";
-  const totalCols = (padLeft ? 1 : 0) + roleColspan + 1 + lineColspan;
+  const totalCols = (padLeft ? 1 : 0) + roleColspan + lineColspan;
   const block = (role) =>
-    `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" rowspan="2" class="doc-sign__role">${esc(role)}</td><td class="doc-sign__hint">Нэр</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr><tr class="${rowClass}">${padCell}<td class="doc-sign__hint">Гарын үсэг</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
+    `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" class="doc-sign__role">${esc(role)}</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
   return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
 }
-/** SignatureSection — sample R51/R53: B:E role, F:J line. */
+/** SignatureSection — sample R51/R53: role + blank line only (no title / Нэр / Гарын үсэг hints). */
 function receiptSignatureRowsHtml(opts = {}) {
   const pushDown = !!opts.pushDown;
   const fill = pushDown
@@ -7436,22 +7436,6 @@ td, th { border: none; }
 .receipt-grid__warn-line:last-child,
 .receipt-grid__warn-line--last { margin-bottom: 0; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
-.receipt-grid__sign-heading {
-  text-align: center;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 0 6px;
-  color: ${RECEIPT_TEXT};
-}
-.receipt-grid__sign-hint {
-  font-size: 10px;
-  font-weight: 400;
-  padding: 0 4px 1px 0;
-  vertical-align: bottom;
-  white-space: nowrap;
-  width: 1%;
-  color: ${RECEIPT_TEXT};
-}
 .receipt-grid__sign-label {
   font-size: 10px;
   font-weight: 400;
@@ -10587,7 +10571,7 @@ function stockInReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________ (гарын үсэг)</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________ (гарын үсэг)</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -10660,8 +10644,8 @@ table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; 
 <tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount)}</td></tr>
-<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________ (гарын үсэг)</td></tr>
-<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________ (гарын үсэг)</td></tr>
+<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -11781,56 +11765,25 @@ function buildCountSheetXml() {
   pushRow(null, [
     xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтан:"), "s"),
     xlsxCellXml(`B${sign1}`, 17, null, "empty"),
-    xlsxCellXml(
-      `C${sign1}`,
-      18,
-      si("/...................................................../"),
-      "s",
-    ),
-    xlsxCellXml(`D${sign1}`, 18, null, "empty"),
-    xlsxCellXml(`E${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`C${sign1}`, 17, null, "empty"),
+    xlsxCellXml(`D${sign1}`, 17, null, "empty"),
+    xlsxCellXml(`E${sign1}`, 17, null, "empty"),
     xlsxCellXml(`F${sign1}`, 1, null, "empty"),
     xlsxCellXml(`G${sign1}`, 1, null, "empty"),
     xlsxCellXml(`H${sign1}`, 1, null, "empty"),
   ]);
-  const sign2 = rowNum;
-  merges.push(`C${sign2}:E${sign2}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign2}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign2}`, 12, null, "empty"),
-    xlsxCellXml(`C${sign2}`, 16, si("гарын үсэг"), "s"),
-    xlsxCellXml(`D${sign2}`, 16, null, "empty"),
-    xlsxCellXml(`E${sign2}`, 16, null, "empty"),
-    xlsxCellXml(`F${sign2}`, 1, null, "empty"),
-    xlsxCellXml(`G${sign2}`, 1, null, "empty"),
-    xlsxCellXml(`H${sign2}`, 1, null, "empty"),
-  ]);
+  pushRow(16.5, emptyCells(rowNum));
   const sign3 = rowNum;
   merges.push(`A${sign3}:B${sign3}`, `C${sign3}:E${sign3}`);
   pushRow(null, [
     xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан ажилтан:"), "s"),
     xlsxCellXml(`B${sign3}`, 17, null, "empty"),
-    xlsxCellXml(
-      `C${sign3}`,
-      18,
-      si("/...................................................../"),
-      "s",
-    ),
-    xlsxCellXml(`D${sign3}`, 18, null, "empty"),
-    xlsxCellXml(`E${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`C${sign3}`, 17, null, "empty"),
+    xlsxCellXml(`D${sign3}`, 17, null, "empty"),
+    xlsxCellXml(`E${sign3}`, 17, null, "empty"),
     xlsxCellXml(`F${sign3}`, 1, null, "empty"),
     xlsxCellXml(`G${sign3}`, 1, null, "empty"),
     xlsxCellXml(`H${sign3}`, 1, null, "empty"),
-  ]);
-  const sign4 = rowNum;
-  merges.push(`C${sign4}:E${sign4}`);
-  pushRow(null, [
-    xlsxCellXml(`C${sign4}`, 16, si("гарын үсэг"), "s"),
-    xlsxCellXml(`D${sign4}`, 16, null, "empty"),
-    xlsxCellXml(`E${sign4}`, 16, null, "empty"),
-    xlsxCellXml(`F${sign4}`, 1, null, "empty"),
-    xlsxCellXml(`G${sign4}`, 1, null, "empty"),
-    xlsxCellXml(`H${sign4}`, 1, null, "empty"),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -11980,57 +11933,19 @@ function buildStockInSheetXml(receipt) {
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
   const sign1 = rowNum;
-  merges.push(`C${sign1}:G${sign1}`);
+  merges.push(`B${sign1}:G${sign1}`);
   pushRow(null, [
     xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн:"), "s"),
-    xlsxCellXml(`B${sign1}`, 18, si("Нэр"), "s"),
-    xlsxCellXml(
-      `C${sign1}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    ...emptyCells(sign1, "D", STOCK_IN_LAST_COL, 18),
-  ]);
-  const sign2 = rowNum;
-  merges.push(`C${sign2}:G${sign2}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign2}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign2}`, 6, si("Гарын үсэг"), "s"),
-    xlsxCellXml(
-      `C${sign2}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    ...emptyCells(sign2, "D", STOCK_IN_LAST_COL, 18),
+    xlsxCellXml(`B${sign1}`, 17, null, "empty"),
+    ...emptyCells(sign1, "C", STOCK_IN_LAST_COL, 17),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
   const sign3 = rowNum;
-  merges.push(`C${sign3}:G${sign3}`);
+  merges.push(`B${sign3}:G${sign3}`);
   pushRow(null, [
     xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан:"), "s"),
-    xlsxCellXml(`B${sign3}`, 18, si("Нэр"), "s"),
-    xlsxCellXml(
-      `C${sign3}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    ...emptyCells(sign3, "D", STOCK_IN_LAST_COL, 18),
-  ]);
-  const sign4 = rowNum;
-  merges.push(`C${sign4}:G${sign4}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign4}`, 12, null, "empty"),
-    xlsxCellXml(`B${sign4}`, 6, si("Гарын үсэг"), "s"),
-    xlsxCellXml(
-      `C${sign4}`,
-      18,
-      si("...................................................."),
-      "s",
-    ),
-    ...emptyCells(sign4, "D", STOCK_IN_LAST_COL, 18),
+    xlsxCellXml(`B${sign3}`, 17, null, "empty"),
+    ...emptyCells(sign3, "C", STOCK_IN_LAST_COL, 17),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -12407,20 +12322,11 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const pushWarehousePrepareSignatureBlock = (role) => {
-    const nameRow = rowNum;
-    merges.push(`C${nameRow}:E${nameRow}`);
+    const r = rowNum;
+    merges.push(`B${r}:E${r}`);
     pushRow(18, [
-      xlsxCellXml(`A${nameRow}`, 3, si(role), "s"),
-      xlsxCellXml(`B${nameRow}`, 4, si("Нэр"), "s"),
-      xlsxCellXml(`C${nameRow}`, 17, null, "empty"),
-    ]);
-    pushRow(8.25, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-    const signRow = rowNum;
-    merges.push(`C${signRow}:E${signRow}`);
-    pushRow(18, [
-      xlsxCellXml(`A${signRow}`, 12, null, "empty"),
-      xlsxCellXml(`B${signRow}`, 4, si("Гарын үсэг"), "s"),
-      xlsxCellXml(`C${signRow}`, 17, null, "empty"),
+      xlsxCellXml(`A${r}`, 3, si(role), "s"),
+      xlsxCellXml(`B${r}`, 17, null, "empty"),
     ]);
   };
   pushWarehousePrepareSignatureBlock("Хүлээлгэн өгсөн ажилтан:");
@@ -12528,13 +12434,9 @@ ${workerRows}
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line"></td></tr>
-<tr class="sign-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line"></td></tr>
+<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td></tr>
 <tr class="sign-block-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td class="sign-hint">Нэр</td><td colspan="4" class="sign-line"></td></tr>
-<tr class="sign-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td></td><td class="sign-hint">Гарын үсэг</td><td colspan="4" class="sign-line"></td></tr>
+<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
