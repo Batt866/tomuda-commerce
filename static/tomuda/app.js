@@ -8073,14 +8073,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   merges.push(`B${grossRow}:D${grossRow}`);
   pushRow(14.25, [
     xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
-    // Style 13 = top+bottom dotted (borderId 5) — spans past Тоо/ш to amount
-    xlsxCellXml(`E${grossRow}`, 13, null, "empty"),
-    xlsxCellXml(`F${grossRow}`, 13, null, "empty"),
-    xlsxCellXml(`G${grossRow}`, 13, null, "empty"),
-    xlsxCellXml(`H${grossRow}`, 13, null, "empty"),
-    xlsxCellXml(`I${grossRow}`, 13, null, "empty"),
-    xlsxCellXml(`J${grossRow}`, 13, null, "empty"),
-    xlsxCellXml(`K${grossRow}`, 33, Number(gross) || 0, "n"),
+    // Style 12 = top+bottom + #,##0 number band through Тоо/ш
+    xlsxCellXml(`E${grossRow}`, 12, null, "empty"),
+    xlsxCellXml(`F${grossRow}`, 12, null, "empty"),
+    xlsxCellXml(`G${grossRow}`, 12, null, "empty"),
+    xlsxCellXml(`H${grossRow}`, 12, null, "empty"),
+    xlsxCellXml(`I${grossRow}`, 12, null, "empty"),
+    xlsxCellXml(`J${grossRow}`, 12, null, "empty"),
+    // Style 32 = gray fill + top/bottom + #,##0 (not 33 = green badge)
+    xlsxCellXml(`K${grossRow}`, 32, Number(gross) || 0, "n"),
     ...emptyCells(grossRow, "C", "D", 19),
   ]);
 
@@ -8120,15 +8121,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     if (grand && note) {
       merges.push(`B${r}:D${r}`);
       const labelStyle = 31;
-      const valueStyle = 33;
+      const valueStyle = 32; // gray + #,##0 — never 33 (green badge)
       pushRow(21.75, [
         xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
         xlsxCellXml(`E${r}`, 30, si(note), "s"),
-        xlsxCellXml(`F${r}`, 30, null, "empty"),
-        xlsxCellXml(`G${r}`, 30, null, "empty"),
-        xlsxCellXml(`H${r}`, 30, null, "empty"),
-        xlsxCellXml(`I${r}`, 30, null, "empty"),
-        xlsxCellXml(`J${r}`, 30, null, "empty"),
+        xlsxCellXml(`F${r}`, 12, null, "empty"),
+        xlsxCellXml(`G${r}`, 12, null, "empty"),
+        xlsxCellXml(`H${r}`, 12, null, "empty"),
+        xlsxCellXml(`I${r}`, 12, null, "empty"),
+        xlsxCellXml(`J${r}`, 12, null, "empty"),
         xlsxCellXml(`K${r}`, valueStyle, Number(amount) || 0, "n"),
         ...emptyCells(r, "C", "D", labelStyle),
       ]);
@@ -8136,8 +8137,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     }
     merges.push(`B${r}:D${r}`, `E${r}:K${r}`);
     const labelStyle = grand ? 31 : 30;
-    // 30/13 = top+bottom dotted across E:K (keep F–K cells written — see filterXlsx…)
-    const valueStyle = grand ? 33 : decimals ? 30 : 13;
+    // 32 = grand gray+#; 29 = #,##0.00; 12 = #,##0 — all real Excel numbers
+    const valueStyle = grand ? 32 : decimals ? 29 : 12;
     pushRow(grand ? 21.75 : 14.25, [
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
       xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"),
