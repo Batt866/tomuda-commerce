@@ -2256,140 +2256,130 @@ img[data-product-img],
   }
 
   .product-card {
-    grid-template-columns: 76px minmax(0, 1fr) auto;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
     grid-template-areas:
       "img copy actions"
-      "img fields fields";
-    gap: 10px 12px;
+      "fields fields fields";
+    gap: 8px 10px;
     padding: 12px 14px;
     border-radius: 0;
     border: none;
     border-bottom: 1px solid var(--hex-border);
     margin-bottom: 0;
+    align-items: start;
   }
 
   .product-list--readonly .product-card {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
     grid-template-areas:
       "img copy"
-      "img fields";
+      "fields fields";
   }
 
   .product-card__img {
-    width: 76px;
-    height: 76px;
+    width: 56px;
+    height: 56px;
     border-radius: 10px;
-    padding: 5px;
+    padding: 4px;
+  }
+
+  .product-card__copy {
+    padding-top: 0;
+    gap: 2px;
+  }
+
+  .product-card__title {
+    font-size: 14px;
+    -webkit-line-clamp: 2;
+  }
+
+  .product-card__subtitle {
+    font-size: 12px;
+  }
+
+  .product-card__actions {
+    grid-area: actions;
+    flex-direction: row;
+    gap: 6px;
+    align-self: start;
+  }
+
+  .product-card__action-btn {
+    min-width: 36px;
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .product-card__action-btn .ui-icon {
+    width: 18px;
+    height: 18px;
   }
 
   .product-card__fields {
     grid-area: fields;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
     width: 100%;
+    min-width: 0;
+  }
+
+  .product-card__cat {
+    display: none;
   }
 
   .product-card__facts {
     display: contents;
   }
 
-  .product-card__pack {
-    grid-row: 1;
-    grid-column: 1;
-  }
-
-  .product-card__price {
-    grid-row: 1;
-    grid-column: 2;
-  }
-
-  .product-card__stock {
-    grid-row: 1;
-    grid-column: 3;
-  }
-
-  .product-card__barcode {
-    grid-row: 2;
-    grid-column: 1 / -1;
-  }
-
-  .product-list--show-cost .product-card__cost {
-    grid-row: 2;
-    grid-column: 1;
-  }
-
-  .product-list--show-cost .product-card__barcode {
-    grid-row: 2;
-    grid-column: 2 / -1;
-  }
-
   .product-card__pack,
   .product-card__price,
   .product-card__cost,
-  .product-card__stock {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    min-height: 54px;
-    padding: 6px 8px;
-    border-radius: 10px;
-    background: var(--hex-secondary);
-    text-align: center;
-    font-size: 13px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-  }
-
-  .product-card__pack {
-    color: var(--hex-primary);
-    background: color-mix(in srgb, var(--hex-primary) 10%, var(--hex-card));
-    border: 1px solid color-mix(in srgb, var(--hex-primary) 16%, transparent);
-  }
-
-  .product-card__pack--empty {
-    color: var(--hex-muted-foreground);
-    font-weight: 500;
-    opacity: 0.55;
-    border-color: var(--hex-border);
-    background: var(--hex-secondary);
+  .product-card__stock,
+  .product-card__barcode {
+    display: block;
+    margin: 0;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    text-align: left;
+    line-height: 1.3;
   }
 
   .product-card__pack::before,
   .product-card__price::before,
   .product-card__cost::before,
-  .product-card__stock::before {
-    display: block;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    opacity: 0.62;
-    line-height: 1.2;
-  }
-
-  .product-card__pack::before {
-    content: "Багц";
-  }
-
-  .product-card__price::before {
-    content: "Үнэ";
-  }
-
-  .product-card__cost::before {
-    content: "Өртөг";
-    margin-right: 0;
-  }
-
-  .product-card__stock::before {
-    content: "Үлдэгдэл";
+  .product-card__stock::before,
+  .product-card__barcode::before {
+    content: none;
+    display: none;
   }
 
   .product-card__price {
+    order: 1;
+    font-size: 15px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
     color: var(--hex-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .product-card__stock {
+    order: 2;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--hex-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--hex-foreground);
   }
 
   .product-card__stock.is-low {
@@ -2397,47 +2387,48 @@ img[data-product-img],
     color: var(--hex-warning-text);
   }
 
-  .product-card__barcode {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 2px;
-    grid-column: 1 / -1;
-    min-height: 36px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--hex-secondary) 80%, var(--hex-card));
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  .product-card__pack {
+    order: 3;
     font-size: 12px;
+    font-weight: 600;
+    color: var(--hex-muted-foreground);
+  }
+
+  .product-card__pack--empty {
+    display: none;
+  }
+
+  .product-card__cost {
+    display: none;
+  }
+
+  .product-list--show-cost .product-card__cost {
+    display: inline;
+    order: 4;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--hex-muted-foreground);
+  }
+
+  .product-list--show-cost .product-card__cost::before {
+    content: "Өртөг ";
+    display: inline;
+    font-weight: 500;
+    opacity: 0.7;
+  }
+
+  .product-card__barcode {
+    order: 5;
+    flex: 1 1 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--hex-muted-foreground);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .product-card__barcode::before {
-    content: "Баркод";
-    font-family: var(--font-sans, system-ui, sans-serif);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    opacity: 0.62;
-  }
-
-  .product-card__cat {
-    display: none;
-  }
-
-  .product-card__actions {
-    grid-area: actions;
-    gap: 6px;
-    align-self: start;
-  }
-
-  .product-card__action-btn {
-    border-radius: 10px;
   }
 }
 
@@ -2449,28 +2440,28 @@ img[data-product-img],
   }
 
   .product-card__img {
-    width: 68px;
-    height: 68px;
+    width: 52px;
+    height: 52px;
   }
 
   .product-card__title {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .product-card__subtitle {
     font-size: 11px;
   }
 
-  .product-card__fields {
-    gap: 6px;
+  .product-card__price {
+    font-size: 14px;
   }
 
-  .product-card__pack,
-  .product-card__price,
-  .product-card__cost,
   .product-card__stock {
-    min-height: 50px;
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .product-card__barcode {
+    font-size: 10px;
   }
 }
 
