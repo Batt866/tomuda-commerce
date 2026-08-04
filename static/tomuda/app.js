@@ -12117,17 +12117,11 @@ function xlsxBarcodeCell(ref, styleId, barcode, si) {
 function warehousePrepareBarcodeCell(ref, barcode, si) {
   const text = String(barcode ?? "").trim();
   if (!text) return xlsxCellXml(ref, 9, null, "empty");
-  if (/^\d+$/.test(text)) {
-    const asNum = Number(text);
-    if (Number.isFinite(asNum) && String(asNum) === text) {
-      return xlsxCellXml(ref, 9, asNum, "n");
-    }
-  }
-  return xlsxCellXml(ref, 9, si(text), "s");
+  return xlsxCellXml(ref, 9, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 const WAREHOUSE_PREPARE_COL_WIDTHS = [
-  25.12890625, 12.74609375, 13.73046875, 7.35546875, 8.08984375, 14.5859375,
+  24, 11, 21, 8, 10, 14,
 ];
 function warehousePreparePatchStylesXml(stylesXml) {
   const numStyle =
@@ -12182,12 +12176,12 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     );
     rowNum += 1;
   };
-  const warehousePrepareMetaRow = (row, label, value, dateText) => [
+  const warehousePrepareMetaRow = (row, label, value, dateLabel, dateValue) => [
     xlsxCellXml(`A${row}`, 3, si(label), "s"),
     xlsxCellXml(`B${row}`, 4, si(value), "s"),
     xlsxCellXml(`C${row}`, 5, null, "empty"),
-    xlsxCellXml(`D${row}`, 6, null, "empty"),
-    xlsxCellXml(`E${row}`, 14, si(dateText), "s"),
+    xlsxCellXml(`D${row}`, 12, si(dateLabel), "s"),
+    xlsxCellXml(`E${row}`, 4, si(String(dateValue || "").trim()), "s"),
   ];
   const warehousePrepareWorkerExtraRow = (row, name) => [
     xlsxCellXml(`A${row}`, 6, null, "empty"),
@@ -12231,7 +12225,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       metaRow1,
       "Агуулахын ажилтан:",
       warehouseEmp,
-      `Захиалгын огноо:${orderDateValue}`,
+      "Захиалгын огноо:",
+      orderDateValue,
     ),
   );
   if (workerNames.length) {
@@ -12243,7 +12238,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         metaRow2,
         "Захиалга авсан ажилтан:",
         workerNames[0],
-        `Хэвлэсэн огноо:${printedDateValue}`,
+        "Хэвлэсэн огноо:",
+        printedDateValue,
       ),
     );
     for (let i = 1; i < workerNames.length; i += 1) {
@@ -12258,7 +12254,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         metaRow2,
         "Захиалга авсан ажилтан:",
         "-",
-        `Хэвлэсэн огноо:${printedDateValue}`,
+        "Хэвлэсэн огноо:",
+        printedDateValue,
       ),
     );
   }
@@ -12369,8 +12366,10 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const stamp = new Date().toISOString().slice(0, 10);
   const warehouseEmp = state.currentEmployee?.name || "-";
-  const orderDateText = `Захиалгын огноо:${warehouseSheetDateValue(state.filters.warehouseDate || todayIso())}`;
-  const printedDateText = `Хэвлэсэн огноо:${warehouseSheetDateValue(todayIso())}`;
+  const orderDateValue = warehouseSheetDateValue(
+    state.filters.warehouseDate || todayIso(),
+  ).trim();
+  const printedDateValue = warehouseSheetDateValue(todayIso()).trim();
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
@@ -12380,10 +12379,10 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? workerNames
         .map(
           (name, idx) =>
-            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td colspan="4" class="date">${h(printedDateText)}</td>` : "<td></td><td></td><td></td><td></td>"}</tr>`,
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue)}</td>` : "<td></td><td></td><td></td><td></td>"}</tr>`,
         )
         .join("")
-    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td colspan="4" class="date">${h(printedDateText)}</td></tr>`;
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue)}</td></tr>`;
   const renderGroupRows = (groups) =>
     groups
       .map((item) => {
@@ -12411,8 +12410,9 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .prepare td:first-child { overflow-wrap: anywhere; }
 .title { height: 72px; text-align: center; font-size: 32px; font-weight: 800; }
 .meta-label { text-align: right; font-weight: 700; white-space: nowrap; }
-.meta-value { font-weight: 400; }
-.date { text-align: center; font-size: 20px; }
+.meta-value { font-weight: 400; white-space: nowrap; }
+.date-label { text-align: right; font-weight: 700; white-space: nowrap; }
+.date-value { text-align: left; white-space: nowrap; }
 .blank td { height: 30px; }
 .head th { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: 2px solid #000; }
 .cat { text-align: center; font-weight: 800; height: 36px; }
@@ -12428,7 +12428,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
 <tr><td colspan="6" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td colspan="4" class="date">${h(orderDateText)}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="2" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
