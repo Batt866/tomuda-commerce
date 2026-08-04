@@ -15169,16 +15169,7 @@ function workerNewOrderStep(cart) {
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
   const remain = Math.max(0, (Number(p.stock) || 0) - p.qty);
-  const packLabel = productPackLabel(p);
-  const barcode = String(p.barcode || "").trim();
-  const lineTotal = p.price * p.qty;
-  const packPart = packLabel
-    ? `<span class="worker-selected-row__meta-sep">·</span><span>${esc(packLabel)}</span>`
-    : "";
-  const barcodePart = barcode
-    ? `<span class="worker-selected-row__meta-sep">·</span><span class="worker-selected-row__barcode">${esc(barcode)}</span>`
-    : "";
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p><p class="worker-selected-row__meta"><span>${esc(p.category || "—")}</span>${packPart}<span class="worker-selected-row__meta-sep">·</span><span>${fmt(p.price)} × ${p.qty} = <b class="worker-selected-row__total">${fmt(lineTotal)}</b></span><span class="worker-selected-row__meta-sep">·</span><span>Үлд ${remain}</span>${barcodePart}</p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate">${esc(p.name)}</p><p class="worker-row-meta text-xs text-muted-foreground">${esc(p.category)} · ${fmt(p.price)} × ${p.qty} = <b class="text-primary">${fmt(p.price * p.qty)}</b> · Үлд ${remain}</p></div>${workerOrderQtyHtml(p, p.qty)}</div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
