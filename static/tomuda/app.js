@@ -873,8 +873,11 @@ function receiptNoteText(o) {
   return String(o?.settlementText || "").trim();
 }
 function receiptUpperFooterRows(o) {
-  // ҮНДСЭН-ийн «Тэмдэглэл бичих хэсэг» шошго хэрэггүй — харуулахгүй.
-  return "";
+  // Зөвхөн захиалгын тэмдэглэлийн текст; «Тэмдэглэл бичих хэсэг:» шошгогүй.
+  const note = receiptNoteText(o);
+  if (!note) return "";
+  const spacer = `<tr class="receipt-grid__spacer receipt-grid__spacer--note"><td colspan="11"></td></tr>`;
+  return `${spacer}<tr class="receipt-grid__return"><td></td><td colspan="10" class="receipt-grid__return-label">${esc(note)}</td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
   const f = receiptPartyFields(o);
@@ -8068,7 +8071,26 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   });
 
-  // «Тэмдэглэл бичих хэсэг» шошго хэрэггүй — алгасна.
+  // Тэмдэглэл — зөвхөн бичсэн текст (шошгогүй).
+  const orderNote = String(o?.settlementText || "").trim();
+  if (orderNote) {
+    pushRow(14.25, emptyCells(rowNum));
+    const noteRow = rowNum;
+    merges.push(`B${noteRow}:K${noteRow}`);
+    const noteH = Math.max(
+      14.25,
+      receiptXlsxWrappedRowHeight(orderNote, 70, {
+        min: 14.25,
+        linePt: 11,
+        pad: 2,
+        max: 42,
+      }),
+    );
+    pushRow(noteH, [
+      xlsxCellXml(`B${noteRow}`, 16, si(orderNote), "s"),
+      ...emptyCells(noteRow, "C", "K", 16),
+    ]);
+  }
 
   pushRow(14.25, emptyCells(rowNum));
 
