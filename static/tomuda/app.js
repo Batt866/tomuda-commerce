@@ -31,6 +31,8 @@ const state = {
   promotionRules: { quantity: [], price: [], payment: [] },
   workerCustomer: "",
   workerStoreReady: false,
+  editingOrderId: "",
+  editingOrderOriginalItems: null,
   deliveryStoreId: "",
   deliveryStoreReady: false,
   orderEmployee: "emp-hasan",
@@ -263,6 +265,13 @@ const persistKeys = [
   "deliveryPhone",
   "settings",
 ];
+function newEntityId(prefix = "id") {
+  const rand =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+      : `${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+  return `${prefix}_${Date.now()}_${rand}`;
+}
 let backendSaveFailedMessage = "";
 let backendReady = false;
 let backendSaveTimer = null;
@@ -3013,6 +3022,13 @@ function currentPageTitle(nav) {
   if (
     state.currentView === "worker" &&
     state.filters.worker === "new" &&
+    state.editingOrderId
+  ) {
+    return "Захиалга засах";
+  }
+  if (
+    state.currentView === "worker" &&
+    state.filters.worker === "new" &&
     state.workerCustomer
   ) {
     const c = state.customers.find((x) => x.id === state.workerCustomer);
@@ -4968,6 +4984,10 @@ function handleAppBack() {
     state.filters.worker === "new" &&
     state.workerStoreReady
   ) {
+    if (state.editingOrderId) {
+      cancelWorkerOrderEdit();
+      return true;
+    }
     if (workerOrderHasCart()) {
       confirmAbortWorkerOrder();
       return true;
@@ -5425,9 +5445,10 @@ function finishPickerEditFor(id) {
 function workerQtyStepperHtml(p, q) {
   const idAttr = esc(p.id);
   const maxOk = maxWorkerPaidQty(p.id);
-  const decDisabled = q <= 1;
+  const minQty = state.editingOrderId ? 0 : 1;
+  const decDisabled = q <= minQty;
   const incDisabled = q >= maxOk;
-  return `<div class="qty-stepper worker-order-qty-stepper" data-qty-min="1"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
+  return `<div class="qty-stepper worker-order-qty-stepper" data-qty-min="${minQty}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" data-qty-action="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button><input data-product-id="${idAttr}" oninput="qtyDraft(this)" onblur="qtyCommit(this)" value="${q}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="Тоо ширхэг"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" data-qty-action="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button></div>`;
 }
 function setWorkerOrderActive(id) {
   if (!id) return;
@@ -5441,7 +5462,7 @@ function finishWorkerOrderEdit() {
       `.worker-order-qty-stepper input[data-product-id="${id}"]`,
     );
     if (input) qtyCommit(input);
-    else if (!getWorkerQty(id)) {
+    else if (!getWorkerQty(id) && !state.editingOrderId) {
       const p = state.products.find((x) => x.id === id);
       if (p) state.workerQty[id] = 1;
     }
@@ -5459,7 +5480,13 @@ function workerOrderQtyHtml(p, q) {
   const id = esc(p.id);
   if (state.workerOrderActiveId === p.id)
     return `<div class="worker-row-edit">${workerQtyStepperHtml(p, q)}<button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
-  return `<button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${q}</span><span class="worker-row-qty__unit">ш</span></button>`;
+  const removeBtn = state.editingOrderId
+    ? `<button type="button" class="worker-row-remove" onclick="removeWorkerCartProduct('${id}')" aria-label="Хасах">×</button>`
+    : "";
+  return `<div class="worker-row-qty-wrap"><button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${q}</span><span class="worker-row-qty__unit">ш</span></button>${removeBtn}</div>`;
+}
+function removeWorkerCartProduct(id) {
+  setWorkerQty(id, 0);
 }
 function qtyDraft(el) {
   const id = el.getAttribute("data-product-id") || "";
@@ -6140,11 +6167,29 @@ async function saveBackendState(retry = 0) {
     restoreSessionSnapshot(session);
     if (!shouldDeferBackendSync()) safeRender();
   }
-  await mergeServerStateBeforeSave();
+  const mergedOk = await mergeServerStateBeforeSave();
+  if (!mergedOk) {
+    persistOrderSnapshot();
+    markBackendSaveFailed(
+      "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
+    );
+    if (retry < 2) {
+      await sleep(900 * (retry + 1));
+      return saveBackendState(retry + 1);
+    }
+    return;
+  }
   let payloadState = stateForBackendSave();
   let unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
   if (unsafeDeletes.length) {
-    await mergeServerStateBeforeSave();
+    const remerged = await mergeServerStateBeforeSave();
+    if (!remerged) {
+      persistOrderSnapshot();
+      markBackendSaveFailed(
+        "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
+      );
+      return;
+    }
     payloadState = stateForBackendSave();
     unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
   }
@@ -6156,6 +6201,14 @@ async function saveBackendState(retry = 0) {
     return;
   }
   const snapshot = backendStateSnapshot(payloadState);
+  if (snapshot === backendLastSaved) {
+    clearOrderPersistenceCache();
+    return;
+  }
+  if (importLoading) {
+    scheduleBackendSave();
+    return;
+  }
   const body = JSON.stringify({
     state: payloadState,
     actor: state.currentEmployee
@@ -6165,14 +6218,6 @@ async function saveBackendState(retry = 0) {
         }
       : null,
   });
-  if (snapshot === backendLastSaved) {
-    clearOrderPersistenceCache();
-    return;
-  }
-  if (importLoading) {
-    scheduleBackendSave();
-    return;
-  }
   backendSaving = true;
   try {
     const res = await fetch(`${API_BASE}/state`, {
@@ -6264,6 +6309,23 @@ function go(view, opts = {}) {
   const changed = state.currentView !== view;
   const wasWorkerOrders =
     state.currentView === "worker" && state.filters.worker === "orders";
+  if (
+    changed &&
+    state.currentView === "worker" &&
+    state.editingOrderId &&
+    view !== "worker"
+  ) {
+    clearWorkerOrderEditState();
+    state.workerStoreReady = false;
+    state.workerCustomer = "";
+    state.deliveryDate = "";
+    state.settlementAgreed = false;
+    state.settlementText = "";
+    state.settlementMonth = "";
+    state.settlementDay = "";
+    state.applyPercentDiscount = false;
+    resetWorkerCart();
+  }
   if (
     view === "worker" &&
     state.currentView === "worker" &&
@@ -12888,12 +12950,17 @@ function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
 }
 function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
-  const qtyHtml = qtyOpts
-    ? promotionQtyField(qtyOpts.name, qtyOpts.label, qtyOpts.defaultValue, true)
-    : "";
-  return qtyHtml
-    ? `<div class="promo-input-row">${searchInputHtml}${qtyHtml}</div>`
-    : `<div class="promo-input-row"><div class="promo-search-wrap">${searchInputHtml}</div></div>`;
+  const search = `<div class="promo-toolbar__search">${searchInputHtml}</div>`;
+  if (!qtyOpts) {
+    return `<div class="promo-toolbar">${search}</div>`;
+  }
+  const qtyHtml = promotionQtyField(
+    qtyOpts.name,
+    qtyOpts.label,
+    qtyOpts.defaultValue,
+    "bar",
+  );
+  return `<div class="promo-toolbar">${search}<div class="promo-toolbar__qty">${qtyHtml}</div></div>`;
 }
 function promoProductRowHtml(p, { onclick, active = false, selected = false, qtyHtml = "", removeHtml = "" } = {}) {
   const cls = [
@@ -12906,8 +12973,8 @@ function promoProductRowHtml(p, { onclick, active = false, selected = false, qty
     .join(" ");
   const meta = selected
     ? `<p class="promo-product-row__meta">${esc(p.category)}</p>`
-    : `<p class="promo-product-row__meta">${esc(p.category)} · ${esc(p.barcode)}</p><p class="promo-product-row__stock"><span class="promo-product-row__price">${fmt(p.price)}</span><span class="promo-product-row__sep">·</span><span>үлд ${p.stock} ${esc(p.unit || "ш")}</span></p>`;
-  const body = `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="promo-product-row__img product-thumb" alt=""><div class="promo-product-row__text"><p class="promo-product-row__name">${esc(p.name)}</p>${meta}</div>${qtyHtml}${removeHtml}`;
+    : `<p class="promo-product-row__meta">${esc(p.category)} · ${esc(p.barcode)}</p><p class="promo-product-row__stock"><span class="promo-product-row__price">${fmt(p.price)}</span><span class="promo-product-row__sep" aria-hidden="true">·</span><span class="promo-product-row__remain">үлд ${p.stock} ${esc(p.unit || "ш")}</span></p>`;
+  const body = `<span class="promo-product-row__media"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="promo-product-row__img product-thumb" alt=""></span><span class="promo-product-row__text"><span class="promo-product-row__name">${esc(p.name)}</span>${meta}</span>${qtyHtml}${removeHtml}`;
   if (onclick) {
     return `<button type="button" onclick="${onclick}" class="${cls}">${body}</button>`;
   }
@@ -13131,7 +13198,7 @@ function promotionProductPickerBlock(
       addAction: "select",
       selectedId,
     }),
-    searchInput = `<input data-promo-pick="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input app-input">`,
+    searchInput = `<input data-promo-pick="${fieldName}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input" autocomplete="off">`,
     inputRow = promotionSearchQtyRow(searchInput, opts?.qty || null),
     badge = variant === "buy" ? "1" : variant === "free" ? "2" : "",
     head = badge
@@ -13145,21 +13212,26 @@ function promotionProductPickerBlock(
 function promoSectionArrow() {
   return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">жишээ: төмөр 50 + газан 50 + энгийн 50 → төмөр 50 урамшуулал</span></div>`;
 }
-function promotionQtyField(name, label, defaultValue, inline = false) {
+function promotionQtyField(name, label, defaultValue, variant = false) {
   const draftVal = promoFormDraftVal(name, "");
   const val = draftVal !== "" ? ` value="${esc(draftVal)}"` : "";
   const ph =
     defaultValue !== undefined && defaultValue !== ""
       ? String(defaultValue)
       : "1";
-  const cls = inline
-    ? "promo-qty-field promo-qty-field--inline"
-    : "promo-qty-field";
-  const wrap = inline ? "" : `<div class="promo-qty-inline">`;
-  const wrapEnd = inline ? "" : `</div>`;
+  const mode =
+    variant === "bar" ? "bar" : variant === true || variant === "inline" ? "inline" : "block";
+  const cls =
+    mode === "bar"
+      ? "promo-qty-field promo-qty-field--bar"
+      : mode === "inline"
+        ? "promo-qty-field promo-qty-field--inline"
+        : "promo-qty-field";
+  const wrap = mode === "block" ? `<div class="promo-qty-inline">` : "";
+  const wrapEnd = mode === "block" ? `</div>` : "";
   const labelHtml = `<span class="promo-qty-field__label">${esc(label)}</span>`;
   const aria = ` aria-label="${esc(label)}"`;
-  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1" required${val} placeholder="${esc(ph)}"${aria} oninput="promoFormDraftField(this)" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
+  return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1" required${val} placeholder="${esc(ph)}"${aria} oninput="promoFormDraftField(this)" class="promo-qty-input"></label>${wrapEnd}`;
 }
 function promotionProductPickRow(p, fieldName, selectedId) {
   return promoProductRowHtml(p, {
@@ -13506,9 +13578,9 @@ function promotionMultiProductPickerBlock({
         (id) => `<input type="hidden" name="${fieldName}" value="${esc(id)}">`,
       )
       .join(""),
-    searchInput = `<input data-promo-pick="${pickKey}" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input app-input">`,
+    searchInput = `<input data-promo-pick="${pickKey}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input" autocomplete="off">`,
     inputRow = perProductQty
-      ? `<div class="promo-input-row"><div class="promo-search-wrap">${searchInput}</div></div>`
+      ? promotionSearchQtyRow(searchInput, null)
       : promotionSearchQtyRow(searchInput, qty),
     head = badge
       ? `<div class="promo-section-head"><span class="promo-section-badge">${badge}</span><div><p class="promo-section-title">${title}</p>${hint ? `<p class="promo-section-hint">${hint}</p>` : ""}</div></div>`
@@ -14773,6 +14845,10 @@ function openWorkerNewTab() {
   pushAppHistory();
 }
 function openWorkerOrdersTab() {
+  if (state.editingOrderId) {
+    cancelWorkerOrderEdit();
+    return;
+  }
   if (state.filters.worker === "orders") return;
   state.filters.worker = "orders";
   render();
@@ -15328,7 +15404,7 @@ function pickWorkerStore(id) {
   render();
 }
 function confirmWorkerStore() {
-  if (!state.workerCustomer) return;
+  if (!state.workerCustomer || state.editingOrderId) return;
   state.workerStoreReady = true;
   state.deliveryDate = todayIso();
   resetWorkerCart();
@@ -15336,6 +15412,7 @@ function confirmWorkerStore() {
   pushAppHistory();
 }
 function abortWorkerOrder() {
+  clearWorkerOrderEditState();
   state.workerStoreReady = false;
   state.workerCustomer = "";
   state.searches.workerStore = "";
@@ -15343,6 +15420,10 @@ function abortWorkerOrder() {
   render();
 }
 function clearWorkerStore() {
+  if (state.editingOrderId) {
+    cancelWorkerOrderEdit();
+    return;
+  }
   state.workerStoreReady = false;
   state.workerCustomer = "";
   state.deliveryDate = "";
@@ -15355,10 +15436,125 @@ function clearWorkerStore() {
   resetWorkerCart();
   render();
 }
+function clearWorkerOrderEditState() {
+  state.editingOrderId = "";
+  state.editingOrderOriginalItems = null;
+}
+function canEditWorkerOrder(order) {
+  if (!order || order.status === "cancelled") return false;
+  if (
+    state.currentEmployee?.role === "sales" &&
+    String(order.employeeId) !== String(state.currentEmployee.id)
+  ) {
+    return false;
+  }
+  return (
+    hasPermission("orders.edit") ||
+    hasPermission("orders.create") ||
+    currentRole() === "admin"
+  );
+}
+function seedWorkerCartFromOrder(order) {
+  resetWorkerCart();
+  const qty = {};
+  (order.items || []).forEach((item) => {
+    if (!item?.productId || item.isPromoFree) return;
+    const id = String(item.productId);
+    qty[id] = (qty[id] || 0) + Math.max(0, Math.floor(Number(item.quantity) || 0));
+  });
+  state.workerQty = qty;
+  Object.keys(qty).forEach((id) => {
+    const p = state.products.find((x) => x.id === id);
+    if (!p || !productPackSize(p)) return;
+    const split = pickerQtyToParts(qty[id], p);
+    syncWorkerQtyParts(id, split.packs, split.pieces);
+  });
+}
+function openWorkerOrderEdit(id) {
+  const order = state.orders.find((x) => x.id === id);
+  if (!order) return;
+  if (!canEditWorkerOrder(order)) {
+    orderReceiptModal(id);
+    return;
+  }
+  closeModal();
+  clearReceiptEdit();
+  state.editingOrderId = order.id;
+  state.editingOrderOriginalItems = (order.items || []).map((i) => ({ ...i }));
+  state.workerCustomer = order.customerId || "";
+  state.workerStoreReady = true;
+  state.orderEmployee = order.employeeId || state.orderEmployee;
+  state.paymentTerm = order.paymentTerm === "credit" ? "credit" : "cash";
+  state.isPaid = paidFromPaymentTerm(state.paymentTerm);
+  state.settlementAgreed = !!order.settlementAgreed;
+  state.settlementText = order.settlementText || "";
+  state.settlementMonth = order.settlementMonth || "";
+  state.settlementDay = order.settlementDay || "";
+  state.applyPercentDiscount = !!order.applyPercentDiscount;
+  state.deliveryDate = orderDeliveryDay(order) || todayIso();
+  seedWorkerCartFromOrder(order);
+  state.filters.worker = "new";
+  clearWorkerOrderHighlight();
+  render();
+  pushAppHistory();
+}
+function cancelWorkerOrderEdit() {
+  clearWorkerOrderEditState();
+  state.workerStoreReady = false;
+  state.workerCustomer = "";
+  state.deliveryDate = "";
+  state.settlementAgreed = false;
+  state.settlementText = "";
+  state.settlementMonth = "";
+  state.settlementDay = "";
+  state.applyPercentDiscount = false;
+  resetWorkerCart();
+  state.filters.worker = "orders";
+  render();
+  pushAppHistory();
+}
 function workerNew(cart) {
   if (!state.workerStoreReady || !state.workerCustomer)
     return workerStorePickStep();
   return workerNewOrderStep(cart);
+}
+function workerNewOrderStep(cart) {
+  ensureOrderEmployeeSelection();
+  const editing = !!state.editingOrderId;
+  const editingOrder = editing
+    ? state.orders.find((x) => x.id === state.editingOrderId)
+    : null;
+  const customer = state.customers.find((c) => c.id === state.workerCustomer),
+    showAgentPicker = !editing && shouldShowOrderAgentPicker(),
+    agentMetaHtml = showAgentPicker
+      ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
+      : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(editingOrder?.employeeName || state.currentEmployee?.name || "-")}</p></div>`,
+    receivableHtml = workerReceivableHtml(customer?.id),
+    paidProducts = workerPaidProductsInCart(),
+    hasItems = paidProducts.length > 0,
+    summaryHtml = workerOrderSummaryPanel(cart, {
+      agentMetaHtml,
+      receivableHtml,
+      hasItems,
+    }),
+    listHtml = hasItems
+      ? paidProducts.map(workerSelectedRow).join("") +
+        (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
+      : "";
+  const saving = orderSubmitLock;
+  const headAction = editing
+    ? `<button type="button" onclick="cancelWorkerOrderEdit()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Буцах</button>`
+    : `<button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button>`;
+  const headExtra = editing
+    ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")} · Захиалга засах</p>`
+    : "";
+  const saveAction = editing ? "saveWorkerOrderEdit()" : "saveWorker()";
+  const saveLabel = saving
+    ? "Хадгалж байна..."
+    : editing
+      ? "Өөрчлөлт хадгалах"
+      : "Хадгалах";
+  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
@@ -15397,31 +15593,9 @@ function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = ""
   if (!stats && !agentMetaHtml && !receivableHtml) return "";
   return `<div class="worker-order-summary">${stats}${receivableHtml}${agentMetaHtml}</div>`;
 }
-function workerNewOrderStep(cart) {
-  ensureOrderEmployeeSelection();
-  const customer = state.customers.find((c) => c.id === state.workerCustomer),
-    showAgentPicker = shouldShowOrderAgentPicker(),
-    agentMetaHtml = showAgentPicker
-      ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
-      : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(state.currentEmployee?.name || "-")}</p></div>`,
-    receivableHtml = workerReceivableHtml(customer?.id),
-    paidProducts = workerPaidProductsInCart(),
-    hasItems = paidProducts.length > 0,
-    summaryHtml = workerOrderSummaryPanel(cart, {
-      agentMetaHtml,
-      receivableHtml,
-      hasItems,
-    }),
-    listHtml = hasItems
-      ? paidProducts.map(workerSelectedRow).join("") +
-        (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
-      : "";
-  const saving = orderSubmitLock;
-  return `<section class="worker-order-card"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}</div><button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button></header><div class="worker-order-card__body">${summaryHtml}<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="saveWorker()" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saving ? "Хадгалж байна..." : "Хадгалах"}</button></footer></section>`;
-}
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
-  const remain = Math.max(0, (Number(p.stock) || 0) - p.qty);
+  const remain = Math.max(0, productStockWithEditCredit(p.id) - p.qty);
   const packLabel = productPackLabel(p);
   const lineTotal = p.price * p.qty;
   const tags = [
@@ -15448,7 +15622,7 @@ function workerOrders(orders) {
   return `<section class="worker-orders-panel">${metricsBar(`${card("Нийт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
-  orderReceiptModal(id);
+  openWorkerOrderEdit(id);
 }
 function render() {
   if (!window.__tomudaBooted) {
@@ -16675,7 +16849,7 @@ async function applyCustomerSave(data, id) {
     applyCustomerPhoneFields(existing, existing.phones);
     customer = existing;
   } else {
-    customer = { ...data, id: String(Date.now()) };
+    customer = { ...data, id: newEntityId("c") };
     if (!customer.image) delete customer.image;
     applyCustomerPhoneFields(customer, customer.phones);
     state.customers.push(customer);
@@ -17788,17 +17962,18 @@ function stock(id, qty, type) {
   const q = Number(qty) || 0;
   p.stock = type === "in" ? current + q : Math.max(0, current - q);
 }
-function orderStockIssues(items) {
+function orderStockIssues(items, opts = {}) {
   const need = {};
   (items || []).forEach((item) => {
     const id = String(item.productId || "");
     if (!id) return;
     need[id] = (need[id] || 0) + (Number(item.quantity) || 0);
   });
+  const credit = opts.stockCredit || {};
   const issues = [];
   Object.entries(need).forEach(([id, qty]) => {
     const p = state.products.find((x) => x.id === id);
-    const have = Number(p?.stock) || 0;
+    const have = (Number(p?.stock) || 0) + (Number(credit[id]) || 0);
     if (!p || qty > have) {
       issues.push({
         id,
@@ -18021,11 +18196,26 @@ function refreshPickerList(opts = {}) {
   restorePickerScroll(scrollSnap);
   return true;
 }
+function editingOrderStockCreditMap() {
+  const map = {};
+  if (!state.editingOrderId) return map;
+  (state.editingOrderOriginalItems || []).forEach((item) => {
+    const id = String(item?.productId || "");
+    if (!id) return;
+    map[id] = (map[id] || 0) + (Number(item.quantity) || 0);
+  });
+  return map;
+}
+function productStockWithEditCredit(productId) {
+  const p = state.products.find((x) => x.id === productId);
+  const have = Math.max(0, Math.floor(Number(p?.stock) || 0));
+  return have + (editingOrderStockCreditMap()[productId] || 0);
+}
 function workerLinesWithPaidQty(productId, qty) {
   const targetId = String(productId || "");
   const paid = state.products
     .map((p) => {
-      const stockHave = Math.max(0, Math.floor(Number(p.stock) || 0));
+      const stockHave = productStockWithEditCredit(p.id);
       const q =
         String(p.id) === targetId
           ? Math.max(0, Math.min(Math.floor(Number(qty) || 0), stockHave))
@@ -18060,14 +18250,16 @@ function getWorkerQtyRaw(productId) {
 function maxWorkerPaidQty(productId) {
   const p = state.products.find((x) => x.id === productId);
   if (!p) return 0;
-  const stockHave = Math.max(0, Math.floor(Number(p.stock) || 0));
+  const stockHave = productStockWithEditCredit(productId);
   if (stockHave < 1) return 0;
   let lo = 0;
   let hi = stockHave;
   let best = 0;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
-    const issues = orderStockIssues(workerLinesWithPaidQty(productId, mid));
+    const issues = orderStockIssues(workerLinesWithPaidQty(productId, mid), {
+      stockCredit: editingOrderStockCreditMap(),
+    });
     if (!issues.length) {
       best = mid;
       lo = mid + 1;
@@ -18082,7 +18274,7 @@ function getWorkerQty(productId) {
   if (raw < 1) return 0;
   const p = state.products.find((x) => x.id === productId);
   if (!p) return 0;
-  return Math.min(raw, Math.max(0, Math.floor(Number(p.stock) || 0)));
+  return Math.min(raw, productStockWithEditCredit(productId));
 }
 function resetWorkerCart() {
   state.workerQty = {};
@@ -18103,7 +18295,7 @@ function setWorkerQty(id, qty) {
   const maxOk = maxWorkerPaidQty(id);
   const q = Math.min(wanted, maxOk);
   if (wanted > maxOk) {
-    const have = Math.max(0, Math.floor(Number(p.stock) || 0));
+    const have = productStockWithEditCredit(id);
     showStockLimitToast(`${p.name}: үлд ${have}, урамшуулалтай нийлээд хүрэхгүй`);
   }
   if (q > 0) state.workerQty[id] = q;
@@ -18400,15 +18592,16 @@ function pickerQtySheetHtml(productId) {
     ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
     : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
   const promoHtml = "";
+  const stockHave = productStockWithEditCredit(p.id);
   const packMeta = packSize
     ? `<span class="picker-qty-sheet__meta-sep">·</span><span>1 багц = ${packSize}ш</span>`
     : "";
-  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${p.stock} ${esc(p.unit || "ш")}${packMeta}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
+  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${stockHave} ${esc(p.unit || "ш")}${packMeta}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
     inCart = q > 0,
-    left = p.stock - q,
+    left = productStockWithEditCredit(p.id) - q,
     promoHint = pickerProductPromoHintHtml(p),
     packLabel = productPackLabel(p),
     packMeta = packLabel
@@ -18518,6 +18711,7 @@ function ensureSavedOrderVisible(order) {
 }
 async function saveWorker() {
   if (orderSubmitLock) return;
+  if (state.editingOrderId) return saveWorkerOrderEdit();
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
   const c = state.customers.find((x) => x.id === state.workerCustomer);
   if (!c) return alert("Харилцагч сонгоно уу");
@@ -18612,6 +18806,99 @@ async function saveWorker() {
   } catch (error) {
     console.warn("Order save failed", error);
     alert("Захиалга хадгалахад алдаа гарлаа");
+  } finally {
+    orderSubmitLock = false;
+    render();
+  }
+}
+async function saveWorkerOrderEdit() {
+  if (orderSubmitLock) return;
+  if (!state.editingOrderId) return saveWorker();
+  if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
+  const order = state.orders.find((x) => x.id === state.editingOrderId);
+  if (!order) {
+    clearWorkerOrderEditState();
+    return alert("Захиалга олдсонгүй");
+  }
+  if (!canEditWorkerOrder(order)) return alert("Захиалга засах эрхгүй");
+  const cart = workerCartSummary();
+  if (!cart.paid.length) return alert("Бараа сонгоно уу");
+  if (state.applyPercentDiscount && !workerPercentDiscountActive())
+    state.applyPercentDiscount = false;
+  const settlementText = state.settlementAgreed
+    ? settlementTextInputValue(state)
+    : "";
+  if (state.settlementAgreed && !settlementText)
+    return alert("Тайлбар оруулна уу");
+  const nextItems = cart.all;
+  const stockCredit = editingOrderStockCreditMap();
+  const stockIssues = orderStockIssues(nextItems, { stockCredit });
+  if (stockIssues.length) {
+    alertOrderStockIssues(stockIssues);
+    showStockLimitToast(
+      "Захиалга + урамшуулал үлдэгдлээс хэтэрсэн тул хадгалах боломжгүй",
+    );
+    return;
+  }
+  orderSubmitLock = true;
+  render();
+  try {
+    const originalItems = state.editingOrderOriginalItems || order.items || [];
+    adjustReceiptEditStock(originalItems, nextItems);
+    order.items = nextItems.map((i) => ({ ...i }));
+    order.paymentTerm = state.paymentTerm === "credit" ? "credit" : "cash";
+    order.isPaid = paidFromPaymentTerm(order.paymentTerm);
+    order.applyPercentDiscount = workerPercentDiscountActive();
+    order.percentDiscount = order.applyPercentDiscount
+      ? percentDiscountRate()
+      : 0;
+    order.settlementAgreed = !!settlementText;
+    order.settlementText = settlementText;
+    order.settlementMonth = "";
+    order.settlementDay = "";
+    recalcOrderTotals(order);
+    const orderId = order.id;
+    clearWorkerOrderEditState();
+    resetWorkerCart();
+    state.workerStoreReady = false;
+    state.workerCustomer = "";
+    state.deliveryDate = "";
+    state.settlementAgreed = false;
+    state.settlementText = "";
+    state.settlementMonth = "";
+    state.settlementDay = "";
+    state.applyPercentDiscount = false;
+    state.filters.worker = "orders";
+    state.workerOrdersArrived = true;
+    state.workerHighlightOrderId = orderId;
+    persistOrderSnapshot();
+    saveAuthSession();
+    render();
+    pushAppHistory();
+    const saved = await criticalBackendSave();
+    if (saved) {
+      showAppToast("Захиалгын өөрчлөлт хадгалагдлаа", "success");
+    } else {
+      showAppToast(
+        "Өөрчлөлт хадгалагдлаа, серверт илгээхэд алдаа гарлаа",
+        "error",
+      );
+    }
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-order-id="${orderId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    setTimeout(() => {
+      if (!state.workerOrdersArrived) return;
+      state.workerOrdersArrived = false;
+      if (state.currentView === "worker" && state.filters.worker === "orders") {
+        render();
+      }
+    }, 1300);
+  } catch (error) {
+    console.warn("Order edit save failed", error);
+    alert("Захиалга засахад алдаа гарлаа");
   } finally {
     orderSubmitLock = false;
     render();
@@ -19212,6 +19499,10 @@ Object.assign(window, {
   downloadOrderReceiptExcelNow,
   orderReceiptModalKeepDraft,
   workerOrderDetail,
+  openWorkerOrderEdit,
+  cancelWorkerOrderEdit,
+  saveWorkerOrderEdit,
+  removeWorkerCartProduct,
   applyStock,
   inventoryStockModal,
   stockOutModal,

@@ -39,6 +39,7 @@ from dashboard.profile_images import (
     update_profile_image_in_state,
 )
 from dashboard.seed_data import default_state
+from dashboard.state_merge import merge_app_states
 from dashboard.state_sanitize import sanitize_app_state
 
 api = NinjaAPI(title="Tomuda API")
@@ -121,20 +122,31 @@ def get_state(request):
 
 @api.post("/state")
 def save_state(request, payload: dict[str, Any] = Body(...)):
-    data = _retained_orders_state(payload.get("state", payload))
-    data, _ = sanitize_app_state(data)
-    data, _ = _hydrate_all_images(data)
+    incoming = _retained_orders_state(payload.get("state", payload))
+    incoming, _ = sanitize_app_state(incoming)
+    incoming, _ = _hydrate_all_images(incoming)
     actor = payload.get("actor")
-    row, _ = AppState.objects.get_or_create(
-        key="main",
-        defaults={"data": default_state()},
-    )
-    ok, message = validate_state_mutation(row.data or {}, data, actor)
-    if not ok:
-        raise HttpError(403, message or "Эрх хүрэлцэхгүй")
-    row.data = data
-    row.save(update_fields=["data", "updated_at"])
-    return {"ok": True, "state": data, "updatedAt": row.updated_at.isoformat()}
+
+    with transaction.atomic():
+        row, _ = AppState.objects.get_or_create(
+            key="main",
+            defaults={"data": default_state()},
+        )
+        row = AppState.objects.select_for_update().get(pk=row.pk)
+        current = dict(row.data or default_state())
+        # Merge so one device cannot wipe customers/orders created on another.
+        data = merge_app_states(current, incoming)
+        data = _retained_orders_state(data)
+        data, _ = sanitize_app_state(data)
+        data, _ = _hydrate_all_images(data)
+        ok, message = validate_state_mutation(current, data, actor)
+        if not ok:
+            raise HttpError(403, message or "Эрх хүрэлцэхгүй")
+        row.data = data
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {"ok": True, "state": data, "updatedAt": updated_at}
 
 
 def _require_import_permission(state: dict[str, Any], actor: dict[str, Any] | None, perm: str) -> None:

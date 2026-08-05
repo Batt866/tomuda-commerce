@@ -672,3 +672,132 @@ class StockInPermissionTests(TestCase):
         saved = AppState.objects.get(key="main").data
         self.assertEqual(saved["products"][0]["stock"], 15)
         self.assertEqual(len(saved["stockInReceipts"]), 1)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class MultiDeviceStateMergeTests(TestCase):
+    def test_merge_keeps_customer_added_on_other_device(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "customers": [
+                {"id": "c-a", "name": "Device A customer", "phone1": "99110000"},
+                {"id": "c-shared", "name": "Shared", "phone1": "99000000"},
+            ],
+            "products": [],
+            "employees": [],
+            "orders": [],
+            "deletionLog": [],
+        }
+        local = {
+            "customers": [
+                {"id": "c-shared", "name": "Shared updated", "phone1": "99000001"},
+                {"id": "c-b", "name": "Device B customer", "phone1": "99220000"},
+            ],
+            "products": [],
+            "employees": [],
+            "orders": [],
+            "deletionLog": [],
+        }
+
+        merged = merge_app_states(remote, local)
+        ids = {c["id"] for c in merged["customers"]}
+        self.assertEqual(ids, {"c-a", "c-b", "c-shared"})
+        shared = next(c for c in merged["customers"] if c["id"] == "c-shared")
+        self.assertEqual(shared["name"], "Shared updated")
+        self.assertEqual(shared["phone1"], "99000001")
+
+    def test_save_state_does_not_wipe_peer_device_customer(self):
+        state = default_state()
+        state["customers"] = [
+            {
+                "id": "c-device-a",
+                "name": "From device A",
+                "companyName": "A LLC",
+                "phone1": "99111111",
+                "registrationNumber": "",
+                "address": "",
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        # Device B posts an older snapshot that never saw c-device-a,
+        # but adds its own customer.
+        device_b = default_state()
+        device_b["customers"] = [
+            {
+                "id": "c-device-b",
+                "name": "From device B",
+                "companyName": "B LLC",
+                "phone1": "99222222",
+                "registrationNumber": "",
+                "address": "",
+            }
+        ]
+
+        response = self.client.post(
+            "/api/state",
+            {
+                "state": device_b,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        saved_ids = {c["id"] for c in response.json()["state"]["customers"]}
+        self.assertIn("c-device-a", saved_ids)
+        self.assertIn("c-device-b", saved_ids)
+
+        row = AppState.objects.get(key="main")
+        db_ids = {c["id"] for c in row.data["customers"]}
+        self.assertIn("c-device-a", db_ids)
+        self.assertIn("c-device-b", db_ids)
+
+    def test_save_state_honors_customer_deletion_log(self):
+        state = default_state()
+        state["customers"] = [
+            {
+                "id": "c-keep",
+                "name": "Keep",
+                "companyName": "",
+                "phone1": "99111111",
+            },
+            {
+                "id": "c-delete",
+                "name": "Delete me",
+                "companyName": "",
+                "phone1": "99333333",
+            },
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        incoming = default_state()
+        incoming["customers"] = [
+            {
+                "id": "c-keep",
+                "name": "Keep",
+                "companyName": "",
+                "phone1": "99111111",
+            }
+        ]
+        incoming["deletionLog"] = [
+            {
+                "type": "customer",
+                "id": "c-delete",
+                "deletedBy": "admin",
+                "deletedAt": "2026-08-05T00:00:00",
+            }
+        ]
+
+        response = self.client.post(
+            "/api/state",
+            {
+                "state": incoming,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        saved_ids = {c["id"] for c in response.json()["state"]["customers"]}
+        self.assertIn("c-keep", saved_ids)
+        self.assertNotIn("c-delete", saved_ids)
