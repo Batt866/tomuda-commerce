@@ -1155,9 +1155,13 @@ function defaultDeliveryDate(from) {
 }
 function orderDeliveryDay(o) {
   const stored = isoDay(o?.deliveryDate);
-  if (stored) return stored;
   const created = isoDay(o?.createdAt);
-  return created || todayIso();
+  // Business rule: delivery is the day after the order was taken.
+  if (stored && created && stored === created) {
+    return defaultDeliveryDate(created);
+  }
+  if (stored) return stored;
+  return defaultDeliveryDate(created) || tomorrowIso();
 }
 const orderDay = (o) => orderDeliveryDay(o);
 function todayNoonLocal() {
@@ -1553,8 +1557,16 @@ function normalizeOrderPayments() {
 function normalizeOrderDeliveryDates() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
-    if (!isoDay(o.deliveryDate))
-      o.deliveryDate = isoDay(o.createdAt) || todayIso();
+    const created = isoDay(o.createdAt);
+    const stored = isoDay(o.deliveryDate);
+    if (!stored) {
+      o.deliveryDate = defaultDeliveryDate(created) || tomorrowIso();
+      continue;
+    }
+    // Older saves incorrectly set deliveryDate to the order day.
+    if (created && stored === created) {
+      o.deliveryDate = defaultDeliveryDate(created);
+    }
   }
 }
 function normalizeOrderTotals() {
@@ -1633,7 +1645,10 @@ function buildNewOrder(fields) {
   const receiptMonth = receiptMonthKey({ createdAt });
   const created = isoDay(createdAt);
   const stored = isoDay(fields.deliveryDate);
-  const deliveryDate = stored ? fields.deliveryDate : created || todayIso();
+  const deliveryDate =
+    stored && !(created && stored === created)
+      ? stored
+      : defaultDeliveryDate(created) || tomorrowIso();
   return {
     id: nextOrderId(),
     receiptMonth,
@@ -3745,8 +3760,67 @@ function saveLocalBackendCache(payload) {
     console.warn("Backend cache save failed", error);
   }
 }
-function mergeBootState(serverState) {
-  const pendingState = readLocalPendingState();
+function readLocalPendingStateMeta() {
+  try {
+    const raw = localStorage.getItem(LOCAL_PENDING_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.savedAt ? { savedAt: parsed.savedAt } : null;
+  } catch {
+    return null;
+  }
+}
+function shouldUsePendingAtBoot(serverUpdatedAt, pendingMeta) {
+  if (!pendingMeta?.savedAt) return true;
+  const serverMs = Date.parse(serverUpdatedAt || "");
+  const pendingMs = Date.parse(pendingMeta.savedAt || "");
+  if (
+    Number.isFinite(serverMs) &&
+    Number.isFinite(pendingMs) &&
+    serverMs > pendingMs
+  ) {
+    return false;
+  }
+  return true;
+}
+function entityIdCount(state, key) {
+  if (!state || typeof state !== "object") return 0;
+  const ids = new Set();
+  (state[key] || []).forEach((item) => {
+    if (item?.id != null) ids.add(String(item.id));
+  });
+  return ids.size;
+}
+function serverSnapshotLooksFresherThanLocal(serverState, serverUpdatedAt) {
+  const pendingMeta = readLocalPendingStateMeta();
+  const serverMs = Date.parse(serverUpdatedAt || "");
+  const pendingMs = Date.parse(pendingMeta?.savedAt || "");
+  if (
+    Number.isFinite(serverMs) &&
+    Number.isFinite(pendingMs) &&
+    serverMs > pendingMs
+  ) {
+    return true;
+  }
+  const local = persistentState();
+  return (
+    entityIdCount(serverState, "customers") >
+      entityIdCount(local, "customers") ||
+    entityIdCount(serverState, "products") > entityIdCount(local, "products") ||
+    entityIdCount(serverState, "orders") > entityIdCount(local, "orders")
+  );
+}
+function mergeBootState(serverState, serverUpdatedAt = "") {
+  let pendingState = readLocalPendingState();
+  const pendingMeta = readLocalPendingStateMeta();
+  if (
+    pendingState &&
+    pendingMeta &&
+    !shouldUsePendingAtBoot(serverUpdatedAt, pendingMeta)
+  ) {
+    pendingState = null;
+    clearLocalPendingState();
+  }
   const ordersBackup = readLocalOrdersBackup();
   if (!pendingState && !ordersBackup.length) return serverState;
   return mergeBootPersistentState(serverState, pendingState, ordersBackup);
@@ -4191,10 +4265,14 @@ function applyCountSessionMerge(remote, local, merged) {
   merged.countSessionStartedAt = src.countSessionStartedAt ?? null;
   merged.countDone = !!src.countDone;
 }
-function mergePersistentStates(remote = {}, local = {}) {
+function mergePersistentStates(remote = {}, local = {}, opts = {}) {
   const merged = {};
-  const deletionLog = mergedDeletionLog(remote, local);
-  const promotionDeletionLog = mergedPromotionDeletionLog(remote, local);
+  const deletionLog = opts.pullFromServer
+    ? normalizeDeletionLog(remote.deletionLog || [])
+    : mergedDeletionLog(remote, local);
+  const promotionDeletionLog = opts.pullFromServer
+    ? normalizePromotionDeletionLog(remote.promotionDeletionLog || [])
+    : mergedPromotionDeletionLog(remote, local);
   for (const key of MERGE_BY_ID_KEYS) {
     const mergeFn =
       key === "products" || key === "customers" || key === "employees"
@@ -4484,7 +4562,7 @@ function applyBootBackendPayload(payload, opts = {}) {
   if (opts.mergeWithCurrent) {
     serverState = mergePersistentStates(serverState, persistentState());
   }
-  const merged = mergeBootState(serverState);
+  const merged = mergeBootState(serverState, payload.updatedAt || "");
   applyPersistentState(merged);
   if (bootPayloadMatchesState(payload.state, merged)) {
     syncBackendSaveMarker(payload.state);
@@ -4723,7 +4801,9 @@ function applyRemoteState(payload, opts = {}) {
   // Always merge server data into local memory. Only rendering may be deferred
   // (typing/scrolling); otherwise peer-device customers never appear.
   const merged = protectAccidentalDeletions(
-    mergePersistentStates(payload.state, persistentState()),
+    mergePersistentStates(payload.state, persistentState(), {
+      pullFromServer: true,
+    }),
   );
   if (JSON.stringify(merged) === JSON.stringify(persistentState())) {
     if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
@@ -4747,6 +4827,17 @@ function applyRemoteState(payload, opts = {}) {
     syncBackendSaveMarker();
   }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+  if (
+    !backendSaving &&
+    !backendSaveTimer &&
+    !backendSaveFailedMessage &&
+    serverSnapshotLooksFresherThanLocal(
+      payload.state,
+      payload.updatedAt || "",
+    )
+  ) {
+    clearLocalPendingState();
+  }
   // Cache the server snapshot (not the local merge) so the next boot sees peers.
   saveLocalBackendCache({
     state: payload.state,
@@ -4810,7 +4901,7 @@ function stopBackendPoll() {
   window.removeEventListener("focus", onVisibilityPoll);
 }
 function onVisibilityPoll() {
-  if (document.visibilityState === "visible") pollBackendState();
+  if (document.visibilityState === "visible") pullBackendStateNow();
 }
 function bootScreenHtml(message = BOOT_LOADING_TEXT, showRetry = false) {
   return `<div class="boot-screen${showRetry ? " boot-screen--error" : ""}" aria-live="polite"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="${BRAND.logoBlue}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Импорт, түгээлт</p></div></div><div class="boot-screen__copy"><p id="boot-title" class="boot-screen__title">${BOOT_TITLE_TEXT}</p><p id="boot-detail" class="boot-screen__detail">${esc(message)}</p></div><div class="boot-screen__progress" aria-hidden="true"><span></span></div><div class="boot-screen__status-row" aria-hidden="true"><span class="boot-screen__pulse"></span><span>Сервертэй холбогдож байна</span></div><div class="boot-screen__preview" aria-hidden="true"><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span></div><button type="button" id="boot-retry" class="boot-screen__retry${showRetry ? "" : " hidden"}" onclick="location.reload()">Дахин оролдох</button></div></div>`;
@@ -6385,7 +6476,7 @@ function go(view, opts = {}) {
   }
   saveAuthSession();
   render();
-  if (changed && (view === "customers" || view === "products" || view === "worker")) {
+  if (view === "customers" || view === "products" || view === "worker") {
     pullBackendStateNow();
   }
   if (changed && !opts.silent && !suppressHistoryPush) pushAppHistory();
@@ -8000,17 +8091,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `C${hr1}:F${hr1}`,
     `C${hr2}:H${hr2}`,
     `C${hr3}:J${hr3}`,
+    `J${hr1}:K${hr1}`,
+    `J${hr2}:K${hr2}`,
   );
   pushRow(20.25, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`C${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
-    xlsxCellXml(`K${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
+    xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(hr1, "D", "F", 39),
+    ...emptyCells(hr1, "I", "I", 3),
   ]);
   pushRow(27, [
     xlsxCellXml(`C${hr2}`, 5, si(companyAddr), "s"),
-    xlsxCellXml(`K${hr2}`, 15, si(deliveryDateText), "s"),
+    xlsxCellXml(`J${hr2}`, 15, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "D", "H", 5),
+    ...emptyCells(hr2, "I", "I", 15),
   ]);
   pushRow(31.5, [
     xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -8214,63 +8309,75 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     pushRow(14.25, emptyCells(rowNum));
   }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
-  promoLines.forEach((item, idx) => {
+  if (promoLines.length) {
+    const promoLabelRow = rowNum;
+    merges.push(`B${promoLabelRow}:D${promoLabelRow}`);
+    pushItemTableRow(14.25, [
+      xlsxCellXml(`B${promoLabelRow}`, 36, si("Урамшуулал"), "s"),
+      ...emptyCells(promoLabelRow, "C", "D", 36),
+      ...emptyCells(promoLabelRow, "E", "K", 36),
+    ]);
+  }
+  promoLines.forEach((item) => {
     const r = rowNum;
+    const p =
+      state.products.find((x) => x.id === item.productId) ||
+      productForReceiptLine(item) ||
+      {};
     const unitPrice = receiptPromoDisplayPrice(item);
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
+    const barcodeText = receiptPromoBarcode(item);
     const nameText = String(item.productName || "").trim() || "-";
-    const promoH = Math.max(14.25, receiptXlsxWrappedRowHeight(nameText, nameColWidth));
-    merges.push(`E${r}:G${r}`, `H${r}:I${r}`);
-    if (idx === 0) merges.push(`C${r}:D${r}`);
-    const cells = [
-      xlsxCellXml(`E${r}`, 36, si(nameText), "s"),
+    const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
+    const promoH = Math.max(
+      14.25,
+      receiptXlsxWrappedRowHeight(nameText, nameColWidth),
+      barcodeText !== "-"
+        ? receiptXlsxWrappedRowHeight(barcodeText, barcodeColWidth, {
+            min: 14.25,
+            linePt: 11,
+            pad: 2,
+            max: 28,
+          })
+        : 14.25,
+    );
+    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
+    pushItemTableRow(promoH, [
+      xlsxCellXml(`A${r}`, 9, null, "empty"),
+      xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
+      xlsxCellXml(`E${r}`, 37, si(unitText), "s"),
+      barcodeText !== "-"
+        ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
+        : xlsxCellXml(`F${r}`, 34, null, "empty"),
       xlsxCellXml(`H${r}`, 37, qty, "n"),
       xlsxCellXml(`J${r}`, 38, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`K${r}`, 38, Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "F", "G", 36),
+      ...emptyCells(r, "C", "D", 36),
+      ...emptyCells(r, "G", "G", 34),
       ...emptyCells(r, "I", "I", 37),
-    ];
-    if (idx === 0) {
-      cells.unshift(
-        xlsxCellXml(`C${r}`, 36, si("Урамшуулал"), "s"),
-        ...emptyCells(r, "D", "D", 36),
-      );
-    }
-    pushItemTableRow(promoH, cells);
+    ]);
   });
 
   if (promoLines.length) pushRow(14.25, emptyCells(rowNum));
 
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
-    if (grand && note) {
-      merges.push(`B${r}:D${r}`);
-      const labelStyle = 31;
-      const valueStyle = 32; // gray + #,##0 — never 33 (green badge)
-      pushRow(21.75, [
-        xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
-        xlsxCellXml(`E${r}`, 30, si(note), "s"),
-        xlsxCellXml(`F${r}`, 12, null, "empty"),
-        xlsxCellXml(`G${r}`, 12, null, "empty"),
-        xlsxCellXml(`H${r}`, 12, null, "empty"),
-        xlsxCellXml(`I${r}`, 12, null, "empty"),
-        xlsxCellXml(`J${r}`, 12, null, "empty"),
-        xlsxCellXml(`K${r}`, valueStyle, Number(amount) || 0, "n"),
-        ...emptyCells(r, "C", "D", labelStyle),
-      ]);
-      return;
-    }
-    merges.push(`B${r}:D${r}`, `E${r}:K${r}`);
     const labelStyle = grand ? 31 : 30;
-    // 32 = grand gray+#; 29 = #,##0.00; 12 = #,##0 — all real Excel numbers
     const valueStyle = grand ? 32 : decimals ? 29 : 12;
-    pushRow(grand ? 21.75 : 14.25, [
+    merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
+    const cells = [
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
-      xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"),
+      xlsxCellXml(`K${r}`, valueStyle, Number(amount) || 0, "n"),
       ...emptyCells(r, "C", "D", labelStyle),
-      ...emptyCells(r, "F", "K", valueStyle),
-    ]);
+    ];
+    if (grand && note) {
+      cells.push(xlsxCellXml(`E${r}`, 30, si(note), "s"));
+      cells.push(...emptyCells(r, "F", "J", valueStyle));
+    } else {
+      cells.push(...emptyCells(r, "E", "J", valueStyle));
+    }
+    pushRow(grand ? 21.75 : 14.25, cells);
   };
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
@@ -8326,19 +8433,26 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(14.25, emptyCells(rowNum));
-  const pushSignRole = (role) => {
-    const r = rowNum;
-    merges.push(`B${r}:E${r}`, `F${r}:J${r}`);
+  const pushSignBlock = (role) => {
+    const labelR = rowNum;
+    merges.push(`B${labelR}:E${labelR}`);
     pushRow(14.25, [
-      xlsxCellXml(`B${r}`, 41, si(role), "s"),
-      xlsxCellXml(`F${r}`, 17, null, "empty"),
-      ...emptyCells(r, "C", "E", 41),
-      ...emptyCells(r, "G", "J", 17),
+      xlsxCellXml(`B${labelR}`, 41, si(role), "s"),
+      ...emptyCells(labelR, "C", "E", 41),
+      ...emptyCells(labelR, "F", "K", 41),
+    ]);
+    const lineR = rowNum;
+    merges.push(`F${lineR}:J${lineR}`);
+    pushRow(24, [
+      xlsxCellXml(`F${lineR}`, 17, null, "empty"),
+      ...emptyCells(lineR, "A", "E", 17),
+      ...emptyCells(lineR, "G", "J", 17),
+      ...emptyCells(lineR, "K", "K", 17),
     ]);
   };
-  pushSignRole("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
-  pushRow(14.25, emptyCells(rowNum));
-  pushSignRole("Хүлээн авсан ажилтны гарын үсэг:");
+  pushSignBlock("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
+  pushRow(8, emptyCells(rowNum));
+  pushSignBlock("Хүлээн авсан ажилтны гарын үсэг:");
   pushRow(14.25, emptyCells(rowNum));
   return rowNum;
 }
@@ -14861,6 +14975,7 @@ function workerOrdersList() {
   return list.sort(compareOrdersNewestFirst);
 }
 function workerViewTabsHtml(tab) {
+  if (state.editingOrderId) return "";
   return `<div class="worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">Шинэ захиалга</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Захиалга харах</button></div>`;
 }
 function workerView() {
@@ -14876,11 +14991,15 @@ function clearWorkerOrderHighlight() {
   state.workerHighlightOrderId = "";
 }
 function openWorkerNewTab() {
-  if (state.filters.worker === "new") return;
+  if (state.filters.worker === "new") {
+    pullBackendStateNow();
+    return;
+  }
   clearWorkerOrderHighlight();
   state.filters.worker = "new";
   render();
   pushAppHistory();
+  pullBackendStateNow();
 }
 function openWorkerOrdersTab() {
   if (state.editingOrderId) {
@@ -15449,7 +15568,7 @@ function pickWorkerStore(id) {
 function confirmWorkerStore() {
   if (!state.workerCustomer || state.editingOrderId) return;
   state.workerStoreReady = true;
-  state.deliveryDate = todayIso();
+  state.deliveryDate = defaultDeliveryDate();
   resetWorkerCart();
   render();
   pushAppHistory();
@@ -15586,10 +15705,10 @@ function workerNewOrderStep(cart) {
       : "";
   const saving = orderSubmitLock;
   const headAction = editing
-    ? `<button type="button" onclick="cancelWorkerOrderEdit()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Буцах</button>`
+    ? ""
     : `<button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button>`;
   const headExtra = editing
-    ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")} · Захиалга засах</p>`
+    ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")}</p>`
     : "";
   const saveAction = editing ? "saveWorkerOrderEdit()" : "saveWorker()";
   const saveLabel = saving
@@ -15597,7 +15716,11 @@ function workerNewOrderStep(cart) {
     : editing
       ? "Өөрчлөлт хадгалах"
       : "Хадгалах";
-  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Бараа сонгох</span></button></div><div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div></div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
+  const addBtn = `<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${editing ? "Бараа нэмэх" : "Бараа сонгох"}</span></button></div>`;
+  const lines = `<div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div>`;
+  // Edit: show lines first so existing items aren't hidden under controls.
+  const bodyMain = editing ? `${lines}${addBtn}` : `${addBtn}${lines}`;
+  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
@@ -18919,7 +19042,7 @@ async function saveWorker() {
       ...orderEmailFields(e),
       isPaid: paidFromPaymentTerm(state.paymentTerm),
       paymentTerm: state.paymentTerm,
-      deliveryDate: todayIso(),
+      deliveryDate: isoDay(state.deliveryDate) || defaultDeliveryDate(),
       ...deliveryFieldsForNewOrder(),
     });
     state.orders.push(order);
@@ -19119,6 +19242,7 @@ function login(e) {
   state.currentView = defaultViewForRole(emp.role);
   saveAuthSession();
   render();
+  pullBackendStateNow();
 }
 function closeConfirmCard() {
   pendingConfirm = null;

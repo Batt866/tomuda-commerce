@@ -5058,13 +5058,13 @@ button:focus-visible,
   }
 
   .app-shell--bottom-nav .app-main:has(.worker-view--ordering) {
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .app-shell--bottom-nav .app-main__inner:has(.worker-view--ordering) {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+    display: block;
+    height: auto;
     min-height: 0;
   }
 
@@ -7997,13 +7997,18 @@ textarea::placeholder {
 
 .worker-order-edit-badge {
   margin: 6px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--hex-muted-foreground);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-primary);
 }
 
 .worker-order-card--edit .worker-order-card__head {
   align-items: flex-start;
+}
+
+.worker-order-card--edit .worker-order-card__tools {
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .worker-row-qty__n {
@@ -9878,14 +9883,15 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-order-card__foot {
-    position: static;
-    bottom: auto;
+    position: sticky;
+    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
-    z-index: 1;
-    margin-top: 0;
-    padding-top: 16px;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-    box-shadow: none;
+    z-index: 12;
+    margin-top: 8px;
+    padding-top: 12px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--hex-background);
+    box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
   }
 
   .app-shell--bottom-nav .worker-order-lines {
@@ -9894,22 +9900,21 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
+    display: block;
+    flex: none;
     min-height: 0;
     align-items: stretch;
-    gap: 8px;
+    gap: 0;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-view__tabs {
-    flex-shrink: 0;
+    margin-bottom: 8px;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__head {
@@ -9917,11 +9922,11 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__body {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-summary {
@@ -9937,27 +9942,22 @@ textarea::placeholder {
     flex-shrink: 0;
   }
 
-  .app-shell--bottom-nav .worker-view--ordering .worker-order-card__tools {
-    flex-shrink: 0;
-  }
-
   .app-shell--bottom-nav .worker-view--ordering .worker-order-lines-wrap {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    touch-action: pan-y;
+    overflow: visible;
+    max-height: none;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
-    position: static;
+    position: sticky;
+    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
     z-index: 12;
     background: var(--hex-background);
-    box-shadow: 0 -6px 16px rgba(16, 22, 35, 0.08);
-    padding-top: 16px;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
+    padding-top: 12px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .worker-selected-row {
