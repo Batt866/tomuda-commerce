@@ -4717,9 +4717,11 @@ function flushPendingCountRender() {
   countRenderPending = false;
   render();
 }
-function applyRemoteState(payload) {
+function applyRemoteState(payload, opts = {}) {
   if (!payload?.state) return false;
-  if (shouldDeferBackendSync()) return false;
+  const forceRender = !!opts.forceRender;
+  // Always merge server data into local memory. Only rendering may be deferred
+  // (typing/scrolling); otherwise peer-device customers never appear.
   const merged = protectAccidentalDeletions(
     mergePersistentStates(payload.state, persistentState()),
   );
@@ -4745,9 +4747,13 @@ function applyRemoteState(payload) {
     syncBackendSaveMarker();
   }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
-  saveLocalBackendCache({ state: merged, updatedAt: payload.updatedAt || "" });
+  // Cache the server snapshot (not the local merge) so the next boot sees peers.
+  saveLocalBackendCache({
+    state: payload.state,
+    updatedAt: payload.updatedAt || "",
+  });
   if (!state.isLoggedIn) return true;
-  safeRender();
+  if (forceRender || !shouldDeferBackendSync()) safeRender();
   if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
     pickerModal();
@@ -4762,21 +4768,27 @@ async function fetchBackendPayload() {
   if (!res.ok) return null;
   return res.json();
 }
+async function pullBackendStateNow(opts = {}) {
+  if (!backendReady || backendSaving || importLoading) return false;
+  try {
+    const payload = await fetchBackendPayload();
+    if (!payload?.state) return false;
+    return applyRemoteState(payload, { forceRender: true, ...opts });
+  } catch (error) {
+    console.warn("Backend pull failed", error);
+    return false;
+  }
+}
 async function pollBackendState() {
-  if (
-    !backendReady ||
-    backendSaving ||
-    backendSaveTimer ||
-    importLoading ||
-    stockInSaveLock
-  )
+  if (!backendReady || backendSaving || backendSaveTimer || importLoading || stockInSaveLock)
     return;
-  if (shouldDeferBackendSync()) return;
   try {
     const payload = await fetchBackendPayload();
     if (!payload?.updatedAt) return;
     if (!serverUpdatedAt) {
       serverUpdatedAt = payload.updatedAt;
+      // First poll after boot: still apply in case cache was stale.
+      applyRemoteState(payload);
       return;
     }
     if (payload.updatedAt === serverUpdatedAt) return;
@@ -6373,6 +6385,9 @@ function go(view, opts = {}) {
   }
   saveAuthSession();
   render();
+  if (changed && (view === "customers" || view === "products" || view === "worker")) {
+    pullBackendStateNow();
+  }
   if (changed && !opts.silent && !suppressHistoryPush) pushAppHistory();
 }
 function search(key, value) {
@@ -16845,6 +16860,40 @@ function initCustomerMap(lat, lng) {
   bindCustomerMapLocateButton();
   bindCustomerMapSettingsButton();
 }
+async function upsertCustomerOnServer(customer) {
+  if (!customer?.id) throw new Error("Харилцагч олдсонгүй");
+  const bodyCustomer = { ...customer };
+  const image = String(bodyCustomer.image || "").trim();
+  if (image.startsWith("data:image/")) delete bodyCustomer.image;
+  const res = await fetch(`${API_BASE}/customers/upsert`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      customer: bodyCustomer,
+      actor: state.currentEmployee
+        ? {
+            id: state.currentEmployee.id,
+            email: state.currentEmployee.email,
+          }
+        : null,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let msg = "Харилцагч серверт хадгалахад алдаа гарлаа";
+    try {
+      const err = await res.json();
+      if (err?.detail) msg = String(err.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
 async function applyCustomerSave(data, id) {
   const incomingImage = String(data.image || "").trim();
   if (productMediaPathFromUrl(incomingImage)) {
@@ -16882,14 +16931,52 @@ async function applyCustomerSave(data, id) {
   }
   const customerId = customer?.id || "";
   const customerName = customer?.name || customer?.companyName || "Харилцагч";
+  let upsertOk = false;
+  try {
+    const payload = await upsertCustomerOnServer(customer);
+    upsertOk = true;
+    if (payload?.customer?.id) {
+      const idx = state.customers.findIndex(
+        (c) => String(c.id) === String(payload.customer.id),
+      );
+      if (idx >= 0) {
+        state.customers[idx] = {
+          ...state.customers[idx],
+          ...payload.customer,
+        };
+      }
+    }
+    if (payload?.state) {
+      const session = captureSessionSnapshot();
+      const merged = mergePersistentStates(payload.state, persistentState());
+      applyPersistentState(merged);
+      restoreSessionSnapshot(session);
+    }
+    if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
+    saveLocalBackendCache({
+      state: payload?.state || persistentState(),
+      updatedAt: payload?.updatedAt || "",
+    });
+  } catch (error) {
+    console.warn("Customer upsert failed", error);
+  }
   closeModal();
   focusSavedCustomer(customerId, customerName);
-  const saved = await criticalBackendSave();
+  // Flush any other dirty local fields; customer row is already on the server.
+  let saved = upsertOk;
+  try {
+    const flushed = await criticalBackendSave();
+    saved = upsertOk || !!flushed;
+  } catch {
+    saved = upsertOk;
+  }
   if (!saved) {
     showAppToast(
       `${customerName} хадгалагдлаа, серверт илгээхэд алдаа гарлаа`,
       "error",
     );
+  } else {
+    showAppToast(`${customerName} хадгалагдлаа`, "success");
   }
 }
 async function saveCustomer(e, id) {

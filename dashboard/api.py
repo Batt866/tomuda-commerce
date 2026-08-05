@@ -149,6 +149,109 @@ def save_state(request, payload: dict[str, Any] = Body(...)):
     return {"ok": True, "state": data, "updatedAt": updated_at}
 
 
+def _actor_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    actor = payload.get("actor")
+    return actor if isinstance(actor, dict) else None
+
+
+def _strip_customer_inline_image(customer: dict[str, Any]) -> dict[str, Any]:
+    next_customer = dict(customer)
+    image = str(next_customer.get("image") or "").strip()
+    if image.startswith("data:image/"):
+        next_customer.pop("image", None)
+    elif image:
+        next_customer["image"] = image
+    else:
+        next_customer.pop("image", None)
+    return next_customer
+
+
+@api.post("/customers/upsert")
+def upsert_customer(request, payload: dict[str, Any] = Body(...)):
+    """Atomically create/update one customer so devices do not wait on full-state races."""
+    raw_customer = payload.get("customer")
+    if not isinstance(raw_customer, dict) or raw_customer.get("id") is None:
+        raise HttpError(400, "Харилцагчийн мэдээлэл дутуу байна")
+    customer = _strip_customer_inline_image(raw_customer)
+    customer_id = str(customer.get("id"))
+    actor = _actor_payload(payload)
+
+    with transaction.atomic():
+        row, _ = AppState.objects.get_or_create(
+            key="main",
+            defaults={"data": default_state()},
+        )
+        row = AppState.objects.select_for_update().get(pk=row.pk)
+        current = dict(row.data or default_state())
+        employee = find_employee(current, actor)
+        if not employee:
+            raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
+
+        customers = [
+            dict(item)
+            for item in (current.get("customers") or [])
+            if isinstance(item, dict) and item.get("id") is not None
+        ]
+        existing_idx = next(
+            (
+                index
+                for index, item in enumerate(customers)
+                if str(item.get("id")) == customer_id
+            ),
+            -1,
+        )
+        if existing_idx >= 0:
+            if not (
+                has_permission(employee, "customers.edit")
+                or has_permission(employee, "customers.create")
+                or has_permission(employee, "customerAdd.edit")
+                or has_permission(employee, "customerAdd.create")
+            ):
+                raise HttpError(403, "Харилцагч засах эрхгүй")
+            previous = customers[existing_idx]
+            merged_customer = {**previous, **customer}
+            if not merged_customer.get("image") and previous.get("image"):
+                merged_customer["image"] = previous["image"]
+            customers[existing_idx] = merged_customer
+            saved_customer = merged_customer
+        else:
+            if not (
+                has_permission(employee, "customers.create")
+                or has_permission(employee, "customerAdd.create")
+                or has_permission(employee, "customerAdd.view")
+            ):
+                raise HttpError(403, "Харилцагч нэмэх эрхгүй")
+            customers.append(customer)
+            saved_customer = customer
+
+        data = dict(current)
+        data["customers"] = customers
+        # Re-adding a customer clears its tombstone so merge won't drop it again.
+        data["deletionLog"] = [
+            entry
+            for entry in (data.get("deletionLog") or [])
+            if not (
+                isinstance(entry, dict)
+                and str(entry.get("type") or "") == "customer"
+                and str(entry.get("id") or "") == customer_id
+            )
+        ]
+        data, _ = sanitize_app_state(data)
+        data, _ = _hydrate_all_images(data)
+        row.data = data
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {
+        "ok": True,
+        "customer": saved_customer,
+        "state": data,
+        "updatedAt": updated_at,
+    }
+
+
 def _require_import_permission(state: dict[str, Any], actor: dict[str, Any] | None, perm: str) -> None:
     if not actor:
         raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")

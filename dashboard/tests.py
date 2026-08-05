@@ -838,3 +838,66 @@ class MultiDeviceStateMergeTests(TestCase):
         saved_ids = {c["id"] for c in response.json()["state"]["customers"]}
         self.assertIn("c-keep", saved_ids)
         self.assertNotIn("c-delete", saved_ids)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class CustomerUpsertApiTests(TestCase):
+    def test_upsert_adds_customer_without_full_state_post(self):
+        state = default_state()
+        state["customers"] = [
+            {
+                "id": "c-existing",
+                "name": "Existing",
+                "companyName": "",
+                "phone1": "99111111",
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        response = self.client.post(
+            "/api/customers/upsert",
+            {
+                "customer": {
+                    "id": "c-new-device",
+                    "name": "New from phone",
+                    "companyName": "Store LLC",
+                    "phone1": "99444444",
+                    "registrationNumber": "",
+                    "address": "UB",
+                },
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        ids = {c["id"] for c in payload["state"]["customers"]}
+        self.assertIn("c-existing", ids)
+        self.assertIn("c-new-device", ids)
+
+        row = AppState.objects.get(key="main")
+        db_ids = {c["id"] for c in row.data["customers"]}
+        self.assertIn("c-new-device", db_ids)
+
+        # Peer device full-state save without the new customer must not wipe it.
+        peer = default_state()
+        peer["customers"] = [
+            {
+                "id": "c-existing",
+                "name": "Existing",
+                "companyName": "",
+                "phone1": "99111111",
+            }
+        ]
+        peer_response = self.client.post(
+            "/api/state",
+            {
+                "state": peer,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(peer_response.status_code, 200, peer_response.content)
+        peer_ids = {c["id"] for c in peer_response.json()["state"]["customers"]}
+        self.assertIn("c-new-device", peer_ids)
+        self.assertIn("c-existing", peer_ids)
