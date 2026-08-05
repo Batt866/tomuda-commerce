@@ -12837,14 +12837,18 @@ function openPromotionPage(type) {
 function promoPanelAddButton(onclick) {
   return `<button type="button" onclick="${onclick}" class="promo-panel__add"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Дүрэм нэмэх</span></button>`;
 }
-function promoPanelShell({ lead = "", addOnclick, listHtml }) {
+function promoPanelShell({ lead = "", addOnclick, listHtml, type = "" }) {
   const leadHtml = lead
     ? `<p class="promo-panel__lead">${lead}</p>`
     : "";
-  return `<div class="promo-panel">${leadHtml}<div class="promo-panel__toolbar">${promoPanelAddButton(addOnclick)}</div><div class="promo-rule-list">${listHtml}</div></div>`;
+  return `<div class="promo-panel${type ? ` promo-panel--${type}` : ""}">${leadHtml}<div class="promo-panel__toolbar">${promoPanelAddButton(addOnclick)}</div><div class="promo-rule-list">${listHtml}</div></div>`;
 }
 function promoRuleListEmpty() {
   return `<div class="promo-rule-list__empty"><span class="promo-rule-list__empty-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${MOBILE_NAV_SVG.promotions}</svg></span><p>${PROMO_EMPTY_RULES_TEXT}</p></div>`;
+}
+function promoDetailBannerHtml(type, count) {
+  const label = promotionTypeLabel(type);
+  return `<div class="promo-detail-banner promo-detail-banner--${esc(type)}"><span class="promo-detail-banner__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${promoTypeIconSvg(type)}</svg></span><div class="promo-detail-banner__body"><p class="promo-detail-banner__title">${esc(label)}</p><p class="promo-detail-banner__meta">${count} дүрэм</p></div></div>`;
 }
 function promotionsView() {
   const detail = state.filters.promotionDetail;
@@ -12854,13 +12858,31 @@ function promotionsView() {
   const qty = state.promotionRules.quantity || [],
     price = state.promotionRules.price || [],
     payment = state.promotionRules.payment || [],
+    rows =
+      detail === "quantity" ? qty : detail === "payment" ? payment : price,
     panel =
       detail === "quantity"
         ? promotionQuantityPanel(qty)
         : detail === "payment"
           ? promotionPaymentPanel(payment)
           : promotionPricePanel(price);
-  return `<div class="promo-page space-y-4">${pageHead(promotionTypeLabel(detail))}${panel}</div>`;
+  return `<div class="promo-page space-y-4">${pageHead(promotionTypeLabel(detail))}${promoDetailBannerHtml(detail, rows.length)}${panel}</div>`;
+}
+function promoFormFieldHtml(label, inputHtml, hint = "") {
+  return `<label class="promo-form-field"><span class="promo-form-field__label">${label}</span>${inputHtml}${hint ? `<span class="promo-form-field__hint">${hint}</span>` : ""}</label>`;
+}
+function promoFormGroupHtml(body, { step = "", title = "" } = {}) {
+  const head =
+    step || title
+      ? `<div class="promo-form-group__head">${step ? `<span class="promo-form-group__step">${step}</span>` : ""}<span class="promo-form-group__title">${title}</span></div>`
+      : "";
+  return `<section class="promo-form-group">${head}<div class="promo-form-group__body">${body}</div></section>`;
+}
+function promoFormSaveBtn() {
+  return `<button type="submit" class="promo-form__save"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Хадгалах</span></button>`;
+}
+function promoFormShell(attrs, bodyHtml) {
+  return `<form ${attrs} class="promo-form"><div class="modal-scroll promo-form__body">${bodyHtml}</div><div class="promo-form__foot">${promoFormSaveBtn()}</div></form>`;
 }
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
@@ -13637,6 +13659,7 @@ function promotionQuantityPanel(rows) {
   return promoPanelShell({
     addOnclick: "openPromotionQtyModal()",
     listHtml,
+    type: "quantity",
   });
 }
 function promoRuleDeleteBtn(kind, i) {
@@ -13677,7 +13700,7 @@ function promotionQtyRuleCard(r, i) {
       .join(""),
     freeRows = freeProducts.map((p) => promoQtyProductChipHtml(p)).join(""),
     deleteBtn = promoRuleDeleteBtn("quantity", i);
-  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane"><p class="promo-rule-card__lane-label">${esc(buyLabel)}</p><div class="promo-qty-chips">${buyRows || `<p class="promo-rule-card__empty">—</p>`}</div></section><div class="promo-rule-card__divider" aria-hidden="true"></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(freeLabel)}</p><div class="promo-qty-chips">${freeRows || `<p class="promo-rule-card__empty">—</p>`}</div></section></div></article>`;
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__lane-label">${esc(buyLabel)}</p><div class="promo-qty-chips">${buyRows || `<p class="promo-rule-card__empty">—</p>`}</div></section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(freeLabel)}</p><div class="promo-qty-chips">${freeRows || `<p class="promo-rule-card__empty">—</p>`}</div></section></div></article>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -13706,6 +13729,7 @@ function promotionPricePanel(rows) {
     lead: `Захиалгын нийт дүнгийн хүрээнд ${promoProductLabelInline()} эсвэл хувийн хөнгөлөлт олгоно.`,
     addOnclick: "openPromotionPriceModal()",
     listHtml,
+    type: "price",
   });
 }
 function promotionPaymentRuleText(r) {
@@ -13728,6 +13752,7 @@ function promotionPaymentPanel(rows) {
   return promoPanelShell({
     addOnclick: "openPromotionPaymentModal()",
     listHtml,
+    type: "payment",
   });
 }
 function promotionPriceAmountLabel(r) {
@@ -13773,7 +13798,7 @@ function promotionPaymentRuleCard(r, i) {
         : "Урамшуулал",
     termBody = `<p class="promo-rule-card__amount">${esc(`${fmt(min)}-с дээш`)}</p>`,
     deleteBtn = promoRuleDeleteBtn("payment", i);
-  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane"><p class="promo-rule-card__lane-label">${esc(term)}</p>${min > 0 ? termBody : ""}</section><div class="promo-rule-card__divider" aria-hidden="true"></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${rewardHtml}</section></div></article>`;
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__lane-label">${esc(term)}</p>${min > 0 ? termBody : ""}</section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${rewardHtml}</section></div></article>`;
 }
 function promotionPriceRuleCard(r, i) {
   const freeIds = promotionFreeProductIds(r),
@@ -13788,7 +13813,7 @@ function promotionPriceRuleCard(r, i) {
         ? `Урамшуулал · ${freeQty} ш`
         : PROMO_PRODUCT_LABEL,
     deleteBtn = promoRuleDeleteBtn("price", i);
-  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane"><p class="promo-rule-card__amount promo-rule-card__amount--solo">${esc(amountLabel)}</p></section><div class="promo-rule-card__divider" aria-hidden="true"></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${promotionPriceRewardHtml(r)}</section></div></article>`;
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__amount promo-rule-card__amount--solo">${esc(amountLabel)}</p></section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${promotionPriceRewardHtml(r)}</section></div></article>`;
 }
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
@@ -13822,8 +13847,12 @@ function promotionQtyModal() {
     freeIds = state.promoPick.freeProductIds;
   box(
     promotionPageTitle("quantity"),
-    `<form data-promo-modal="qty" onsubmit="savePromotionQty(event)" class="promo-qty-form p-5 flex flex-col max-h-[85vh]"><div class="modal-scroll overflow-y-auto promo-qty-form__body flex-1">${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: "Урамшуулал", hint: "Олон бараа сонгож болно · захиалгын бараатай ижил байж болно", placeholder: "урамшуулал хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}</div><div class="promo-qty-form__foot pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    promoFormShell(
+      `data-promo-modal="qty" onsubmit="savePromotionQty(event)"`,
+      `${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: "Урамшуулал", hint: "Олон бараа сонгож болно · захиалгын бараатай ижил байж болно", placeholder: "урамшуулал хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}`,
+    ),
     "max-w-2xl",
+    { panelClass: "modal-panel--promo" },
   );
 }
 function openPromotionPriceModal() {
@@ -13853,7 +13882,7 @@ function promotionPriceModal() {
   const type = state.promoPriceRuleType === "percent" ? "percent" : "free",
     freeIds = state.promoPick.priceFreeProductIds || [],
     typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">${PROMO_PRODUCT_LABEL}</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">${PROMO_PERCENT_TAB_LABEL}</button></div>`,
-    amountFields = `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { required: true, placeholder: "200000", value: promoFormDraftVal("minAmount") })}</label><label class="block"><span class="block text-sm font-medium mb-2">Дээд дүн (₮)</span>${promoAmountInputHtml("maxAmount", { placeholder: "400000", value: promoFormDraftVal("maxAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label></div>`,
+    amountFields = `<div class="promo-form-grid">${promoFormFieldHtml("Доод дүн (₮)", promoAmountInputHtml("minAmount", { required: true, placeholder: "200000", value: promoFormDraftVal("minAmount") }))}${promoFormFieldHtml("Дээд дүн (₮)", promoAmountInputHtml("maxAmount", { placeholder: "400000", value: promoFormDraftVal("maxAmount") }), "Хоосон = хязгааргүй")}</div>`,
     freeBlock =
       type === "free"
         ? promotionMultiFreePickerBlock({
@@ -13863,17 +13892,32 @@ function promotionPriceModal() {
             title: PROMO_PRODUCT_LABEL,
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайж нэмэх...",
+            badge: "2",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
           })
         : "",
     percentBlock =
       type === "percent"
-        ? `<label class="block"><span class="block text-sm font-medium mb-2">${PROMO_PERCENT_TAB_LABEL} (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
+        ? promoFormGroupHtml(
+            promoFormFieldHtml(
+              `${PROMO_PERCENT_TAB_LABEL} (%)`,
+              promoAmountInputHtml("discountPercent", {
+                required: true,
+                placeholder: "5",
+                value: promoFormDraftVal("discountPercent"),
+              }),
+            ),
+            { step: "2", title: PROMO_PERCENT_TAB_LABEL },
+          )
         : "";
   box(
     promotionPageTitle("price"),
-    `<form data-promo-modal="price" onsubmit="savePromotionPrice(event)" class="p-5 flex flex-col max-h-[85vh]"><input type="hidden" name="type" value="${type}"><div class="modal-scroll overflow-y-auto space-y-4 flex-1">${amountFields}${typeToggle}${freeBlock}${percentBlock}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    promoFormShell(
+      `data-promo-modal="price" onsubmit="savePromotionPrice(event)"`,
+      `<input type="hidden" name="type" value="${type}">${promoFormGroupHtml(amountFields, { step: "1", title: promotionPageTitle("price") })}${promoFormGroupHtml(typeToggle)}${freeBlock}${percentBlock}`,
+    ),
     "max-w-2xl",
+    { panelClass: "modal-panel--promo" },
   );
 }
 function openPromotionPaymentModal() {
@@ -13911,7 +13955,14 @@ function promotionPaymentModal() {
     freeIds = state.promoPick.paymentFreeProductIds || [],
     termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Шууд төлөх</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Зээлээр</button></div>`,
     typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPaymentRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">${PROMO_PRODUCT_LABEL}</button><button type="button" onclick="setPromotionPaymentRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">Хувь тооцох</button></div>`,
-    minField = `<label class="block"><span class="block text-sm font-medium mb-2">Доод дүн (₮)</span>${promoAmountInputHtml("minAmount", { placeholder: "0", value: promoFormDraftVal("minAmount") })}<span class="text-xs text-muted-foreground mt-1 block">Хоосон = хязгааргүй</span></label>`,
+    minField = promoFormFieldHtml(
+      "Доод дүн (₮)",
+      promoAmountInputHtml("minAmount", {
+        placeholder: "0",
+        value: promoFormDraftVal("minAmount"),
+      }),
+      "Хоосон = хязгааргүй",
+    ),
     freeBlock =
       type === "free"
         ? promotionMultiFreePickerBlock({
@@ -13921,17 +13972,32 @@ function promotionPaymentModal() {
             title: PROMO_PRODUCT_LABEL,
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайх...",
+            badge: "2",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
           })
         : "",
     percentBlock =
       type === "percent"
-        ? `<label class="block"><span class="block text-sm font-medium mb-2">Хөнгөлөлтийн хувь (%)</span>${promoAmountInputHtml("discountPercent", { required: true, placeholder: "5", value: promoFormDraftVal("discountPercent") })}</label>`
+        ? promoFormGroupHtml(
+            promoFormFieldHtml(
+              "Хөнгөлөлтийн хувь (%)",
+              promoAmountInputHtml("discountPercent", {
+                required: true,
+                placeholder: "5",
+                value: promoFormDraftVal("discountPercent"),
+              }),
+            ),
+            { step: "2", title: "Хувь тооцох" },
+          )
         : "";
   box(
     promotionPageTitle("payment"),
-    `<form data-promo-modal="payment" onsubmit="savePromotionPayment(event)" class="p-5 flex flex-col max-h-[85vh]"><input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="${term}"><div class="modal-scroll overflow-y-auto space-y-4 flex-1">${termToggle}${minField}${typeToggle}${freeBlock}${percentBlock}</div><div class="pt-4 mt-2 border-t border-border"><button class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    promoFormShell(
+      `data-promo-modal="payment" onsubmit="savePromotionPayment(event)"`,
+      `<input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="${term}">${promoFormGroupHtml(termToggle, { step: "1", title: promotionPageTitle("payment") })}${promoFormGroupHtml(minField)}${promoFormGroupHtml(typeToggle)}${freeBlock}${percentBlock}`,
+    ),
     "max-w-2xl",
+    { panelClass: "modal-panel--promo" },
   );
 }
 function savePromotionQty(e) {
