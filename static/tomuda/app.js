@@ -856,16 +856,18 @@ function documentSignatureBlockHtml(opts = {}) {
     `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" class="doc-sign__role">${esc(role)}</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
   return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
 }
-/** SignatureSection — sample R51/R53: role + blank line only (no title / Нэр / Гарын үсэг hints). */
+/** SignatureSection — sample: role + dotted line on same row; 2nd line indented. */
 function receiptSignatureRowsHtml(opts = {}) {
   const pushDown = !!opts.pushDown;
   const fill = pushDown
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
-  const block = (role) =>
-    `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
+  const block = (role, { indent = false } = {}) =>
+    indent
+      ? `<tr class="receipt-grid__sign receipt-grid__sign--indent"><td></td><td></td><td></td><td colspan="3" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td></tr>`
+      : `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
-  return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
+  return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:", { indent: true })}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -7493,7 +7495,7 @@ td, th { border: none; }
   border-bottom: 1px dotted #666 !important;
 }
 .receipt-grid__pay-opt {
-  text-align: center;
+  text-align: right;
   font-size: 11px;
   font-weight: 400;
   color: ${RECEIPT_TEXT};
@@ -8087,7 +8089,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const deliveryDateText = receiptDeliveryDateDisplay(o);
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}                                             ${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header R1–R3: logo A:B (2 rows only — never overlaps title), brand C:F, addr C:H, title C:J, date K
+  // Header R1–R3: logo A:B (2 rows only — never overlaps title), brand C:F, addr C:H, title C:J
+  // Date: label J:K right-aligned; value only in K (right) — matches ҮНДСЭН sample
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
@@ -8097,7 +8100,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `C${hr2}:H${hr2}`,
     `C${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
-    `J${hr2}:K${hr2}`,
   );
   pushRow(14.25, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
@@ -8109,10 +8111,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(27, [
     xlsxCellXml(`C${hr2}`, 5, si(companyAddr), "s"),
-    xlsxCellXml(`J${hr2}`, 15, si(deliveryDateText), "s"),
+    // 46 = bold right — sits under "огноо:" in K, same as sample
+    xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "D", "H", 5),
-    ...emptyCells(hr2, "I", "I", 15),
-    ...emptyCells(hr2, "K", "K", 15),
   ]);
   pushRow(31.5, [
     xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -8399,14 +8400,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     note: grandNote || "",
   });
 
-  // Төлбөрийн нөхцөл — утга K баганад (нийт дүнтэй нэг багана)
+  // Төлбөрийн нөхцөл — K баганад, баруун шахалт (баганы дотор)
   {
     const r = rowNum;
     const term = receiptPaymentTermDisplay(o);
     merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
     pushRow(14.25, [
       xlsxCellXml(`B${r}`, 30, si("Төлбөрийн нөхцөл"), "s"),
-      xlsxCellXml(`K${r}`, 15, si(term), "s"),
+      // 46 = bold, right-aligned — stays in K, flush with totals
+      xlsxCellXml(`K${r}`, 46, si(term), "s"),
       ...emptyCells(r, "C", "D", 30),
       ...emptyCells(r, "E", "J", 1),
     ]);
@@ -8443,26 +8445,30 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(14.25, emptyCells(rowNum));
-  const pushSignBlock = (role) => {
-    const labelR = rowNum;
-    merges.push(`B${labelR}:E${labelR}`);
-    pushRow(14.25, [
-      xlsxCellXml(`B${labelR}`, 41, si(role), "s"),
-      ...emptyCells(labelR, "C", "E", 41),
-      ...emptyCells(labelR, "F", "K", 41),
-    ]);
-    const lineR = rowNum;
-    merges.push(`F${lineR}:J${lineR}`);
-    pushRow(24, [
-      xlsxCellXml(`F${lineR}`, 17, null, "empty"),
-      ...emptyCells(lineR, "A", "E", 17),
-      ...emptyCells(lineR, "G", "J", 17),
-      ...emptyCells(lineR, "K", "K", 17),
-    ]);
+  // ҮНДСЭН sample: label + dotted line on ONE row; 2nd signature indented right
+  const pushSignRow = (role, { indent = false } = {}) => {
+    const r = rowNum;
+    if (indent) {
+      merges.push(`D${r}:G${r}`, `H${r}:K${r}`);
+      pushRow(18, [
+        xlsxCellXml(`D${r}`, 41, si(role), "s"),
+        xlsxCellXml(`H${r}`, 17, null, "empty"),
+        ...emptyCells(r, "E", "G", 41),
+        ...emptyCells(r, "I", "K", 17),
+      ]);
+    } else {
+      merges.push(`B${r}:E${r}`, `F${r}:K${r}`);
+      pushRow(18, [
+        xlsxCellXml(`B${r}`, 41, si(role), "s"),
+        xlsxCellXml(`F${r}`, 17, null, "empty"),
+        ...emptyCells(r, "C", "E", 41),
+        ...emptyCells(r, "G", "K", 17),
+      ]);
+    }
   };
-  pushSignBlock("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
-  pushRow(8, emptyCells(rowNum));
-  pushSignBlock("Хүлээн авсан ажилтны гарын үсэг:");
+  pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
+  pushRow(10, emptyCells(rowNum));
+  pushSignRow("Хүлээн авсан ажилтны гарын үсэг:", { indent: true });
   pushRow(14.25, emptyCells(rowNum));
   return rowNum;
 }
