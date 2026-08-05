@@ -12800,19 +12800,30 @@ function promotionTypeLabel(type) {
     }[type] || "Урамшуулал"
   );
 }
+function promoTypeIconSvg(type) {
+  const paths = {
+    price:
+      '<path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    quantity:
+      '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/>',
+    payment:
+      '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+  };
+  return paths[type] || MOBILE_NAV_SVG.promotions;
+}
 function promotionMenuHtml() {
   const items = [
     ["price", promotionPageTitle("price")],
     ["quantity", promotionPageTitle("quantity")],
     ["payment", promotionPageTitle("payment")],
   ];
-  return `<nav class="admin-menu promo-type-menu" aria-label="Урамшууллын төрөл">${items
+  return `<nav class="promo-hub" aria-label="Урамшууллын төрөл">${items
     .map(([id, label]) => {
       const count = (state.promotionRules[id] || []).length;
-      const badge = count
-        ? `<span class="promo-type-menu__count">${count}</span>`
-        : "";
-      return `<button type="button" onclick="openPromotionPage('${id}')" class="admin-menu__item promo-type-menu__item"><span class="promo-type-menu__label">${esc(label)}</span>${badge}</button>`;
+      const countHtml = count
+        ? `<span class="promo-hub-card__count">${count}</span>`
+        : `<span class="promo-hub-card__count promo-hub-card__count--empty">0</span>`;
+      return `<button type="button" onclick="openPromotionPage('${id}')" class="promo-hub-card promo-hub-card--${id}"><span class="promo-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${promoTypeIconSvg(id)}</svg></span><span class="promo-hub-card__body"><span class="promo-hub-card__label">${esc(label)}</span></span>${countHtml}<svg class="ui-icon promo-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
     })
     .join("")}</nav>`;
 }
@@ -12823,10 +12834,22 @@ function openPromotionPage(type) {
   render();
   pushAppHistory();
 }
+function promoPanelAddButton(onclick) {
+  return `<button type="button" onclick="${onclick}" class="promo-panel__add"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Дүрэм нэмэх</span></button>`;
+}
+function promoPanelShell({ lead = "", addOnclick, listHtml }) {
+  const leadHtml = lead
+    ? `<p class="promo-panel__lead">${lead}</p>`
+    : "";
+  return `<div class="promo-panel">${leadHtml}<div class="promo-panel__toolbar">${promoPanelAddButton(addOnclick)}</div><div class="promo-rule-list">${listHtml}</div></div>`;
+}
+function promoRuleListEmpty() {
+  return `<div class="promo-rule-list__empty"><span class="promo-rule-list__empty-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${MOBILE_NAV_SVG.promotions}</svg></span><p>${PROMO_EMPTY_RULES_TEXT}</p></div>`;
+}
 function promotionsView() {
   const detail = state.filters.promotionDetail;
   if (!detail) {
-    return `<div class="space-y-4">${pageHead("Урамшуулал")}${promotionMenuHtml()}</div>`;
+    return `<div class="promo-page space-y-4">${pageHead("Урамшуулал")}${promotionMenuHtml()}</div>`;
   }
   const qty = state.promotionRules.quantity || [],
     price = state.promotionRules.price || [],
@@ -12837,7 +12860,7 @@ function promotionsView() {
         : detail === "payment"
           ? promotionPaymentPanel(payment)
           : promotionPricePanel(price);
-  return `<div class="space-y-4">${pageHead(promotionTypeLabel(detail))}${panel}</div>`;
+  return `<div class="promo-page space-y-4">${pageHead(promotionTypeLabel(detail))}${panel}</div>`;
 }
 function productLabel(id) {
   return state.products.find((p) => p.id === id)?.name || "-";
@@ -13608,7 +13631,22 @@ function promoQtyProductChipHtml(p, qty = 0) {
   return `<div class="promo-qty-chip"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="promo-qty-chip__img" alt=""><span class="promo-qty-chip__name">${esc(p.name)}</span>${qtyBadge}</div>`;
 }
 function promotionQuantityPanel(rows) {
-  return `<div class="space-y-3"><button onclick="openPromotionQtyModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="promo-qty-rule-list">${rows.length ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("") : `<div class="promo-qty-rule-list__empty">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
+  const listHtml = rows.length
+    ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("")
+    : promoRuleListEmpty();
+  return promoPanelShell({
+    addOnclick: "openPromotionQtyModal()",
+    listHtml,
+  });
+}
+function promoRuleDeleteBtn(kind, i) {
+  if (!canDelete()) return "";
+  return deleteIconButton({
+    className:
+      "icon-action-btn icon-action-btn--neutral promo-rule-card__delete",
+    attrs: `onclick="confirmRemovePromotionRule('${kind}',${i})"`,
+    label: "Дүрэм устгах",
+  });
 }
 function promotionQtyRuleCard(r, i) {
   const buyIds = promotionBuyProductIds(r),
@@ -13638,15 +13676,8 @@ function promotionQtyRuleCard(r, i) {
       )
       .join(""),
     freeRows = freeProducts.map((p) => promoQtyProductChipHtml(p)).join(""),
-    deleteBtn = canDelete()
-      ? deleteIconButton({
-          className:
-            "icon-action-btn icon-action-btn--neutral promo-qty-rule-card__delete",
-          attrs: `onclick="confirmRemovePromotionRule('quantity',${i})"`,
-          label: "Дүрэм устгах",
-        })
-      : "";
-  return `<article class="promo-qty-rule-card"><header class="promo-qty-rule-card__head"><span class="promo-qty-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-qty-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-qty-rule-card__flow"><section class="promo-qty-rule-card__lane"><p class="promo-qty-rule-card__lane-label">${esc(buyLabel)}</p><div class="promo-qty-chips">${buyRows || `<p class="promo-qty-rule-card__empty">—</p>`}</div></section><div class="promo-qty-rule-card__divider" aria-hidden="true"></div><section class="promo-qty-rule-card__lane promo-qty-rule-card__lane--free"><p class="promo-qty-rule-card__lane-label">${esc(freeLabel)}</p><div class="promo-qty-chips">${freeRows || `<p class="promo-qty-rule-card__empty">—</p>`}</div></section></div></article>`;
+    deleteBtn = promoRuleDeleteBtn("quantity", i);
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane"><p class="promo-rule-card__lane-label">${esc(buyLabel)}</p><div class="promo-qty-chips">${buyRows || `<p class="promo-rule-card__empty">—</p>`}</div></section><div class="promo-rule-card__divider" aria-hidden="true"></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(freeLabel)}</p><div class="promo-qty-chips">${freeRows || `<p class="promo-rule-card__empty">—</p>`}</div></section></div></article>`;
 }
 function promotionPriceRuleText(r) {
   if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
@@ -13668,7 +13699,14 @@ function promotionPricePanel(rows) {
   const sorted = [...rows].sort(
     (a, b) => (Number(a.minAmount) || 0) - (Number(b.minAmount) || 0),
   );
-  return `<div class="space-y-3"><p class="text-sm text-muted-foreground">Захиалгын нийт дүнгийн хүрээнд ${promoProductLabelInline()} эсвэл хувийн хөнгөлөлт олгоно.</p><button onclick="openPromotionPriceModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${sorted.length ? sorted.map((r, i) => promotionPriceRuleCard(r, rows.indexOf(r))).join("") : `<div class="p-6 text-sm text-muted-foreground">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
+  const listHtml = sorted.length
+    ? sorted.map((r) => promotionPriceRuleCard(r, rows.indexOf(r))).join("")
+    : promoRuleListEmpty();
+  return promoPanelShell({
+    lead: `Захиалгын нийт дүнгийн хүрээнд ${promoProductLabelInline()} эсвэл хувийн хөнгөлөлт олгоно.`,
+    addOnclick: "openPromotionPriceModal()",
+    listHtml,
+  });
 }
 function promotionPaymentRuleText(r) {
   const term = r.paymentTerm === "credit" ? "Зээлээр" : "Шууд төлөх",
@@ -13684,13 +13722,73 @@ function promotionPaymentRuleText(r) {
   return `${term}${minText} · ${freeNames || "-"} ${promoProductQtyLabel(r.freeQty)}`;
 }
 function promotionPaymentPanel(rows) {
-  return `<div class="space-y-3"><button onclick="openPromotionPaymentModal()" class="px-4 py-2 bg-primary text-primary-foreground rounded text-sm">Дүрэм нэмэх</button><div class="bg-card rounded overflow-hidden divide-y divide-border">${rows.length ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("") : `<div class="p-6 text-sm text-muted-foreground">${PROMO_EMPTY_RULES_TEXT}</div>`}</div></div>`;
+  const listHtml = rows.length
+    ? rows.map((r, i) => promotionPaymentRuleCard(r, i)).join("")
+    : promoRuleListEmpty();
+  return promoPanelShell({
+    addOnclick: "openPromotionPaymentModal()",
+    listHtml,
+  });
+}
+function promotionPriceAmountLabel(r) {
+  if (r.minAmount == null && r.discountPercent && !r.freeProductId) {
+    return r.category ? `Ангилал: ${r.category}` : "Бүх ангилал";
+  }
+  const min = fmt(Number(r.minAmount) || 0),
+    max = Number(r.maxAmount) > 0 ? fmt(Number(r.maxAmount)) : "";
+  return max ? `${min} – ${max}` : `${min}-с дээш`;
+}
+function promotionPriceRewardHtml(r) {
+  const freeIds = promotionFreeProductIds(r);
+  const freeProducts = freeIds
+    .map((id) => state.products.find((p) => p.id === id))
+    .filter(Boolean);
+  const isPercent =
+    r.type === "percent" || (r.discountPercent && !freeIds.length);
+  if (isPercent) {
+    return `<div class="promo-rule-card__percent"><span class="promo-rule-card__percent-value">${esc(String(r.discountPercent || 0))}%</span><span class="promo-rule-card__percent-label">хөнгөлөлт</span></div>`;
+  }
+  const freeQty = Math.floor(Number(r.freeQty) || 0);
+  const freeRows = freeProducts.map((p) => promoQtyProductChipHtml(p)).join("");
+  return `<div class="promo-qty-chips">${freeRows || `<p class="promo-rule-card__empty">—</p>`}</div>${freeQty > 0 ? `<p class="promo-rule-card__gift-meta">${esc(promoProductQtyLabel(freeQty))}</p>` : ""}`;
 }
 function promotionPaymentRuleCard(r, i) {
-  return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPaymentRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('payment',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
+  const term = r.paymentTerm === "credit" ? "Зээлээр" : "Шууд төлөх",
+    min = Number(r.minAmount) || 0,
+    freeIds = promotionFreeProductIds(r),
+    freeProducts = freeIds
+      .map((id) => state.products.find((p) => p.id === id))
+      .filter(Boolean),
+    isPercent =
+      r.type === "percent" || (r.discountPercent && !freeIds.length),
+    formula = promotionPaymentRuleText(r),
+    freeQty = Math.floor(Number(r.freeQty) || 0),
+    rewardHtml = isPercent
+      ? `<div class="promo-rule-card__percent"><span class="promo-rule-card__percent-value">${esc(String(r.discountPercent || 0))}%</span><span class="promo-rule-card__percent-label">хөнгөлөлт</span></div>`
+      : `<div class="promo-qty-chips">${freeProducts.map((p) => promoQtyProductChipHtml(p)).join("") || `<p class="promo-rule-card__empty">—</p>`}</div>${freeQty > 0 ? `<p class="promo-rule-card__gift-meta">${esc(promoProductQtyLabel(freeQty))}</p>` : ""}`,
+    rewardLabel = isPercent
+      ? PROMO_PERCENT_TAB_LABEL
+      : freeQty > 0
+        ? `Урамшуулал · ${freeQty} ш`
+        : "Урамшуулал",
+    termBody = `<p class="promo-rule-card__amount">${esc(`${fmt(min)}-с дээш`)}</p>`,
+    deleteBtn = promoRuleDeleteBtn("payment", i);
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane"><p class="promo-rule-card__lane-label">${esc(term)}</p>${min > 0 ? termBody : ""}</section><div class="promo-rule-card__divider" aria-hidden="true"></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${rewardHtml}</section></div></article>`;
 }
 function promotionPriceRuleCard(r, i) {
-  return `<div class="p-4 flex justify-between gap-3 text-sm"><div class="min-w-0"><p class="font-medium">Дүрэм ${i + 1}</p><p class="text-muted-foreground mt-1">${promotionPriceRuleText(r)}</p></div>${canDelete() ? deleteIconButton({ className: "icon-action-btn icon-action-btn--neutral shrink-0", attrs: `onclick="confirmRemovePromotionRule('price',${i})"`, label: "Дүрэм устгах" }) : ""}</div>`;
+  const freeIds = promotionFreeProductIds(r),
+    isPercent =
+      r.type === "percent" || (r.discountPercent && !freeIds.length),
+    formula = promotionPriceRuleText(r),
+    amountLabel = promotionPriceAmountLabel(r),
+    freeQty = Math.floor(Number(r.freeQty) || 0),
+    rewardLabel = isPercent
+      ? PROMO_PERCENT_TAB_LABEL
+      : freeQty > 0
+        ? `Урамшуулал · ${freeQty} ш`
+        : PROMO_PRODUCT_LABEL,
+    deleteBtn = promoRuleDeleteBtn("price", i);
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane"><p class="promo-rule-card__amount promo-rule-card__amount--solo">${esc(amountLabel)}</p></section><div class="promo-rule-card__divider" aria-hidden="true"></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${promotionPriceRewardHtml(r)}</section></div></article>`;
 }
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
