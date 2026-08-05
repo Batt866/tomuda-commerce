@@ -856,18 +856,16 @@ function documentSignatureBlockHtml(opts = {}) {
     `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" class="doc-sign__role">${esc(role)}</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
   return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
 }
-/** SignatureSection — sample: role + dotted line on same row; 2nd line indented. */
+/** SignatureSection — role + dotted line on same row; both start in same column. */
 function receiptSignatureRowsHtml(opts = {}) {
   const pushDown = !!opts.pushDown;
   const fill = pushDown
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
-  const block = (role, { indent = false } = {}) =>
-    indent
-      ? `<tr class="receipt-grid__sign receipt-grid__sign--indent"><td></td><td></td><td></td><td colspan="3" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td></tr>`
-      : `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
+  const block = (role) =>
+    `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
-  return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:", { indent: true })}`;
+  return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -8445,30 +8443,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(14.25, emptyCells(rowNum));
-  // ҮНДСЭН sample: label + dotted line on ONE row; 2nd signature indented right
-  const pushSignRow = (role, { indent = false } = {}) => {
+  // Label + dotted line on ONE row; both signatures start in column B
+  const pushSignRow = (role) => {
     const r = rowNum;
-    if (indent) {
-      merges.push(`D${r}:G${r}`, `H${r}:K${r}`);
-      pushRow(18, [
-        xlsxCellXml(`D${r}`, 41, si(role), "s"),
-        xlsxCellXml(`H${r}`, 17, null, "empty"),
-        ...emptyCells(r, "E", "G", 41),
-        ...emptyCells(r, "I", "K", 17),
-      ]);
-    } else {
-      merges.push(`B${r}:E${r}`, `F${r}:K${r}`);
-      pushRow(18, [
-        xlsxCellXml(`B${r}`, 41, si(role), "s"),
-        xlsxCellXml(`F${r}`, 17, null, "empty"),
-        ...emptyCells(r, "C", "E", 41),
-        ...emptyCells(r, "G", "K", 17),
-      ]);
-    }
+    merges.push(`B${r}:E${r}`, `F${r}:K${r}`);
+    pushRow(18, [
+      xlsxCellXml(`B${r}`, 41, si(role), "s"),
+      xlsxCellXml(`F${r}`, 17, null, "empty"),
+      ...emptyCells(r, "C", "E", 41),
+      ...emptyCells(r, "G", "K", 17),
+    ]);
   };
   pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
   pushRow(10, emptyCells(rowNum));
-  pushSignRow("Хүлээн авсан ажилтны гарын үсэг:", { indent: true });
+  pushSignRow("Хүлээн авсан ажилтны гарын үсэг:");
   pushRow(14.25, emptyCells(rowNum));
   return rowNum;
 }
