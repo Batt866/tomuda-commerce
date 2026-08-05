@@ -7234,11 +7234,13 @@ td, th { border: none; }
   min-height: 16px;
   font-size: 9px;
   border: none !important;
-  background: #f3f3f3 !important;
+  background: #ffffcc !important;
   text-align: left;
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 .receipt-grid__return-label {
   font-weight: 400;
