@@ -14887,10 +14887,14 @@ function openWorkerOrdersTab() {
     cancelWorkerOrderEdit();
     return;
   }
-  if (state.filters.worker === "orders") return;
+  if (state.filters.worker === "orders") {
+    pullBackendStateNow();
+    return;
+  }
   state.filters.worker = "orders";
   render();
   pushAppHistory();
+  pullBackendStateNow();
   requestAnimationFrame(scrollWorkerOrdersToDate);
 }
 function clearWorkerOrderDate() {
@@ -14906,6 +14910,7 @@ function setWorkerOrderDate(day) {
 function selectWorkerOrderToday() {
   state.filters.workerDate = todayIso();
   render();
+  pullBackendStateNow();
   requestAnimationFrame(scrollWorkerOrdersToDate);
 }
 function scrollWorkerOrdersToDate() {
@@ -18819,6 +18824,51 @@ function ensureSavedOrderVisible(order) {
   scheduleBackendSave();
   return false;
 }
+async function upsertOrderOnServer(order, previousItems = null) {
+  if (!order?.id) throw new Error("Захиалга олдсонгүй");
+  const body = {
+    order,
+    actor: state.currentEmployee
+      ? {
+          id: state.currentEmployee.id,
+          email: state.currentEmployee.email,
+        }
+      : null,
+  };
+  if (Array.isArray(previousItems)) body.previousItems = previousItems;
+  const res = await fetch(`${API_BASE}/orders/upsert`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    let msg = "Захиалга серверт хадгалахад алдаа гарлаа";
+    try {
+      const err = await res.json();
+      if (err?.detail) msg = String(err.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+function applyOrderUpsertPayload(payload) {
+  if (!payload?.state) return;
+  const session = captureSessionSnapshot();
+  const merged = mergePersistentStates(payload.state, persistentState());
+  applyPersistentState(merged);
+  restoreSessionSnapshot(session);
+  if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+  saveLocalBackendCache({
+    state: payload.state,
+    updatedAt: payload.updatedAt || "",
+  });
+}
 async function saveWorker() {
   if (orderSubmitLock) return;
   if (state.editingOrderId) return saveWorkerOrderEdit();
@@ -18891,7 +18941,22 @@ async function saveWorker() {
     saveAuthSession();
     render();
     pushAppHistory();
-    const saved = await criticalBackendSave();
+    let upsertOk = false;
+    try {
+      const payload = await upsertOrderOnServer(order);
+      upsertOk = true;
+      applyOrderUpsertPayload(payload);
+      if (!ensureSavedOrderVisible(order)) render();
+    } catch (error) {
+      console.warn("Order upsert failed", error);
+    }
+    let saved = upsertOk;
+    try {
+      const flushed = await criticalBackendSave();
+      saved = upsertOk || !!flushed;
+    } catch {
+      saved = upsertOk;
+    }
     if (!ensureSavedOrderVisible(order)) render();
     if (saved) {
       showAppToast("Захиалга хадгалагдлаа", "success");
@@ -18968,6 +19033,7 @@ async function saveWorkerOrderEdit() {
     order.settlementDay = "";
     recalcOrderTotals(order);
     const orderId = order.id;
+    const orderSnapshot = { ...order, items: (order.items || []).map((i) => ({ ...i })) };
     clearWorkerOrderEditState();
     resetWorkerCart();
     state.workerStoreReady = false;
@@ -18985,7 +19051,21 @@ async function saveWorkerOrderEdit() {
     saveAuthSession();
     render();
     pushAppHistory();
-    const saved = await criticalBackendSave();
+    let upsertOk = false;
+    try {
+      const payload = await upsertOrderOnServer(orderSnapshot, originalItems);
+      upsertOk = true;
+      applyOrderUpsertPayload(payload);
+    } catch (error) {
+      console.warn("Order edit upsert failed", error);
+    }
+    let saved = upsertOk;
+    try {
+      const flushed = await criticalBackendSave();
+      saved = upsertOk || !!flushed;
+    } catch {
+      saved = upsertOk;
+    }
     if (saved) {
       showAppToast("Захиалгын өөрчлөлт хадгалагдлаа", "success");
     } else {

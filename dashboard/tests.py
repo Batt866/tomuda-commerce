@@ -901,3 +901,88 @@ class CustomerUpsertApiTests(TestCase):
         peer_ids = {c["id"] for c in peer_response.json()["state"]["customers"]}
         self.assertIn("c-new-device", peer_ids)
         self.assertIn("c-existing", peer_ids)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class OrderUpsertApiTests(TestCase):
+    def test_upsert_adds_order_and_survives_peer_state_save(self):
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "p1",
+                "name": "Cola",
+                "price": 1000,
+                "stock": 50,
+                "unit": "ширхэг",
+            }
+        ]
+        state["orders"] = []
+        AppState.objects.create(key="main", data=state)
+
+        order = {
+            "id": "o-device-b",
+            "customerId": "c1",
+            "customerName": "Шинэ хүнс 2",
+            "items": [
+                {
+                    "productId": "p1",
+                    "productName": "Cola",
+                    "quantity": 5,
+                    "price": 1000,
+                    "total": 5000,
+                }
+            ],
+            "total": 5000,
+            "grossTotal": 5000,
+            "discountAmount": 0,
+            "status": "pending",
+            "paymentTerm": "credit",
+            "isPaid": False,
+            "employeeId": "admin",
+            "employeeName": "Admin",
+            "createdAt": "2026-08-05T07:00:00.000Z",
+            "deliveryDate": "2026-08-05",
+        }
+        response = self.client.post(
+            "/api/orders/upsert",
+            {
+                "order": order,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertEqual(payload["order"]["id"], "o-device-b")
+        self.assertEqual(
+            next(p["stock"] for p in payload["state"]["products"] if p["id"] == "p1"),
+            45,
+        )
+
+        # Peer device posts an older empty order list — merge must keep the order.
+        peer = default_state()
+        peer["products"] = [
+            {
+                "id": "p1",
+                "name": "Cola",
+                "price": 1000,
+                "stock": 50,
+                "unit": "ширхэг",
+            }
+        ]
+        peer["orders"] = []
+        peer_response = self.client.post(
+            "/api/state",
+            {
+                "state": peer,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(peer_response.status_code, 200, peer_response.content)
+        peer_ids = {o["id"] for o in peer_response.json()["state"]["orders"]}
+        self.assertIn("o-device-b", peer_ids)
+
+        row = AppState.objects.get(key="main")
+        self.assertIn("o-device-b", {o["id"] for o in row.data["orders"]})
+

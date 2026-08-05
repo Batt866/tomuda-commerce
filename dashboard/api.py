@@ -252,6 +252,179 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
     }
 
 
+def _order_item_qty_map(items: Any) -> dict[str, float]:
+    qty: dict[str, float] = {}
+    if not isinstance(items, list):
+        return qty
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        product_id = str(item.get("productId") or "").strip()
+        if not product_id:
+            continue
+        try:
+            amount = float(item.get("quantity") or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        if amount <= 0:
+            continue
+        qty[product_id] = qty.get(product_id, 0.0) + amount
+    return qty
+
+
+def _adjust_order_stock(
+    products: list[dict[str, Any]],
+    before_items: Any,
+    after_items: Any,
+) -> None:
+    before = _order_item_qty_map(before_items)
+    after = _order_item_qty_map(after_items)
+    product_map = {
+        str(item.get("id")): item
+        for item in products
+        if isinstance(item, dict) and item.get("id") is not None
+    }
+    for product_id in set(before) | set(after):
+        delta = after.get(product_id, 0.0) - before.get(product_id, 0.0)
+        if abs(delta) < 0.0001:
+            continue
+        product = product_map.get(product_id)
+        if not product:
+            continue
+        try:
+            stock = float(product.get("stock") or 0)
+        except (TypeError, ValueError):
+            stock = 0.0
+        if delta > 0:
+            product["stock"] = max(0, stock - delta)
+        else:
+            product["stock"] = stock - delta  # delta negative => increase
+
+
+def _validate_order_stock(
+    products: list[dict[str, Any]],
+    before_items: Any,
+    after_items: Any,
+) -> None:
+    before = _order_item_qty_map(before_items)
+    after = _order_item_qty_map(after_items)
+    product_map = {
+        str(item.get("id")): item
+        for item in products
+        if isinstance(item, dict) and item.get("id") is not None
+    }
+    shortages = []
+    for product_id, need in after.items():
+        extra = need - before.get(product_id, 0.0)
+        if extra <= 0:
+            continue
+        product = product_map.get(product_id)
+        try:
+            have = float((product or {}).get("stock") or 0)
+        except (TypeError, ValueError):
+            have = 0.0
+        # Credit back the qty already reserved by the previous version of this order.
+        have += before.get(product_id, 0.0)
+        if need > have + 0.0001:
+            name = str((product or {}).get("name") or product_id)
+            shortages.append(f"{name}: {int(have)} үлдсэн, {int(need)} ш хэрэгтэй")
+    if shortages:
+        raise HttpError(400, "Үлдэгдэл хүрэлцэхгүй байна.\n" + "\n".join(shortages))
+
+
+@api.post("/orders/upsert")
+def upsert_order(request, payload: dict[str, Any] = Body(...)):
+    """Atomically create/update one order so peer devices see it immediately."""
+    raw_order = payload.get("order")
+    if not isinstance(raw_order, dict) or raw_order.get("id") is None:
+        raise HttpError(400, "Захиалгын мэдээлэл дутуу байна")
+    order = dict(raw_order)
+    order_id = str(order.get("id"))
+    actor = _actor_payload(payload)
+    previous_items = payload.get("previousItems")
+
+    with transaction.atomic():
+        row, _ = AppState.objects.get_or_create(
+            key="main",
+            defaults={"data": default_state()},
+        )
+        row = AppState.objects.select_for_update().get(pk=row.pk)
+        current = dict(row.data or default_state())
+        employee = find_employee(current, actor)
+        if not employee:
+            raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
+
+        orders = [
+            dict(item)
+            for item in (current.get("orders") or [])
+            if isinstance(item, dict) and item.get("id") is not None
+        ]
+        products = [
+            dict(item)
+            for item in (current.get("products") or [])
+            if isinstance(item, dict) and item.get("id") is not None
+        ]
+        existing_idx = next(
+            (
+                index
+                for index, item in enumerate(orders)
+                if str(item.get("id")) == order_id
+            ),
+            -1,
+        )
+
+        if existing_idx >= 0:
+            if not (
+                has_permission(employee, "orders.edit")
+                or has_permission(employee, "orders.create")
+            ):
+                raise HttpError(403, "Захиалга засах эрхгүй")
+            previous = orders[existing_idx]
+            before_items = (
+                previous_items
+                if isinstance(previous_items, list)
+                else previous.get("items") or []
+            )
+            _validate_order_stock(products, before_items, order.get("items") or [])
+            _adjust_order_stock(products, before_items, order.get("items") or [])
+            merged_order = {**previous, **order}
+            orders[existing_idx] = merged_order
+            saved_order = merged_order
+        else:
+            if not has_permission(employee, "orders.create"):
+                raise HttpError(403, "Захиалга үүсгэх эрхгүй")
+            _validate_order_stock(products, [], order.get("items") or [])
+            _adjust_order_stock(products, [], order.get("items") or [])
+            orders.append(order)
+            saved_order = order
+
+        data = dict(current)
+        data["orders"] = orders
+        data["products"] = products
+        data["deletionLog"] = [
+            entry
+            for entry in (data.get("deletionLog") or [])
+            if not (
+                isinstance(entry, dict)
+                and str(entry.get("type") or "") == "order"
+                and str(entry.get("id") or "") == order_id
+            )
+        ]
+        data = _retained_orders_state(data)
+        data, _ = sanitize_app_state(data)
+        data, _ = _hydrate_all_images(data)
+        row.data = data
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {
+        "ok": True,
+        "order": saved_order,
+        "state": data,
+        "updatedAt": updated_at,
+    }
+
+
 def _require_import_permission(state: dict[str, Any], actor: dict[str, Any] | None, perm: str) -> None:
     if not actor:
         raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
