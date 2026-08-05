@@ -8374,9 +8374,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
 
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
-    // 44 = grand label (green), 45 = grand amount (green, large)
-    const labelStyle = grand ? 44 : 30;
-    const valueStyle = grand ? 45 : decimals ? 29 : 12;
+    // 31/32 = previous grand look (bold black on light gray)
+    const labelStyle = grand ? 31 : 30;
+    const valueStyle = grand ? 32 : decimals ? 29 : 12;
     merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
     const cells = [
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
@@ -8389,7 +8389,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     } else {
       cells.push(...emptyCells(r, "E", "J", valueStyle));
     }
-    pushRow(grand ? 22 : 14.25, cells);
+    pushRow(grand ? 21.75 : 14.25, cells);
   };
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
