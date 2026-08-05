@@ -873,11 +873,12 @@ function receiptNoteText(o) {
   return String(o?.settlementText || "").trim();
 }
 function receiptUpperFooterRows(o) {
-  // Зөвхөн захиалга дээр тэмдэглэл бичсэн үед; барааны жагсаалтаас 1 мөр зайтай.
+  // ҮНДСЭН R26: үргэлж «Тэмдэглэл бичих хэсэг»; захиалгын текст байвал хавсаргана.
   const note = receiptNoteText(o);
-  if (!note) return "";
+  const label = note
+    ? `Тэмдэглэл бичих хэсэг: ${note}`
+    : "Тэмдэглэл бичих хэсэг";
   const spacer = `<tr class="receipt-grid__spacer receipt-grid__spacer--note"><td colspan="11"></td></tr>`;
-  const label = `Тэмдэглэл бичих хэсэг: ${note}`;
   return `${spacer}<tr class="receipt-grid__return"><td></td><td colspan="10" class="receipt-grid__return-label">${esc(label)}</td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
@@ -8072,27 +8073,29 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   });
 
-  // Тэмдэглэл — зөвхөн захиалга дээр бичсэн үед; бараанаас 1 мөр зайтай.
+  // ҮНДСЭН: «Тэмдэглэл бичих хэсэг» үргэлж; захиалгын текст байвал хавсаргана.
+  pushRow(14.25, emptyCells(rowNum));
   const orderNote = String(o?.settlementText || "").trim();
-  if (orderNote) {
-    pushRow(14.25, emptyCells(rowNum));
-    const noteLabel = `Тэмдэглэл бичих хэсэг: ${orderNote}`;
-    const noteRow = rowNum;
-    merges.push(`B${noteRow}:K${noteRow}`);
-    const noteH = Math.max(
-      14.25,
-      receiptXlsxWrappedRowHeight(noteLabel, 70, {
-        min: 14.25,
-        linePt: 11,
-        pad: 2,
-        max: 42,
-      }),
-    );
-    pushRow(noteH, [
-      xlsxCellXml(`B${noteRow}`, 16, si(noteLabel), "s"),
-      ...emptyCells(noteRow, "C", "K", 16),
-    ]);
-  }
+  const noteLabel = orderNote
+    ? `Тэмдэглэл бичих хэсэг: ${orderNote}`
+    : "Тэмдэглэл бичих хэсэг";
+  const noteRow = rowNum;
+  merges.push(`B${noteRow}:K${noteRow}`);
+  const noteH = orderNote
+    ? Math.max(
+        14.25,
+        receiptXlsxWrappedRowHeight(noteLabel, 70, {
+          min: 14.25,
+          linePt: 11,
+          pad: 2,
+          max: 42,
+        }),
+      )
+    : 14.25;
+  pushRow(noteH, [
+    xlsxCellXml(`B${noteRow}`, 16, si(noteLabel), "s"),
+    ...emptyCells(noteRow, "C", "K", 16),
+  ]);
 
   pushRow(14.25, emptyCells(rowNum));
 
