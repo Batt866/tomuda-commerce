@@ -12892,8 +12892,26 @@ function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
     ? promotionQtyField(qtyOpts.name, qtyOpts.label, qtyOpts.defaultValue, true)
     : "";
   return qtyHtml
-    ? `<div class="promo-input-row promo-input-row--stack">${searchInputHtml}${qtyHtml}</div>`
-    : `<div class="mb-2">${searchInputHtml}</div>`;
+    ? `<div class="promo-input-row">${searchInputHtml}${qtyHtml}</div>`
+    : `<div class="promo-input-row"><div class="promo-search-wrap">${searchInputHtml}</div></div>`;
+}
+function promoProductRowHtml(p, { onclick, active = false, selected = false, qtyHtml = "", removeHtml = "" } = {}) {
+  const cls = [
+    "promo-product-row",
+    active ? "is-active" : "",
+    selected ? "promo-product-row--selected" : "",
+    qtyHtml ? "promo-product-row--with-qty" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const meta = selected
+    ? `<p class="promo-product-row__meta">${esc(p.category)}</p>`
+    : `<p class="promo-product-row__meta">${esc(p.category)} · ${esc(p.barcode)}</p><p class="promo-product-row__stock"><span class="promo-product-row__price">${fmt(p.price)}</span><span class="promo-product-row__sep">·</span><span>үлд ${p.stock} ${esc(p.unit || "ш")}</span></p>`;
+  const body = `<img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="promo-product-row__img product-thumb" alt=""><div class="promo-product-row__text"><p class="promo-product-row__name">${esc(p.name)}</p>${meta}</div>${qtyHtml}${removeHtml}`;
+  if (onclick) {
+    return `<button type="button" onclick="${onclick}" class="${cls}">${body}</button>`;
+  }
+  return `<div class="${cls}">${body}</div>`;
 }
 function promoFormDraftVal(name, fallback = "") {
   const v = state.promoFormDraft?.[name];
@@ -12997,7 +13015,10 @@ function promoProductSearchListInnerHtml({
         addAction === "select"
           ? `selectPromoProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})`
           : `addPromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})`;
-      return `<button type="button" onclick="${onclick}" class="promo-product-row ${selectedId === p.id ? "is-active" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 text-left promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`;
+      return promoProductRowHtml(p, {
+        onclick,
+        active: selectedId === p.id,
+      });
     })
     .join(
       "",
@@ -13110,7 +13131,7 @@ function promotionProductPickerBlock(
       addAction: "select",
       selectedId,
     }),
-    searchInput = `<input data-promo-pick="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
+    searchInput = `<input data-promo-pick="${fieldName}" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input app-input">`,
     inputRow = promotionSearchQtyRow(searchInput, opts?.qty || null),
     badge = variant === "buy" ? "1" : variant === "free" ? "2" : "",
     head = badge
@@ -13136,15 +13157,15 @@ function promotionQtyField(name, label, defaultValue, inline = false) {
     : "promo-qty-field";
   const wrap = inline ? "" : `<div class="promo-qty-inline">`;
   const wrapEnd = inline ? "" : `</div>`;
-  const labelHtml = inline
-    ? ""
-    : `<span class="block text-xs text-muted-foreground mb-1">${label}</span>`;
-  const aria = inline ? ` aria-label="${label}"` : "";
+  const labelHtml = `<span class="promo-qty-field__label">${esc(label)}</span>`;
+  const aria = ` aria-label="${esc(label)}"`;
   return `${wrap}<label class="${cls}">${labelHtml}<input name="${name}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" data-promo-digits="1" required${val} placeholder="${esc(ph)}"${aria} oninput="promoFormDraftField(this)" class="promo-qty-input bg-secondary rounded"></label>${wrapEnd}`;
 }
 function promotionProductPickRow(p, fieldName, selectedId) {
-  const active = selectedId === p.id;
-  return `<button type="button" onclick="selectPromoProduct('${fieldName}','${p.id}')" class="promo-product-row ${active ? "is-active" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 text-left promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)} · ${esc(p.barcode)}</p><p class="text-xs font-semibold text-primary mt-1">${fmt(p.price)} · үлд ${p.stock} ${esc(p.unit || "ш")}</p></div></button>`;
+  return promoProductRowHtml(p, {
+    onclick: `selectPromoProduct('${fieldName}','${p.id}')`,
+    active: selectedId === p.id,
+  });
 }
 function promotionBuyProductIds(rule) {
   if (Array.isArray(rule.buyProductIds) && rule.buyProductIds.length) {
@@ -13444,10 +13465,12 @@ function promotionSelectedProductRowHtml(p, pickKey, { perProductQty = false } =
   const qtyHtml = perProductQty
     ? promotionQtyField(promoBuyQtyFieldName(p.id), "Ширхэг", "1", true)
     : "";
-  const rowCls = perProductQty
-    ? "promo-product-row promo-product-row--selected promo-product-row--with-qty"
-    : "promo-product-row promo-product-row--selected";
-  return `<div class="${rowCls}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb" alt=""><div class="min-w-0 flex-1 promo-product-row__text"><p class="text-sm font-medium promo-product-row__name">${esc(p.name)}</p><p class="text-xs text-muted-foreground">${esc(p.category)}</p></div>${qtyHtml}<button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button></div>`;
+  const removeHtml = `<button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button>`;
+  return promoProductRowHtml(p, {
+    selected: true,
+    qtyHtml,
+    removeHtml,
+  });
 }
 function promotionMultiProductPickerBlock({
   pickKey,
@@ -13471,7 +13494,7 @@ function promotionMultiProductPickerBlock({
       .filter(Boolean),
     selectedHtml = selectedProducts.length
       ? `<div class="promo-product-list promo-product-list--selected">${selectedProducts.map((p) => promotionSelectedProductRowHtml(p, pickKey, { perProductQty })).join("")}</div>`
-      : `<p class="promo-section-hint">Хайлтаар бараа нэмнэ</p>`,
+      : `<p class="promo-product-empty promo-product-empty--hint">Хайлтаар бараа нэмнэ</p>`,
     searchHtml = promoProductSearchListHtml({
       pickKey,
       selectedIds: ids,
@@ -13483,9 +13506,9 @@ function promotionMultiProductPickerBlock({
         (id) => `<input type="hidden" name="${fieldName}" value="${esc(id)}">`,
       )
       .join(""),
-    searchInput = `<input data-promo-pick="${pickKey}" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input px-3 py-2 bg-secondary rounded text-sm">`,
+    searchInput = `<input data-promo-pick="${pickKey}" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input app-input">`,
     inputRow = perProductQty
-      ? `<div class="mb-2">${searchInput}</div>`
+      ? `<div class="promo-input-row"><div class="promo-search-wrap">${searchInput}</div></div>`
       : promotionSearchQtyRow(searchInput, qty),
     head = badge
       ? `<div class="promo-section-head"><span class="promo-section-badge">${badge}</span><div><p class="promo-section-title">${title}</p>${hint ? `<p class="promo-section-hint">${hint}</p>` : ""}</div></div>`
