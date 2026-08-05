@@ -111,6 +111,24 @@ server {
 
     client_max_body_size 50M;
 
+    location /media/ {
+        alias ${APP_DIR}/media/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+        try_files \$uri @tomuda_app;
+    }
+
+    location @tomuda_app {
+        proxy_pass http://127.0.0.1:${GUNICORN_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 120s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:${GUNICORN_PORT};
         proxy_http_version 1.1;

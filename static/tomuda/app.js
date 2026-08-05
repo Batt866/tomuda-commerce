@@ -3304,12 +3304,20 @@ function pushUniqueProductImage(list, url) {
   if (!list.some((item) => productImageUrlKey(item) === key))
     list.push(resolved);
 }
-function productImageMediaUrl(productId, ext = "jpg") {
+function productImageMediaUrl(productId, ext = "jpg", version = "") {
   const id = String(productId || "").trim();
   if (!id) return "";
-  return resolveBackendAssetUrl(
+  const base = resolveBackendAssetUrl(
     `/media/products/${encodeURIComponent(id)}.${ext}`,
   );
+  if (!base) return "";
+  const v = String(version || "").trim();
+  if (!v || /[?&]v=/.test(base)) return base;
+  return `${base}${base.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
+}
+function productImageVersion(url) {
+  const match = String(url || "").match(/[?&]v=([^&]+)/);
+  return match ? match[1] : "";
 }
 function storedProductImage(p) {
   const raw = String(p?.image || "").trim();
@@ -3320,24 +3328,34 @@ function isLocalProductImage(url) {
   const raw = String(url || "").trim();
   return !!productMediaPathFromUrl(raw) || raw.startsWith("data:image/");
 }
-function productImageFallbackList(p = {}) {
+function productImageFallbackList(p = {}, { thumb = false } = {}) {
   const list = [];
   const id = String(p?.id || "").trim();
   const stored = storedProductImage(p);
+  const storedMedia = productMediaPathFromUrl(stored);
+  const version = productImageVersion(stored);
+
+  if (thumb && id) {
+    pushUniqueProductImage(list, productImageMediaUrl(`${id}_t`, "jpg", version));
+  }
   pushUniqueProductImage(list, stored);
-  if (id) {
+
+  // Only probe alternate extensions when we have no known local media URL —
+  // otherwise each broken image fires up to 4 serial 404s.
+  if (!storedMedia && id) {
     PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
-      pushUniqueProductImage(list, productImageMediaUrl(id, ext));
+      pushUniqueProductImage(list, productImageMediaUrl(id, ext, version));
     });
   }
   list.push(productImagePlaceholder(p));
   return list;
 }
-function productImgDataAttrs(p) {
-  return `data-product-img data-product-id="${esc(p.id)}" alt="${esc(p.name)}"`;
+function productImgDataAttrs(p, { thumb = false } = {}) {
+  const thumbAttr = thumb ? ' data-product-img-thumb="1"' : "";
+  return `data-product-img data-product-id="${esc(p.id)}"${thumbAttr} alt="${esc(p.name)}"`;
 }
-function productImageSrc(p) {
-  return productImageFallbackList(p)[0];
+function productImageSrc(p, opts = {}) {
+  return productImageFallbackList(p, opts)[0];
 }
 function findProductForImage(img) {
   const id = String(img?.dataset?.productId || "").trim();
@@ -3361,6 +3379,7 @@ function findProductForImage(img) {
     } catch {
       /* keep raw id */
     }
+    if (mediaId.endsWith("_t")) mediaId = mediaId.slice(0, -2);
     const fromMedia = state.products.find((x) => String(x.id) === mediaId);
     if (fromMedia) return fromMedia;
     return { id: mediaId, name: alt || "", category: "" };
@@ -3368,7 +3387,8 @@ function findProductForImage(img) {
   return { name: alt || "", category: "" };
 }
 function applyProductImageFallback(img, product) {
-  const candidates = productImageFallbackList(product);
+  const thumb = img?.dataset?.productImgThumb === "1";
+  const candidates = productImageFallbackList(product, { thumb });
   if (!candidates.length) return;
   let index = Number(img.dataset.imgFallbackIdx || "0");
   const current = String(img.getAttribute("src") || "");
@@ -3410,8 +3430,11 @@ function bindProductImages(root = document) {
   });
 }
 const productImage = (p) => productImageSrc(p);
-function productImageSrcAttr(p) {
-  return esc(productImageSrc(p));
+function productImageSrcAttr(p, opts = {}) {
+  return esc(productImageSrc(p, opts));
+}
+function productImageThumbAttr(p) {
+  return productImageSrcAttr(p, { thumb: true });
 }
 function initProductImageField(p) {
   const value = document.getElementById("productImageValue");
@@ -3449,6 +3472,10 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
 function preferredEntityImage(localImage, remoteImage) {
   const local = String(localImage || "").trim();
   const remote = String(remoteImage || "").trim();
+  const localMedia = productMediaPathFromUrl(local);
+  if (localMedia) return localMedia;
+  const remoteMedia = productMediaPathFromUrl(remote);
+  if (remoteMedia) return remoteMedia;
   if (local.startsWith("data:image/") && !local.startsWith("data:image/svg")) {
     return local;
   }
@@ -3458,10 +3485,6 @@ function preferredEntityImage(localImage, remoteImage) {
   ) {
     return remote;
   }
-  const localMedia = productMediaPathFromUrl(local);
-  if (localMedia) return localMedia;
-  const remoteMedia = productMediaPathFromUrl(remote);
-  if (remoteMedia) return remoteMedia;
   return local || remote;
 }
 
@@ -6681,7 +6704,7 @@ function stockAlertModal() {
           const limit = stockAlertLevel(p);
           const lowNow = isLowStock(p);
           const limitAttr = limit > 0 ? `value="${limit}" ` : "";
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
@@ -10068,7 +10091,7 @@ function productCard(p) {
   const low = isLowStock(p);
   const stock = p.stock ?? 0;
   const unit = esc(p.unit || "ш");
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="product-card__img" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл">${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
+  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-card__img" width="64" height="64" loading="lazy" decoding="async" alt=""><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл">${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
 }
 function inventoryView() {
   const tab = state.filters.inventory,
@@ -10556,7 +10579,7 @@ function stockInEntryRow(p) {
     : `<span class="stock-in-entry-row__hint">Тоо ширхэг оруулах</span>`;
   const salesPrice = productSalesPrice(p);
   const displayStock = (Number(p.stock) || 0) + (hasEntry ? qty : 0);
-  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="stock-in-entry-row__img" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
+  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
 }
 function stockInPackDerivedPieces(packs, packSize) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
@@ -10824,7 +10847,7 @@ function stockActionRow(p, tab) {
     tab === "out"
       ? `stockOutModal('${esc(p.id)}')`
       : `inventoryStockModal('${esc(p.id)}','${tab}')`;
-  return `<button type="button" onclick="${openModal}" class="inventory-stock-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="product-card__img inventory-stock-row__thumb" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div></button>`;
+  return `<button type="button" onclick="${openModal}" class="inventory-stock-row"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="product-card__img inventory-stock-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div></button>`;
 }
 function stockOutModal(id) {
   ensureStockOutSession();
@@ -10936,7 +10959,7 @@ function stockActionList(list, tab) {
   return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">${hint}</div><div class="divide-y divide-border">${list.length ? list.map((p) => stockActionRow(p, tab)).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockGrid(list) {
-  return `<div class="bg-card rounded overflow-hidden"><div class="hidden md:grid grid-cols-[48px_minmax(0,1fr)_140px_140px_120px] gap-3 px-4 py-3 bg-secondary/50 text-xs font-semibold text-muted-foreground"><span>Зураг</span><span>Бараа</span><span>Төрөл</span><span>Баркод</span><span class="text-right">Үлдэгдэл</span></div><div class="divide-y divide-border">${list.length ? list.map((p) => `<div class="p-4 flex items-center gap-3 md:grid md:grid-cols-[48px_minmax(0,1fr)_140px_140px_120px] md:items-center md:gap-3"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="${esc(p.name)}" class="product-thumb shrink-0" loading="lazy" decoding="async"><div class="min-w-0 flex-1 md:flex-none"><p class="font-medium truncate">${esc(p.name)}</p><p class="md:hidden text-xs text-muted-foreground mt-1">${esc(p.category || "-")} · ${esc(p.barcode || "-")}</p></div><span class="hidden md:block text-sm">${esc(p.category || "-")}</span><span class="hidden md:block text-sm font-mono">${esc(p.barcode || "-")}</span><b class="shrink-0 ml-auto whitespace-nowrap md:ml-0 md:text-right">${p.stock} ${esc(p.unit || "ш")}</b></div>`).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden"><div class="hidden md:grid grid-cols-[48px_minmax(0,1fr)_140px_140px_120px] gap-3 px-4 py-3 bg-secondary/50 text-xs font-semibold text-muted-foreground"><span>Зураг</span><span>Бараа</span><span>Төрөл</span><span>Баркод</span><span class="text-right">Үлдэгдэл</span></div><div class="divide-y divide-border">${list.length ? list.map((p) => `<div class="p-4 flex items-center gap-3 md:grid md:grid-cols-[48px_minmax(0,1fr)_140px_140px_120px] md:items-center md:gap-3"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async"><div class="min-w-0 flex-1 md:flex-none"><p class="font-medium truncate">${esc(p.name)}</p><p class="md:hidden text-xs text-muted-foreground mt-1">${esc(p.category || "-")} · ${esc(p.barcode || "-")}</p></div><span class="hidden md:block text-sm">${esc(p.category || "-")}</span><span class="hidden md:block text-sm font-mono">${esc(p.barcode || "-")}</span><b class="shrink-0 ml-auto whitespace-nowrap md:ml-0 md:text-right">${p.stock} ${esc(p.unit || "ш")}</b></div>`).join("") : `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function countFilteredProducts() {
   const q = (state.searches.count || "").toLowerCase().trim(),
@@ -11387,7 +11410,7 @@ function countRow(p) {
     metaHtml = countSessionActive()
       ? `<span>Эхний: <b>${stats.opening}</b></span><span>Борлуулсан: <b>${stats.sold}</b></span><span>Зарлага: <b>${stats.expended}</b></span>${productCostMetaHtml(p)}`
       : `<span>Бүртгэл: <b>${stats.system}</b></span>${productCostMetaHtml(p)}`;
-  return `<article class="count-row"><div class="count-row__main"><div class="count-row__lead"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="count-row__img" loading="lazy" decoding="async"><p class="count-row__title">${esc(p.name)}</p></div><div class="count-row__meta count-row__stats">${metaHtml}</div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span>${canViewProductCost() ? `<span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span>` : ""}</div></div></div></article>`;
+  return `<article class="count-row"><div class="count-row__main"><div class="count-row__lead"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="count-row__img" width="48" height="48" loading="lazy" decoding="async"><p class="count-row__title">${esc(p.name)}</p></div><div class="count-row__meta count-row__stats">${metaHtml}</div><div class="count-row__actions"><input id="count-qty-${esc(p.id)}" name="countQty-${esc(p.id)}" data-count-product-id="${p.id}" placeholder="0" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="count-row__input app-input" aria-label="${esc(p.name)} эцсийн үлдэгдэл"><div class="count-row__diff-wrap"><span class="count-row__diff ${diffClass}" title="Зөрүү (бүртгэлээс)">${diffText}</span>${canViewProductCost() ? `<span class="count-row__diff-amt ${diffClass}" title="Зөрүү дүн">${diffAmtText}</span>` : ""}</div></div></div></article>`;
 }
 function countValue(id) {
   const value = state.countQty[id];
@@ -12974,7 +12997,7 @@ function promoProductRowHtml(p, { onclick, active = false, selected = false, qty
   const meta = selected
     ? `<p class="promo-product-row__meta">${esc(p.category)}</p>`
     : `<p class="promo-product-row__meta">${esc(p.category)} · ${esc(p.barcode)}</p><p class="promo-product-row__stock"><span class="promo-product-row__price">${fmt(p.price)}</span><span class="promo-product-row__sep" aria-hidden="true">·</span><span class="promo-product-row__remain">үлд ${p.stock} ${esc(p.unit || "ш")}</span></p>`;
-  const body = `<span class="promo-product-row__media"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="promo-product-row__img product-thumb" alt=""></span><span class="promo-product-row__text"><span class="promo-product-row__name">${esc(p.name)}</span>${meta}</span>${qtyHtml}${removeHtml}`;
+  const body = `<span class="promo-product-row__media"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-product-row__img product-thumb" width="48" height="48" loading="lazy" decoding="async" alt=""></span><span class="promo-product-row__text"><span class="promo-product-row__name">${esc(p.name)}</span>${meta}</span>${qtyHtml}${removeHtml}`;
   if (onclick) {
     return `<button type="button" onclick="${onclick}" class="${cls}">${body}</button>`;
   }
@@ -13745,7 +13768,7 @@ function promoQtyProductChipHtml(p, qty = 0) {
     qty > 0
       ? `<span class="promo-qty-chip__qty">${qty} ш</span>`
       : "";
-  return `<div class="promo-qty-chip"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="promo-qty-chip__img" alt=""><span class="promo-qty-chip__name">${esc(p.name)}</span>${qtyBadge}</div>`;
+  return `<div class="promo-qty-chip"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-qty-chip__img" width="40" height="40" loading="lazy" decoding="async" alt=""><span class="promo-qty-chip__name">${esc(p.name)}</span>${qtyBadge}</div>`;
 }
 function promotionQuantityPanel(rows) {
   const listHtml = rows.length
@@ -15355,7 +15378,7 @@ function qtyDetail(orders) {
 }
 function detailRow(x) {
   const p = x.product;
-  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb shrink-0" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${x.qty} ш</b></div>`;
+  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${x.qty} ш</b></div>`;
 }
 function workerStoreSummary(c, compact = false) {
   if (!c)
@@ -15558,7 +15581,7 @@ function workerNewOrderStep(cart) {
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb"><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${line.quantity} ш урамшуулал</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${line.quantity} ш урамшуулал</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
@@ -15605,7 +15628,7 @@ function workerSelectedRow(p) {
   ]
     .filter(Boolean)
     .join('<span class="worker-selected-row__dot" aria-hidden="true">·</span>');
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img class="product-thumb worker-selected-row__thumb" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
+  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb worker-selected-row__thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
 }
 function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
@@ -18610,7 +18633,7 @@ function pickerRow(p) {
     qtyBadge = inCart
       ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
       : "";
-  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p)} class="picker-row__thumb" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${packMeta}${promoHint}</span></div>${qtyBadge}</button>`;
+  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="picker-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${packMeta}${promoHint}</span></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";

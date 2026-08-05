@@ -9,6 +9,8 @@ from django.views.decorators.http import require_GET
 
 from dashboard.product_images import (
     IMAGE_EXT_TO_MIME,
+    THUMB_SUFFIX,
+    ensure_product_thumb_bytes,
     get_stored_product_image,
     safe_product_id,
 )
@@ -68,6 +70,23 @@ def entity_media(request, folder: str, filename: str):
             return response
     except OSError:
         pass
+
+    # List UIs request /media/products/{id}_t.jpg — build on demand from full image.
+    if folder == "products" and stem.endswith(THUMB_SUFFIX):
+        base_id = stem[: -len(THUMB_SUFFIX)]
+        try:
+            product_id = safe_product_id(base_id)
+        except ValueError as exc:
+            raise Http404("Image not found") from exc
+        if product_id != base_id:
+            raise Http404("Image not found")
+        thumb = ensure_product_thumb_bytes(product_id)
+        if not thumb:
+            raise Http404("Image not found")
+        response = HttpResponse(thumb, content_type="image/jpeg")
+        response["Content-Length"] = str(len(thumb))
+        response["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
     if folder == "products":
         try:

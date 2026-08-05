@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 import re
 import time
@@ -20,6 +21,9 @@ DATA_URL_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 MAX_IMAGE_BYTES = 300_000
+THUMB_MAX_EDGE = 160
+THUMB_JPEG_QUALITY = 72
+THUMB_SUFFIX = "_t"
 OPENFOODFACTS_FIELDS = "image_url"
 IMAGE_MIME_TO_EXT = {
     "image/jpeg": "jpg",
@@ -65,6 +69,117 @@ def decode_data_url(data_url: str) -> tuple[bytes, str]:
     return raw, ext
 
 
+def make_product_thumb_bytes(raw: bytes) -> bytes | None:
+    """Build a small JPEG thumb for list UIs. Returns None if decode fails."""
+    if not raw or len(raw) < 32:
+        return None
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            img = img.convert("RGB")
+            img.thumbnail((THUMB_MAX_EDGE, THUMB_MAX_EDGE), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img.save(
+                out,
+                format="JPEG",
+                quality=THUMB_JPEG_QUALITY,
+                optimize=True,
+            )
+            data = out.getvalue()
+    except Exception:
+        return None
+    if len(data) < 32 or len(data) > MAX_IMAGE_BYTES:
+        return None
+    return data
+
+
+def clear_product_media_files(product_id: str) -> None:
+    pid = safe_product_id(product_id)
+    try:
+        directory = product_image_dir()
+    except OSError:
+        return
+    for pattern in (f"{pid}.*", f"{pid}{THUMB_SUFFIX}.*"):
+        for old in directory.glob(pattern):
+            try:
+                old.unlink()
+            except OSError:
+                pass
+
+
+def write_product_thumb_file(product_id: str, raw: bytes) -> Path | None:
+    thumb = make_product_thumb_bytes(raw)
+    if not thumb:
+        return None
+    pid = safe_product_id(product_id)
+    try:
+        directory = product_image_dir()
+        for old in directory.glob(f"{pid}{THUMB_SUFFIX}.*"):
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        path = directory / f"{pid}{THUMB_SUFFIX}.jpg"
+        path.write_bytes(thumb)
+        return path
+    except OSError:
+        return None
+
+
+def load_product_image_bytes(product_id: str) -> bytes | None:
+    pid = safe_product_id(product_id)
+    try:
+        directory = product_image_dir()
+    except OSError:
+        directory = None
+    if directory:
+        for ext in ("jpg", "jpeg", "png", "webp", "gif"):
+            path = directory / f"{pid}.{ext}"
+            try:
+                if path.is_file() and path.stat().st_size > 32:
+                    return path.read_bytes()
+            except OSError:
+                continue
+    image = get_stored_product_image(pid)
+    if image and image.image and len(image.image) > 32:
+        return bytes(image.image)
+    return None
+
+
+def ensure_product_thumb_bytes(product_id: str) -> bytes | None:
+    """Return thumb bytes, generating and caching to disk when missing."""
+    pid = safe_product_id(product_id)
+    try:
+        directory = product_image_dir()
+        thumb_path = directory / f"{pid}{THUMB_SUFFIX}.jpg"
+        if thumb_path.is_file() and thumb_path.stat().st_size > 32:
+            return thumb_path.read_bytes()
+    except OSError:
+        thumb_path = None
+
+    raw = load_product_image_bytes(pid)
+    if not raw:
+        return None
+    thumb = make_product_thumb_bytes(raw)
+    if not thumb:
+        return None
+    if thumb_path is not None:
+        try:
+            thumb_path.write_bytes(thumb)
+        except OSError:
+            pass
+    return thumb
+
+
+def product_thumb_url(product_id: str, version: int | None = None) -> str:
+    pid = safe_product_id(product_id)
+    version = int(version or time.time())
+    return f"{settings.MEDIA_URL}products/{pid}{THUMB_SUFFIX}.jpg?v={version}"
+
+
 def save_product_image_bytes(product_id: str, raw: bytes, ext: str) -> str:
     pid = safe_product_id(product_id)
     clean_ext = str(ext or "").lower()
@@ -87,14 +202,11 @@ def save_product_image_bytes(product_id: str, raw: bytes, ext: str) -> str:
     )
 
     try:
+        clear_product_media_files(pid)
         directory = product_image_dir()
-        for old in directory.glob(f"{pid}.*"):
-            try:
-                old.unlink()
-            except OSError:
-                pass
         filename = f"{pid}.{final_ext}"
         (directory / filename).write_bytes(raw)
+        write_product_thumb_file(pid, raw)
     except OSError:
         # The DB copy is the durable source; media files are only a fast path.
         pass

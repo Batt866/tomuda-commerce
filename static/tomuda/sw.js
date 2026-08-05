@@ -1,4 +1,5 @@
-const CACHE = "tomuda-v418";
+const CACHE = "tomuda-v419";
+const MEDIA_CACHE = "tomuda-media-v1";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
@@ -27,7 +28,9 @@ self.addEventListener("activate", (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)),
+          keys
+            .filter((k) => k !== CACHE && k !== MEDIA_CACHE)
+            .map((k) => caches.delete(k)),
         ),
       )
       .then(() => self.clients.claim()),
@@ -67,6 +70,23 @@ self.addEventListener("fetch", (event) => {
 
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(request));
+    return;
+  }
+
+  // Product/profile images: cache-first with background refresh.
+  if (url.pathname.startsWith("/media/")) {
+    event.respondWith(
+      caches.open(MEDIA_CACHE).then(async (cache) => {
+        const cached = await cache.match(request);
+        const network = fetch(request)
+          .then((res) => {
+            if (res.ok) cache.put(request, res.clone());
+            return res;
+          })
+          .catch(() => cached);
+        return cached || network;
+      }),
+    );
     return;
   }
 

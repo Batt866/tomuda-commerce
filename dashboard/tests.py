@@ -26,6 +26,43 @@ from dashboard.seed_data import default_state
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class ProductImageStorageTests(TestCase):
+    def test_product_thumb_is_generated_and_served(self):
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                buf = io.BytesIO()
+                Image.new("RGB", (640, 480), (30, 120, 200)).save(buf, format="JPEG", quality=90)
+                raw = buf.getvalue()
+                url = save_product_image_bytes("thumb-prod", raw, "jpg")
+
+                self.assertIn("/media/products/thumb-prod.jpg", url)
+                thumb_file = Path(tmp) / "products" / "thumb-prod_t.jpg"
+                self.assertTrue(thumb_file.is_file())
+                self.assertLess(thumb_file.stat().st_size, len(raw))
+
+                response = self.client.get("/media/products/thumb-prod_t.jpg")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], "image/jpeg")
+                body = (
+                    b"".join(response.streaming_content)
+                    if hasattr(response, "streaming_content")
+                    else response.content
+                )
+                self.assertGreater(len(body), 32)
+
+                # On-demand rebuild when thumb file is missing.
+                thumb_file.unlink()
+                rebuilt = self.client.get("/media/products/thumb-prod_t.jpg")
+                self.assertEqual(rebuilt.status_code, 200)
+                rebuilt_body = (
+                    b"".join(rebuilt.streaming_content)
+                    if hasattr(rebuilt, "streaming_content")
+                    else rebuilt.content
+                )
+                self.assertGreater(len(rebuilt_body), 32)
+                self.assertTrue(thumb_file.is_file())
+
     def test_product_image_serves_from_db_when_media_file_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
