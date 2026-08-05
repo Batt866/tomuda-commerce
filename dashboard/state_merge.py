@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 ENTITY_KEYS = ("customers", "products", "employees", "orders")
@@ -154,16 +155,86 @@ def _merge_promotion_kind(remote_list: Any, local_list: Any) -> list:
     return out
 
 
-def json_dumps_stable(value: Any) -> str:
-    import json
+def _promotion_free_ids(rule: dict[str, Any]) -> list[str]:
+    for key in ("freeProductIds", "priceFreeProductIds", "paymentFreeProductIds"):
+        value = rule.get(key)
+        if isinstance(value, list) and value:
+            return sorted({str(x) for x in value if x is not None and str(x)})
+    for key in ("freeProductId", "priceFreeProductId", "paymentFreeProductId"):
+        value = rule.get(key)
+        if value is not None and str(value):
+            return [str(value)]
+    return []
 
+
+def _stable_promotion_value(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_stable_promotion_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _stable_promotion_value(value[key]) for key in sorted(value)}
+    return value
+
+
+def promotion_rule_canonical_fingerprint(rule: Any) -> str:
+    if not isinstance(rule, dict):
+        return json_dumps_stable(rule)
+    copy = dict(rule)
+    free_ids = _promotion_free_ids(copy)
+    for key in (
+        "freeProductId",
+        "priceFreeProductId",
+        "paymentFreeProductId",
+        "priceFreeProductIds",
+        "paymentFreeProductIds",
+    ):
+        copy.pop(key, None)
+    copy["freeProductIds"] = free_ids
+    buy_ids = copy.get("buyProductIds")
+    if isinstance(buy_ids, list):
+        copy["buyProductIds"] = sorted({str(x) for x in buy_ids if x is not None and str(x)})
+    return json_dumps_stable(_stable_promotion_value(copy))
+
+
+def promotion_deletion_canonical_key(kind: str, fingerprint: Any) -> str:
+    fp = str(fingerprint or "")
+    try:
+        parsed = json.loads(fp)
+        fp = promotion_rule_canonical_fingerprint(parsed)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        pass
+    return f"{kind}:{fp}"
+
+
+def promotion_deletion_log_has(log: list[dict[str, Any]], kind: str, rule: Any) -> bool:
+    key = (
+        promotion_deletion_canonical_key(kind, rule)
+        if isinstance(rule, str)
+        else f"{kind}:{promotion_rule_canonical_fingerprint(rule)}"
+    )
+    for entry in log:
+        if entry.get("restored"):
+            continue
+        entry_key = promotion_deletion_canonical_key(
+            str(entry.get("kind") or ""), entry.get("fingerprint")
+        )
+        if entry_key == key:
+            return True
+    return False
+
+
+def json_dumps_stable(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=False, default=str)
 
 
-def merge_promotion_rules(remote: Any, local: Any) -> dict[str, list]:
+def merge_promotion_rules(
+    remote: Any,
+    local: Any,
+    deletion_log: list[dict[str, Any]] | None = None,
+) -> dict[str, list]:
     remote_rules = _as_dict(remote)
     local_rules = _as_dict(local)
-    return {
+    tombstones = deletion_log or []
+    merged = {
         "quantity": _merge_promotion_kind(
             remote_rules.get("quantity"), local_rules.get("quantity")
         ),
@@ -171,6 +242,16 @@ def merge_promotion_rules(remote: Any, local: Any) -> dict[str, list]:
         "payment": _merge_promotion_kind(
             remote_rules.get("payment"), local_rules.get("payment")
         ),
+    }
+    if not tombstones:
+        return merged
+    return {
+        kind: [
+            rule
+            for rule in rules
+            if isinstance(rule, dict) and not promotion_deletion_log_has(tombstones, kind, rule)
+        ]
+        for kind, rules in merged.items()
     }
 
 
@@ -273,7 +354,9 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
     merged["deletionLog"] = deletion_log
     merged["promotionDeletionLog"] = promotion_deletion_log
     merged["promotionRules"] = merge_promotion_rules(
-        remote_state.get("promotionRules"), local_state.get("promotionRules")
+        remote_state.get("promotionRules"),
+        local_state.get("promotionRules"),
+        promotion_deletion_log,
     )
     merged["settings"] = {
         **_as_dict(remote_state.get("settings")),

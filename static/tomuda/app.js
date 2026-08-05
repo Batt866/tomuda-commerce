@@ -2436,7 +2436,19 @@ function canDelete() {
     hasPermission("customers.create") ||
     hasPermission("orders.delete") ||
     hasPermission("orders.edit") ||
-    hasPermission("receipts.delete")
+    hasPermission("receipts.delete") ||
+    hasPermission("promotions.delete") ||
+    hasPermission("promotions.edit") ||
+    currentRole() === "admin"
+  );
+}
+function canDeletePromotion() {
+  if (!state.isLoggedIn) return false;
+  return (
+    hasPermission("promotions.delete") ||
+    hasPermission("promotions.edit") ||
+    canDelete() ||
+    currentRole() === "admin"
   );
 }
 function canDeleteReceipt() {
@@ -3978,6 +3990,21 @@ function mergeArrayById(remote = [], local = [], opts = {}) {
   return Array.from(map.values());
 }
 
+function stablePromotionJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => stablePromotionJsonValue(item));
+  }
+  if (value && typeof value === "object") {
+    const ordered = {};
+    Object.keys(value)
+      .sort()
+      .forEach((key) => {
+        ordered[key] = stablePromotionJsonValue(value[key]);
+      });
+    return ordered;
+  }
+  return value;
+}
 function promotionRuleFingerprint(rule) {
   if (!rule || typeof rule !== "object") return JSON.stringify(rule);
   const copy = { ...rule };
@@ -3992,13 +4019,7 @@ function promotionRuleFingerprint(rule) {
       copy[key] = [...copy[key]].map(String).filter(Boolean).sort();
     }
   }
-  const ordered = {};
-  Object.keys(copy)
-    .sort()
-    .forEach((key) => {
-      ordered[key] = copy[key];
-    });
-  return JSON.stringify(ordered);
+  return JSON.stringify(stablePromotionJsonValue(copy));
 }
 // Canonical fingerprint: stable no matter which legacy/alternate keys the
 // rule uses for its free products, so the same logical rule always matches.
@@ -4021,13 +4042,7 @@ function promotionRuleCanonicalFingerprint(rule) {
       .filter(Boolean)
       .sort();
   }
-  const ordered = {};
-  Object.keys(copy)
-    .sort()
-    .forEach((key) => {
-      ordered[key] = copy[key];
-    });
-  return JSON.stringify(ordered);
+  return JSON.stringify(stablePromotionJsonValue(copy));
 }
 function dedupePromotionRuleList(list = []) {
   const seen = new Set();
@@ -4080,37 +4095,12 @@ function normalizePromotionDeletionLog(log = []) {
   return [...byKey.values()].slice(-500);
 }
 function mergedPromotionDeletionLog(remote = {}, local = {}) {
-  const remoteLog = normalizePromotionDeletionLog(
-    remote.promotionDeletionLog || [],
-  );
-  const merged = normalizePromotionDeletionLog([
-    ...remoteLog,
+  // Newest entry per rule wins (delete vs restored). Do not auto-revive rules
+  // just because the server still lists them — that made deletes appear broken.
+  return normalizePromotionDeletionLog([
+    ...(remote.promotionDeletionLog || []),
     ...(local.promotionDeletionLog || []),
   ]);
-  const remoteKeys = new Set(
-    remoteLog.map((e) => promotionDeletionCanonicalKey(e.kind, e.fingerprint)),
-  );
-  const remoteRules = normalizePromotionRulesState(remote.promotionRules || {});
-  const FRESH_MS = 10 * 60 * 1000;
-  const now = Date.now();
-  return merged.map((entry) => {
-    if (entry.restored) return entry;
-    const key = promotionDeletionCanonicalKey(entry.kind, entry.fingerprint);
-    // Deletion the backend already knows about: keep it.
-    if (remoteKeys.has(key)) return entry;
-    // Recent local deletion (e.g. made offline) that hasn't synced yet: keep.
-    const ts = Date.parse(entry.updatedAt || entry.deletedAt || "");
-    if (Number.isFinite(ts) && now - ts < FRESH_MS) return entry;
-    // Stale local-only tombstone while the backend still has the rule alive:
-    // this deletion never propagated legitimately, so restore the rule
-    // instead of silently re-deleting it on this device.
-    const ruleAlive = (remoteRules[entry.kind] || []).some(
-      (rule) =>
-        key === `${entry.kind}:${promotionRuleCanonicalFingerprint(rule)}`,
-    );
-    if (!ruleAlive) return entry;
-    return { ...entry, restored: true, updatedAt: new Date().toISOString() };
-  });
 }
 function promotionDeletionLogHas(log = [], kind, rule) {
   const key =
@@ -4192,6 +4182,20 @@ function mergePromotionRules(remote = {}, local = {}, deletionLog = []) {
     ),
   };
   return normalizePromotionRulesState(merged);
+}
+function applyPromotionDeletionLogToRules(rules = {}, deletionLog = []) {
+  const src = normalizePromotionRulesState(rules || {});
+  return normalizePromotionRulesState({
+    quantity: (src.quantity || []).filter(
+      (rule) => !promotionDeletionLogHas(deletionLog, "quantity", rule),
+    ),
+    price: (src.price || []).filter(
+      (rule) => !promotionDeletionLogHas(deletionLog, "price", rule),
+    ),
+    payment: (src.payment || []).filter(
+      (rule) => !promotionDeletionLogHas(deletionLog, "payment", rule),
+    ),
+  });
 }
 function appendPromotionRule(kind, rule) {
   if (!state.promotionRules || typeof state.promotionRules !== "object") {
@@ -7939,7 +7943,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = dotted all sides (source zarlaga hair/dotted grid).
   // Promo/sign use borderId 3 = dotted bottom; summary amounts borderId 5 = top+bottom dotted.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="12"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="7"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="dotted"><color rgb="FF666666"/></left><right style="dotted"><color rgb="FF666666"/></right><top style="dotted"><color rgb="FF666666"/></top><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="dotted"><color rgb="FF666666"/></top><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="44"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="9"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="7"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="dotted"><color rgb="FF666666"/></left><right style="dotted"><color rgb="FF666666"/></right><top style="dotted"><color rgb="FF666666"/></top><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="dotted"><color rgb="FF666666"/></top><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="46"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -8094,18 +8098,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `J${hr1}:K${hr1}`,
     `J${hr2}:K${hr2}`,
   );
-  pushRow(20.25, [
+  pushRow(14.25, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`C${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(hr1, "D", "F", 39),
     ...emptyCells(hr1, "I", "I", 3),
+    ...emptyCells(hr1, "K", "K", 3),
   ]);
   pushRow(27, [
     xlsxCellXml(`C${hr2}`, 5, si(companyAddr), "s"),
     xlsxCellXml(`J${hr2}`, 15, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "D", "H", 5),
     ...emptyCells(hr2, "I", "I", 15),
+    ...emptyCells(hr2, "K", "K", 15),
   ]);
   pushRow(31.5, [
     xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -8189,12 +8195,17 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(perBankH, [
     xlsxCellXml(`B${bankR4}`, 5, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`D${bankR4}`, 4, si(`IBAN:  ${RECEIPT_BANK_IBAN_SHORT}`), "s"),
+    xlsxCellXml(`D${bankR4}`, 4, si("IBAN:"), "s"),
     ...emptyCells(bankR4, "C", "C", 5),
     ...emptyCells(bankR4, "E", "E", 4),
   ]);
-  pushRow(perBankH, [
-    xlsxCellXml(`D${bankR5}`, 4, si(RECEIPT_BANK_ACCOUNT), "s"),
+  pushRow(Math.max(perBankH, 28), [
+    xlsxCellXml(
+      `D${bankR5}`,
+      4,
+      si(`${RECEIPT_BANK_IBAN_SHORT}\n${RECEIPT_BANK_ACCOUNT}`),
+      "s",
+    ),
     ...emptyCells(bankR5, "E", "E", 4),
   ]);
 
@@ -8297,25 +8308,24 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     merges.push(`B${grossRow}:D${grossRow}`);
     pushRow(14.25, [
       xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
-      xlsxCellXml(`E${grossRow}`, 12, null, "empty"),
-      xlsxCellXml(`F${grossRow}`, 12, null, "empty"),
-      xlsxCellXml(`G${grossRow}`, 12, null, "empty"),
-      xlsxCellXml(`H${grossRow}`, 12, null, "empty"),
-      xlsxCellXml(`I${grossRow}`, 12, null, "empty"),
-      xlsxCellXml(`J${grossRow}`, 12, null, "empty"),
+      xlsxCellXml(`E${grossRow}`, 1, null, "empty"),
+      xlsxCellXml(`F${grossRow}`, 1, null, "empty"),
+      xlsxCellXml(`G${grossRow}`, 1, null, "empty"),
+      xlsxCellXml(`H${grossRow}`, 1, null, "empty"),
+      xlsxCellXml(`I${grossRow}`, 1, null, "empty"),
+      xlsxCellXml(`J${grossRow}`, 1, null, "empty"),
       xlsxCellXml(`K${grossRow}`, 32, Number(gross) || 0, "n"),
       ...emptyCells(grossRow, "C", "D", 19),
     ]);
-    pushRow(14.25, emptyCells(rowNum));
   }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
   if (promoLines.length) {
     const promoLabelRow = rowNum;
     merges.push(`B${promoLabelRow}:D${promoLabelRow}`);
-    pushItemTableRow(14.25, [
-      xlsxCellXml(`B${promoLabelRow}`, 36, si("Урамшуулал"), "s"),
-      ...emptyCells(promoLabelRow, "C", "D", 36),
-      ...emptyCells(promoLabelRow, "E", "K", 36),
+    // No dotted borders — Урамшуулал is a section title, not a table line.
+    pushRow(16, [
+      xlsxCellXml(`B${promoLabelRow}`, 15, si("Урамшуулал"), "s"),
+      ...emptyCells(promoLabelRow, "C", "D", 15),
     ]);
   }
   promoLines.forEach((item) => {
@@ -8345,26 +8355,25 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, 9, null, "empty"),
-      xlsxCellXml(`B${r}`, 36, si(nameText), "s"),
-      xlsxCellXml(`E${r}`, 37, si(unitText), "s"),
+      xlsxCellXml(`B${r}`, 8, si(nameText), "s"),
+      xlsxCellXml(`E${r}`, 9, si(unitText), "s"),
       barcodeText !== "-"
         ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
         : xlsxCellXml(`F${r}`, 34, null, "empty"),
-      xlsxCellXml(`H${r}`, 37, qty, "n"),
-      xlsxCellXml(`J${r}`, 38, Number(unitPrice) || 0, "n"),
-      xlsxCellXml(`K${r}`, 38, Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "C", "D", 36),
+      xlsxCellXml(`H${r}`, 11, qty, "n"),
+      xlsxCellXml(`J${r}`, 10, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(`K${r}`, 10, Number(lineTotal) || 0, "n"),
+      ...emptyCells(r, "C", "D", 8),
       ...emptyCells(r, "G", "G", 34),
-      ...emptyCells(r, "I", "I", 37),
+      ...emptyCells(r, "I", "I", 11),
     ]);
   });
 
-  if (promoLines.length) pushRow(14.25, emptyCells(rowNum));
-
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
-    const labelStyle = grand ? 31 : 30;
-    const valueStyle = grand ? 32 : decimals ? 29 : 12;
+    // 44 = grand label (green), 45 = grand amount (green, large)
+    const labelStyle = grand ? 44 : 30;
+    const valueStyle = grand ? 45 : decimals ? 29 : 12;
     merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
     const cells = [
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
@@ -8377,7 +8386,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     } else {
       cells.push(...emptyCells(r, "E", "J", valueStyle));
     }
-    pushRow(grand ? 21.75 : 14.25, cells);
+    pushRow(grand ? 22 : 14.25, cells);
   };
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
@@ -8387,18 +8396,16 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     note: grandNote || "",
   });
 
-  // Төлбөрийн нөхцөл — яг нийт төлөх дүнгийн доор
+  // Төлбөрийн нөхцөл — утга K баганад (нийт дүнтэй нэг багана)
   {
     const r = rowNum;
     const term = receiptPaymentTermDisplay(o);
-    merges.push(`B${r}:D${r}`, `E${r}:G${r}`, `H${r}:K${r}`);
+    merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
     pushRow(14.25, [
       xlsxCellXml(`B${r}`, 30, si("Төлбөрийн нөхцөл"), "s"),
-      xlsxCellXml(`E${r}`, 3, null, "empty"),
-      xlsxCellXml(`H${r}`, 15, si(term), "s"),
+      xlsxCellXml(`K${r}`, 15, si(term), "s"),
       ...emptyCells(r, "C", "D", 30),
-      ...emptyCells(r, "F", "G", 3),
-      ...emptyCells(r, "I", "K", 15),
+      ...emptyCells(r, "E", "J", 1),
     ]);
   }
 
@@ -13034,10 +13041,7 @@ function promotionMenuHtml() {
   return `<nav class="promo-hub" aria-label="Урамшууллын төрөл">${items
     .map(([id, label]) => {
       const count = (state.promotionRules[id] || []).length;
-      const countHtml = count
-        ? `<span class="promo-hub-card__count">${count}</span>`
-        : `<span class="promo-hub-card__count promo-hub-card__count--empty">0</span>`;
-      return `<button type="button" onclick="openPromotionPage('${id}')" class="promo-hub-card promo-hub-card--${id}"><span class="promo-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${promoTypeIconSvg(id)}</svg></span><span class="promo-hub-card__body"><span class="promo-hub-card__label">${esc(label)}</span></span>${countHtml}<svg class="ui-icon promo-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
+      return `<button type="button" onclick="openPromotionPage('${id}')" class="promo-hub-card promo-hub-card--${id}"><span class="promo-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${promoTypeIconSvg(id)}</svg></span><span class="promo-hub-card__body"><span class="promo-hub-card__label">${esc(label)}</span><span class="promo-hub-card__meta">${count} дүрэм</span></span><span class="promo-hub-card__count">${count}</span><svg class="ui-icon promo-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
     })
     .join("")}</nav>`;
 }
@@ -13361,8 +13365,20 @@ function promotionProductPickerBlock(
       : "";
   return `<div class="promo-section${variant ? ` promo-section--${variant}` : ""}"><div class="promo-product-block"><input type="hidden" name="${fieldName}" id="promo-${fieldName}" value="${esc(selectedId)}" required>${head}${inputRow}${promoCategoryFilterHtml(fieldName)}${warn}${selectedHtml}${listHtml}</div></div>`;
 }
-function promoSectionArrow() {
-  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="promo-section-arrow-text">жишээ: төмөр 50 + газан 50 + энгийн 50 → төмөр 50 урамшуулал</span></div>`;
+function promoSectionArrow(text = "") {
+  const hint = text
+    ? `<span class="promo-section-arrow-text">${esc(text)}</span>`
+    : "";
+  return `<div class="promo-section-arrow" aria-hidden="true"><span class="promo-section-arrow-icon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>${hint}</div>`;
+}
+function promoConditionSectionHtml({
+  badge = "1",
+  title,
+  hint = "",
+  body,
+  variant = "buy",
+}) {
+  return `<div class="promo-section promo-section--${esc(variant)}"><div class="promo-product-block"><div class="promo-section-head"><span class="promo-section-badge">${esc(badge)}</span><div><p class="promo-section-title">${esc(title)}</p>${hint ? `<p class="promo-section-hint">${esc(hint)}</p>` : ""}</div></div><div class="promo-condition-body">${body}</div></div></div>`;
 }
 function promotionQtyField(name, label, defaultValue, variant = false) {
   const draftVal = promoFormDraftVal(name, "");
@@ -13903,18 +13919,22 @@ function promotionQuantityPanel(rows) {
   const listHtml = rows.length
     ? rows.map((r, i) => promotionQtyRuleCard(r, i)).join("")
     : promoRuleListEmpty();
+  const clearAll =
+    rows.length && canDeletePromotion()
+      ? `<button type="button" onclick="confirmClearPromotionRules('quantity')" class="promo-panel__clear">Бүгдийг устгах</button>`
+      : "";
   return promoPanelShell({
     addOnclick: "openPromotionQtyModal()",
-    listHtml,
+    listHtml: `${clearAll}${listHtml}`,
     type: "quantity",
   });
 }
 function promoRuleDeleteBtn(kind, i) {
-  if (!canDelete()) return "";
+  if (!canDeletePromotion()) return "";
   return deleteIconButton({
     className:
       "icon-action-btn icon-action-btn--neutral promo-rule-card__delete",
-    attrs: `onclick="confirmRemovePromotionRule('${kind}',${i})"`,
+    attrs: `onclick="event.stopPropagation();confirmRemovePromotionRule('${kind}',${i})"`,
     label: "Дүрэм устгах",
   });
 }
@@ -13973,7 +13993,6 @@ function promotionPricePanel(rows) {
     ? sorted.map((r) => promotionPriceRuleCard(r, rows.indexOf(r))).join("")
     : promoRuleListEmpty();
   return promoPanelShell({
-    lead: `Захиалгын нийт дүнгийн хүрээнд ${promoProductLabelInline()} эсвэл хувийн хөнгөлөлт олгоно.`,
     addOnclick: "openPromotionPriceModal()",
     listHtml,
     type: "price",
@@ -14058,9 +14077,9 @@ function promotionPriceRuleCard(r, i) {
       ? PROMO_PERCENT_TAB_LABEL
       : freeQty > 0
         ? `Урамшуулал · ${freeQty} ш`
-        : PROMO_PRODUCT_LABEL,
+        : "Урамшуулал",
     deleteBtn = promoRuleDeleteBtn("price", i);
-  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__amount promo-rule-card__amount--solo">${esc(amountLabel)}</p></section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${promotionPriceRewardHtml(r)}</section></div></article>`;
+  return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${i + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__lane-label">Дүнгийн хүрээ</p><p class="promo-rule-card__amount">${esc(amountLabel)}</p></section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">${esc(rewardLabel)}</p>${promotionPriceRewardHtml(r)}</section></div></article>`;
 }
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
@@ -14096,7 +14115,7 @@ function promotionQtyModal() {
     promotionPageTitle("quantity"),
     promoFormShell(
       `data-promo-modal="qty" onsubmit="savePromotionQty(event)"`,
-      `${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow()}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: "Урамшуулал", hint: "Олон бараа сонгож болно · захиалгын бараатай ижил байж болно", placeholder: "урамшуулал хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}`,
+      `${promotionMultiBuyPickerBlock(buyIds)}${promoSectionArrow("жишээ: төмөр 50 + газан 50 + энгийн 50 → төмөр 50 урамшуулал")}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: "Урамшуулал", hint: "Олон бараа сонгож болно · захиалгын бараатай ижил байж болно", placeholder: "урамшуулал хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}`,
     ),
     "max-w-2xl",
     { panelClass: "modal-panel--promo" },
@@ -14128,40 +14147,50 @@ function promotionPriceModal() {
   }
   const type = state.promoPriceRuleType === "percent" ? "percent" : "free",
     freeIds = state.promoPick.priceFreeProductIds || [],
-    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">${PROMO_PRODUCT_LABEL}</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">${PROMO_PERCENT_TAB_LABEL}</button></div>`,
     amountFields = `<div class="promo-form-grid">${promoFormFieldHtml("Доод дүн (₮)", promoAmountInputHtml("minAmount", { required: true, placeholder: "200000", value: promoFormDraftVal("minAmount") }))}${promoFormFieldHtml("Дээд дүн (₮)", promoAmountInputHtml("maxAmount", { placeholder: "400000", value: promoFormDraftVal("maxAmount") }), "Хоосон = хязгааргүй")}</div>`,
+    typeToggle = `<div class="seg-tabs promo-type-tabs"><button type="button" onclick="setPromotionPriceRuleType('free')" class="seg-tab ${type === "free" ? "is-active" : ""}">${PROMO_PRODUCT_LABEL}</button><button type="button" onclick="setPromotionPriceRuleType('percent')" class="seg-tab ${type === "percent" ? "is-active" : ""}">${PROMO_PERCENT_TAB_LABEL}</button></div>`,
     freeBlock =
       type === "free"
         ? promotionMultiFreePickerBlock({
             pickKey: "priceFreeProductIds",
             fieldName: "priceFreeProductIds",
             selectedIds: freeIds,
-            title: PROMO_PRODUCT_LABEL,
+            title: "Урамшуулал",
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайж нэмэх...",
             badge: "2",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
           })
-        : "",
-    percentBlock =
-      type === "percent"
-        ? promoFormGroupHtml(
-            promoFormFieldHtml(
-              `${PROMO_PERCENT_TAB_LABEL} (%)`,
-              promoAmountInputHtml("discountPercent", {
-                required: true,
-                placeholder: "5",
-                value: promoFormDraftVal("discountPercent"),
-              }),
-            ),
-            { step: "2", title: PROMO_PERCENT_TAB_LABEL },
-          )
         : "";
+  const condition = promoConditionSectionHtml({
+    badge: "1",
+    title: "Захиалгын дүнгийн хүрээ",
+    hint: "Жишээ: 200,000 – 400,000₮",
+    body: amountFields,
+  });
+  const typeBar = `<div class="promo-reward-toggle">${typeToggle}</div>`;
+  const reward =
+    type === "free"
+      ? `${typeBar}${freeBlock}`
+      : `${typeBar}${promoConditionSectionHtml({
+          badge: "2",
+          title: PROMO_PERCENT_TAB_LABEL,
+          hint: "Нийт дүнгээс хасах хувь",
+          variant: "free",
+          body: promoFormFieldHtml(
+            `${PROMO_PERCENT_TAB_LABEL} (%)`,
+            promoAmountInputHtml("discountPercent", {
+              required: true,
+              placeholder: "5",
+              value: promoFormDraftVal("discountPercent"),
+            }),
+          ),
+        })}`;
   box(
     promotionPageTitle("price"),
     promoFormShell(
       `data-promo-modal="price" onsubmit="savePromotionPrice(event)"`,
-      `<input type="hidden" name="type" value="${type}">${promoFormGroupHtml(amountFields, { step: "1", title: promotionPageTitle("price") })}${promoFormGroupHtml(typeToggle)}${freeBlock}${percentBlock}`,
+      `<input type="hidden" name="type" value="${type}">${condition}${promoSectionArrow("нийт дүн хүрээнд → урамшуулал / хувь")}${reward}`,
     ),
     "max-w-2xl",
     { panelClass: "modal-panel--promo" },
@@ -14216,32 +14245,42 @@ function promotionPaymentModal() {
             pickKey: "paymentFreeProductIds",
             fieldName: "paymentFreeProductIds",
             selectedIds: freeIds,
-            title: PROMO_PRODUCT_LABEL,
+            title: "Урамшуулал",
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайх...",
             badge: "2",
             qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" },
           })
-        : "",
-    percentBlock =
-      type === "percent"
-        ? promoFormGroupHtml(
-            promoFormFieldHtml(
-              "Хөнгөлөлтийн хувь (%)",
-              promoAmountInputHtml("discountPercent", {
-                required: true,
-                placeholder: "5",
-                value: promoFormDraftVal("discountPercent"),
-              }),
-            ),
-            { step: "2", title: "Хувь тооцох" },
-          )
         : "";
+  const condition = promoConditionSectionHtml({
+    badge: "1",
+    title: "Төлбөрийн нөхцөл",
+    hint: "Шууд төлөх эсвэл зээлээр",
+    body: `${termToggle}${minField}`,
+  });
+  const typeBar = `<div class="promo-reward-toggle">${typeToggle}</div>`;
+  const reward =
+    type === "free"
+      ? `${typeBar}${freeBlock}`
+      : `${typeBar}${promoConditionSectionHtml({
+          badge: "2",
+          title: "Хувь тооцох",
+          hint: "Шууд төлөлтөд хасах хувь",
+          variant: "free",
+          body: promoFormFieldHtml(
+            "Хөнгөлөлтийн хувь (%)",
+            promoAmountInputHtml("discountPercent", {
+              required: true,
+              placeholder: "5",
+              value: promoFormDraftVal("discountPercent"),
+            }),
+          ),
+        })}`;
   box(
     promotionPageTitle("payment"),
     promoFormShell(
       `data-promo-modal="payment" onsubmit="savePromotionPayment(event)"`,
-      `<input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="${term}">${promoFormGroupHtml(termToggle, { step: "1", title: promotionPageTitle("payment") })}${promoFormGroupHtml(minField)}${promoFormGroupHtml(typeToggle)}${freeBlock}${percentBlock}`,
+      `<input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="${term}">${condition}${promoSectionArrow("төлбөрийн нөхцөл → урамшуулал / хувь")}${reward}`,
     ),
     "max-w-2xl",
     { panelClass: "modal-panel--promo" },
@@ -14619,22 +14658,34 @@ function savePromotionPayment(e) {
   }
 }
 function removePromotionRule(type, index) {
-  if (!requireAdminDelete()) return;
+  if (!canDeletePromotion()) {
+    alertModal("Эрхгүй", "Урамшууллын дүрэм устгах эрхгүй.");
+    return;
+  }
   if (!Array.isArray(state.promotionRules[type]))
     state.promotionRules[type] = [];
   if (index < 0 || index >= state.promotionRules[type].length) return;
-  recordPromotionDeletion(type, state.promotionRules[type][index]);
+  const removed = state.promotionRules[type][index];
+  recordPromotionDeletion(type, removed);
   state.promotionRules[type].splice(index, 1);
+  // Drop any leftover copies with the same fingerprint (merge ghosts).
+  const fp = promotionRuleCanonicalFingerprint(removed);
   state.promotionRules[type] = dedupePromotionRuleList(
-    state.promotionRules[type],
+    state.promotionRules[type].filter(
+      (rule) => promotionRuleCanonicalFingerprint(rule) !== fp,
+    ),
+  );
+  state.promotionRules = applyPromotionDeletionLogToRules(
+    state.promotionRules,
+    state.promotionDeletionLog,
   );
   render();
   showAppToast(`${promotionTypeLabel(type)} дүрэм устгагдлаа`, "success");
   criticalBackendSave();
 }
 function confirmRemovePromotionRule(type, index) {
-  if (!canDelete()) {
-    alertModal("Эрхгүй", "Зөвхөн админ устгах эрхтэй.");
+  if (!canDeletePromotion()) {
+    alertModal("Эрхгүй", "Урамшууллын дүрэм устгах эрхгүй.");
     return;
   }
   const label = promotionTypeLabel(type);
@@ -14644,6 +14695,41 @@ function confirmRemovePromotionRule(type, index) {
     {
       confirmLabel: "Устгах",
       onConfirm: () => removePromotionRule(type, index),
+      danger: true,
+    },
+  );
+}
+function clearPromotionRules(type) {
+  if (!canDeletePromotion()) {
+    alertModal("Эрхгүй", "Урамшууллын дүрэм устгах эрхгүй.");
+    return;
+  }
+  if (!Array.isArray(state.promotionRules[type])) return;
+  const rules = [...state.promotionRules[type]];
+  rules.forEach((rule) => recordPromotionDeletion(type, rule));
+  state.promotionRules[type] = [];
+  state.promotionRules = applyPromotionDeletionLogToRules(
+    state.promotionRules,
+    state.promotionDeletionLog,
+  );
+  render();
+  showAppToast(`${promotionTypeLabel(type)} дүрмүүд устгагдлаа`, "success");
+  criticalBackendSave();
+}
+function confirmClearPromotionRules(type) {
+  if (!canDeletePromotion()) {
+    alertModal("Эрхгүй", "Урамшууллын дүрэм устгах эрхгүй.");
+    return;
+  }
+  const count = (state.promotionRules[type] || []).length;
+  if (!count) return;
+  const label = promotionTypeLabel(type);
+  confirmModal(
+    "Бүгдийг устгах уу?",
+    `<b class="text-foreground">${label}</b> — ${count} дүрмийг бүрмөсөн устгах гэж байна.`,
+    {
+      confirmLabel: "Бүгдийг устгах",
+      onConfirm: () => clearPromotionRules(type),
       danger: true,
     },
   );
@@ -19922,6 +20008,8 @@ Object.assign(window, {
   savePromotionPayment,
   removePromotionRule,
   confirmRemovePromotionRule,
+  clearPromotionRules,
+  confirmClearPromotionRules,
   removePromotionRuleNow,
   excel,
   saveWorker,

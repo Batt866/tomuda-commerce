@@ -839,6 +839,37 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertIn("c-keep", saved_ids)
         self.assertNotIn("c-delete", saved_ids)
 
+    def test_promotion_deletion_log_removes_rules_on_merge(self):
+        from dashboard.state_merge import merge_app_states, promotion_rule_canonical_fingerprint
+
+        rule = {
+            "buyProductIds": ["p2", "p1"],
+            "buyQtyByProduct": {"p2": 50, "p1": 50},
+            "freeProductIds": ["p3"],
+            "freeQty": 10,
+            "buyMode": "each",
+        }
+        fp = promotion_rule_canonical_fingerprint(rule)
+        remote = {
+            "promotionRules": {"quantity": [rule], "price": [], "payment": []},
+            "promotionDeletionLog": [],
+        }
+        local = {
+            "promotionRules": {"quantity": [], "price": [], "payment": []},
+            "promotionDeletionLog": [
+                {
+                    "kind": "quantity",
+                    "fingerprint": fp,
+                    "deletedBy": "admin",
+                    "deletedAt": "2026-08-05T12:00:00",
+                    "restored": False,
+                    "updatedAt": "2026-08-05T12:00:00",
+                }
+            ],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(merged["promotionRules"]["quantity"], [])
+
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class CustomerUpsertApiTests(TestCase):
