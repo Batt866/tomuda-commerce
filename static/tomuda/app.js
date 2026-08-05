@@ -8321,53 +8321,37 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
-  if (promoLines.length) {
-    const promoLabelRow = rowNum;
-    merges.push(`B${promoLabelRow}:D${promoLabelRow}`);
-    // No dotted borders — Урамшуулал is a section title, not a table line.
-    pushRow(16, [
-      xlsxCellXml(`B${promoLabelRow}`, 15, si("Урамшуулал"), "s"),
-      ...emptyCells(promoLabelRow, "C", "D", 15),
-    ]);
-  }
-  promoLines.forEach((item) => {
+  // ҮНДСЭН: same row — C:D Урамшуулал (1st only), E:G name, H:I qty, J price, K total
+  promoLines.forEach((item, idx) => {
     const r = rowNum;
-    const p =
-      state.products.find((x) => x.id === item.productId) ||
-      productForReceiptLine(item) ||
-      {};
     const unitPrice = receiptPromoDisplayPrice(item);
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
-    const barcodeText = receiptPromoBarcode(item);
     const nameText = String(item.productName || "").trim() || "-";
-    const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
     const promoH = Math.max(
       14.25,
-      receiptXlsxWrappedRowHeight(nameText, nameColWidth),
-      barcodeText !== "-"
-        ? receiptXlsxWrappedRowHeight(barcodeText, barcodeColWidth, {
-            min: 14.25,
-            linePt: 11,
-            pad: 2,
-            max: 28,
-          })
-        : 14.25,
+      receiptXlsxWrappedRowHeight(nameText, 28, {
+        min: 14.25,
+        linePt: 11,
+        pad: 2,
+        max: 36,
+      }),
     );
-    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
+    merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
+    const labelStyle = idx === 0 ? 36 : 35;
     pushItemTableRow(promoH, [
-      xlsxCellXml(`A${r}`, 9, null, "empty"),
-      xlsxCellXml(`B${r}`, 8, si(nameText), "s"),
-      xlsxCellXml(`E${r}`, 9, si(unitText), "s"),
-      barcodeText !== "-"
-        ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
-        : xlsxCellXml(`F${r}`, 34, null, "empty"),
-      xlsxCellXml(`H${r}`, 11, qty, "n"),
-      xlsxCellXml(`J${r}`, 10, Number(unitPrice) || 0, "n"),
-      xlsxCellXml(`K${r}`, 10, Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "C", "D", 8),
-      ...emptyCells(r, "G", "G", 34),
-      ...emptyCells(r, "I", "I", 11),
+      xlsxCellXml(`A${r}`, 35, null, "empty"),
+      xlsxCellXml(`B${r}`, 35, null, "empty"),
+      idx === 0
+        ? xlsxCellXml(`C${r}`, 36, si("Урамшуулал"), "s")
+        : xlsxCellXml(`C${r}`, 35, null, "empty"),
+      xlsxCellXml(`E${r}`, 35, si(nameText), "s"),
+      xlsxCellXml(`H${r}`, 37, qty, "n"),
+      xlsxCellXml(`J${r}`, 38, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(`K${r}`, 38, Number(lineTotal) || 0, "n"),
+      ...emptyCells(r, "D", "D", labelStyle),
+      ...emptyCells(r, "F", "G", 35),
+      ...emptyCells(r, "I", "I", 37),
     ]);
   });
 
