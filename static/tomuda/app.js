@@ -288,6 +288,7 @@ let countInputSyncing = false;
 let warehouseDateRenderPending = false;
 let warehouseDateBlurTimer = null;
 let warehouseDatePickerActiveUntil = 0;
+let forceDatePickerRender = false;
 let receiptStatusSelectActiveUntil = 0;
 let receiptStatusFilterPending = false;
 let toolbarSelectActiveUntil = 0;
@@ -4619,6 +4620,9 @@ function isEditingCountQty() {
   );
 }
 function isWarehouseDateEditing() {
+  // Native date pickers often keep focus until an outside tap; date setters
+  // set forceDatePickerRender so the chosen day applies immediately.
+  if (forceDatePickerRender) return false;
   if (Date.now() < warehouseDatePickerActiveUntil) return true;
   const el = document.activeElement;
   return el?.matches?.(".wh-date-filters__native");
@@ -4762,14 +4766,30 @@ function releaseWarehouseDatePicker() {
   clearTimeout(warehouseDateBlurTimer);
   warehouseDatePickerActiveUntil = 0;
   warehouseDateRenderPending = false;
-  const el = document.activeElement;
-  if (el?.matches?.(".wh-date-filters__native, .worker-orders-filters input[type=date]")) {
-    el.blur();
-  }
+  // Allow the next render even if the native date input still has focus.
+  forceDatePickerRender = true;
+  document
+    .querySelectorAll(
+      ".wh-date-filters__native, .worker-orders-filters input[type=date]",
+    )
+    .forEach((el) => {
+      try {
+        el.blur();
+      } catch {}
+    });
+}
+function commitDatePickerChange(apply) {
+  apply?.();
+  releaseWarehouseDatePicker();
+  clearTimeout(toolbarSelectBlurTimer);
+  toolbarSelectActiveUntil = 0;
+  toolbarSelectRenderPending = false;
+  render();
 }
 function warehouseDateFocus() {
   closeReceiptPrintPickersState();
   closeReceiptPrintPickersVisual();
+  forceDatePickerRender = false;
   warehouseDatePickerActiveUntil = Date.now() + 60000;
 }
 function warehouseDateBlur() {
@@ -4821,6 +4841,7 @@ function safeRender() {
     warehouseDateRenderPending = true;
     return;
   }
+  forceDatePickerRender = false;
   if (isReceiptStatusSelecting()) {
     receiptStatusFilterPending = true;
     return;
@@ -9991,22 +10012,22 @@ function warehouseDateFiltersHtml() {
     day = normalizeIsoDateInput(state.filters.warehouseDate) || today,
     isToday = day === today,
     display = warehouseDateDisplayText(day);
-  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" oninput="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдрийн захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
 }
 function selectWarehouseToday() {
-  state.filters.warehouseDate = todayIso();
-  state.selectedWarehouseOrderId = "";
-  releaseWarehouseDatePicker();
-  render();
+  commitDatePickerChange(() => {
+    state.filters.warehouseDate = todayIso();
+    state.selectedWarehouseOrderId = "";
+  });
 }
 function clearWarehouseDate() {
   selectWarehouseToday();
 }
 function setWarehouseDate(day) {
-  state.filters.warehouseDate = normalizeIsoDateInput(day) || todayIso();
-  state.selectedWarehouseOrderId = "";
-  releaseWarehouseDatePicker();
-  render();
+  commitDatePickerChange(() => {
+    state.filters.warehouseDate = normalizeIsoDateInput(day) || todayIso();
+    state.selectedWarehouseOrderId = "";
+  });
 }
 function receiptFilterToggle(kind, id) {
   const key = kind === "delivery" ? "receiptDeliveryIds" : "receiptWorkerIds";
@@ -13115,21 +13136,21 @@ function reportDateFiltersHtml() {
     pickerDay = day || todayIso(),
     display = warehouseDateDisplayText(day),
     q = state.searches.reports || "";
-  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Нэр, баримт №-ээр хайх..." })}<div class="wh-date-filters wh-date-filters--reports"><button type="button" onclick="clearReportDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Бүгд</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setReportDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Бүх захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Нэр, баримт №-ээр хайх..." })}<div class="wh-date-filters wh-date-filters--reports"><button type="button" onclick="clearReportDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Бүгд</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setReportDate(this.value)" oninput="setReportDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Бүх захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
   return pageToolbarHtml({
     filters,
     actions: excelDownloadBtn("confirmReportExport()"),
   });
 }
 function clearReportDate() {
-  state.filters.reportDate = "";
-  releaseWarehouseDatePicker();
-  render();
+  commitDatePickerChange(() => {
+    state.filters.reportDate = "";
+  });
 }
 function setReportDate(day) {
-  state.filters.reportDate = day || "";
-  releaseWarehouseDatePicker();
-  render();
+  commitDatePickerChange(() => {
+    state.filters.reportDate = day || "";
+  });
 }
 function reportsView() {
   const orders = reportOrdersFiltered(),
@@ -15277,30 +15298,21 @@ function openWorkerOrdersTab() {
   requestAnimationFrame(scrollWorkerOrdersToDate);
 }
 function clearWorkerOrderDate() {
-  state.filters.workerDate = "";
-  releaseWarehouseDatePicker();
-  clearTimeout(toolbarSelectBlurTimer);
-  toolbarSelectActiveUntil = 0;
-  toolbarSelectRenderPending = false;
-  render();
+  commitDatePickerChange(() => {
+    state.filters.workerDate = "";
+  });
 }
 function setWorkerOrderDate(day) {
   // Empty = Бүгд; otherwise filter list to that calendar day.
-  state.filters.workerDate = day ? normalizeIsoDateInput(day) || "" : "";
-  releaseWarehouseDatePicker();
-  clearTimeout(toolbarSelectBlurTimer);
-  toolbarSelectActiveUntil = 0;
-  toolbarSelectRenderPending = false;
-  render();
+  commitDatePickerChange(() => {
+    state.filters.workerDate = day ? normalizeIsoDateInput(day) || "" : "";
+  });
   requestAnimationFrame(scrollWorkerOrdersToDate);
 }
 function selectWorkerOrderToday() {
-  state.filters.workerDate = todayIso();
-  releaseWarehouseDatePicker();
-  clearTimeout(toolbarSelectBlurTimer);
-  toolbarSelectActiveUntil = 0;
-  toolbarSelectRenderPending = false;
-  render();
+  commitDatePickerChange(() => {
+    state.filters.workerDate = todayIso();
+  });
   pullBackendStateNow();
   requestAnimationFrame(scrollWorkerOrdersToDate);
 }
@@ -16070,7 +16082,7 @@ function workerOrders(orders) {
     todayActive = day === today,
     todayBtnClass = `worker-orders-filters__chip${todayActive ? " is-active" : ""}`;
   // Өнөөдөр must always be clickable — even when a past date is selected.
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   openWorkerOrderEdit(id);
@@ -16090,6 +16102,7 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
+  forceDatePickerRender = false;
   if (isEditingSettlementText()) {
     settlementRenderPending = true;
     if (localStateDirty()) scheduleBackendSave();
