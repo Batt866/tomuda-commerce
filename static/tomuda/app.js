@@ -602,11 +602,11 @@ function receiptPaymentTermDisplay(o) {
   }
   return "Шууд төлөх";
 }
-/** InvoiceHeader — logo A:B (2 rows only), brand C:F, address C:H, title C:J, date K. */
+/** InvoiceHeader — logo A only (2 rows), brand/address from B (closer to logo), date K. */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="7" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="9" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -7066,8 +7066,9 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: middle;
-  padding: 0 2px 0 0 !important;
+  padding: 0 1px 0 0 !important;
   overflow: hidden;
+  width: 16mm;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
   width: 14mm !important;
@@ -7867,7 +7868,7 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 // ҮНДСЭН A–K widths
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 14.0, 12.5, 3.875, 9.5, 9.0, 5.0, 4.875, 3.75, 9.25, 9.5,
+  8.0, 11.0, 12.0, 3.875, 9.0, 8.5, 5.0, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
@@ -8100,28 +8101,28 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Two lines under brand; flush toward logo (C), full text visible
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header R1–R3: logo A:B (2 rows only — never overlaps title), brand C:F, addr C:I, title C:J
-  // Date: label J:K right-aligned; value only in K (right) — matches ҮНДСЭН sample
+  // Header: logo A only (tight to brand); brand B:F, addr B:I, title B:J
+  // Date: label J:K row1; value K row2
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
   merges.push(
-    `A${hr1}:B${hr2}`,
-    `C${hr1}:F${hr1}`,
-    `C${hr2}:I${hr2}`,
-    `C${hr3}:J${hr3}`,
+    `A${hr1}:A${hr2}`,
+    `B${hr1}:F${hr1}`,
+    `B${hr2}:I${hr2}`,
+    `B${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
   );
-  // Row1: label in J:K; Row2: date in K — stacked, both columns J+K
   pushRow(14.25, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
-    xlsxCellXml(`C${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
-    ...emptyCells(hr1, "D", "F", 39),
+    ...emptyCells(hr1, "C", "F", 39),
     ...emptyCells(hr1, "I", "I", 3),
     ...emptyCells(hr1, "K", "K", 3),
   ]);
   const companyAddrColW =
+    RECEIPT_XLSX_COL_WIDTHS[1] +
     RECEIPT_XLSX_COL_WIDTHS[2] +
     RECEIPT_XLSX_COL_WIDTHS[3] +
     RECEIPT_XLSX_COL_WIDTHS[4] +
@@ -8139,13 +8140,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     }),
   );
   pushRow(companyAddrH, [
-    xlsxCellXml(`C${hr2}`, 5, si(companyAddr), "s"),
+    xlsxCellXml(`B${hr2}`, 5, si(companyAddr), "s"),
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
-    ...emptyCells(hr2, "D", "I", 5),
+    ...emptyCells(hr2, "C", "I", 5),
   ]);
   pushRow(31.5, [
-    xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr3, "D", "J", 40),
+    xlsxCellXml(`B${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(hr3, "C", "J", 40),
   ]);
 
   const pushMetaPairRow = (leftLabel, leftValue, rightLabel, rightValue, { rightBold = false } = {}) => {
