@@ -606,7 +606,7 @@ function receiptPaymentTermDisplay(o) {
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="6" class="receipt-grid__address">${addr}</td><td colspan="2"></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="7" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -5301,27 +5301,18 @@ function workerQtyPartsForProduct(p, qty) {
   const split = pickerQtyToParts(total, p);
   return { packs: split.packs, loosePieces: split.pieces };
 }
-function normalizeWarehousePrepareParts(totalQty, packs, loosePieces, packSize) {
+/** Split total qty into full packs + remaining loose pieces for warehouse prepare.
+ *  Examples (packSize=20): 8 → 0 багц + 8ш; 70 → 3 багц + 10ш.
+ *  Always canonical — do not preserve how the order was typed. */
+function normalizeWarehousePrepareParts(totalQty, _packs, _loosePieces, packSize) {
   const total = Math.max(0, Math.floor(Number(totalQty) || 0));
   const size = Math.floor(Number(packSize) || 0);
   if (!size || size <= 1) {
     return { packs: 0, loosePieces: total, totalQty: total };
   }
-  let pk = Math.max(0, Math.floor(Number(packs) || 0));
-  let loose = Math.max(0, Math.floor(Number(loosePieces) || 0));
-  if (pk * size + loose === total) {
-    return { packs: pk, loosePieces: loose, totalQty: total };
-  }
-  loose = total - pk * size;
-  if (loose >= 0 && loose < size) {
-    return { packs: pk, loosePieces: loose, totalQty: total };
-  }
-  const split = pickerQtyToParts(total, { boxQuantity: size });
-  return {
-    packs: split.packs,
-    loosePieces: split.pieces,
-    totalQty: total,
-  };
+  const packs = Math.floor(total / size);
+  const loosePieces = total % size;
+  return { packs, loosePieces, totalQty: total };
 }
 function orderItemPrepareParts(item, product) {
   const totalQty = Math.max(0, Math.floor(Number(item.quantity) || 0));
@@ -7492,7 +7483,7 @@ td, th { border: none; }
   line-height: 1.15;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
-  background: transparent !important;
+  background: ${RECEIPT_GRAND_BG} !important;
   color: ${RECEIPT_TEXT} !important;
   height: 18px;
   padding: 1px 4px;
@@ -8106,9 +8097,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
   const deliveryDateText = receiptDeliveryDateDisplay(o);
-  const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}                                             ${RECEIPT_COMPANY_ADDRESS_LINE2}`;
+  // Two lines under brand; flush toward logo (C), full text visible
+  const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header R1–R3: logo A:B (2 rows only — never overlaps title), brand C:F, addr C:H, title C:J
+  // Header R1–R3: logo A:B (2 rows only — never overlaps title), brand C:F, addr C:I, title C:J
   // Date: label J:K right-aligned; value only in K (right) — matches ҮНДСЭН sample
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
@@ -8116,7 +8108,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   merges.push(
     `A${hr1}:B${hr2}`,
     `C${hr1}:F${hr1}`,
-    `C${hr2}:H${hr2}`,
+    `C${hr2}:I${hr2}`,
     `C${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
   );
@@ -8129,10 +8121,27 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(hr1, "I", "I", 3),
     ...emptyCells(hr1, "K", "K", 3),
   ]);
-  pushRow(27, [
+  const companyAddrColW =
+    RECEIPT_XLSX_COL_WIDTHS[2] +
+    RECEIPT_XLSX_COL_WIDTHS[3] +
+    RECEIPT_XLSX_COL_WIDTHS[4] +
+    RECEIPT_XLSX_COL_WIDTHS[5] +
+    RECEIPT_XLSX_COL_WIDTHS[6] +
+    RECEIPT_XLSX_COL_WIDTHS[7] +
+    RECEIPT_XLSX_COL_WIDTHS[8];
+  const companyAddrH = Math.max(
+    28,
+    receiptXlsxWrappedRowHeight(companyAddr, companyAddrColW, {
+      min: 28,
+      linePt: 11,
+      pad: 4,
+      max: 44,
+    }),
+  );
+  pushRow(companyAddrH, [
     xlsxCellXml(`C${hr2}`, 5, si(companyAddr), "s"),
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
-    ...emptyCells(hr2, "D", "H", 5),
+    ...emptyCells(hr2, "D", "I", 5),
   ]);
   pushRow(31.5, [
     xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -8396,11 +8405,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
 
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
-    // Grand: gray fill only on B:C label + K amount (middle stays clear → narrower band)
+    // Grand: continuous gray B→K (label + mid + amount)
     // Non-grand: borderless amounts so no hairline sits in the promo gap
     const labelStyle = grand ? 49 : 30;
     const valueStyle = grand ? 50 : decimals ? 55 : 54;
-    const midStyle = grand ? 30 : 1;
+    const midStyle = grand ? 49 : 1;
     if (grand) {
       merges.push(`B${r}:C${r}`, `D${r}:J${r}`);
     } else {
@@ -8413,7 +8422,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     if (grand) {
       cells.push(...emptyCells(r, "C", "C", labelStyle));
       if (note) {
-        cells.push(xlsxCellXml(`D${r}`, 30, si(note), "s"));
+        cells.push(xlsxCellXml(`D${r}`, 49, si(note), "s"));
         cells.push(...emptyCells(r, "E", "J", midStyle));
       } else {
         cells.push(...emptyCells(r, "D", "J", midStyle));
@@ -12677,7 +12686,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
         xlsxOptionalNum(`D${r}`, 10, parts.packs),
-        xlsxCellXml(`E${r}`, 10, parts.totalQty, "n"),
+        xlsxOptionalNum(`E${r}`, 10, parts.loosePieces),
         xlsxCellXml(`F${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
@@ -12766,7 +12775,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
-        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${parts.packs || ""}</td><td class="num">${parts.totalQty || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
+        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${parts.packs || ""}</td><td class="num">${parts.loosePieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
       })
       .join("");
   const promoRows = sections.promo.length
