@@ -2519,6 +2519,9 @@ function ensureEmployeePermissions() {
   });
 }
 function employeePermissionsSelected(e, role = "sales") {
+  if (permApi()?.storedPermissionKeys) {
+    return permApi().storedPermissionKeys(e);
+  }
   if (e?.permissions?.length) return permApi().normalizeKeys(e.permissions);
   return permApi().templateForRole(role || e?.role || "sales");
 }
@@ -2592,9 +2595,12 @@ function mergedPermissionSelection() {
   if (!api?.mergePermissionsForEmployees) {
     const emps = selectedPermissionEmployees();
     const union = new Set();
-    emps.forEach((e) =>
-      resolveEmployeePermissions(e).forEach((k) => union.add(k)),
-    );
+    emps.forEach((e) => {
+      const keys = api?.storedPermissionKeys
+        ? api.storedPermissionKeys(e)
+        : [...resolveEmployeePermissions(e)];
+      keys.forEach((k) => union.add(k));
+    });
     return [...union];
   }
   return api.mergePermissionsForEmployees(selectedPermissionEmployees());
@@ -6583,10 +6589,12 @@ let lastRenderedView = null;
 function captureRenderScroll() {
   const main = document.querySelector(".app-main");
   const lineList = document.querySelector(".line-list--scroll");
+  const permPanel = document.querySelector(".perm-panel");
   const snap = {
     sameView: lastRenderedView === state.currentView,
     mainTop: main?.scrollTop ?? 0,
     lineListTop: lineList?.scrollTop ?? null,
+    permPanelTop: permPanel?.scrollTop ?? null,
     pickerLists: {},
     receiptListTop: null,
   };
@@ -6628,6 +6636,10 @@ function restoreRenderScroll(snap) {
     if (snap.lineListTop != null) {
       const lineList = document.querySelector(".line-list--scroll");
       if (lineList) lineList.scrollTop = snap.lineListTop;
+    }
+    if (snap.permPanelTop != null) {
+      const permPanel = document.querySelector(".perm-panel");
+      if (permPanel) permPanel.scrollTop = snap.permPanelTop;
     }
   });
 }
@@ -16039,7 +16051,11 @@ function render() {
     syncCountInputsFromState();
   requestAnimationFrame(() => {
     enhanceMobileNumericInputs(document);
-    permApi()?.syncAllPermissionRowDeps?.();
+    if (state.currentView === "employeePermissions") {
+      permApi()?.syncAllPermissionRowDeps?.(
+        document.querySelector("[data-permissions-form]"),
+      );
+    }
     bindProductImages(document);
     syncSettlementInputHeights(app);
     bindScrollTopFab();

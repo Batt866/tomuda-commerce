@@ -14259,6 +14259,7 @@ textarea::placeholder {
 }
 
 .perm-grant-page {
+  overflow-anchor: none;
   display: flex;
   flex-direction: column;
   gap: 16px;

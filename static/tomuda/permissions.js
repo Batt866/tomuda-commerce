@@ -285,6 +285,15 @@
     return expandLegacyKeys(list).filter((k) => ALL_KEY_SET.has(k));
   }
 
+  /** Raw saved keys for grant UI — no legacy expansion (avoids phantom checks). */
+  function storedPermissionKeys(emp) {
+    if (!emp) return [];
+    const raw = Array.isArray(emp.permissions) ? emp.permissions : [];
+    const filtered = raw.filter((k) => ALL_KEY_SET.has(k));
+    if (filtered.length) return filtered;
+    return templateForRole(emp.role || "sales");
+  }
+
   function resolveEmployeePermissions(emp) {
     if (!emp) return new Set();
     const custom = normalizeKeys(emp.permissions);
@@ -362,10 +371,11 @@
   function permToggleHtml(key, checked, ariaLabel, esc, actionId, disabled = false) {
     const dis = disabled ? " disabled" : "";
     const labelClass = disabled ? "perm-toggle is-disabled" : "perm-toggle";
-    return `<label class="${labelClass}"><input type="checkbox" name="permissions" value="${esc(key)}" data-perm-action="${esc(actionId)}"${checked ? " checked" : ""}${dis} aria-label="${esc(ariaLabel)}" onchange="TOMUDA_PERMISSIONS.syncPermissionRowDeps(this)"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label>`;
+    return `<label class="${labelClass}"><input type="checkbox" name="permissions" value="${esc(key)}" data-perm-action="${esc(actionId)}"${checked ? " checked" : ""}${dis} aria-label="${esc(ariaLabel)}" onmousedown="event.preventDefault()" onchange="TOMUDA_PERMISSIONS.syncPermissionRowDeps(this)"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label>`;
   }
 
-  function syncPermissionRowDeps(changedInput) {
+  function syncPermissionRowDeps(changedInput, opts = {}) {
+    const init = !!opts.init;
     const row = changedInput?.closest?.(".perm-matrix__row");
     if (!row || row.classList.contains("perm-matrix__row--head")) return;
     const viewInput = row.querySelector(
@@ -378,7 +388,7 @@
       .forEach((el) => {
         el.disabled = !viewOn;
         el.closest(".perm-toggle")?.classList.toggle("is-disabled", !viewOn);
-        if (!viewOn) el.checked = false;
+        if (!viewOn && !init && changedInput === viewInput) el.checked = false;
       });
   }
 
@@ -391,7 +401,7 @@
         const viewInput = row.querySelector(
           'input[name="permissions"][data-perm-action="view"]',
         );
-        if (viewInput) syncPermissionRowDeps(viewInput);
+        if (viewInput) syncPermissionRowDeps(viewInput, { init: true });
       });
   }
 
@@ -448,7 +458,7 @@
   function mergePermissionsForEmployees(employees) {
     const union = new Set();
     (employees || []).forEach((emp) => {
-      resolveEmployeePermissions(emp).forEach((k) => union.add(k));
+      storedPermissionKeys(emp).forEach((k) => union.add(k));
     });
     return [...union];
   }
@@ -464,6 +474,7 @@
     NAV_ITEMS,
     permissionKey,
     normalizeKeys,
+    storedPermissionKeys,
     resolveEmployeePermissions,
     hasPermission,
     canAccessView,
