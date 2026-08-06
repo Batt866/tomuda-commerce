@@ -18,7 +18,7 @@
       modules: [
         { id: "customers", label: "Харилцагч", actions: CRUD },
         { id: "products", label: "Бараа", actions: CRUD },
-        { id: "warehouse", label: "Агуулах", actions: CRUD },
+        { id: "warehouse", label: "Нярав", actions: CRUD },
         { id: "employees", label: "Ажилтан", actions: CRUD },
       ],
     },

@@ -1095,7 +1095,20 @@ function isLowStock(p) {
 function lowStockProducts() {
   return state.products.filter(isLowStock);
 }
-const dte = (d) => new Date(d).toLocaleDateString("mn-MN");
+const dte = (d) => {
+  // Date-only ISO must use local calendar day (avoid UTC midnight shifting the day).
+  const raw = String(d ?? "").trim();
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const y = Number(dateOnly[1]);
+    const m = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+    return new Date(y, m - 1, day).toLocaleDateString("mn-MN");
+  }
+  const x = new Date(d);
+  if (Number.isNaN(x.getTime())) return "";
+  return x.toLocaleDateString("mn-MN");
+};
 const dteAt = (d) => {
   const x = new Date(d);
   if (Number.isNaN(x.getTime())) return "-";
@@ -1179,15 +1192,12 @@ function todayNoonLocal() {
   return d;
 }
 function orderInWarehouseLiveSession(o) {
-  const today = todayIso();
-  if (isoDay(o.createdAt) === today) return true;
-  return orderDay(o) === today;
+  return orderCreatedDay(o) === todayIso();
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
   const targetDay = normalizeIsoDateInput(day) || todayIso();
-  // Today's warehouse view includes orders created today even if delivery is later.
-  if (targetDay === todayIso()) return orderInWarehouseLiveSession(o);
-  return normalizeIsoDateInput(orderDay(o)) === targetDay;
+  // Баримт/Нярав календар = захиалга авсан өдөр (жагсаалтын огноотой ижил).
+  return orderCreatedDay(o) === targetDay;
 }
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
@@ -2953,11 +2963,12 @@ function canPageBack() {
     "employees",
     "employeePermissions",
     "inventory",
+    "warehouse",
     "reports",
     "promotions",
     "warehouseReceipts",
     "count",
-  ].includes(state.currentView);
+  ].includes(state.currentView) && canAccessView("admin");
 }
 const pageHead = (title, action = "", opts = {}) => {
   const showBack = opts.back !== false && (opts.back === true || canPageBack());
@@ -3003,35 +3014,42 @@ const MOBILE_NAV_SVG = {
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
 function sidebarNavForRole(role) {
+  let nav;
   if (permApi() && state.currentEmployee) {
-    return permApi()
+    nav = permApi()
       .allowedNavForEmployee(state.currentEmployee)
       .map(([id, label]) => [id, label]);
-  }
-  if (role === "delivery") return [["delivery", "Хүргэлт"]];
-  if (role === "admin")
-    return [
+  } else if (role === "delivery") {
+    nav = [["delivery", "Хүргэлт"]];
+  } else if (role === "admin") {
+    nav = [
       ["worker", "Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Нярав"],
       ["employees", "Ажилтан"],
       ["reports", "Борлуулалтын мэдээ"],
       ["promotions", "Урамшуулал"],
       ["admin", "Админ"],
     ];
-  return [
-    ["worker", "Шинэ захиалга"],
-    ["customers", "Харилцагч"],
-    ["products", "Бараа"],
-    ["warehouse", "Нярав"],
-    ["admin", "Админ"],
-  ].filter(([id]) => allowedNavIds().includes(id));
+  } else {
+    nav = [
+      ["worker", "Шинэ захиалга"],
+      ["customers", "Харилцагч"],
+      ["products", "Бараа"],
+      ["warehouse", "Нярав"],
+      ["admin", "Админ"],
+    ].filter(([id]) => allowedNavIds().includes(id));
+  }
+  // Нярав is under Админ hub — hide from primary nav when Admin is available.
+  if (nav.some(([id]) => id === "admin")) {
+    nav = nav.filter(([id]) => id !== "warehouse");
+  }
+  return nav;
 }
 function bottomNavForRole(role) {
   const allowed = new Set(allowedNavIds());
   const mobileIds = {
-    admin: ["worker", "customers", "products", "warehouse", "admin"],
+    admin: ["worker", "customers", "products", "admin"],
     sales: ["worker", "customers", "products", "warehouse"],
     warehouse: ["warehouse"],
     delivery: ["delivery"],
@@ -3051,9 +3069,15 @@ function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
   if (
     navId === "admin" &&
-    (viewId === "warehouseReceipts" ||
+    (viewId === "warehouse" ||
+      viewId === "warehouseReceipts" ||
       viewId === "count" ||
-      viewId === "delivery")
+      viewId === "delivery" ||
+      viewId === "employees" ||
+      viewId === "employeePermissions" ||
+      viewId === "reports" ||
+      viewId === "promotions" ||
+      viewId === "inventory")
   )
     return true;
   return false;
@@ -5098,12 +5122,18 @@ function canAppBack() {
     "employees",
     "employeePermissions",
     "inventory",
+    "warehouse",
     "reports",
     "promotions",
     "warehouseReceipts",
     "count",
   ];
-  if (subAdminViews.includes(state.currentView)) return true;
+  if (
+    subAdminViews.includes(state.currentView) &&
+    canAccessView("admin")
+  ) {
+    return true;
+  }
   const defaultView = defaultViewForRole(currentRole());
   if (state.currentView !== defaultView) return true;
   if (state.currentView === "worker" && state.filters.worker === "orders") {
@@ -5224,12 +5254,16 @@ function handleAppBack() {
     "employees",
     "employeePermissions",
     "inventory",
+    "warehouse",
     "reports",
     "promotions",
     "warehouseReceipts",
     "count",
   ];
-  if (subAdminViews.includes(state.currentView)) {
+  if (
+    subAdminViews.includes(state.currentView) &&
+    canAccessView("admin")
+  ) {
     go("admin", { silent: true });
     return true;
   }
@@ -9019,12 +9053,12 @@ function warehouseOrderStatusActions(o) {
 }
 function warehouseReceiptListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id;
-  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)}</span></span></button>`;
+  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(orderCreatedDay(o))}</span></span></button>`;
 }
 function warehouseReceiptPrintListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id,
     checked = idList(state.receiptPrintOrderIds).includes(o.id);
-  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(o.createdAt)}</span></span></button></div>`;
+  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · ${dte(orderCreatedDay(o))}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions(includeDelivered = true) {
   const opts = ["pending", "confirmed", "delivered", "cancelled"];
