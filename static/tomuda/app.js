@@ -17837,12 +17837,13 @@ function deleteCategoryNow(name) {
   showAppToast(`«${name}» төрөл устгагдлаа`, "success");
   categoryModal();
 }
-function employeePasswordFieldHtml(isEdit) {
+function employeePasswordFieldHtml(isEdit, employee = null) {
   if (!canSetEmployeePassword()) {
     return `<p class="text-xs text-muted-foreground rounded bg-secondary/60 px-3 py-2.5">Нууц үгийг зөвхөн админ тохируулж, өөрчилнө.</p>`;
   }
+  const currentPassword = isEdit ? String(employee?.password || "") : "";
   const passwordAttrs = isEdit
-    ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
+    ? `value="${esc(currentPassword)}" placeholder="Нууц үг" autocomplete="off"`
     : `required placeholder="Нууц үг" autocomplete="new-password"`;
   return `<label class="block"><span class="field-label">Нууц үг</span><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div></label>`;
 }
@@ -17867,7 +17868,7 @@ function employeeModal(id) {
     .join("");
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input">${employeePasswordFieldHtml(isEdit)}<select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрхийн тохиргоо хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input">${employeePasswordFieldHtml(isEdit, e)}<select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрхийн тохиргоо хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-lg",
   );
   setTimeout(() => initEmployeeImageField(e || {}), 0);
