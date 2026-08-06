@@ -2339,6 +2339,9 @@ function canManageEmployees() {
     hasPermission("employeeAdd.view")
   );
 }
+function canSetEmployeePassword(emp = state.currentEmployee) {
+  return (emp?.role || currentRole()) === "admin";
+}
 function canManageEmployeePermissions(emp = state.currentEmployee) {
   return (
     hasPermission("permissions.view", emp) ||
@@ -17834,6 +17837,15 @@ function deleteCategoryNow(name) {
   showAppToast(`«${name}» төрөл устгагдлаа`, "success");
   categoryModal();
 }
+function employeePasswordFieldHtml(isEdit) {
+  if (!canSetEmployeePassword()) {
+    return `<p class="text-xs text-muted-foreground rounded bg-secondary/60 px-3 py-2.5">Нууц үгийг зөвхөн админ тохируулж, өөрчилнө.</p>`;
+  }
+  const passwordAttrs = isEdit
+    ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
+    : `required placeholder="Нууц үг" autocomplete="new-password"`;
+  return `<label class="block"><span class="field-label">Нууц үг</span><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div></label>`;
+}
 function employeeModal(id) {
   const editId = id ? String(id) : "";
   if (editId) {
@@ -17853,12 +17865,9 @@ function employeeModal(id) {
         `<option value="${r}" ${selectedRole === r ? "selected" : ""}>${role(r)}</option>`,
     )
     .join("");
-  const passwordAttrs = isEdit
-    ? `placeholder="Шинэ нууц үг (хоосон = өөрчлөхгүй)" autocomplete="new-password"`
-    : `required placeholder="Нууц үг" autocomplete="new-password"`;
   box(
     isEdit ? "Ажилтан засах" : "Ажилтан нэмэх",
-    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="login-password-wrap"><input id="employeePassword" name="password" type="password" ${passwordAttrs} class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="button" id="employeePasswordToggle" onclick="togglePasswordField('employeePassword','employeePasswordToggle')" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрхийн тохиргоо хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
+    `<form data-employee-form data-employee-id="${esc(editId)}" class="employee-form p-5 flex flex-col min-h-0 max-h-[90vh]"><div class="employee-form__body modal-scroll overflow-y-auto space-y-3 flex-1 min-h-0">${employeeImageField(e || {})}<input name="name" required placeholder="Нэр" value="${esc(e?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="email" type="email" required placeholder="Email" value="${esc(e?.email || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас" value="${esc(e?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input">${employeePasswordFieldHtml(isEdit)}<select name="role" id="employeeRoleSelect" class="w-full px-3 py-3 bg-secondary rounded app-input">${roleOptions}</select><p class="text-xs text-muted-foreground">Эрх болон «Хувь тооцох» зөвшөөрлийг Админ → Эрхийн тохиргоо хэсэгт тохируулна.</p></div><div class="employee-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${isEdit ? "Хадгалах" : "Нэмэх"}</button></div></form>`,
     "max-w-lg",
   );
   setTimeout(() => initEmployeeImageField(e || {}), 0);
@@ -17867,10 +17876,12 @@ function buildEmployeeDataFromForm(form, editId = "") {
   const f = Object.fromEntries(new FormData(form));
   const name = String(f.name || "").trim();
   const email = normalizeEmail(f.email);
-  const password = String(f.password || "");
+  const password = canSetEmployeePassword() ? String(f.password || "") : "";
   if (!name) return { error: "Нэр оруулна уу" };
   if (!email) return { error: "Email оруулна уу" };
-  if (!editId && !password) return { error: "Нууц үг оруулна уу" };
+  if (!editId && canSetEmployeePassword() && !password) {
+    return { error: "Нууц үг оруулна уу" };
+  }
   if (
     state.employees.some(
       (emp) => normalizeEmail(emp.email) === email && emp.id !== editId,
@@ -17930,7 +17941,9 @@ async function applyEmployeeSave(data, editId = "") {
     else if (!incomingImage) delete existing.image;
     existing.allowPercentDiscount = data.allowPercentDiscount;
     existing.permissions = data.permissions;
-    if (data.password) existing.password = data.password;
+    if (canSetEmployeePassword() && data.password) {
+      existing.password = data.password;
+    }
     employee = existing;
     if (state.currentEmployee?.id === editId) {
       state.currentEmployee = existing;
@@ -17944,7 +17957,7 @@ async function applyEmployeeSave(data, editId = "") {
       name: data.name,
       email: data.email,
       phone: data.phone,
-      password: data.password,
+      password: canSetEmployeePassword() ? data.password : "",
       role: data.role,
       image: data.image || "",
       totalSales: 0,
@@ -17954,7 +17967,11 @@ async function applyEmployeeSave(data, editId = "") {
     };
     if (!employee.image) delete employee.image;
     state.employees.push(employee);
-    showInstallToast("Ажилтан нэмэгдлээ");
+    showInstallToast(
+      canSetEmployeePassword()
+        ? "Ажилтан нэмэгдлээ"
+        : "Ажилтан нэмэгдлээ. Нэвтрэх нууц үгийг админ тохируулна.",
+    );
   }
   if (employee) {
     await persistProfileImageToMedia(employee, "employee");
