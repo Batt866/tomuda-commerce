@@ -7318,11 +7318,18 @@ td, th { border: none; }
   font-weight: 400;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td {
-  border: 0.4pt solid #777 !important;
+  border: none !important;
+  border-bottom: 0.4pt solid #777 !important;
   padding: 2px 4px;
   vertical-align: middle;
   font-size: 9px;
   background: #fff;
+}
+.receipt-grid--sheet tr.receipt-items__promo > td:first-child,
+.receipt-grid--sheet tr.receipt-items__promo > td:nth-child(2),
+.receipt-grid--sheet tr.receipt-items__promo > td:nth-child(3),
+.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-label {
+  border: none !important;
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--sm > td {
   border: none !important;
@@ -7967,12 +7974,26 @@ td, th { border: none; }
   .receipt-grid__sign { page-break-inside: avoid; break-inside: avoid; }
   .receipt-grid--sheet tr.receipt-items__head > td,
   .receipt-grid--sheet tr.receipt-items__row > td,
-  .receipt-grid--sheet tr.receipt-items__promo > td,
   .receipt-items th,
   .receipt-items td {
     border: 0.5pt solid #000 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-name,
+  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty,
+  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price,
+  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
+    border: none !important;
+    border-bottom: 0.5pt solid #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .receipt-grid--sheet tr.receipt-items__promo > td:first-child,
+  .receipt-grid--sheet tr.receipt-items__promo > td:nth-child(2),
+  .receipt-grid--sheet tr.receipt-items__promo > td:nth-child(3),
+  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-label {
+    border: none !important;
   }
   .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-rule,
   .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money,
@@ -8596,8 +8617,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
-  // ҮНДСЭН: same row — C:D Урамшуулал (1st only), E:G name, H:I qty, J price, K total
-  // Always keep dotted borders (same family as item grid) — do not strip on last row.
+  // Урамшуулал: no borders on A–D (left of name); grid only on E→K data cells
   promoLines.forEach((item, idx) => {
     const r = rowNum;
     const unitPrice = receiptPromoDisplayPrice(item);
@@ -8614,17 +8634,18 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       }),
     );
     merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
-    const bodyStyle = 8;
-    // 10 = right + dotted grid — «Урамшуулал» sits at the right edge of D
-    const labelStyle = idx === 0 ? 10 : bodyStyle;
-    const qtyStyle = 11;
-    const moneyStyle = 10;
+    const clearStyle = 1; // no borders — left of promo name
+    // Row lines only (borderId 3 = bottom hair) — no vertical grid inside promo items
+    const bodyStyle = 35;
+    const labelStyle = idx === 0 ? 52 : clearStyle;
+    const qtyStyle = 37;
+    const moneyStyle = 47;
     pushItemTableRow(promoH, [
-      xlsxCellXml(`A${r}`, bodyStyle, null, "empty"),
-      xlsxCellXml(`B${r}`, bodyStyle, null, "empty"),
+      xlsxCellXml(`A${r}`, clearStyle, null, "empty"),
+      xlsxCellXml(`B${r}`, clearStyle, null, "empty"),
       idx === 0
         ? xlsxCellXml(`C${r}`, labelStyle, si("Урамшуулал"), "s")
-        : xlsxCellXml(`C${r}`, bodyStyle, null, "empty"),
+        : xlsxCellXml(`C${r}`, clearStyle, null, "empty"),
       xlsxCellXml(`E${r}`, bodyStyle, si(nameText), "s"),
       xlsxCellXml(`H${r}`, qtyStyle, qty, "n"),
       xlsxCellXml(`J${r}`, moneyStyle, Number(unitPrice) || 0, "n"),
