@@ -7898,9 +7898,11 @@ td, th { border: none; }
   font-weight: 400;
   color: ${RECEIPT_TEXT};
   border: none !important;
+  border-top: 0.4pt solid #777 !important;
+  border-bottom: 0.4pt solid #777 !important;
 }
 .receipt-grid__summary:first-of-type .receipt-grid__summary-value {
-  border-top: none !important;
+  border-top: 0.4pt solid #777 !important;
 }
 .receipt-grid__summary-value--pay {
   font-weight: 400;
@@ -7909,6 +7911,9 @@ td, th { border: none; }
 }
 .receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 12px !important; }
 .receipt-grid__summary-value--grand { font-size: 12px !important; font-weight: 700 !important; }
+.receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
+  border: none !important;
+}
 .receipt-grid__settle td { padding: 2px 0 !important; }
 .receipt-grid__settle-text {
   text-align: center;
@@ -8003,6 +8008,16 @@ td, th { border: none; }
   }
   .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-label {
     border: none !important;
+  }
+  .receipt-grid__summary-label,
+  .receipt-grid__summary-label--grand {
+    border: none !important;
+  }
+  .receipt-grid__summary-value,
+  .receipt-grid__summary-value--grand {
+    border: none !important;
+    border-top: 0.5pt solid #000 !important;
+    border-bottom: 0.5pt solid #000 !important;
   }
 }
 `;
@@ -8661,9 +8676,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
 
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
-    // Same layout as sub/VAT: label B:D, amount behind in E:K (no vertical grid seam).
+    // Label B:D — no borders. Amount E:K — horizontal lines only (right of D).
     const labelStyle = grand ? 49 : 30;
-    const valueStyle = grand ? 50 : decimals ? 55 : 54;
+    const valueStyle = grand ? 50 : decimals ? 29 : 47;
     const midStyle = grand ? 49 : 1;
     merges.push(`B${r}:D${r}`);
     if (grand && note) {
@@ -8672,6 +8687,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       merges.push(`E${r}:K${r}`);
     }
     const cells = [
+      xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
       ...emptyCells(r, "C", "D", labelStyle),
     ];
