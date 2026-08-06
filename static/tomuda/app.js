@@ -53,6 +53,7 @@ const state = {
   receiptPrintOrderIds: [],
   receiptPrintWorkerSyncKey: "",
   permissionEmployeePickerOpen: false,
+  permissionGrantDirty: false,
   selectedDeliveryId: "",
   deliveryName: "",
   deliveryPhone: "",
@@ -2528,9 +2529,14 @@ function allowedNavIds() {
 }
 function ensureEmployeePermissions() {
   if (!permApi()) return;
+  const valid = new Set(permApi().ALL_KEYS || []);
   state.employees.forEach((e) => {
-    if (!Array.isArray(e.permissions)) return;
-    e.permissions = permApi().normalizeKeys(e.permissions);
+    if (!Array.isArray(e.permissions)) {
+      e.permissions = [];
+      return;
+    }
+    // Keep stored keys literal — expandLegacyKeys is for runtime checks only.
+    e.permissions = e.permissions.filter((k) => valid.has(k));
   });
 }
 function employeePermissionsSelected(e, role = "sales") {
@@ -2659,6 +2665,7 @@ function saveGrantedPermissions() {
     }
   });
   scheduleBackendSave();
+  state.permissionGrantDirty = false;
   showInstallToast("Эрх хадгалагдлаа");
   render();
 }
@@ -4497,6 +4504,7 @@ function shouldDeferBackendSync() {
   if (isReceiptStatusSelecting()) return true;
   if (isToolbarSelectActive()) return true;
   if (isUserScrolling()) return true;
+  if (state.currentView === "employeePermissions") return true;
   if (
     state.currentView === "count" &&
     (state.countDone || countSessionActive())
@@ -6518,6 +6526,12 @@ function go(view, opts = {}) {
     return;
   }
   if (changed && wasWorkerOrders) clearWorkerOrderHighlight();
+  if (changed && state.currentView === "employeePermissions") {
+    state.permissionGrantDirty = false;
+  }
+  if (changed && view === "employeePermissions") {
+    state.permissionGrantDirty = false;
+  }
   state.currentView = view;
   state.mobileOpen = false;
   if (changed && view !== "promotions") state.filters.promotionDetail = "";

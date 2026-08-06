@@ -346,6 +346,18 @@
     return NAV_ITEMS.filter(([, , perm]) => hasPermission(perm, emp));
   }
 
+  function ensureModuleViewDeps(set) {
+    PERM_MODULES.forEach((mod) => {
+      if (!mod.actions.includes("view")) return;
+      const viewKey = permissionKey(mod.id, "view");
+      const needsView = mod.actions.some(
+        (actionId) =>
+          actionId !== "view" && set.has(permissionKey(mod.id, actionId)),
+      );
+      if (needsView) set.add(viewKey);
+    });
+  }
+
   function permissionsFromForm(form) {
     const root = form || document;
     const keys = [];
@@ -370,6 +382,7 @@
     ) {
       set.add("dashboard.view");
     }
+    ensureModuleViewDeps(set);
     return [...set].filter((k) => ALL_KEY_SET.has(k));
   }
 
@@ -381,7 +394,21 @@
   function onPermToggleChange(changedInput) {
     const main = document.querySelector(".app-main");
     const scrollTop = main?.scrollTop ?? 0;
+    const row = changedInput?.closest?.(".perm-matrix__row");
+    if (
+      row &&
+      changedInput?.checked &&
+      changedInput.dataset.permAction !== "view"
+    ) {
+      const viewInput = row.querySelector(
+        'input[name="permissions"][data-perm-action="view"]',
+      );
+      if (viewInput && !viewInput.checked) viewInput.checked = true;
+    }
     syncPermissionRowDeps(changedInput);
+    if (typeof window !== "undefined" && window.state) {
+      window.state.permissionGrantDirty = true;
+    }
     requestAnimationFrame(() => {
       if (main) main.scrollTop = scrollTop;
     });
@@ -405,8 +432,10 @@
     row
       .querySelectorAll('input[name="permissions"]:not([data-perm-action="view"])')
       .forEach((el) => {
-        el.disabled = !viewOn;
         el.closest(".perm-toggle")?.classList.toggle("is-disabled", !viewOn);
+        el
+          .closest(".perm-matrix__cell")
+          ?.classList.toggle("perm-matrix__cell--disabled", !viewOn);
         if (!viewOn && !init && changedInput === viewInput) el.checked = false;
       });
   }
@@ -435,9 +464,9 @@
       const key = permissionKey(mod.id, action.id);
       const checked = selected.has(key);
       const aria = `${mod.label} — ${action.label}`;
-      const disabled =
+      const muted =
         action.id !== "view" && mod.actions.includes("view") && !viewChecked;
-      return `<div class="perm-matrix__cell${disabled ? " perm-matrix__cell--disabled" : ""}"><span class="perm-matrix__action-label">${esc(action.label)}</span>${permToggleHtml(key, checked, aria, esc, action.id, disabled)}</div>`;
+      return `<div class="perm-matrix__cell${muted ? " perm-matrix__cell--disabled" : ""}"><span class="perm-matrix__action-label">${esc(action.label)}</span>${permToggleHtml(key, checked, aria, esc, action.id, false)}</div>`;
     }).join("");
     return `<article class="perm-matrix__row" data-perm-module="${esc(mod.id)}"><h3 class="perm-matrix__module">${esc(mod.label)}</h3><div class="perm-matrix__cells">${cells}</div></article>`;
   }

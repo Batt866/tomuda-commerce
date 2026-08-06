@@ -14238,7 +14238,7 @@ textarea::placeholder {
 }
 
 .perm-toggle.is-disabled {
-  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .perm-toggle input:disabled {
