@@ -7027,9 +7027,9 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* Source jishee widths ≈ 3 / 6.25 / 17.38 / 3.88 / 10.38 / 9.62 / 5.62 / 4.88 / 3.75 / 9.25 / 9.5 */
-.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 7.4%; } .receipt-grid__c { width: 20.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 12.3%; }
-.receipt-grid__f { width: 11.4%; } .receipt-grid__g { width: 6.6%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
+/* Source jishee widths — A:B logo (B slim), C wide for names */
+.receipt-grid__a { width: 6.5%; } .receipt-grid__b { width: 3.2%; } .receipt-grid__c { width: 21.3%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 11.8%; }
+.receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -7865,9 +7865,9 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K widths — narrow A/B for logo, wide C for names
+// ҮНДСЭН A–K: logo A:B (B narrow so brand in C sits close), wide C for names
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.5, 6.5, 16.5, 3.875, 10.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  5.5, 2.75, 18.0, 3.875, 10.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
