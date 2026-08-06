@@ -5301,18 +5301,39 @@ function workerQtyPartsForProduct(p, qty) {
   const split = pickerQtyToParts(total, p);
   return { packs: split.packs, loosePieces: split.pieces };
 }
-/** Split total qty into full packs + remaining loose pieces for warehouse prepare.
- *  Examples (packSize=20): 8 → 0 багц + 8ш; 70 → 3 багц + 10ш.
- *  Always canonical — do not preserve how the order was typed. */
-function normalizeWarehousePrepareParts(totalQty, _packs, _loosePieces, packSize) {
+/** Split qty into bagts + loose shirheg for warehouse prepare Excel.
+ *  Preserves explicit splits (e.g. 2 багц + 10ш @ 20ш/багц → 50 нийт).
+ *  Falls back to canonical floor/mod when packs are missing or inconsistent. */
+function resolveWarehousePrepareParts(totalQty, packs, loosePieces, packSize) {
   const total = Math.max(0, Math.floor(Number(totalQty) || 0));
   const size = Math.floor(Number(packSize) || 0);
   if (!size || size <= 1) {
     return { packs: 0, loosePieces: total, totalQty: total };
   }
-  const packs = Math.floor(total / size);
-  const loosePieces = total % size;
-  return { packs, loosePieces, totalQty: total };
+  const hasExplicit =
+    packs != null &&
+    packs !== "" &&
+    (Number(packs) > 0 ||
+      (loosePieces != null && loosePieces !== "" && Number(loosePieces) >= 0));
+  if (hasExplicit) {
+    let pk = Math.max(0, Math.floor(Number(packs) || 0));
+    let loose = Math.max(0, Math.floor(Number(loosePieces) || 0));
+    if (loose >= size) {
+      pk += Math.floor(loose / size);
+      loose = loose % size;
+    }
+    if (pk * size + loose === total) {
+      return { packs: pk, loosePieces: loose, totalQty: total };
+    }
+  }
+  return {
+    packs: Math.floor(total / size),
+    loosePieces: total % size,
+    totalQty: total,
+  };
+}
+function normalizeWarehousePrepareParts(totalQty, packs, loosePieces, packSize) {
+  return resolveWarehousePrepareParts(totalQty, packs, loosePieces, packSize);
 }
 function orderItemPrepareParts(item, product) {
   const totalQty = Math.max(0, Math.floor(Number(item.quantity) || 0));
@@ -5329,7 +5350,7 @@ function orderItemPrepareParts(item, product) {
       item.loosePieces != null && item.loosePieces !== ""
         ? Math.max(0, Math.floor(Number(item.loosePieces) || 0))
         : Math.max(0, totalQty - packs * packSize);
-    return normalizeWarehousePrepareParts(
+    return resolveWarehousePrepareParts(
       totalQty,
       packs,
       loosePieces,
@@ -5337,16 +5358,22 @@ function orderItemPrepareParts(item, product) {
     );
   }
   const split = pickerQtyToParts(totalQty, { ...product, boxQuantity: packSize });
-  return normalizeWarehousePrepareParts(
+  return resolveWarehousePrepareParts(
     totalQty,
     split.packs,
     split.pieces,
     packSize,
   );
 }
+function warehousePreparePackSize(item, product) {
+  if (Number(item?.boxQuantity) > 1) {
+    return Math.floor(Number(item.boxQuantity));
+  }
+  return productPackSize(product);
+}
 function warehousePreparePrintParts(item, product) {
-  const packSize = productPackSize(product);
-  return normalizeWarehousePrepareParts(
+  const packSize = warehousePreparePackSize(item, product);
+  return resolveWarehousePrepareParts(
     item.qty,
     item.packs,
     item.loosePieces,
@@ -8485,15 +8512,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(14.25, emptyCells(rowNum));
-  // Text in B:C:D, right-aligned flush to D; dotted line E:K
+  // Label B:F (wide enough for full Mongolian text); dotted signature line G:K
   const pushSignRow = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:D${r}`, `E${r}:K${r}`);
+    merges.push(`B${r}:F${r}`, `G${r}:K${r}`);
     pushRow(18, [
-      xlsxCellXml(`B${r}`, 48, si(role), "s"),
-      xlsxCellXml(`E${r}`, 17, null, "empty"),
-      ...emptyCells(r, "C", "D", 48),
-      ...emptyCells(r, "F", "K", 17),
+      xlsxCellXml(`B${r}`, 49, si(role), "s"),
+      xlsxCellXml(`G${r}`, 17, null, "empty"),
+      ...emptyCells(r, "C", "F", 49),
+      ...emptyCells(r, "H", "K", 17),
     ]);
   };
   pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
@@ -12441,11 +12468,8 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
   const items = Object.values(map)
     .map((row) => {
       const p = warehousePrepareProduct(row);
-      const packSize =
-        Number(row.boxQuantity) > 1
-          ? Math.floor(Number(row.boxQuantity))
-          : productPackSize(p);
-      const normalized = normalizeWarehousePrepareParts(
+      const packSize = warehousePreparePackSize(row, p);
+      const normalized = resolveWarehousePrepareParts(
         row.qty,
         row.packs,
         row.loosePieces,
@@ -12456,6 +12480,7 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
         qty: normalized.totalQty,
         packs: normalized.packs,
         loosePieces: normalized.loosePieces,
+        boxQuantity: packSize,
       };
     })
     .sort(
@@ -12483,6 +12508,7 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
       qty: item.qty,
       packs: item.packs,
       loosePieces: item.loosePieces,
+      boxQuantity: item.boxQuantity,
     });
   }
   return groups;
@@ -14520,18 +14546,12 @@ function workerPaidLines() {
       if (!q) return null;
       const packSize = productPackSize(p);
       const raw = workerQtyPartsForProduct(p, q);
-      const parts = normalizeWarehousePrepareParts(
-        q,
-        raw.packs,
-        raw.loosePieces,
-        packSize,
-      );
       return {
         productId: p.id,
         productName: p.name,
-        quantity: parts.totalQty,
-        packs: parts.packs,
-        loosePieces: parts.loosePieces,
+        quantity: q,
+        packs: raw.packs,
+        loosePieces: raw.loosePieces,
         boxQuantity: packSize || 0,
         price: p.price,
         total: p.price * q,
