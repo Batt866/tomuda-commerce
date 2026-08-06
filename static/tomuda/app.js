@@ -13158,7 +13158,7 @@ function paymentRow(o) {
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || orderIsPaid(o)) return;
-  confirmModal("Төлбөр баталгаажуулах", "Төлбөр төлснийг баталгаажуулах уу?", {
+  confirmModal("Төлбөр баталгаажуулах", "", {
     confirmLabel: "Тийм",
     onConfirm: () => setPaid(id, true),
   });
@@ -19675,7 +19675,11 @@ function showConfirmCard({
       dialog.setAttribute("aria-describedby", "confirm-card-message");
     }
   }
-  if (messageEl) messageEl.innerHTML = message || "";
+  if (messageEl) {
+    const html = String(message || "").trim();
+    messageEl.innerHTML = html;
+    messageEl.hidden = !html;
+  }
   if (yesBtn) {
     yesBtn.textContent = confirmLabel || "Тийм";
     yesBtn.className = `confirm-card__btn ${danger ? "confirm-card__btn--danger" : "confirm-card__btn--confirm"}`;
