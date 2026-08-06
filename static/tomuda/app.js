@@ -3053,6 +3053,7 @@ function sidebarNavForRole(role) {
     ].filter(([id]) => allowedNavIds().includes(id) || id === "inventory");
   }
   // Нярав is under Админ hub — hide from primary nav when Admin is available.
+  // Агуулах stays on bottom nav; its screens live inside Нярав tabs.
   if (nav.some(([id]) => id === "admin")) {
     nav = nav.filter(([id]) => id !== "warehouse");
   }
@@ -3097,6 +3098,15 @@ function mobileNavIcon(id) {
 function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
   if (
+    navId === "inventory" &&
+    viewId === "warehouse" &&
+    (state.filters.warehouseTab === "stock" ||
+      state.filters.warehouseTab === "in" ||
+      state.filters.warehouseTab === "out")
+  ) {
+    return true;
+  }
+  if (
     navId === "admin" &&
     (viewId === "warehouse" ||
       viewId === "warehouseReceipts" ||
@@ -3106,8 +3116,18 @@ function mobileNavActive(viewId, navId) {
       viewId === "employeePermissions" ||
       viewId === "reports" ||
       viewId === "promotions")
-  )
+  ) {
+    // Нярав → Захиалга tab from Admin; stock tabs highlight Агуулах instead.
+    if (
+      viewId === "warehouse" &&
+      (state.filters.warehouseTab === "stock" ||
+        state.filters.warehouseTab === "in" ||
+        state.filters.warehouseTab === "out")
+    ) {
+      return false;
+    }
     return true;
+  }
   return false;
 }
 function sidebarNavItems(nav) {
@@ -6571,6 +6591,17 @@ function initPageUnloadPersist() {
 }
 
 function go(view, opts = {}) {
+  // Доод цэс «Агуулах» → Нярав-ийн бүртгэлийн таб (логик нэг).
+  if (view === "inventory") {
+    if (
+      state.filters.warehouseTab !== "stock" &&
+      state.filters.warehouseTab !== "in" &&
+      state.filters.warehouseTab !== "out"
+    ) {
+      state.filters.warehouseTab = state.filters.inventory || "stock";
+    }
+    view = "warehouse";
+  }
   if (!canAccessView(view)) {
     if (!opts.silent) {
       alertModal(
@@ -6800,7 +6831,6 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["warehouse", "Нярав", "warehouse", "warehouse.view"],
-    ["inventory", "Агуулах", "inventory", "warehouse.view"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
@@ -6812,8 +6842,6 @@ function adminHubHtml() {
     if (id === "promotions") return canManagePromotions();
     if (id === "warehouseReceipts") return canManageReceipts();
     if (id === "count") return canManageCount();
-    if (id === "inventory")
-      return hasPermission("warehouse.view") || hasPermission("warehouse.edit");
     return hasPermission(perm);
   });
   const settings = [];
@@ -10482,48 +10510,50 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
 }
 function inventoryView() {
-  const tab =
-    state.filters.inventory === "in" || state.filters.inventory === "out"
-      ? state.filters.inventory
+  // Агуулах = Нярав доторх Үлдэгдэл/Орлого/Зарлага (логик нэг).
+  if (
+    state.filters.warehouseTab !== "stock" &&
+    state.filters.warehouseTab !== "in" &&
+    state.filters.warehouseTab !== "out"
+  ) {
+    state.filters.warehouseTab = state.filters.inventory || "stock";
+  }
+  state.filters.inventory =
+    state.filters.warehouseTab === "in" || state.filters.warehouseTab === "out"
+      ? state.filters.warehouseTab
       : "stock";
-  state.filters.inventory = tab;
-  return `<div class="space-y-4">${pageHead("Агуулах")}<div class="seg-tabs seg-tabs--3">${[
-    ["stock", "Үлдэгдэл"],
-    ["in", "Орлого"],
-    ["out", "Зарлага"],
-  ]
-    .map(
-      ([id, label]) =>
-        `<button type="button" onclick="setInventoryTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
-    )
-    .join("")}</div>${inventoryRegisterBody(tab)}</div>`;
+  return warehouseView();
 }
 function setWarehouseTab(tab) {
-  state.filters.warehouseTab = "orders";
-  if (tab === "stock" || tab === "in" || tab === "out") {
-    setInventoryTab(tab);
-    return;
-  }
-  render();
-}
-function setInventoryTab(tab) {
-  const next = tab === "in" || tab === "out" || tab === "stock" ? tab : "stock";
+  const next =
+    tab === "stock" || tab === "in" || tab === "out" || tab === "orders"
+      ? tab
+      : "orders";
   if (next !== "in") stopBarcodeScan();
-  state.filters.inventory = next;
-  if (next === "in") {
-    state.stockInEmployeeId = defaultInventoryEmployeeId();
-    ensureStockInSession();
+  state.filters.warehouseTab = next;
+  if (next === "stock" || next === "in" || next === "out") {
+    state.filters.inventory = next;
+    if (next === "in") {
+      state.stockInEmployeeId = defaultInventoryEmployeeId();
+      ensureStockInSession();
+    }
+    if (next === "out") {
+      state.stockOutEmployeeId = defaultInventoryEmployeeId();
+      ensureStockOutSession();
+    }
   }
-  if (next === "out") {
-    state.stockOutEmployeeId = defaultInventoryEmployeeId();
-    ensureStockOutSession();
-  }
-  if (state.currentView !== "inventory") {
-    go("inventory");
+  if (state.currentView !== "warehouse" && state.currentView !== "inventory") {
+    go("warehouse");
     return;
+  }
+  if (state.currentView === "inventory") {
+    state.currentView = "warehouse";
   }
   render();
   scrollAppMainToTop();
+}
+function setInventoryTab(tab) {
+  setWarehouseTab(tab === "in" || tab === "out" || tab === "stock" ? tab : "stock");
 }
 function inventoryEmployees() {
   return state.employees
@@ -11127,7 +11157,7 @@ function stockInEntryList(list) {
         : stockInEntryRow(item.product),
     )
     .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="inventory-stock-panel__hint px-4 py-3 text-sm text-muted-foreground bg-secondary/40 border-b border-border">Бараа дээр дарж тоо оруулаад «Дуусгах» дарвал орлого шууд нэмэгдэнэ. Олон бараа scan хийсэн бол доорх «Дуусгах»-аар бүгдийг нь хадгална.</div><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -15404,8 +15434,24 @@ function scrollWarehouseReceiptListToActive() {
   });
 }
 function warehouseView() {
+  const tab = state.filters.warehouseTab || "orders";
+  const tabs = [
+    ["orders", "Захиалга"],
+    ["stock", "Үлдэгдэл"],
+    ["in", "Орлого"],
+    ["out", "Зарлага"],
+  ];
+  const tabsHtml = `<div class="seg-tabs seg-tabs--4">${tabs
+    .map(
+      ([id, label]) =>
+        `<button type="button" onclick="setWarehouseTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
+    )
+    .join("")}</div>`;
+  if (tab === "stock" || tab === "in" || tab === "out") {
+    return `<div class="space-y-3">${pageHead("Нярав")}${tabsHtml}${inventoryRegisterBody(tab)}</div>`;
+  }
   const orders = warehouseOrdersForSelectedWorkers();
-  return `<div class="space-y-3">${pageHead("Нярав")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
+  return `<div class="space-y-3">${pageHead("Нярав")}${tabsHtml}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
 }
 function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";
