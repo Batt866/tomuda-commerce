@@ -2515,9 +2515,11 @@ function canAccessView(viewId) {
   const r = currentRole();
   if (r === "admin") return true;
   if (r === "delivery") return viewId === "delivery";
-  if (r === "warehouse") return viewId === "warehouse";
+  if (r === "warehouse") return viewId === "warehouse" || viewId === "inventory";
   if (r === "sales")
-    return ["worker", "customers", "products", "warehouse"].includes(viewId);
+    return ["worker", "customers", "products", "warehouse", "inventory"].includes(
+      viewId,
+    );
   return false;
 }
 function allowedNavIds() {
@@ -2528,10 +2530,18 @@ function allowedNavIds() {
   }
   const r = currentRole();
   if (r === "admin")
-    return ["worker", "customers", "products", "warehouse", "admin"];
-  if (r === "warehouse") return ["warehouse"];
+    return [
+      "worker",
+      "customers",
+      "products",
+      "warehouse",
+      "inventory",
+      "admin",
+    ];
+  if (r === "warehouse") return ["warehouse", "inventory"];
   if (r === "delivery") return ["delivery"];
-  if (r === "sales") return ["worker", "customers", "products", "warehouse"];
+  if (r === "sales")
+    return ["worker", "customers", "products", "warehouse", "inventory"];
   return ["worker", "customers", "products"];
 }
 function ensureEmployeePermissions() {
@@ -2986,7 +2996,7 @@ const MOBILE_NAV_SHORT = {
   delivery: "Хүргэлт",
   count: "Тооллого",
   employees: "Ажилтан",
-  inventory: "Нярав",
+  inventory: "Агуулах",
   reports: "Борлуулалтын мэдээ",
   promotions: "Урамшуулал",
   admin: "Админ",
@@ -3026,6 +3036,7 @@ function sidebarNavForRole(role) {
       ["worker", "Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
+      ["inventory", "Агуулах"],
       ["employees", "Ажилтан"],
       ["reports", "Борлуулалтын мэдээ"],
       ["promotions", "Урамшуулал"],
@@ -3036,9 +3047,10 @@ function sidebarNavForRole(role) {
       ["worker", "Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
+      ["inventory", "Агуулах"],
       ["warehouse", "Нярав"],
       ["admin", "Админ"],
-    ].filter(([id]) => allowedNavIds().includes(id));
+    ].filter(([id]) => allowedNavIds().includes(id) || id === "inventory");
   }
   // Нярав is under Админ hub — hide from primary nav when Admin is available.
   if (nav.some(([id]) => id === "admin")) {
@@ -3047,17 +3059,34 @@ function sidebarNavForRole(role) {
   return nav;
 }
 function bottomNavForRole(role) {
-  const allowed = new Set(allowedNavIds());
-  const mobileIds = {
-    admin: ["worker", "customers", "products", "admin"],
-    sales: ["worker", "customers", "products", "warehouse"],
-    warehouse: ["warehouse"],
-    delivery: ["delivery"],
+  const canInv =
+    canAccessView("inventory") || hasPermission("warehouse.view");
+  const specs = {
+    admin: [
+      ["worker", "Захиалга"],
+      ["customers", "Харилцагч"],
+      ["products", "Бараа"],
+      ["inventory", "Агуулах"],
+      ["admin", "Админ"],
+    ],
+    sales: [
+      ["worker", "Захиалга"],
+      ["customers", "Харилцагч"],
+      ["products", "Бараа"],
+      ["inventory", "Агуулах"],
+    ],
+    warehouse: [
+      ["warehouse", "Нярав"],
+      ["inventory", "Агуулах"],
+    ],
+    delivery: [["delivery", "Хүргэлт"]],
   };
-  const ids = mobileIds[role] || mobileIds.sales;
-  return sidebarNavForRole(role).filter(
-    ([id]) => ids.includes(id) && allowed.has(id),
-  );
+  const items = specs[role] || specs.sales;
+  return items.filter(([id]) => {
+    if (id === "inventory") return canInv;
+    if (id === "admin") return canAccessView("admin");
+    return canAccessView(id);
+  });
 }
 function mobileNavIcon(id) {
   const paths = MOBILE_NAV_SVG[id];
@@ -3076,8 +3105,7 @@ function mobileNavActive(viewId, navId) {
       viewId === "employees" ||
       viewId === "employeePermissions" ||
       viewId === "reports" ||
-      viewId === "promotions" ||
-      viewId === "inventory")
+      viewId === "promotions")
   )
     return true;
   return false;
@@ -3124,7 +3152,8 @@ function currentPageTitle(nav) {
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрхийн тохиргоо",
-    inventory: "Нярав",
+    inventory: "Агуулах",
+    warehouse: "Нярав",
     reports: "Борлуулалтын мэдээ",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
@@ -6542,12 +6571,6 @@ function initPageUnloadPersist() {
 }
 
 function go(view, opts = {}) {
-  if (view === "inventory") {
-    if ((state.filters.warehouseTab || "orders") === "orders") {
-      state.filters.warehouseTab = state.filters.inventory || "stock";
-    }
-    view = "warehouse";
-  }
   if (!canAccessView(view)) {
     if (!opts.silent) {
       alertModal(
@@ -6777,6 +6800,7 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["warehouse", "Нярав", "warehouse", "warehouse.view"],
+    ["inventory", "Агуулах", "inventory", "warehouse.view"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
@@ -6788,6 +6812,8 @@ function adminHubHtml() {
     if (id === "promotions") return canManagePromotions();
     if (id === "warehouseReceipts") return canManageReceipts();
     if (id === "count") return canManageCount();
+    if (id === "inventory")
+      return hasPermission("warehouse.view") || hasPermission("warehouse.edit");
     return hasPermission(perm);
   });
   const settings = [];
@@ -10456,29 +10482,45 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
 }
 function inventoryView() {
-  // Legacy entry: open Нярав → бүртгэл tabs.
-  if ((state.filters.warehouseTab || "orders") === "orders") {
-    state.filters.warehouseTab = state.filters.inventory || "stock";
-  }
-  return warehouseView();
+  const tab =
+    state.filters.inventory === "in" || state.filters.inventory === "out"
+      ? state.filters.inventory
+      : "stock";
+  state.filters.inventory = tab;
+  return `<div class="space-y-4">${pageHead("Агуулах")}<div class="seg-tabs seg-tabs--3">${[
+    ["stock", "Үлдэгдэл"],
+    ["in", "Орлого"],
+    ["out", "Зарлага"],
+  ]
+    .map(
+      ([id, label]) =>
+        `<button type="button" onclick="setInventoryTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
+    )
+    .join("")}</div>${inventoryRegisterBody(tab)}</div>`;
 }
 function setWarehouseTab(tab) {
-  const next =
-    tab === "stock" || tab === "in" || tab === "out" || tab === "orders"
-      ? tab
-      : "orders";
+  state.filters.warehouseTab = "orders";
+  if (tab === "stock" || tab === "in" || tab === "out") {
+    setInventoryTab(tab);
+    return;
+  }
+  render();
+}
+function setInventoryTab(tab) {
+  const next = tab === "in" || tab === "out" || tab === "stock" ? tab : "stock";
   if (next !== "in") stopBarcodeScan();
-  state.filters.warehouseTab = next;
-  if (next === "stock" || next === "in" || next === "out") {
-    state.filters.inventory = next;
-    if (next === "in") {
-      state.stockInEmployeeId = defaultInventoryEmployeeId();
-      ensureStockInSession();
-    }
-    if (next === "out") {
-      state.stockOutEmployeeId = defaultInventoryEmployeeId();
-      ensureStockOutSession();
-    }
+  state.filters.inventory = next;
+  if (next === "in") {
+    state.stockInEmployeeId = defaultInventoryEmployeeId();
+    ensureStockInSession();
+  }
+  if (next === "out") {
+    state.stockOutEmployeeId = defaultInventoryEmployeeId();
+    ensureStockOutSession();
+  }
+  if (state.currentView !== "inventory") {
+    go("inventory");
+    return;
   }
   render();
   scrollAppMainToTop();
@@ -13138,24 +13180,6 @@ function setInventoryCategory(cat) {
   render();
   scrollAppMainToTop();
 }
-function setInventoryTab(tab) {
-  const next = tab === "in" || tab === "out" || tab === "stock" ? tab : "stock";
-  if (state.currentView !== "warehouse" && state.currentView !== "inventory") {
-    state.filters.warehouseTab = next;
-    state.filters.inventory = next;
-    if (next === "in") {
-      state.stockInEmployeeId = defaultInventoryEmployeeId();
-      ensureStockInSession();
-    }
-    if (next === "out") {
-      state.stockOutEmployeeId = defaultInventoryEmployeeId();
-      ensureStockOutSession();
-    }
-    go("warehouse");
-    return;
-  }
-  setWarehouseTab(next);
-}
 function reportOrdersFiltered() {
   const day = state.filters.reportDate || "";
   let list = retainedOrders(state.orders).filter(
@@ -15380,24 +15404,8 @@ function scrollWarehouseReceiptListToActive() {
   });
 }
 function warehouseView() {
-  const tab = state.filters.warehouseTab || "orders";
-  const tabs = [
-    ["orders", "Захиалга"],
-    ["stock", "Үлдэгдэл"],
-    ["in", "Орлого"],
-    ["out", "Зарлага"],
-  ];
-  const tabsHtml = `<div class="seg-tabs seg-tabs--4">${tabs
-    .map(
-      ([id, label]) =>
-        `<button type="button" onclick="setWarehouseTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
-    )
-    .join("")}</div>`;
-  if (tab === "stock" || tab === "in" || tab === "out") {
-    return `<div class="space-y-3">${pageHead("Нярав")}${tabsHtml}${inventoryRegisterBody(tab)}</div>`;
-  }
   const orders = warehouseOrdersForSelectedWorkers();
-  return `<div class="space-y-3">${pageHead("Нярав")}${tabsHtml}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
+  return `<div class="space-y-3">${pageHead("Нярав")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
 }
 function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";

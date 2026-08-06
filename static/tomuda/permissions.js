@@ -277,6 +277,7 @@
     ["worker", "Захиалга үүсгэх", "orders.view"],
     ["customers", "Харилцагч", "customers.view"],
     ["products", "Бараа", "products.view"],
+    ["inventory", "Агуулах", "warehouse.view"],
     ["warehouse", "Нярав", "warehouse.view"],
     ["employees", "Ажилтан", "employees.view"],
     ["reports", "Борлуулалтын мэдээ", "reports.view"],
