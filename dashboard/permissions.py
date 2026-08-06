@@ -182,6 +182,11 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "excelTemplate.edit": ["products.create", "customers.create"],
     "excelTemplate.delete": ["products.create", "customers.create"],
     "customers.create": ["customerAdd.create", "customerAdd.view"],
+    "customers.edit": [
+        "customers.create",
+        "customerAdd.edit",
+        "customerAdd.create",
+    ],
     "products.create": ["productAdd.create", "productAdd.view"],
     "employees.create": ["employeeAdd.create", "employeeAdd.view"],
     "dashboard.view": ["settings.view", "permissions.view"],

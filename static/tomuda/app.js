@@ -2339,6 +2339,21 @@ function canManageEmployees() {
     hasPermission("employeeAdd.view")
   );
 }
+function canCreateCustomer() {
+  return (
+    hasPermission("customers.create") ||
+    hasPermission("customerAdd.create") ||
+    hasPermission("customerAdd.view")
+  );
+}
+function canEditCustomer() {
+  return (
+    hasPermission("customers.edit") ||
+    hasPermission("customers.create") ||
+    hasPermission("customerAdd.edit") ||
+    hasPermission("customerAdd.create")
+  );
+}
 function canSetEmployeePassword(emp = state.currentEmployee) {
   return (emp?.role || currentRole()) === "admin";
 }
@@ -10188,6 +10203,13 @@ function customerAddress(c) {
 }
 function customerRow(c) {
   const id = esc(c.id);
+  const editBtn = canEditCustomer()
+    ? editIconButton({
+        className: "customer-card__icon-btn",
+        attrs: `onclick="confirmEditCustomer('${id}')"`,
+        label: "Харилцагч засах",
+      })
+    : "";
   const deleteBtn = canDelete()
     ? deleteIconButton({
         className: "customer-card__icon-btn",
@@ -10197,7 +10219,7 @@ function customerRow(c) {
     : "";
   return customerListRow(
     c,
-    `${viewIconButton({ className: "customer-card__icon-btn", attrs: `onclick="customerDetail('${id}')"`, label: "Харах" })}${editIconButton({ className: "customer-card__icon-btn", attrs: `onclick="confirmEditCustomer('${id}')"`, label: "Харилцагч засах" })}${deleteBtn}`,
+    `${viewIconButton({ className: "customer-card__icon-btn", attrs: `onclick="customerDetail('${id}')"`, label: "Харах" })}${editBtn}${deleteBtn}`,
     state.customerHighlightId === c.id,
   );
 }
@@ -17011,6 +17033,9 @@ function customerFromDraft(id, draft) {
   return next;
 }
 function confirmEditCustomer(id) {
+  if (!canEditCustomer()) {
+    return alertModal("Эрхгүй", "Харилцагч засах эрхгүй.");
+  }
   const c = state.customers.find((x) => x.id === id);
   if (!c) return alert("Харилцагч олдсонгүй");
   const name = c.name || c.companyName || "Харилцагч";
@@ -17053,6 +17078,12 @@ function confirmEditEmployee(id) {
 }
 function customerModal(id, draft = null) {
   destroyCustomerMap();
+  if (id ? !canEditCustomer() : !canCreateCustomer()) {
+    return alertModal(
+      "Эрхгүй",
+      id ? "Харилцагч засах эрхгүй." : "Харилцагч нэмэх эрхгүй.",
+    );
+  }
   const useDraft = draft || null;
   if (useDraft)
     state.customerFormDraft = {
@@ -17067,7 +17098,7 @@ function customerModal(id, draft = null) {
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" novalidate onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -17225,7 +17256,10 @@ async function applyCustomerSave(data, id) {
   let customer = null;
   if (id) {
     const existing = state.customers.find((c) => c.id === id);
-    if (!existing) return;
+    if (!existing) {
+      alert("Харилцагч олдсонгүй");
+      return false;
+    }
     const prevImage = storedEntityImage(existing);
     Object.assign(existing, data);
     if (!storedEntityImage(existing) && prevImage) {
@@ -17245,6 +17279,7 @@ async function applyCustomerSave(data, id) {
   const customerId = customer?.id || "";
   const customerName = customer?.name || customer?.companyName || "Харилцагч";
   let upsertOk = false;
+  let upsertError = "";
   try {
     const payload = await upsertCustomerOnServer(customer);
     upsertOk = true;
@@ -17271,7 +17306,15 @@ async function applyCustomerSave(data, id) {
       updatedAt: payload?.updatedAt || "",
     });
   } catch (error) {
+    upsertError = String(error?.message || "").trim();
     console.warn("Customer upsert failed", error);
+  }
+  if (!upsertOk) {
+    alertModal(
+      "Хадгалах амжилтгүй",
+      upsertError || "Серверт хадгалахад алдаа гарлаа. Дахин оролдоно уу.",
+    );
+    return false;
   }
   closeModal();
   focusSavedCustomer(customerId, customerName);
@@ -17291,12 +17334,22 @@ async function applyCustomerSave(data, id) {
   } else {
     showAppToast(`${customerName} хадгалагдлаа`, "success");
   }
+  return true;
 }
 async function saveCustomer(e, id) {
   e.preventDefault();
+  const form = e.target?.closest?.("[data-customer-form]") || e.target;
+  id = String(form?.getAttribute?.("data-customer-id") || id || "").trim();
+  if (id ? !canEditCustomer() : !canCreateCustomer()) {
+    return alertModal(
+      "Эрхгүй",
+      id ? "Харилцагч засах эрхгүй." : "Харилцагч нэмэх эрхгүй.",
+    );
+  }
   if (customerSaveLock) return;
-  const form = e.target;
-  const submitBtn = form.querySelector('button[type="submit"]');
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    form.querySelector('button:not([type="button"])');
   const setSaving = (on) => {
     customerSaveLock = on;
     if (!submitBtn) return;
@@ -17307,7 +17360,7 @@ async function saveCustomer(e, id) {
     try {
       await customerImageCompressTask;
     } catch {
-      return;
+      return alert("Зураг боловсруулахад алдаа гарлаа. Дахин оролдоно уу.");
     }
   }
   const fd = new FormData(e.target);

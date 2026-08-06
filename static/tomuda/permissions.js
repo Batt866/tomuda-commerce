@@ -172,6 +172,11 @@
     "excelTemplate.edit": ["products.create", "customers.create"],
     "excelTemplate.delete": ["products.create", "customers.create"],
     "customers.create": ["customerAdd.create", "customerAdd.view"],
+    "customers.edit": [
+      "customers.create",
+      "customerAdd.edit",
+      "customerAdd.create",
+    ],
     "products.create": ["productAdd.create", "productAdd.view"],
     "employees.create": ["employeeAdd.create", "employeeAdd.view"],
     "dashboard.view": ["settings.view", "permissions.view"],
@@ -368,10 +373,24 @@
     return [...set].filter((k) => ALL_KEY_SET.has(k));
   }
 
+  /** Keys for grant UI matrix — literal saved keys only, no legacy expansion. */
+  function keysForGrantUi(list) {
+    return (Array.isArray(list) ? list : []).filter((k) => ALL_KEY_SET.has(k));
+  }
+
+  function onPermToggleChange(changedInput) {
+    const main = document.querySelector(".app-main");
+    const scrollTop = main?.scrollTop ?? 0;
+    syncPermissionRowDeps(changedInput);
+    requestAnimationFrame(() => {
+      if (main) main.scrollTop = scrollTop;
+    });
+  }
+
   function permToggleHtml(key, checked, ariaLabel, esc, actionId, disabled = false) {
     const dis = disabled ? " disabled" : "";
     const labelClass = disabled ? "perm-toggle is-disabled" : "perm-toggle";
-    return `<label class="${labelClass}"><input type="checkbox" name="permissions" value="${esc(key)}" data-perm-action="${esc(actionId)}"${checked ? " checked" : ""}${dis} aria-label="${esc(ariaLabel)}" onmousedown="event.preventDefault()" onchange="TOMUDA_PERMISSIONS.syncPermissionRowDeps(this)"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label>`;
+    return `<label class="${labelClass}"><input type="checkbox" name="permissions" value="${esc(key)}" data-perm-action="${esc(actionId)}"${checked ? " checked" : ""}${dis} aria-label="${esc(ariaLabel)}" onchange="TOMUDA_PERMISSIONS.onPermToggleChange(this)"><span class="perm-toggle__track" aria-hidden="true"><span class="perm-toggle__thumb"></span></span></label>`;
   }
 
   function syncPermissionRowDeps(changedInput, opts = {}) {
@@ -424,7 +443,7 @@
   }
 
   function permissionsFieldHtml(selectedKeys = [], role = "sales", opts = {}) {
-    const selected = new Set(normalizeKeys(selectedKeys));
+    const selected = new Set(keysForGrantUi(selectedKeys));
     const esc =
       typeof window !== "undefined" && window.esc
         ? window.esc
@@ -474,6 +493,7 @@
     NAV_ITEMS,
     permissionKey,
     normalizeKeys,
+    keysForGrantUi,
     storedPermissionKeys,
     resolveEmployeePermissions,
     hasPermission,
@@ -483,6 +503,7 @@
     permissionsFieldHtml,
     syncPermissionRowDeps,
     syncAllPermissionRowDeps,
+    onPermToggleChange,
     templateForRole,
     mergePermissionsForEmployees,
   };
