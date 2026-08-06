@@ -1311,15 +1311,10 @@ function orderCreatedDay(o) {
   if (created) return created;
   return orderDeliveryDay(o);
 }
-function orderInWorkerLiveSession(o) {
-  const today = todayIso();
-  if (orderCreatedDay(o) === today) return true;
-  return normalizeIsoDateInput(orderDay(o)) === today;
-}
 function orderMatchesWorkerDate(o, day = state.filters.workerDate) {
   const targetDay = normalizeIsoDateInput(day) || "";
   if (!targetDay) return true;
-  if (targetDay === todayIso()) return orderInWorkerLiveSession(o);
+  // Өнөөдөр / сонгосон өдөр = зөвхөн тухайн өдөр авсан захиалга (хүргэлтийн өдөр биш).
   return orderCreatedDay(o) === targetDay;
 }
 function orderRetentionDays() {

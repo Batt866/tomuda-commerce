@@ -5163,14 +5163,26 @@ button:focus-visible,
     box-shadow: 0 -12px 40px rgba(16, 22, 35, 0.12) !important;
   }
 
+  /* Захиалга засвар/шинэ: зөвхөн барааны жагсаалт гүйлгэнэ, доод панел тогтно. */
   .app-shell--bottom-nav .app-main:has(.worker-view--ordering) {
-    overflow-x: hidden;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .app-shell--bottom-nav .app-main__inner:has(.worker-view--ordering) {
-    display: block;
-    height: auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+  }
+
+  .app-shell--bottom-nav
+    .app-main__inner:has(.worker-view--ordering)
+    > .worker-view--ordering {
+    flex: 1 1 auto;
     min-height: 0;
   }
 
@@ -6796,8 +6808,7 @@ textarea::placeholder {
 }
 
 .worker-order-card__foot {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 12;
   display: flex;
   flex-direction: column;
@@ -6805,10 +6816,7 @@ textarea::placeholder {
   padding: 14px 0 12px;
   border-top: none;
   background: var(--hex-background);
-}
-
-.app-shell--bottom-nav .worker-order-card__foot {
-  bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
 }
 
 .worker-order-options {
@@ -10017,13 +10025,12 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-order-card__foot {
-    position: sticky;
-    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+    position: relative;
     flex-shrink: 0;
     z-index: 12;
     margin-top: 8px;
     padding-top: 12px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 10px;
     background: var(--hex-background);
     box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
   }
@@ -10034,21 +10041,26 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering {
-    display: block;
-    flex: none;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
+    height: 100%;
     align-items: stretch;
     gap: 0;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-view__tabs {
+    flex-shrink: 0;
     margin-bottom: 8px;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card {
-    flex: none;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__head {
@@ -10056,11 +10068,14 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__body {
-    flex: none;
+    flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: visible;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-summary {
@@ -10077,21 +10092,22 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-lines-wrap {
-    flex: none;
+    flex: 0 0 auto;
     min-height: 0;
     overflow: visible;
     max-height: none;
+    margin-bottom: 0;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
-    position: sticky;
-    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+    position: relative;
     flex-shrink: 0;
     z-index: 12;
+    margin-top: 0;
     background: var(--hex-background);
     box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
     padding-top: 12px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 10px;
   }
 
   .worker-selected-row {
