@@ -8588,7 +8588,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     );
     merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
     const bodyStyle = 8;
-    const labelStyle = idx === 0 ? 8 : bodyStyle;
+    // 10 = right + dotted grid — «Урамшуулал» sits at the right edge of D
+    const labelStyle = idx === 0 ? 10 : bodyStyle;
     const qtyStyle = 11;
     const moneyStyle = 10;
     pushItemTableRow(promoH, [
