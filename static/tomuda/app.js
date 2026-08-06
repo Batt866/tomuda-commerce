@@ -10041,6 +10041,8 @@ function customerExcel() {
     ],
     ...sorted.map((c, i) => {
       const phones = customerPhonesList(c);
+      const lat = c.latitude ?? "";
+      const lng = c.longitude ?? "";
       return [
         i + 1,
         c.name || "",
@@ -10052,12 +10054,31 @@ function customerExcel() {
         c.district || "",
         c.khoroo || "",
         c.address || "",
-        c.latitude ?? "",
-        c.longitude ?? "",
+        lng === "" || lng === null || lng === undefined ? "" : String(lng),
+        lat === "" || lat === null || lat === undefined ? "" : String(lat),
       ];
     }),
   ];
-  excel("hariltsagch.xlsx", rows);
+  // Minimum widths so name/company/address are fully readable (not clipped).
+  const colMins = [
+    5,
+    20,
+    12,
+    24,
+    ...phoneHeaders.map(() => 12),
+    24,
+    14,
+    14,
+    12,
+    40,
+    12,
+    12,
+  ];
+  excel("hariltsagch.xlsx", rows, {
+    sheetName: "Харилцагч",
+    colMins,
+    maxColWidth: 56,
+  });
 }
 function customerAddress(c) {
   return (
@@ -19739,13 +19760,46 @@ function simpleRootRelsXml() {
 function simpleContentTypesXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>`;
 }
-function simpleSheetXml(rows, si) {
+function simpleSheetColWidths(rows, colCount, { mins = [], maxWidth = 48 } = {}) {
+  const widths = Array.from({ length: colCount }, (_, i) =>
+    Math.max(8, Number(mins[i]) || 10),
+  );
+  for (const row of rows || []) {
+    if (!Array.isArray(row)) continue;
+    for (let i = 0; i < colCount; i += 1) {
+      const text = String(row[i] ?? "");
+      // Approximate Excel character width (CJK/Mongolian denser → +2 pad).
+      const len = [...text].length + 2;
+      if (len > widths[i]) widths[i] = len;
+    }
+  }
+  return widths.map((w) => Math.min(maxWidth, Math.max(8, w)));
+}
+function simpleSheetColsXml(widths) {
+  return (widths || [])
+    .map(
+      (w, i) =>
+        `<col min="${i + 1}" max="${i + 1}" width="${Number(w).toFixed(2)}" customWidth="1"/>`,
+    )
+    .join("");
+}
+function simpleSheetXml(rows, si, opts = {}) {
   const normalizedRows = (rows || []).map((row) =>
     Array.isArray(row) ? row : [row],
   );
   const rowCount = Math.max(normalizedRows.length, 1);
   const colCount = Math.max(1, ...normalizedRows.map((row) => row.length));
   const lastRef = `${xlsxColName(colCount)}${rowCount}`;
+  const widths =
+    Array.isArray(opts.colWidths) && opts.colWidths.length
+      ? opts.colWidths.map((w, i) =>
+          Number(w) > 0 ? Number(w) : simpleSheetColWidths(normalizedRows, colCount)[i],
+        )
+      : simpleSheetColWidths(normalizedRows, colCount, {
+          mins: opts.colMins || [],
+          maxWidth: opts.maxColWidth || 48,
+        });
+  const colsXml = `<cols>${simpleSheetColsXml(widths)}</cols>`;
   const sheetRows = normalizedRows
     .map((row, rowIdx) => {
       const rowNum = rowIdx + 1;
@@ -19757,19 +19811,19 @@ function simpleSheetXml(rows, si) {
           cells.push(`<c r="${ref}"/>`);
           continue;
         }
-        const numberValue = typeof value === "number" ? value : Number(value);
-        if (typeof value === "number" && Number.isFinite(numberValue)) {
-          cells.push(`<c r="${ref}"><v>${numberValue}</v></c>`);
+        if (typeof value === "number" && Number.isFinite(value)) {
+          cells.push(`<c r="${ref}"><v>${value}</v></c>`);
         } else {
+          // Keep IDs/phones as text so leading zeros and full values stay intact.
           cells.push(`<c r="${ref}" t="s"><v>${si(value)}</v></c>`);
         }
       }
       return `<row r="${rowNum}" spans="1:${colCount}">${cells.join("")}</row>`;
     })
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetData>${sheetRows}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${colsXml}<sheetData>${sheetRows}</sheetData><pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
 }
-async function downloadRowsXlsx(name, rows, sheetName = "Sheet1") {
+async function downloadRowsXlsx(name, rows, sheetName = "Sheet1", opts = {}) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
@@ -19790,13 +19844,13 @@ async function downloadRowsXlsx(name, rows, sheetName = "Sheet1") {
   zip.file("_rels/.rels", simpleRootRelsXml(), opt);
   zip.file("xl/workbook.xml", simpleWorkbookXml(safeSheetName), opt);
   zip.file("xl/_rels/workbook.xml.rels", simpleWorkbookRelsXml(), opt);
-  zip.file("xl/worksheets/sheet1.xml", simpleSheetXml(rows, si), opt);
+  zip.file("xl/worksheets/sheet1.xml", simpleSheetXml(rows, si, opts), opt);
   zip.file("xl/sharedStrings.xml", xlsxSharedStringsXml(strings), opt);
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, xlsxFileName(name));
 }
-function excel(name, rows) {
-  downloadRowsXlsx(name, rows).catch(() =>
+function excel(name, rows, opts = {}) {
+  downloadRowsXlsx(name, rows, opts.sheetName || "Sheet1", opts).catch(() =>
     csv(String(name || "excel.xlsx").replace(/\.(xlsx|xls)$/i, ".csv"), rows),
   );
 }
