@@ -13089,11 +13089,8 @@ function reportsView() {
   const orders = reportOrdersFiltered(),
     q = String(state.searches.reports || "").trim(),
     paymentOrders = orders.filter((o) => orderReceiptMatchesQuery(o, q)),
-    total = orders.reduce((s, o) => s + orderAmount(o), 0),
-    paid = orders
-      .filter((o) => orderIsPaid(o))
-      .reduce((s, o) => s + orderAmount(o), 0),
-    unpaid = total - paid;
+    orderCount = orders.length,
+    total = orders.reduce((s, o) => s + orderAmount(o), 0);
   const sales = state.employees
     .filter((e) => e.role === "sales")
     .map((e) => {
@@ -13106,7 +13103,7 @@ function reportsView() {
         commission: (sum * e.commissionRate) / 100,
       };
     });
-  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Төлсөн", fmt(paid), "text-tone-success")}${card("Төлөөгүй", fmt(unpaid), "text-tone-danger")}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
 }
 function paymentRow(o) {
   const paid = orderIsPaid(o),
