@@ -4294,6 +4294,10 @@ button:focus-visible,
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.seg-tabs--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .seg-tab {
   min-height: var(--btn-h-md);
   padding: 0 12px;
@@ -5279,6 +5283,11 @@ button:focus-visible,
 
   .seg-tabs--3 .seg-tab {
     font-size: 12px;
+  }
+
+  .seg-tabs--4 .seg-tab {
+    font-size: 11px;
+    padding: 0 4px;
   }
 
   #app button.bg-primary,

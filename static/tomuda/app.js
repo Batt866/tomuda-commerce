@@ -18,6 +18,7 @@ const state = {
     category: "all",
     inventory: "stock",
     inventoryCategory: "all",
+    warehouseTab: "orders",
     countCategory: "all",
     worker: "new",
     workerCategory: "",
@@ -2974,11 +2975,11 @@ const MOBILE_NAV_SHORT = {
   worker: "Захиалга",
   customers: "Харилцагч",
   products: "Бараа",
-  warehouse: "Агуулах",
+  warehouse: "Нярав",
   delivery: "Хүргэлт",
   count: "Тооллого",
   employees: "Ажилтан",
-  inventory: "Бүртгэл",
+  inventory: "Нярав",
   reports: "Борлуулалтын мэдээ",
   promotions: "Урамшуулал",
   admin: "Админ",
@@ -3019,7 +3020,6 @@ function sidebarNavForRole(role) {
       ["products", "Бараа"],
       ["warehouse", "Нярав"],
       ["employees", "Ажилтан"],
-      ["inventory", "Агуулахын бүртгэл"],
       ["reports", "Борлуулалтын мэдээ"],
       ["promotions", "Урамшуулал"],
       ["admin", "Админ"],
@@ -6492,6 +6492,12 @@ function initPageUnloadPersist() {
 }
 
 function go(view, opts = {}) {
+  if (view === "inventory") {
+    if ((state.filters.warehouseTab || "orders") === "orders") {
+      state.filters.warehouseTab = state.filters.inventory || "stock";
+    }
+    view = "warehouse";
+  }
   if (!canAccessView(view)) {
     if (!opts.silent) {
       alertModal(
@@ -6710,7 +6716,7 @@ function adminHubActionCard(action, label, iconKey) {
 function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
-    ["inventory", "Нярав", "inventory", "warehouse.view"],
+    ["warehouse", "Нярав", "warehouse", "warehouse.view"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
@@ -10378,9 +10384,8 @@ function productCard(p) {
   const unit = esc(p.unit || "ш");
   return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><span class="product-card__media" aria-hidden="true"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-card__img" width="72" height="72" loading="lazy" decoding="async" alt=""></span><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд</span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
 }
-function inventoryView() {
-  const tab = state.filters.inventory,
-    cat = state.filters.inventoryCategory,
+function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
+  const cat = state.filters.inventoryCategory,
     q = state.searches.inventory || "",
     list = state.products.filter(
       (p) =>
@@ -10388,18 +10393,35 @@ function inventoryView() {
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
           p.barcode.includes(q)),
     );
-  return `<div class="space-y-4">${pageHead("Нярав")}<div class="seg-tabs seg-tabs--3">${[
-    ["stock", "Үлдэгдэл"],
-    ["in", "Орлого авах"],
-    ["out", "Зарлага гаргах"],
-  ]
-    .map(
-      (t) =>
-        `<button type="button" onclick="setInventoryTab('${t[0]}')" class="seg-tab ${tab === t[0] ? "is-active" : ""}">${t[1]}</button>`,
-    )
-    .join(
-      "",
-    )}</div><div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}</div>`;
+  return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
+}
+function inventoryView() {
+  // Legacy entry: open Нярав → бүртгэл tabs.
+  if ((state.filters.warehouseTab || "orders") === "orders") {
+    state.filters.warehouseTab = state.filters.inventory || "stock";
+  }
+  return warehouseView();
+}
+function setWarehouseTab(tab) {
+  const next =
+    tab === "stock" || tab === "in" || tab === "out" || tab === "orders"
+      ? tab
+      : "orders";
+  if (next !== "in") stopBarcodeScan();
+  state.filters.warehouseTab = next;
+  if (next === "stock" || next === "in" || next === "out") {
+    state.filters.inventory = next;
+    if (next === "in") {
+      state.stockInEmployeeId = defaultInventoryEmployeeId();
+      ensureStockInSession();
+    }
+    if (next === "out") {
+      state.stockOutEmployeeId = defaultInventoryEmployeeId();
+      ensureStockOutSession();
+    }
+  }
+  render();
+  scrollAppMainToTop();
 }
 function inventoryEmployees() {
   return state.employees
@@ -10840,8 +10862,10 @@ function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
     if (state.stockInHighlightId === product.id) {
       state.stockInHighlightId = "";
       if (
-        state.currentView === "inventory" &&
-        state.filters.inventory === "in"
+        (state.currentView === "inventory" ||
+          state.currentView === "warehouse") &&
+        (state.filters.inventory === "in" ||
+          state.filters.warehouseTab === "in")
       ) {
         render();
       }
@@ -13055,18 +13079,22 @@ function setInventoryCategory(cat) {
   scrollAppMainToTop();
 }
 function setInventoryTab(tab) {
-  if (tab !== "in") stopBarcodeScan();
-  state.filters.inventory = tab;
-  if (tab === "in") {
-    state.stockInEmployeeId = defaultInventoryEmployeeId();
-    ensureStockInSession();
+  const next = tab === "in" || tab === "out" || tab === "stock" ? tab : "stock";
+  if (state.currentView !== "warehouse" && state.currentView !== "inventory") {
+    state.filters.warehouseTab = next;
+    state.filters.inventory = next;
+    if (next === "in") {
+      state.stockInEmployeeId = defaultInventoryEmployeeId();
+      ensureStockInSession();
+    }
+    if (next === "out") {
+      state.stockOutEmployeeId = defaultInventoryEmployeeId();
+      ensureStockOutSession();
+    }
+    go("warehouse");
+    return;
   }
-  if (tab === "out") {
-    state.stockOutEmployeeId = defaultInventoryEmployeeId();
-    ensureStockOutSession();
-  }
-  render();
-  scrollAppMainToTop();
+  setWarehouseTab(next);
 }
 function reportOrdersFiltered() {
   const day = state.filters.reportDate || "";
@@ -15301,8 +15329,24 @@ function scrollWarehouseReceiptListToActive() {
   });
 }
 function warehouseView() {
+  const tab = state.filters.warehouseTab || "orders";
+  const tabs = [
+    ["orders", "Захиалга"],
+    ["stock", "Үлдэгдэл"],
+    ["in", "Орлого"],
+    ["out", "Зарлага"],
+  ];
+  const tabsHtml = `<div class="seg-tabs seg-tabs--4">${tabs
+    .map(
+      ([id, label]) =>
+        `<button type="button" onclick="setWarehouseTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
+    )
+    .join("")}</div>`;
+  if (tab === "stock" || tab === "in" || tab === "out") {
+    return `<div class="space-y-3">${pageHead("Нярав")}${tabsHtml}${inventoryRegisterBody(tab)}</div>`;
+  }
   const orders = warehouseOrdersForSelectedWorkers();
-  return `<div class="space-y-3">${pageHead("Нярав")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
+  return `<div class="space-y-3">${pageHead("Нярав")}${tabsHtml}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
 }
 function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";
@@ -20146,6 +20190,7 @@ Object.assign(window, {
   applyStockFromModal,
   setInventoryCategory,
   setInventoryTab,
+  setWarehouseTab,
   setCountCategory,
   setWorkerQty,
   setWorkerOrderActive,
