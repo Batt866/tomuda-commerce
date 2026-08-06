@@ -575,7 +575,7 @@ function receiptInfoRows(o) {
   }
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА», «Регистрийн».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td rowspan="2" class="receipt-grid__label">Дансны дугаар:</td><td rowspan="2" class="receipt-grid__value receipt-grid__iban-label"><b>IBAN:</b></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}</b></td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_ACCOUNT}</b></td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-head"><span>Дансны дугаар:</span><span class="receipt-grid__iban-label"><b>IBAN:</b></span></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}</b></td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_ACCOUNT}</b></td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -872,7 +872,7 @@ function receiptSignatureRowsHtml(opts = {}) {
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
   const block = (role) =>
-    `<tr class="receipt-grid__sign"><td></td><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5"></td></tr>`;
+    `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="6"></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
   return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
 }
@@ -7228,7 +7228,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* Source jishee widths — A:B logo (B slim), C wide for names */
-.receipt-grid__a { width: 6.7%; } .receipt-grid__b { width: 17.0%; } .receipt-grid__c { width: 8.2%; } .receipt-grid__d { width: 4.7%; } .receipt-grid__e { width: 12.2%; }
+.receipt-grid__a { width: 6.5%; } .receipt-grid__b { width: 3.2%; } .receipt-grid__c { width: 21.3%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 11.8%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -7827,6 +7827,14 @@ td, th { border: none; }
 .receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9px; }
 .receipt-grid__iban-nums { font-weight: 700; font-size: 11px !important; line-height: 1.25; }
 .receipt-grid__iban-nums b { font-size: 11px !important; }
+.receipt-grid__iban-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 9px;
+}
 .receipt-grid__iban-label { text-align: right; padding-right: 4px; font-weight: 700; white-space: nowrap; vertical-align: top; }
 .receipt-info__value,
 .receipt-info__address-text,
@@ -8057,8 +8065,7 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 // ҮНДСЭН A–K: logo A:B (B narrow so brand in C sits close), wide C for names
 const RECEIPT_XLSX_COL_WIDTHS = [
-  // B wider so «Дансны дугаар:» fits alone; B+C+D name width unchanged (24.625)
-  5.5, 14.0, 6.75, 3.875, 10.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  5.5, 2.75, 18.0, 3.875, 10.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
@@ -8400,9 +8407,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // B = «Дансны дугаар:»; C = «IBAN:» right-aligned (rowspan); D:E = account digits
-    `B${bankR4}:B${bankR5}`,
-    `C${bankR4}:C${bankR5}`,
+    // Keep B column width unchanged: label uses B:C merge; IBAN sits at right of that merge
+    `B${bankR4}:C${bankR4}`,
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
@@ -8429,16 +8435,27 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR3, "C", "C", 5),
     ...emptyCells(bankR3, "E", "E", 5),
   ]);
-  pushRow(perBankH, [
-    xlsxCellXml(`B${bankR4}`, 5, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`C${bankR4}`, 46, si("IBAN:"), "s"),
-    xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
-    ...emptyCells(bankR4, "E", "E", 4),
-  ]);
+  {
+    const left = "Дансны дугаар:";
+    const right = "IBAN:";
+    const slot = Math.max(
+      20,
+      Math.round(
+        (RECEIPT_XLSX_COL_WIDTHS[1] + RECEIPT_XLSX_COL_WIDTHS[2]) * 1.3,
+      ),
+    );
+    const pad = Math.max(1, slot - [...left].length - [...right].length);
+    const ibanLabel = `${left}${"\u00A0".repeat(pad)}${right}`;
+    pushRow(perBankH, [
+      xlsxCellXml(`B${bankR4}`, 5, si(ibanLabel), "s"),
+      xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
+      ...emptyCells(bankR4, "C", "C", 5),
+      ...emptyCells(bankR4, "E", "E", 4),
+    ]);
+  }
   pushRow(perBankH, [
     xlsxCellXml(`D${bankR5}`, 4, si(RECEIPT_BANK_ACCOUNT), "s"),
-    ...emptyCells(bankR5, "B", "B", 5),
-    ...emptyCells(bankR5, "C", "C", 46),
+    ...emptyCells(bankR5, "B", "C", 5),
     ...emptyCells(bankR5, "E", "E", 4),
   ]);
 
@@ -8672,14 +8689,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(14.25, emptyCells(rowNum));
-  // Label B:F right-aligned so text sits at the right edge of column F
+  // Right-aligned through E — text sits at the right edge of column E (B width unchanged)
   const pushSignRow = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:F${r}`);
+    merges.push(`B${r}:E${r}`);
     pushRow(18, [
       xlsxCellXml(`B${r}`, 30, si(role), "s"),
-      ...emptyCells(r, "C", "F", 30),
-      ...emptyCells(r, "G", "K", 1),
+      ...emptyCells(r, "C", "E", 30),
+      ...emptyCells(r, "F", "K", 1),
     ]);
   };
   pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
