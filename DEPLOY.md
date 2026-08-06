@@ -2,7 +2,7 @@
 
 ## 1. VPS дээр deploy (production)
 
-**Одоогийн production:** https://tomuda.jobbox.mn
+**Одоогийн production:** https://tomudagroup.mn
 
 ### Шинэ сервер дээр суулгах
 
@@ -18,7 +18,7 @@ bash /root/deploy-vps-ubuntu.sh
 DOMAIN=shop.example.mn bash /root/deploy-vps-ubuntu.sh
 ```
 
-`tomuda.mn` нэмэх:
+`tomudagroup.mn` тохируулах (одоо ажиллаж буй сервер дээр):
 
 ```bash
 bash scripts/setup-tomuda-mn-domain.sh
@@ -55,7 +55,7 @@ python manage.py runserver
 
 | Төхөөрөмж | Арга |
 |-----------|------|
-| **Android** | Chrome → https://tomuda.jobbox.mn → «App суулгах» |
+| **Android** | Chrome → https://tomudagroup.mn → «App суулгах» |
 | **iPhone** | Safari → Хуваалцах → Нүүр дэлгэцэнд нэмэх |
 
 HTTPS заавал. App Store / Play Store шаардлаггүй.
@@ -75,7 +75,7 @@ cat DEPLOY-LINK.txt
 
 ```bash
 ./scripts/check-deploy-link.sh
-curl -s https://tomuda.jobbox.mn/api/health
+curl -s https://tomudagroup.mn/api/health
 ```
 
 ---

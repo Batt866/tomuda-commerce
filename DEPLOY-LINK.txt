@@ -1,15 +1,15 @@
 ТОМУДА — Deploy link
 
-✅ ҮНДСЭН (шинэ VPS, 24/7):
-http://202.179.6.110
+✅ ҮНДСЭН:
+https://tomudagroup.mn
 
 API health:
-http://202.179.6.110/api/health
+https://tomudagroup.mn/api/health
 
 Нэвтрэх (seed):
 admin@tomuda.mn / admin
 
-⚠ Хуучин: https://tomuda.jobbox.mn (өмнөх сервер)
+⚠ Хуучин: https://tomuda.jobbox.mn
 
 🔧 Локал хөгжүүлэлт:
 ./scripts/start-tomuda.sh

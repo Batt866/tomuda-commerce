@@ -3,7 +3,7 @@
 cd "$(dirname "$0")/.."
 LINK_FILE="DEPLOY-LINK.txt"
 PORT=8011
-PRODUCTION_URL="${PRODUCTION_URL:-https://tomuda.jobbox.mn}"
+PRODUCTION_URL="${PRODUCTION_URL:-https://tomudagroup.mn}"
 
 wait_http_ok() {
   local url="$1"

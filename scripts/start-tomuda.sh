@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 PORT=8011
 LOG_DIR="$ROOT/logs"
-PRODUCTION_URL="${PRODUCTION_URL:-https://tomuda.jobbox.mn}"
+PRODUCTION_URL="${PRODUCTION_URL:-https://tomudagroup.mn}"
 mkdir -p "$LOG_DIR"
 
 if [ -d ".venv" ]; then

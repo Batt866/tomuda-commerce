@@ -3,7 +3,7 @@
   "appName": "TOMUDA",
   "webDir": "static/tomuda",
   "server": {
-    "url": "https://tomuda.jobbox.mn",
+    "url": "https://tomudagroup.mn",
     "cleartext": false
   },
   "plugins": {

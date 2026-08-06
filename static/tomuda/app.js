@@ -7388,7 +7388,7 @@ td, th { border: none; }
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
-  text-align: left;
+  text-align: right;
   white-space: nowrap;
   vertical-align: middle;
   padding-left: 4px;
@@ -8338,12 +8338,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       }),
     );
     merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
-    const labelStyle = idx === 0 ? 36 : 35;
+    const labelStyle = idx === 0 ? 38 : 35;
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, 35, null, "empty"),
       xlsxCellXml(`B${r}`, 35, null, "empty"),
       idx === 0
-        ? xlsxCellXml(`C${r}`, 36, si("Урамшуулал"), "s")
+        ? xlsxCellXml(`C${r}`, 38, si("Урамшуулал"), "s")
         : xlsxCellXml(`C${r}`, 35, null, "empty"),
       xlsxCellXml(`E${r}`, 35, si(nameText), "s"),
       xlsxCellXml(`H${r}`, 37, qty, "n"),

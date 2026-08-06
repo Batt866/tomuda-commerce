@@ -2,7 +2,7 @@
 
 HTML, Tailwind CSS, vanilla JavaScript, Django, Django Ninja хувилбар.
 
-**Production:** https://tomuda.jobbox.mn
+**Production:** https://tomudagroup.mn
 
 ## Ажиллуулах (локал)
 
@@ -21,7 +21,7 @@ python manage.py runserver
 
 ### Android (Chrome)
 
-1. https://tomuda.jobbox.mn нээнэ
+1. https://tomudagroup.mn нээнэ
 2. **«App суулгах»** banner эсвэл Chrome цэс → App суулгах
 
 ### iPhone (Safari)
