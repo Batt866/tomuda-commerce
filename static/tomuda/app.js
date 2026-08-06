@@ -6629,11 +6629,15 @@ function captureRenderScroll() {
   const main = document.querySelector(".app-main");
   const lineList = document.querySelector(".line-list--scroll");
   const permPanel = document.querySelector(".perm-panel");
+  const orderBody = document.querySelector(
+    ".worker-view--ordering .worker-order-card__body",
+  );
   const snap = {
     sameView: lastRenderedView === state.currentView,
     mainTop: main?.scrollTop ?? 0,
     lineListTop: lineList?.scrollTop ?? null,
     permPanelTop: permPanel?.scrollTop ?? null,
+    orderBodyTop: orderBody?.scrollTop ?? null,
     pickerLists: {},
     receiptListTop: null,
   };
@@ -6679,6 +6683,12 @@ function restoreRenderScroll(snap) {
     if (snap.permPanelTop != null) {
       const permPanel = document.querySelector(".perm-panel");
       if (permPanel) permPanel.scrollTop = snap.permPanelTop;
+    }
+    if (snap.orderBodyTop != null) {
+      const orderBody = document.querySelector(
+        ".worker-view--ordering .worker-order-card__body",
+      );
+      if (orderBody) orderBody.scrollTop = snap.orderBodyTop;
     }
   });
 }

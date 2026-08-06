@@ -5163,26 +5163,15 @@ button:focus-visible,
     box-shadow: 0 -12px 40px rgba(16, 22, 35, 0.12) !important;
   }
 
-  /* Захиалга засвар/шинэ: зөвхөн барааны жагсаалт гүйлгэнэ, доод панел тогтно. */
+  /* Захиалгын форм: app-main гүйлгэнэ (overflow:hidden биш — түгжигдэхээс сэргийлнэ). */
   .app-shell--bottom-nav .app-main:has(.worker-view--ordering) {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .app-shell--bottom-nav .app-main__inner:has(.worker-view--ordering) {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-    height: 100%;
-    max-height: 100%;
-  }
-
-  .app-shell--bottom-nav
-    .app-main__inner:has(.worker-view--ordering)
-    > .worker-view--ordering {
-    flex: 1 1 auto;
+    display: block;
+    height: auto;
     min-height: 0;
   }
 
@@ -10041,26 +10030,24 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
+    display: block;
+    flex: none;
     min-height: 0;
-    height: 100%;
+    height: auto;
     align-items: stretch;
     gap: 0;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-view__tabs {
-    flex-shrink: 0;
     margin-bottom: 8px;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
+    /* Fixed footer-ийн доор бараа нуугдахгүй зай */
+    padding-bottom: calc(210px + env(safe-area-inset-bottom, 0px));
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__head {
@@ -10068,14 +10055,11 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__body {
-    flex: 1 1 auto;
+    flex: none;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
+    overflow: visible;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-summary {
@@ -10092,22 +10076,23 @@ textarea::placeholder {
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-lines-wrap {
-    flex: 0 0 auto;
+    flex: none;
     min-height: 0;
     overflow: visible;
     max-height: none;
-    margin-bottom: 0;
   }
 
+  /* Доод панел навигацийн дээр бэхлэгдэнэ — жагсаалттай хамт гүйлгэхгүй */
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
-    position: relative;
-    flex-shrink: 0;
-    z-index: 12;
-    margin-top: 0;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    margin: 0;
+    padding: 12px var(--app-gutter) 10px;
     background: var(--hex-background);
     box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
-    padding-top: 12px;
-    padding-bottom: 10px;
   }
 
   .worker-selected-row {
