@@ -387,13 +387,11 @@ textarea.text-sm,
   overflow: hidden;
   transition:
     box-shadow 0.2s ease,
-    transform 0.2s ease,
     border-color 0.2s ease;
 }
 
 .catalog-card:hover {
   box-shadow: 0 8px 24px rgba(16, 22, 35, 0.1);
-  transform: translateY(-2px);
 }
 
 .catalog-card__media {
@@ -3967,13 +3965,14 @@ button {
     background 0.15s ease,
     color 0.15s ease,
     opacity 0.15s ease,
-    transform 0.1s ease,
-    filter 0.1s ease;
+    filter 0.1s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .btn:active:not(:disabled) {
-  transform: scale(0.98);
+  filter: brightness(0.94);
 }
 
 .btn:disabled {
@@ -4008,7 +4007,7 @@ button {
 }
 
 .btn.page-action-add:active:not(:disabled) {
-  transform: translateY(1px);
+  filter: brightness(0.92);
 }
 
 .btn--sm {
@@ -4039,7 +4038,7 @@ button {
 
 .btn--primary:active:not(:disabled) {
   background: #0d5f6c !important;
-  transform: scale(0.98);
+  filter: brightness(0.96);
 }
 
 .btn--secondary {
@@ -4091,14 +4090,13 @@ button {
     #fff 12%,
     var(--hex-sidebar-border)
   ) !important;
-  transform: scale(0.98);
+  filter: brightness(0.94);
 }
 
 /* ——— Button press feedback (бүх интерактив товч) ——— */
 #app button.bg-primary.text-primary-foreground:active:not(:disabled),
 #modal button.bg-primary.text-primary-foreground:active:not(:disabled) {
   background: #0d5f6c !important;
-  transform: scale(0.98);
 }
 
 #app button.bg-secondary:active:not(:disabled),
@@ -4108,7 +4106,6 @@ button {
     var(--hex-foreground) 10%,
     var(--hex-secondary)
   ) !important;
-  transform: scale(0.98);
 }
 
 #app button.bg-card:active:not(:disabled),
@@ -4118,16 +4115,13 @@ button {
     var(--hex-foreground) 6%,
     var(--hex-card)
   ) !important;
-  transform: scale(0.98);
 }
 
 button.tone:active:not(:disabled) {
   filter: brightness(0.94);
-  transform: scale(0.98);
 }
 
 .seg-tab:active:not(:disabled) {
-  transform: scale(0.98);
   filter: brightness(0.94);
 }
 
@@ -4137,7 +4131,6 @@ button.tone:active:not(:disabled) {
 }
 
 .catalog-card__btn:active:not(:disabled) {
-  transform: scale(0.97);
   filter: brightness(0.94);
 }
 
@@ -4153,7 +4146,6 @@ button.tone:active:not(:disabled) {
 }
 
 .list-btn:active:not(:disabled) {
-  transform: scale(0.97);
   filter: brightness(0.94);
 }
 
@@ -4175,7 +4167,6 @@ button.tone:active:not(:disabled) {
 }
 
 .picker-cat-chip:active:not(:disabled) {
-  transform: scale(0.97);
   filter: brightness(0.94);
 }
 
@@ -4186,16 +4177,13 @@ button.tone:active:not(:disabled) {
 
 .mobile-bottom-nav__item:active:not(:disabled) {
   background: color-mix(in srgb, var(--hex-primary) 14%, var(--hex-secondary));
-  transform: scale(0.96);
 }
 
 .mobile-menu-button:active:not(:disabled) {
-  transform: scale(0.94);
   filter: brightness(0.9);
 }
 
 .sidebar-nav-btn:active:not(:disabled) {
-  transform: scale(0.98);
   filter: brightness(0.94);
 }
 
@@ -4205,7 +4193,6 @@ button.tone:active:not(:disabled) {
 }
 
 .modal-close:active:not(:disabled) {
-  transform: scale(0.94);
   background: color-mix(
     in srgb,
     var(--hex-foreground) 10%,
@@ -4214,7 +4201,6 @@ button.tone:active:not(:disabled) {
 }
 
 .confirm-card__btn:active:not(:disabled) {
-  transform: scale(0.98);
   filter: brightness(0.94);
 }
 
@@ -4233,12 +4219,10 @@ button.tone:active:not(:disabled) {
 
 .promo-product-row:active:not(:disabled) {
   background: color-mix(in srgb, var(--hex-primary) 10%, var(--hex-secondary));
-  transform: scale(0.99);
 }
 
 .worker-row-qty:active:not(:disabled) {
   background: color-mix(in srgb, var(--hex-primary) 14%, var(--hex-secondary));
-  transform: scale(0.97);
 }
 
 .picker-row__ordered:active:not(:disabled) {
@@ -4247,12 +4231,107 @@ button.tone:active:not(:disabled) {
 
 .worker-order-add-btn:active {
   background: var(--hex-primary-active);
-  transform: scale(0.98);
 }
 
 .qty-stepper__btn:active:not(:disabled) {
   background: var(--hex-primary-soft);
-  transform: scale(0.92);
+}
+
+/* ——— Anti hover-flicker: never move hit-box under the cursor ——— */
+.btn,
+.btn:hover,
+.btn:active,
+.btn:focus,
+.sidebar-nav-btn,
+.sidebar-nav-btn:hover,
+.sidebar-nav-btn:active,
+.mobile-bottom-nav__item,
+.mobile-bottom-nav__item:hover,
+.mobile-bottom-nav__item:active,
+.mobile-menu-button,
+.mobile-menu-button:hover,
+.mobile-menu-button:active,
+.mobile-top-bar__back,
+.mobile-top-bar__back:hover,
+.mobile-top-bar__back:active,
+.seg-tab,
+.seg-tab:hover,
+.seg-tab:active,
+.list-btn,
+.list-btn:hover,
+.list-btn:active,
+.catalog-card__btn,
+.catalog-card__btn:hover,
+.catalog-card__btn:active,
+.picker-cat-chip,
+.picker-cat-chip:hover,
+.picker-cat-chip:active,
+.modal-close,
+.modal-close:hover,
+.modal-close:active,
+.confirm-card__btn,
+.confirm-card__btn:hover,
+.confirm-card__btn:active,
+.confirm-card__close,
+.confirm-card__close:hover,
+.confirm-card__close:active,
+.qty-stepper__btn,
+.qty-stepper__btn:hover,
+.qty-stepper__btn:active,
+.worker-order-add-btn,
+.worker-order-add-btn:hover,
+.worker-order-add-btn:active,
+.worker-row-qty,
+.worker-row-qty:hover,
+.worker-row-qty:active,
+.promo-product-row,
+.promo-product-row:hover,
+.promo-product-row:active,
+.page-head__back,
+.page-head__back:hover,
+.page-head__back:active,
+.btn--toolbar,
+.btn--toolbar:hover,
+.btn--toolbar:active,
+.sidebar-pwa-btn,
+.sidebar-pwa-btn:hover,
+.sidebar-pwa-btn:active,
+.admin-action,
+.admin-action:hover,
+.admin-action:active,
+.catalog-card,
+.catalog-card:hover,
+.admin-metric-card,
+.admin-metric-card:hover,
+.admin-menu__item,
+.admin-menu__item:hover,
+.admin-menu__item:active,
+.delivery-store-card,
+.delivery-store-card:hover,
+.delivery-store-card:active,
+.promo-panel__add,
+.promo-panel__add:hover,
+.promo-panel__add:active,
+.promo-form__save,
+.promo-form__save:hover,
+.promo-form__save:active {
+  transform: none !important;
+}
+
+.btn > *,
+.sidebar-nav-btn > *,
+.mobile-bottom-nav__item > *,
+.seg-tab > *,
+.list-btn > *,
+.catalog-card__btn > *,
+.confirm-card__btn > *,
+.picker-cat-chip > *,
+.page-head__back > *,
+.btn--toolbar > *,
+.sidebar-pwa-btn > *,
+.mobile-menu-button > *,
+.qty-stepper__btn > * {
+  pointer-events: none;
 }
 
 button:focus-visible,
@@ -4534,7 +4613,6 @@ button:focus-visible,
     background 0.15s ease,
     color 0.15s ease,
     box-shadow 0.15s ease,
-    transform 0.1s ease,
     filter 0.1s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -4762,7 +4840,6 @@ button:focus-visible,
 
 .mobile-top-bar__back:active:not(:disabled) {
   background: var(--hex-secondary);
-  transform: scale(0.96);
 }
 
 .mobile-top-bar__user {
@@ -5035,7 +5112,6 @@ button:focus-visible,
 }
 
 .confirm-card__close:active:not(:disabled) {
-  transform: scale(0.96);
   filter: brightness(0.96);
 }
 
@@ -7100,7 +7176,6 @@ textarea::placeholder {
 }
 
 .worker-add-plus:active {
-  transform: scale(0.96);
 }
 
 .worker-add-plus--compact {
@@ -7388,7 +7463,6 @@ textarea::placeholder {
 }
 
 .promo-product-row:active:not(:disabled) {
-  transform: scale(0.99);
 }
 
 .promo-product-row__media {
@@ -9134,7 +9208,7 @@ textarea::placeholder {
 }
 
 .delivery-store-card:active:not(:disabled) {
-  transform: scale(0.985);
+  filter: brightness(0.96);
 }
 
 .worker-store-list {
@@ -12278,10 +12352,6 @@ textarea::placeholder {
   color: var(--hex-primary-foreground);
 }
 
-.delivery-picker-footer__btn:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
 .delivery-picker-footer__btn--primary:active:not(:disabled) {
   background: #0d5f6c;
 }
@@ -13303,7 +13373,6 @@ textarea::placeholder {
 }
 
 .promo-hub-card:active:not(:disabled) {
-  transform: scale(0.98);
   background: color-mix(in srgb, var(--hex-primary) 6%, var(--hex-card));
 }
 
@@ -13501,7 +13570,7 @@ textarea::placeholder {
 }
 
 .promo-panel__add:active:not(:disabled) {
-  transform: scale(0.985);
+  filter: brightness(0.94);
 }
 
 .promo-panel__add .ui-icon {
@@ -13613,7 +13682,7 @@ textarea::placeholder {
 }
 
 .promo-form__save:active:not(:disabled) {
-  transform: scale(0.985);
+  filter: brightness(0.94);
 }
 
 .promo-form-group {
@@ -13779,7 +13848,6 @@ textarea::placeholder {
 }
 
 .admin-hub-card:active:not(:disabled) {
-  transform: scale(0.98);
   background: color-mix(in srgb, var(--hex-primary) 6%, var(--hex-card));
 }
 
@@ -13848,7 +13916,6 @@ textarea::placeholder {
 }
 
 .admin-metric-card:hover {
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--hex-primary) 40%, var(--hex-border));
   box-shadow: 0 6px 16px color-mix(in srgb, var(--hex-primary) 12%, transparent);
 }
@@ -13952,7 +14019,6 @@ textarea::placeholder {
 
 .admin-menu__item:active:not(:disabled) {
   background: color-mix(in srgb, var(--hex-primary) 12%, var(--hex-secondary));
-  transform: scale(0.995);
 }
 
 .line-panel {
@@ -14157,7 +14223,6 @@ textarea::placeholder {
 }
 
 .worker-order-row__cancel:active {
-  transform: scale(0.98);
 }
 
 .worker-orders-filters {
