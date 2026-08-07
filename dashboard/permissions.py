@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
+
+BUSINESS_TZ_NAME = "Asia/Ulaanbaatar"
 
 PERM_ACTIONS: list[dict[str, str]] = [
     {"id": "view", "label": "Харах"},
@@ -347,10 +354,24 @@ def _deletion_log_has(state: dict[str, Any], type_id: str, item_id: str) -> bool
 
 
 def _iso_day(value: Any) -> str:
-    raw = str(value or "")
-    if len(raw) >= 10:
-        return raw[:10]
-    return ""
+    """Calendar day in Asia/Ulaanbaatar — never raw UTC [:10] from timestamps."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if len(raw) == 10 and raw[4] == "-" and raw[7] == "-":
+        return raw
+    try:
+        text = raw.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(text)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if ZoneInfo is not None:
+            return dt.astimezone(ZoneInfo(BUSINESS_TZ_NAME)).date().isoformat()
+        return dt.astimezone(timezone.utc).date().isoformat()
+    except (TypeError, ValueError):
+        if len(raw) >= 10 and raw[4] == "-" and raw[7] == "-":
+            return raw[:10]
+        return ""
 
 
 def _order_retention_days(state: dict[str, Any] | None = None) -> int:
@@ -367,7 +388,7 @@ def _order_within_retention(
     now: datetime | None = None,
     retention_days: int | None = None,
 ) -> bool:
-    day = _iso_day(order.get("createdAt") or order.get("deliveryDate"))
+    day = _iso_day(order.get("takenDay") or order.get("createdAt") or "")
     if not day:
         return True
     try:

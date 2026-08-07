@@ -86,6 +86,12 @@ const state = {
   stockInHighlightId: "",
   customerHighlightId: "",
   stockOutEmployeeId: "",
+  stockOutDraft: {},
+  stockOutDone: false,
+  stockOutReceipt: null,
+  stockOutSessionStartedAt: null,
+  stockOutReceipts: [],
+  stockOutHighlightId: "",
   settings: {
     stockAlertEnabled: true,
     stockAlertMin: 10,
@@ -250,6 +256,7 @@ const persistKeys = [
   "extraCategories",
   "inventoryLogs",
   "stockInReceipts",
+  "stockOutReceipts",
   "deletionLog",
   "promotionDeletionLog",
   "countQty",
@@ -299,6 +306,7 @@ let searchRenderTimer = null;
 let promotionSaveLock = false;
 let orderSubmitLock = false;
 let stockInSaveLock = false;
+let stockOutSaveLock = false;
 let customerSaveLock = false;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
@@ -1111,20 +1119,58 @@ const dte = (d) => {
     const day = Number(dateOnly[3]);
     return new Date(y, m - 1, day).toLocaleDateString("mn-MN");
   }
-  const x = new Date(d);
-  if (Number.isNaN(x.getTime())) return "";
-  return x.toLocaleDateString("mn-MN");
+  const day = isoDay(d);
+  if (!day) return "";
+  const [y, m, dnum] = day.split("-").map(Number);
+  return new Date(y, m - 1, dnum).toLocaleDateString("mn-MN");
 };
 const dteAt = (d) => {
   const x = new Date(d);
   if (Number.isNaN(x.getTime())) return "-";
-  const hh = String(x.getHours()).padStart(2, "0");
-  const mm = String(x.getMinutes()).padStart(2, "0");
-  return `${dte(d)} ${hh}:${mm}`;
+  const day = isoDay(d) || "";
+  let dateLabel = "";
+  if (day) {
+    const [y, m, dnum] = day.split("-").map(Number);
+    dateLabel = new Date(y, m - 1, dnum).toLocaleDateString("mn-MN");
+  } else {
+    dateLabel = x.toLocaleDateString("mn-MN");
+  }
+  try {
+    const hm = new Intl.DateTimeFormat("en-GB", {
+      timeZone: BUSINESS_TZ,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(x);
+    return `${dateLabel} ${hm}`;
+  } catch {
+    const hh = String(x.getHours()).padStart(2, "0");
+    const mm = String(x.getMinutes()).padStart(2, "0");
+    return `${dateLabel} ${hh}:${mm}`;
+  }
 };
+/** Business calendar — always Asia/Ulaanbaatar (not device TZ, not UTC date slice). */
+const BUSINESS_TZ = "Asia/Ulaanbaatar";
+function isoDayFromDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: BUSINESS_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
+  } catch {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+}
 const isoDay = (d) => {
   const text = String(d ?? "").trim();
   if (!text) return "";
+  // Pure calendar date — keep as written (already a business day).
   const dateOnly = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dateOnly) {
     const y = Number(dateOnly[1]);
@@ -1140,12 +1186,9 @@ const isoDay = (d) => {
     }
     return "";
   }
-  const x = new Date(d);
+  const x = new Date(text);
   if (Number.isNaN(x.getTime())) return "";
-  const y = x.getFullYear();
-  const m = String(x.getMonth() + 1).padStart(2, "0");
-  const day = String(x.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return isoDayFromDate(x);
 };
 function normalizeIsoDateInput(value) {
   const text = String(value || "").trim();
@@ -1167,12 +1210,18 @@ function normalizeIsoDateInput(value) {
   }
   return isoDay(text);
 }
-const todayIso = () => isoDay(new Date());
+const todayIso = () => isoDayFromDate(new Date());
 const isDayBeforeToday = (day) => !!(day && day < todayIso());
 const tomorrowIso = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return isoDay(d);
+  const today = todayIso();
+  const parts = String(today).split("-").map(Number);
+  const y = parts[0],
+    m = parts[1],
+    d = parts[2];
+  if (!y || !m || !d) return "";
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  return isoDayFromDate(dt);
 };
 function defaultDeliveryDate(from) {
   const day = isoDay(from) || todayIso();
@@ -1207,9 +1256,9 @@ function orderInWarehouseLiveSession(o) {
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
   const targetDay = normalizeIsoDateInput(day) || todayIso();
-  // Нярав / Баримтууд жагсаалт = авсан өдөр. Баримт дээрх хүргэлт тусдаа (+1 хоног).
-  const created = isoDay(o?.createdAt);
-  return !!created && created === targetDay;
+  // Нярав / Баримтууд жагсаалт = авсан өдөр. Хүргэлтийн өдрөөр бүү шүү.
+  const taken = orderTakenDay(o);
+  return !!taken && taken === targetDay;
 }
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
@@ -1231,7 +1280,7 @@ const esc = (s = "") =>
       })[c],
   );
 function receiptMonthKey(o) {
-  const day = isoDay(o?.createdAt || o?.deliveryDate || "");
+  const day = orderTakenDay(o) || isoDay(o?.createdAt) || "";
   return day ? day.slice(0, 7) : "";
 }
 function orderReceiptNum(o) {
@@ -1242,7 +1291,7 @@ function orderReceiptNum(o) {
 }
 function formatReceiptNumber(o) {
   // ҮНДСЭН sample: №260817 (YY + MM + 2-digit seq) — no dashes.
-  const day = isoDay(o?.createdAt || o?.deliveryDate || "");
+  const day = orderTakenDay(o) || isoDay(o?.createdAt) || "";
   const seq = Number(o?.receiptSeq);
   if (day) {
     const [y, m, d] = day.split("-");
@@ -1329,17 +1378,21 @@ function orderAmount(o) {
   recalcOrderTotals(o);
   return Number(o.total) || 0;
 }
+/** Авсан өдөр — хэзээ ч хүргэлтийн өдрөөр бүү соли. */
+function orderTakenDay(o) {
+  const locked = normalizeIsoDateInput(o?.takenDay);
+  if (locked) return locked;
+  return isoDay(o?.createdAt) || "";
+}
 function orderCreatedDay(o) {
-  const created = isoDay(o?.createdAt);
-  if (created) return created;
-  return orderDeliveryDay(o);
+  return orderTakenDay(o);
 }
 function orderMatchesWorkerDate(o, day = state.filters.workerDate) {
   const targetDay = normalizeIsoDateInput(day) || "";
   if (!targetDay) return true;
   // Өнөөдөр / сонгосон өдөр = зөвхөн тухайн өдөр авсан захиалга (хүргэлтийн өдөр биш).
-  const created = isoDay(o?.createdAt);
-  return !!created && created === targetDay;
+  const taken = orderTakenDay(o);
+  return !!taken && taken === targetDay;
 }
 function orderRetentionDays() {
   ensureSettings();
@@ -1584,7 +1637,7 @@ function normalizeOrderPayments() {
 function normalizeOrderDeliveryDates() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
-    const created = isoDay(o.createdAt);
+    const created = orderTakenDay(o) || isoDay(o.createdAt);
     const stored = isoDay(o.deliveryDate);
     if (!stored) {
       o.deliveryDate = defaultDeliveryDate(created) || tomorrowIso();
@@ -1594,6 +1647,18 @@ function normalizeOrderDeliveryDates() {
     if (created && stored === created) {
       o.deliveryDate = defaultDeliveryDate(created);
     }
+  }
+}
+function normalizeOrderTakenDays() {
+  if (!Array.isArray(state.orders)) return;
+  for (const o of state.orders) {
+    const locked = normalizeIsoDateInput(o.takenDay);
+    if (locked) {
+      o.takenDay = locked;
+      continue;
+    }
+    const fromCreated = isoDay(o.createdAt);
+    if (fromCreated) o.takenDay = fromCreated;
   }
 }
 function normalizeOrderTotals() {
@@ -1669,8 +1734,12 @@ function nextOrderId() {
 }
 function buildNewOrder(fields) {
   const createdAt = fields.createdAt || new Date().toISOString();
-  const receiptMonth = receiptMonthKey({ createdAt });
-  const created = isoDay(createdAt);
+  const takenDay =
+    normalizeIsoDateInput(fields.takenDay) ||
+    isoDay(createdAt) ||
+    todayIso();
+  const receiptMonth = receiptMonthKey({ createdAt, takenDay });
+  const created = takenDay;
   const stored = isoDay(fields.deliveryDate);
   const deliveryDate =
     stored && !(created && stored === created)
@@ -1680,8 +1749,9 @@ function buildNewOrder(fields) {
     id: nextOrderId(),
     receiptMonth,
     receiptSeq: nextReceiptSeq(receiptMonth),
-    createdAt,
     ...fields,
+    createdAt,
+    takenDay,
     deliveryDate,
   };
 }
@@ -4498,6 +4568,13 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       merged.stockInReceipts = mergeArrayById(
         remote.stockInReceipts,
         local.stockInReceipts,
+      );
+      continue;
+    }
+    if (key === "stockOutReceipts") {
+      merged.stockOutReceipts = mergeArrayById(
+        remote.stockOutReceipts,
+        local.stockOutReceipts,
         { preferRemote: true },
       );
       continue;
@@ -4596,6 +4673,9 @@ function applyPersistentState(data) {
   if (!state.workerQtyParts || typeof state.workerQtyParts !== "object")
     state.workerQtyParts = {};
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
+  if (!Array.isArray(state.stockOutReceipts)) state.stockOutReceipts = [];
+  if (!state.stockOutDraft || typeof state.stockOutDraft !== "object")
+    state.stockOutDraft = {};
   state.deletionLog = normalizeDeletionLog(state.deletionLog);
   state.promotionDeletionLog = normalizePromotionDeletionLog(
     state.promotionDeletionLog,
@@ -4606,6 +4686,7 @@ function applyPersistentState(data) {
   syncCurrentEmployeeFromState();
   ensureDeliverySelection();
   state.orders = retainedOrders(state.orders);
+  normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
@@ -4631,8 +4712,9 @@ function shouldDeferBackendSync() {
   ) {
     return true;
   }
-  if (stockInSaveLock) return true;
+  if (stockInSaveLock || stockOutSaveLock) return true;
   if (stockInSessionActive() && stockInHasEntries()) return true;
+  if (stockOutSessionActive() && stockOutHasEntries()) return true;
   return false;
 }
 function isUserScrolling() {
@@ -5007,6 +5089,7 @@ function applyRemoteState(payload, opts = {}) {
   restoreSessionSnapshot(session);
   ensureEmployeeEmails();
   ensureEmployeePercentDiscount();
+  normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
@@ -5062,7 +5145,7 @@ async function pullBackendStateNow(opts = {}) {
   }
 }
 async function pollBackendState() {
-  if (!backendReady || backendSaving || backendSaveTimer || importLoading || stockInSaveLock)
+  if (!backendReady || backendSaving || backendSaveTimer || importLoading || stockInSaveLock || stockOutSaveLock)
     return;
   try {
     const payload = await fetchBackendPayload();
@@ -5108,6 +5191,7 @@ function completeBootUiInit(options = {}) {
   ensureSettings();
   ensureEmployeePercentDiscount();
   ensureDeliverySelection();
+  normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
@@ -7175,7 +7259,7 @@ function buildOrderReceiptExcelRows(o) {
     rows = [
       ["ТОМУДА групп ХХК"],
       ["ЗАРЛАГЫН БАРИМТ", `№${formatReceiptNumber(o)}`],
-      ["Захиалгын огноо", dte(o.createdAt)],
+      ["Захиалгын огноо", dte(orderTakenDay(o))],
       [],
       ["Худалдааны төлөөлөгч", o.employeeName || sales.name || "-"],
       ["Төлөөлөгчийн утас", o.employeePhone || sales.phone || "-"],
@@ -9388,7 +9472,7 @@ function ensureReceiptScreenStyles() {
 `;
 }
 function orderRow(o) {
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(o.createdAt)}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(orderTakenDay(o))}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
 }
 function customerAvatarHtml(c, className = "customer-card__avatar") {
   const src = entityImageSrc(c?.image);
@@ -10754,6 +10838,7 @@ function stockInEmployees() {
   return inventoryEmployees();
 }
 function ensureStockInSession() {
+  if (state.stockInDone && state.stockInReceipt) return;
   if (!state.stockInSessionStartedAt) {
     state.stockInSessionStartedAt = new Date().toISOString();
     state.stockInDone = false;
@@ -10768,6 +10853,12 @@ function ensureStockInSession() {
   }
 }
 function ensureStockOutSession() {
+  if (state.stockOutDone && state.stockOutReceipt) return;
+  if (!state.stockOutSessionStartedAt) {
+    state.stockOutSessionStartedAt = new Date().toISOString();
+    state.stockOutDone = false;
+    state.stockOutReceipt = null;
+  }
   if (!state.stockOutEmployeeId) {
     state.stockOutEmployeeId = defaultInventoryEmployeeId();
   } else {
@@ -10778,6 +10869,9 @@ function ensureStockOutSession() {
 }
 function stockInSessionActive() {
   return !!state.stockInSessionStartedAt && !state.stockInDone;
+}
+function stockOutSessionActive() {
+  return !!state.stockOutSessionStartedAt && !state.stockOutDone;
 }
 function stockInDraftEntry(id) {
   if (!state.stockInDraft[id]) state.stockInDraft[id] = {};
@@ -10882,6 +10976,249 @@ function stockInEmployeeName() {
 }
 function stockOutEmployeeName() {
   return inventoryEmployeeName(state.stockOutEmployeeId);
+}
+function stockOutDraftEntry(id) {
+  if (!state.stockOutDraft[id]) state.stockOutDraft[id] = {};
+  return state.stockOutDraft[id];
+}
+function stockOutLineQty(p) {
+  const d = state.stockOutDraft[p.id] || {};
+  const packSize = productPackSize(p);
+  const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+  const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
+  if (packSize) return packs * packSize + pieces;
+  return pieces;
+}
+function stockOutHasEntries() {
+  return state.products.some((p) => stockOutLineQty(p) > 0);
+}
+function stockOutCanFinish() {
+  if (stockOutSaveLock) return false;
+  if (!state.stockOutEmployeeId) return false;
+  return stockOutHasEntries();
+}
+function stockOutEntryProducts(list) {
+  return list.filter((p) => stockOutLineQty(p) > 0);
+}
+function startStockOutSession() {
+  state.stockOutDraft = {};
+  state.stockOutDone = false;
+  state.stockOutReceipt = null;
+  state.stockOutSessionStartedAt = new Date().toISOString();
+  state.stockOutHighlightId = "";
+  if (!state.stockOutEmployeeId) {
+    state.stockOutEmployeeId = defaultInventoryEmployeeId();
+  }
+}
+function resetStockOutSession() {
+  startStockOutSession();
+  render();
+}
+function stockOutReceiptMonthKey(at) {
+  const day = isoDay(at || new Date().toISOString());
+  return day ? day.slice(0, 7) : todayIso().slice(0, 7);
+}
+function usedStockOutReceiptSeqs(monthKey) {
+  const used = new Set();
+  for (const receipt of state.stockOutReceipts || []) {
+    if (stockOutReceiptMonthKey(receipt.createdAt) !== monthKey) continue;
+    const seq =
+      Number(receipt.receiptSeq) ||
+      stockInReceiptSeqFromNumber(receipt.receiptNumber, monthKey);
+    if (seq > 0) used.add(seq);
+  }
+  return used;
+}
+function nextStockOutReceiptNumber(createdAt) {
+  const monthKey = stockOutReceiptMonthKey(createdAt);
+  const used = usedStockOutReceiptSeqs(monthKey);
+  let seq = 1;
+  while (used.has(seq)) seq += 1;
+  return {
+    monthKey,
+    receiptSeq: seq,
+    receiptNumber: formatStockInReceiptNumber(monthKey, seq),
+  };
+}
+function finalizeStockOutReceipt(receipt) {
+  if (receipt.receiptNumber) return receipt;
+  return { ...receipt, ...nextStockOutReceiptNumber(receipt.createdAt) };
+}
+function stockOutReceiptFileName(receipt) {
+  const no = receipt?.receiptNumber;
+  return no ? `zarlaga-${no}.xlsx` : `zarlaga-${todayIso()}.xlsx`;
+}
+function stockOutReceiptTitle(receipt) {
+  const no = receipt?.receiptNumber;
+  return no ? `Зарлага гаргах баримт №${no}` : "Зарлага гаргах баримт";
+}
+function buildStockOutReceiptSnapshot(productIds = null) {
+  let products = stockOutEntryProducts(state.products);
+  if (productIds?.length) {
+    const idSet = new Set(productIds.map(String));
+    products = products.filter((p) => idSet.has(String(p.id)));
+  }
+  const lines = products.map((p) => {
+    const d = state.stockOutDraft[p.id] || {};
+    const qty = stockOutLineQty(p);
+    const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+    const unitPrice = productSalesPrice(p) || productCostPrice(p) || 0;
+    return {
+      productId: p.id,
+      productName: p.name,
+      category: p.category || "",
+      barcode: p.barcode || "",
+      packs,
+      quantity: qty,
+      unitPrice,
+      totalPrice: qty * unitPrice,
+    };
+  });
+  return {
+    id: String(Date.now()),
+    createdAt: new Date().toISOString(),
+    employeeId: state.stockOutEmployeeId,
+    employeeName: stockOutEmployeeName(),
+    lines,
+    totalAmount: lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0),
+  };
+}
+function applyStockOutReceipt(receipt) {
+  if (!Array.isArray(state.stockOutReceipts)) state.stockOutReceipts = [];
+  const saved = finalizeStockOutReceipt(receipt);
+  if (state.stockOutReceipts.some((r) => r.id === saved.id)) return saved;
+  for (const line of saved.lines) {
+    const p = state.products.find((x) => x.id === line.productId);
+    if (!p) continue;
+    const qty = Number(line.quantity) || 0;
+    if (qty <= 0) continue;
+    const stockNow = Number(p.stock) || 0;
+    if (qty > stockNow) {
+      throw new Error(
+        `${p.name}: үлдэгдэл хүрэлцэхгүй (${stockNow} / ${qty})`,
+      );
+    }
+  }
+  state.stockOutReceipts.push({
+    id: saved.id,
+    receiptNumber: saved.receiptNumber,
+    receiptSeq: saved.receiptSeq,
+    monthKey: saved.monthKey,
+    createdAt: saved.createdAt,
+    employeeId: saved.employeeId,
+    employeeName: saved.employeeName,
+    lines: saved.lines,
+    totalAmount: saved.totalAmount,
+  });
+  for (const line of saved.lines) {
+    const qty = Number(line.quantity) || 0;
+    if (qty <= 0) continue;
+    stock(line.productId, qty, "out");
+    state.inventoryLogs.push({
+      id: nextInventoryLogId(),
+      productId: line.productId,
+      productName: line.productName,
+      type: "out",
+      quantity: qty,
+      packs: line.packs,
+      date: saved.createdAt,
+      employeeName: saved.employeeName,
+      receiptId: saved.id,
+      receiptNumber: saved.receiptNumber,
+    });
+  }
+  return saved;
+}
+function confirmFinishStockOut() {
+  ensureStockOutSession();
+  if (!canManageStockOut()) {
+    return alertModal("Эрхгүй", "Зарлага бүртгэх эрхгүй.");
+  }
+  if (!stockOutCanFinish()) {
+    if (!state.stockOutEmployeeId) return alert("Ажилтан сонгоно уу");
+    return alert("Зарлага оруулна уу");
+  }
+  const receipt = buildStockOutReceiptSnapshot();
+  if (!receipt?.lines?.length) return;
+  for (const line of receipt.lines) {
+    const p = state.products.find((x) => x.id === line.productId);
+    const stockNow = Number(p?.stock) || 0;
+    if ((Number(line.quantity) || 0) > stockNow) {
+      return alert(
+        `${p?.name || "Бараа"}: үлдэгдэл хүрэлцэхгүй байна! (${stockNow})`,
+      );
+    }
+  }
+  const summary = `<p>Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Тийм дарвал Excel татагдаж, зарлагын баримт харагдана. Үгүй дарвал зөвхөн зарлага хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(receipt.employeeName)}</b> · ${receipt.lines.length} бараа · ${receipt.lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)} ш</p>`;
+  confirmModal("Зарлагын баримт", summary, {
+    confirmLabel: "Тийм",
+    cancelLabel: "Үгүй",
+    onConfirm: () =>
+      void finishStockOutReceipt(receipt, {
+        downloadExcel: true,
+        showReceipt: true,
+      }),
+    onCancel: () =>
+      void finishStockOutReceipt(receipt, {
+        downloadExcel: false,
+        showReceipt: false,
+      }),
+  });
+}
+async function finishStockOutReceipt(
+  receipt,
+  { downloadExcel = false, showReceipt = false } = {},
+) {
+  if (!receipt?.lines?.length || stockOutSaveLock) return;
+  stockOutSaveLock = true;
+  try {
+    let saved;
+    try {
+      saved = applyStockOutReceipt(receipt);
+    } catch (err) {
+      alert(err?.message || "Зарлага хадгалж чадсангүй");
+      return;
+    }
+    if (showReceipt) {
+      state.stockOutDraft = {};
+      state.stockOutHighlightId = "";
+      state.stockOutDone = true;
+      state.stockOutReceipt = saved;
+      state.stockOutSessionStartedAt = null;
+    } else {
+      startStockOutSession();
+    }
+    render();
+    const ok = await criticalBackendSave();
+    if (!ok) {
+      const msg =
+        backendSaveFailedMessage ||
+        "Зарлага түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
+      showAppToast(msg, "error");
+      alertModal("Хадгалах амжилтгүй", esc(msg));
+      return;
+    }
+    showAppToast("Зарлага хадгалагдлаа", "success");
+    if (downloadExcel) exportStockOutExcel(saved);
+  } finally {
+    stockOutSaveLock = false;
+  }
+}
+function confirmNewStockOut() {
+  const hasData = stockOutHasEntries() || (state.stockOutDone && state.stockOutReceipt);
+  if (!hasData) {
+    resetStockOutSession();
+    return;
+  }
+  confirmModal(
+    "Шинэ зарлага",
+    "Одоогийн зарлагыг цэвэрлээд шинээр эхлүүлэх үү?",
+    {
+      confirmLabel: "Шинээр эхлүүлэх",
+      danger: true,
+      onConfirm: resetStockOutSession,
+    },
+  );
 }
 function stockInProductsGrouped(products) {
   const sorted = [...products].sort((a, b) => {
@@ -11039,19 +11376,25 @@ function confirmFinishStockIn() {
   const receipt = buildStockInReceiptSnapshot();
   if (!receipt?.lines?.length) return;
   const normalized = normalizeStockInReceiptTotals(receipt);
-  const summary = `<p>Хадгалах үед мэдээлэл татагдана.</p><p class="text-sm text-muted-foreground mt-2">Мэдээлэл татахгүй бол «Үгүй» дарна уу. Аль ч тохиолдолд орлого хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
+  const summary = `<p>Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Тийм дарвал Excel татагдаж, орлогын баримт харагдана. Үгүй дарвал зөвхөн орлого хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
   confirmModal("Орлогын баримт", summary, {
-    confirmLabel: "Хадгалах",
+    confirmLabel: "Тийм",
     cancelLabel: "Үгүй",
     onConfirm: () =>
-      void finishStockInReceipt(receipt, { downloadExcel: true }),
+      void finishStockInReceipt(receipt, {
+        downloadExcel: true,
+        showReceipt: true,
+      }),
     onCancel: () =>
-      void finishStockInReceipt(receipt, { downloadExcel: false }),
+      void finishStockInReceipt(receipt, {
+        downloadExcel: false,
+        showReceipt: false,
+      }),
   });
 }
 async function finishStockInReceipt(
   receipt,
-  { downloadExcel = false, clearDraftOnly = null } = {},
+  { downloadExcel = false, clearDraftOnly = null, showReceipt = false } = {},
 ) {
   if (!receipt?.lines?.length || stockInSaveLock) return;
   stockInSaveLock = true;
@@ -11062,6 +11405,12 @@ async function finishStockInReceipt(
       state.stockInDone = false;
       state.stockInReceipt = null;
       if (!stockInHasEntries()) state.stockInHighlightId = "";
+    } else if (showReceipt) {
+      state.stockInDraft = {};
+      state.stockInHighlightId = "";
+      state.stockInDone = true;
+      state.stockInReceipt = saved;
+      state.stockInSessionStartedAt = null;
     } else {
       startStockInSession();
     }
@@ -11082,7 +11431,8 @@ async function finishStockInReceipt(
   }
 }
 function confirmNewStockIn() {
-  const hasData = stockInHasEntries();
+  const hasData =
+    stockInHasEntries() || (state.stockInDone && state.stockInReceipt);
   if (!hasData) {
     resetStockInSession();
     return;
@@ -11248,7 +11598,7 @@ function stockInEntryModal(id) {
   const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
   box(
     "Орлого оруулах",
-    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--primary">Дуусгах</button></div></form>`,
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--primary">Нэмэх</button></div></form>`,
     "max-w-md",
   );
 }
@@ -11295,13 +11645,9 @@ function applyStockInEntryModal(e, id) {
   }
   state.stockInDone = false;
   state.stockInReceipt = null;
-  const receipt = buildStockInReceiptSnapshot([id]);
   closeModal();
-  if (!receipt?.lines?.length) {
-    render();
-    return;
-  }
-  void finishStockInReceipt(receipt, { downloadExcel: false, clearDraftOnly: [id] });
+  render();
+  showAppToast(`${p.name} · ${qty} ш нэмэгдлээ`, "success");
 }
 function stockInReceiptRow(line) {
   const unitPrice = stockInReceiptLineUnitPrice(line);
@@ -11315,15 +11661,20 @@ function stockInTableHead(mode = "entry") {
   return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Багцийн тоо</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
 }
 function stockInEntryList(list) {
-  const groups = stockInProductsGrouped(list);
-  const rows = groups
-    .map((item) =>
-      item.type === "cat"
-        ? `<div class="stock-in-entry-cat">${esc(item.name)}</div>`
-        : stockInEntryRow(item.product),
-    )
-    .join("");
-  return `<div class="bg-card rounded overflow-hidden inventory-stock-panel"><div class="divide-y divide-border">${rows || `<div class="p-8 text-center text-sm text-muted-foreground">Бараа олдсонгүй</div>`}</div></div>`;
+  const filled = list.filter((p) => stockInLineQty(p) > 0);
+  const others = list.filter((p) => stockInLineQty(p) <= 0);
+  const section = (title, products, emptyText) => {
+    const groups = stockInProductsGrouped(products);
+    const rows = groups
+      .map((item) =>
+        item.type === "cat"
+          ? `<div class="stock-in-entry-cat">${esc(item.name)}</div>`
+          : stockInEntryRow(item.product),
+      )
+      .join("");
+    return `<div class="stock-in-entry-section"><div class="stock-in-entry-section__title">${esc(title)}${products.length ? ` · ${products.length}` : ""}</div><div class="divide-y divide-border">${rows || `<div class="p-6 text-center text-sm text-muted-foreground">${esc(emptyText)}</div>`}</div></div>`;
+  };
+  return `<div class="space-y-3">${section("Орлого авсан бараанууд", filled, "Сонгосон бараа байхгүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -11369,12 +11720,19 @@ function stockInReceiptPanel(receipt) {
 }
 function stockInPanel(list) {
   ensureStockInSession();
+  if (state.stockInDone && state.stockInReceipt) {
+    return `<div class="space-y-4 stock-in-view">${stockInReceiptPanel(state.stockInReceipt)}<button type="button" onclick="confirmNewStockIn()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ орлого</button></div>`;
+  }
   const canFinish = stockInCanFinish();
   return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
 function stockOutPanel(list) {
   ensureStockOutSession();
-  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${stockActionList(list, "out")}</div>`;
+  if (state.stockOutDone && state.stockOutReceipt) {
+    return `<div class="space-y-4 stock-out-view">${stockOutReceiptPanel(state.stockOutReceipt)}<button type="button" onclick="confirmNewStockOut()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ зарлага</button></div>`;
+  }
+  const canFinish = stockOutCanFinish();
+  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${stockOutEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockOut()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockOut()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
 }
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
@@ -11384,13 +11742,22 @@ function exportStockInExcel(receipt) {
   );
 }
 function confirmStockInExcel() {
+  if (state.stockInDone && state.stockInReceipt) {
+    return exportStockInExcel(state.stockInReceipt);
+  }
   return alert("Эхлээд орлогоо дуусгана уу");
+}
+function confirmStockOutExcel() {
+  if (state.stockOutDone && state.stockOutReceipt) {
+    return exportStockOutExcel(state.stockOutReceipt);
+  }
+  return alert("Эхлээд зарлагаа дуусгана уу");
 }
 function exportStockInExcelFallback(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   const receivedDateValue = warehouseSheetDateValue(
     receipt.createdAt
-      ? new Date(receipt.createdAt).toISOString().slice(0, 10)
+      ? isoDay(receipt.createdAt) || todayIso()
       : todayIso(),
   );
   const printedDateValue = warehouseSheetDateValue(todayIso());
@@ -11456,43 +11823,168 @@ function stockActionRow(p, tab) {
       : `inventoryStockModal('${esc(p.id)}','${tab}')`;
   return `<button type="button" onclick="${openModal}" class="inventory-stock-row"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="product-card__img inventory-stock-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></span></div></button>`;
 }
+function stockOutEntryRow(p) {
+  const qty = stockOutLineQty(p);
+  const hasEntry = qty > 0;
+  const stockNow = Number(p.stock) || 0;
+  const displayStock = Math.max(0, stockNow - (hasEntry ? qty : 0));
+  const entryMeta = hasEntry
+    ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">−${qty} ${esc(p.unit || "ш")}</span></span>`
+    : `<span class="stock-in-entry-row__hint">Тоо ширхэг оруулах</span>`;
+  return `<button type="button" onclick="stockOutModal('${esc(p.id)}')" data-stock-out-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockOutHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (−${qty} хүлээгдэж байна)</span>` : ""}</span></div>${entryMeta}</button>`;
+}
+function stockOutEntryList(list) {
+  const filled = list.filter((p) => stockOutLineQty(p) > 0);
+  const others = list.filter((p) => stockOutLineQty(p) <= 0);
+  const section = (title, products, emptyText) => {
+    const groups = stockInProductsGrouped(products);
+    const rows = groups
+      .map((item) =>
+        item.type === "cat"
+          ? `<div class="stock-in-entry-cat">${esc(item.name)}</div>`
+          : stockOutEntryRow(item.product),
+      )
+      .join("");
+    return `<div class="stock-in-entry-section"><div class="stock-in-entry-section__title">${esc(title)}${products.length ? ` · ${products.length}` : ""}</div><div class="divide-y divide-border">${rows || `<div class="p-6 text-center text-sm text-muted-foreground">${esc(emptyText)}</div>`}</div></div>`;
+  };
+  return `<div class="space-y-3">${section("Зарлага гарсан бараанууд", filled, "Сонгосон бараа байхгүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
+}
+function stockOutReceiptRow(line) {
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice || 0)}</span></div>`;
+}
+function stockOutReceiptPanel(receipt) {
+  const groups = stockInReceiptGroupedLines(receipt.lines || []);
+  const rows = groups
+    .map((item) => {
+      if (item.type === "cat") {
+        return `<div class="stock-in-table__cat">${esc(item.name)}</div>`;
+      }
+      if (item.type === "catTotal") {
+        return stockInCategoryTotalRow(item.name, item.amount);
+      }
+      return stockOutReceiptRow(item.line);
+    })
+    .join("");
+  const date = stockInReceiptDateParts(receipt.createdAt);
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount || 0)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockOutExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+}
 function stockOutModal(id) {
   ensureStockOutSession();
+  if (!canManageStockOut()) {
+    return alertModal("Эрхгүй", "Зарлага бүртгэх эрхгүй.");
+  }
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
+  const d = state.stockOutDraft[p.id] || {};
+  const qtyFields = stockInPackQtyFieldsHtml(p, d);
   box(
     "Зарлага гаргах",
-    `<form onsubmit="applyStockOutModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${Number(p.stock) || 0} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо ширхэг</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required autofocus class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--danger">Зарлага</button></div></form>`,
+    `<form onsubmit="applyStockOutModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${Number(p.stock) || 0} ${esc(p.unit || "ш")}</b></p></div></div>${qtyFields}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--danger">Нэмэх</button></div></form>`,
     "max-w-md",
   );
 }
 function applyStockOutModal(e, id) {
   e.preventDefault();
   ensureStockOutSession();
+  if (!canManageStockOut()) {
+    return alertModal("Эрхгүй", "Зарлага бүртгэх эрхгүй.");
+  }
   if (!state.stockOutEmployeeId) return alert("Ажилтан сонгоно уу");
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  const q = Number(new FormData(e.target).get("quantity") || 0);
-  if (!Number.isFinite(q) || q < 1) {
-    alert("Тоо оруулна уу");
+  const formData = new FormData(e.target);
+  const packSize = productPackSize(p);
+  const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
+  const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
+  const qty = packSize ? packs * packSize + pieces : pieces;
+  if (qty <= 0) {
+    delete state.stockOutDraft[id];
+    state.stockOutDone = false;
+    state.stockOutReceipt = null;
+    closeModal();
+    render();
     return;
   }
   const stockNow = Number(p.stock) || 0;
-  if (q > stockNow) {
+  if (qty > stockNow) {
     alert("Үлдэгдэл хүрэлцэхгүй байна!");
     return;
   }
-  const afterStock = stockNow - q;
-  confirmModal(
-    "Зарлага гаргах",
-    `<p><b>${esc(p.name)}</b>-аас <b>${q}</b> ${esc(p.unit || "ш")} зарлага гаргах уu?</p><p class="text-sm text-muted-foreground mt-2">Үлдэгдэл: ${stockNow} ${esc(p.unit || "ш")} → ${afterStock} ${esc(p.unit || "ш")}</p>`,
-    {
-      confirmLabel: "Зарлага",
-      danger: true,
-      onConfirm: () => {
-        if (applyStock(id, "out", q)) closeModal();
-      },
-    },
+  const entry = stockOutDraftEntry(id);
+  if (packSize) {
+    if (packs > 0) entry.packs = String(packs);
+    else delete entry.packs;
+    if (pieces > 0) entry.qty = String(pieces);
+    else delete entry.qty;
+  } else {
+    entry.qty = String(pieces);
+    delete entry.packs;
+  }
+  state.stockOutDone = false;
+  state.stockOutReceipt = null;
+  state.stockOutHighlightId = id;
+  closeModal();
+  render();
+  showAppToast(`${p.name} · −${qty} ш нэмэгдлээ`, "success");
+}
+function exportStockOutExcel(receipt) {
+  if (!receipt?.lines?.length) return alert("Зарлагын баримт байхгүй");
+  exportStockOutExcelXlsx(receipt).catch(() =>
+    exportStockOutExcelFallback(receipt),
+  );
+}
+function exportStockOutExcelFallback(receipt) {
+  const receivedDateValue = warehouseSheetDateValue(
+    receipt.createdAt
+      ? isoDay(receipt.createdAt) || todayIso()
+      : todayIso(),
+  );
+  const printedDateValue = warehouseSheetDateValue(todayIso());
+  const h = (value) => xlsxXmlEsc(value ?? "");
+  const bodyRows = stockInReceiptGroupedLines(receipt.lines || [])
+    .map((item) => {
+      if (item.type === "cat") {
+        return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
+      }
+      if (item.type === "catTotal") {
+        return `<tr class="cat-total"><td colspan="6" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
+      }
+      const line = item.line;
+      const unitPrice = Number(line.unitPrice) || 0;
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
+    })
+    .join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; color: #000; }
+table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
+.title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
+.meta td { border: none; padding: 4px 0; }
+.date-label { text-align: right; white-space: nowrap; }
+.date-value { text-align: left; white-space: nowrap; }
+.head th { text-align: center; font-weight: 800; background: #eef0f2; }
+.cat { text-align: center; font-weight: 800; background: #f7f7f7; }
+.cat-total td { font-weight: 700; background: #f3f4f6; }
+.barcode { mso-number-format:"\\@"; text-align: center; }
+.num { text-align: right; }
+.total td { font-weight: 800; }
+.sign td { border: none; padding-top: 18px; }
+</style></head><body><table class="stock-in">
+<tr><td colspan="7" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
+<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Нэгж үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+${bodyRows}
+<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
+<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________</td></tr>
+</table></body></html>`;
+  const blob = new Blob([html], {
+    type: "application/vnd.ms-excel;charset=utf-8",
+  });
+  void downloadBlobFile(
+    blob,
+    legacyExcelFileName(stockOutReceiptFileName(receipt)),
   );
 }
 function inventoryStockModal(id, tab) {
@@ -12625,7 +13117,10 @@ const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
 const STOCK_IN_LAST_COL = "G";
 const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
-function buildStockInSheetXml(receipt) {
+function buildStockInSheetXml(receipt, {
+  titleText = null,
+  receivedLabel = "Орлого авсан огноо:",
+} = {}) {
   receipt = normalizeStockInReceiptTotals(receipt);
   const strings = [];
   const strIndex = new Map();
@@ -12639,7 +13134,7 @@ function buildStockInSheetXml(receipt) {
   };
   const receivedDateValue = warehouseSheetDateValue(
     receipt.createdAt
-      ? new Date(receipt.createdAt).toISOString().slice(0, 10)
+      ? isoDay(receipt.createdAt) || todayIso()
       : todayIso(),
   );
   const printedDateValue = warehouseSheetDateValue(todayIso());
@@ -12660,8 +13155,9 @@ function buildStockInSheetXml(receipt) {
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
+  const sheetTitle = titleText || stockInReceiptTitle(receipt);
   pushRow(43.5, [
-    xlsxCellXml("A1", 13, si(stockInReceiptTitle(receipt)), "s"),
+    xlsxCellXml("A1", 13, si(sheetTitle), "s"),
     ...emptyCells(1, "B", STOCK_IN_LAST_COL, 13),
   ]);
   pushRow(20.25, [
@@ -12674,7 +13170,7 @@ function buildStockInSheetXml(receipt) {
       "s",
     ),
     xlsxCellXml("B2", 4, null, "empty"),
-    xlsxCellXml("C2", 14, si("Орлого авсан огноо:"), "s"),
+    xlsxCellXml("C2", 14, si(receivedLabel), "s"),
     xlsxCellXml("D2", 14, null, "empty"),
     xlsxCellXml("E2", 14, null, "empty"),
     xlsxCellXml("F2", 14, si(receivedDateValue), "s"),
@@ -12777,6 +13273,40 @@ async function exportStockInExcelXlsx(receipt) {
   zip.file("xl/styles.xml", warehousePrepareStylesXml());
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
+}
+function buildStockOutSheetXml(receipt) {
+  const asIn = normalizeStockInReceiptTotals({
+    ...receipt,
+    lines: (receipt.lines || []).map((line) => ({
+      ...line,
+      costPrice: Number(line.unitPrice) || Number(line.costPrice) || 0,
+      unitPrice: Number(line.unitPrice) || Number(line.costPrice) || 0,
+      totalPrice:
+        Number(line.totalPrice) ||
+        (Number(line.quantity) || 0) *
+          (Number(line.unitPrice) || Number(line.costPrice) || 0),
+    })),
+  });
+  return buildStockInSheetXml(asIn, {
+    titleText: stockOutReceiptTitle(receipt),
+    receivedLabel: "Зарлага гарсан огноо:",
+  });
+}
+async function exportStockOutExcelXlsx(receipt) {
+  if (typeof JSZip === "undefined") {
+    throw new Error("JSZip missing");
+  }
+  const { sharedStringsXml, sheetXml } = buildStockOutSheetXml(receipt);
+  const tpl = await fetch(staticAssetUrl(STOCK_IN_XLSX_TEMPLATE)).then((r) => {
+    if (!r.ok) throw new Error("template missing");
+    return r.arrayBuffer();
+  });
+  const zip = await JSZip.loadAsync(tpl);
+  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+  zip.file("xl/worksheets/sheet1.xml", sheetXml);
+  zip.file("xl/styles.xml", warehousePrepareStylesXml());
+  const blob = await zipToExcelBlob(zip);
+  await downloadBlobFile(blob, stockOutReceiptFileName(receipt));
 }
 function warehouseDateLabel(prefix, raw = todayIso()) {
   const parts = String(raw).split("-");
@@ -16417,7 +16947,7 @@ function workerOrders(orders) {
     todayActive = day === today,
     todayBtnClass = `worker-orders-filters__chip${todayActive ? " is-active" : ""}`;
   // Өнөөдөр must always be clickable — even when a past date is selected.
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(o.createdAt)} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   openWorkerOrderEdit(id);
@@ -19612,6 +20142,7 @@ function ensureSavedOrderVisible(order) {
   );
   if (exists) return true;
   state.orders = [...(state.orders || []), order];
+  normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();

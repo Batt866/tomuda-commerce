@@ -6350,6 +6350,21 @@ textarea::placeholder {
   letter-spacing: 0.02em;
   color: var(--hex-foreground);
 }
+.stock-in-entry-section {
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--hex-card);
+}
+.stock-in-entry-section__title {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--hex-foreground);
+  background: color-mix(in srgb, var(--hex-primary) 8%, var(--hex-card));
+  border-bottom: 1px solid var(--hex-border);
+}
 
 .inventory-stock-panel .inventory-stock-row__name {
   margin: 0;

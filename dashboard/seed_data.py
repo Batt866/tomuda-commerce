@@ -271,6 +271,7 @@ def default_state() -> dict:
             "extraCategories": [],
             "inventoryLogs": [],
             "stockInReceipts": [],
+            "stockOutReceipts": [],
             "countQty": {},
             "countDone": False,
             "workerCustomer": "cust-green-mart",

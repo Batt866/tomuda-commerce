@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 ENTITY_KEYS = ("customers", "products", "employees", "orders")
-ARRAY_BY_ID_KEYS = ("inventoryLogs", "stockInReceipts")
+ARRAY_BY_ID_KEYS = ("inventoryLogs", "stockInReceipts", "stockOutReceipts")
 DELETION_TYPE = {
     "customers": "customer",
     "products": "product",
