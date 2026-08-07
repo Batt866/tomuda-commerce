@@ -7840,10 +7840,10 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: transparent !important;
   color: ${RECEIPT_TEXT} !important;
-  height: 12px;
+  height: 14px;
   padding: 0 3px;
-  font-weight: 400;
-  font-size: 9px;
+  font-weight: 700;
+  font-size: 11px;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   font-weight: 700 !important;
