@@ -12922,7 +12922,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D pack · E piece · F stock */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [24, 14, 14, 6, 7, 14];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [38, 14, 14, 6, 7, 14];
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -13226,7 +13226,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
 table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
-.prepare col:nth-child(1) { width: 345px; }
+.prepare col:nth-child(1) { width: 480px; }
 .prepare col:nth-child(2) { width: 160px; }
 .prepare col:nth-child(3) { width: 150px; }
 .prepare col:nth-child(4) { width: 52px; }
