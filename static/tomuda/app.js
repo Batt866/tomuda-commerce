@@ -7408,17 +7408,18 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: middle;
-  padding: 0 1px 0 0 !important;
-  overflow: hidden;
-  max-width: 100%;
+  padding: 0 !important;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
-  width: 6.5mm !important;
-  height: 6.5mm !important;
-  min-width: 6.5mm !important;
-  max-width: 6.5mm !important;
-  min-height: 6.5mm !important;
-  max-height: 6.5mm !important;
+  width: 13mm !important;
+  height: 13mm !important;
+  min-width: 13mm !important;
+  max-width: 13mm !important;
+  min-height: 13mm !important;
+  max-height: 13mm !important;
   display: block;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
@@ -8411,11 +8412,13 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Pin logo to column A only (A1:A2). twoCellAnchor scales it to narrow A
-  // so it never overflows into B / brand text.
+  // A stays narrow. Logo is ~13mm: fills A and extends a bit into B.
+  // Brand/address in B are indented so they never sit under the logo.
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  const pad = Math.round((0.2 / 25.4) * 914400);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoRow + 2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  const pad = Math.round((0.15 / 25.4) * 914400);
+  // ~7.5mm into column B (A≈5.5mm + 7.5mm ≈ 13mm logo)
+  const intoB = Math.round((7.5 / 25.4) * 914400);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>${intoB}</xdr:colOff><xdr:row>${logoRow + 2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -8544,10 +8547,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
   const deliveryDateText = receiptDeliveryDateDisplay(o);
-  // Two lines under brand; flush toward logo (B), full text visible
+  // Two lines under brand; clear of logo that extends into B
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
+  // Leading spaces clear the logo spill into B (A stays narrow).
+  const logoTextPad = "\u00A0".repeat(14);
 
-  // Header: logo A only (rows 1–2); brand/address/title from B — keeps wide B without header gap
+  // Header: logo spans A + start of B; brand/address indented in B; title full B
   // Date: label J:K row1; value K row2
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
@@ -8559,9 +8564,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `B${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
   );
-  pushRow(14.25, [
+  pushRow(16, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
-    xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml(`B${hr1}`, 39, si(`${logoTextPad}ТОМУДА ГРУПП`), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(hr1, "C", "F", 39),
     ...emptyCells(hr1, "I", "I", 3),
@@ -8577,16 +8582,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     RECEIPT_XLSX_COL_WIDTHS[7] +
     RECEIPT_XLSX_COL_WIDTHS[8];
   const companyAddrH = Math.max(
-    28,
-    receiptXlsxWrappedRowHeight(companyAddr, companyAddrColW, {
-      min: 28,
+    30,
+    receiptXlsxWrappedRowHeight(companyAddr, companyAddrColW - 4, {
+      min: 30,
       linePt: 11,
       pad: 4,
       max: 44,
     }),
   );
+  const paddedAddr = companyAddr
+    .split("\n")
+    .map((line) => `${logoTextPad}${line}`)
+    .join("\n");
   pushRow(companyAddrH, [
-    xlsxCellXml(`B${hr2}`, 5, si(companyAddr), "s"),
+    xlsxCellXml(`B${hr2}`, 5, si(paddedAddr), "s"),
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "C", "I", 5),
   ]);
