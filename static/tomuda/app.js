@@ -8688,22 +8688,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR3, "C", "C", 5),
     ...emptyCells(bankR3, "E", "E", 5),
   ]);
-  {
-    const left = "Дансны дугаар:";
-    const right = "IBAN:";
-    // B+C нэгтгэсэн өргөнд хоёр шошгыг бүрэн, зүүн/баруун байрлуулна (дэвсгэргүй).
-    const avail =
-      RECEIPT_XLSX_COL_WIDTHS[1] + RECEIPT_XLSX_COL_WIDTHS[2];
-    const used = receiptXlsxLabelUnits(left) + receiptXlsxLabelUnits(right);
-    const pad = Math.max(2, Math.floor(avail - used));
-    const ibanHead = `${left}${"\u00A0".repeat(pad)}${right}`;
-    pushRow(perBankH, [
-      xlsxCellXml(`B${bankR4}`, 5, si(ibanHead), "s"),
-      xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
-      ...emptyCells(bankR4, "C", "C", 5),
-      ...emptyCells(bankR4, "E", "E", 4),
-    ]);
-  }
+  pushRow(perBankH, [
+    xlsxCellXml(`B${bankR4}`, 5, si("Дансны дугаар:"), "s"),
+    // 30 = right-aligned — IBAN flush to the right edge of column C
+    xlsxCellXml(`C${bankR4}`, 30, si("IBAN:"), "s"),
+    xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
+    ...emptyCells(bankR4, "E", "E", 4),
+  ]);
   pushRow(perBankH, [
     xlsxCellXml(`D${bankR5}`, 4, si(RECEIPT_BANK_ACCOUNT), "s"),
     ...emptyCells(bankR5, "B", "C", 5),
