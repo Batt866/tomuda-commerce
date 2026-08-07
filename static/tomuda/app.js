@@ -8411,11 +8411,12 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Logo sits in column A only (rows 1–2) — brand starts at B so wide B doesn't gap the header.
-  const logoMm = 15;
+  // Logo must stay entirely inside column A — never overlap brand text in B.
+  // A width ≈ 8.5 Excel units; keep logo ≤ 11mm with small inset.
+  const logoMm = 11;
   const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.1 / 25.4) * 914400);
-  const rowOff = Math.round((0.2 / 25.4) * 914400);
+  const colOff = Math.round((0.35 / 25.4) * 914400);
+  const rowOff = Math.round((0.35 / 25.4) * 914400);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
