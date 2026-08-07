@@ -7947,11 +7947,14 @@ td, th { border: none; }
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 11px;
   font-weight: 700;
-  padding: 0 !important;
+  padding: 0 0 0 8mm !important;
   margin: 0;
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
   text-align: left;
+}
+.receipt-grid__header--r2 .receipt-grid__address {
+  padding-left: 8mm !important;
 }
 .receipt-grid__address,
 .receipt-grid__phone {
