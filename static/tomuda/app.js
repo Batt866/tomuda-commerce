@@ -12921,9 +12921,35 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
   return xlsxCellXml(ref, 9, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
-const WAREHOUSE_PREPARE_COL_WIDTHS = [
-  24, 11, 21, 8, 10, 14,
-];
+/** A name · B unit · C barcode · D pack · E piece · F stock */
+const WAREHOUSE_PREPARE_COL_WIDTHS = [24, 14, 14, 6, 7, 14];
+function warehousePrepareMaxBarcodeLen(sections) {
+  let maxLen = String("Баркод").length;
+  const scan = (groups) => {
+    for (const item of groups || []) {
+      if (item?.type === "cat") continue;
+      const n = String(item?.product?.barcode || "").trim().length;
+      if (n > maxLen) maxLen = n;
+    }
+  };
+  scan(sections?.regular);
+  scan(sections?.promo);
+  return maxLen;
+}
+/** Column widths: unit fits «Хэмжих нэгж»; barcode ≈ digit length; pack/piece slightly narrow. */
+function warehousePrepareColWidthsFor(sections) {
+  const barcodeChars = warehousePrepareMaxBarcodeLen(sections);
+  // Digits ≈ 1 Excel unit each; +1 padding so last digit isn't clipped.
+  const barcodeW = Math.min(20, Math.max(10, Math.round(barcodeChars * 1.05) + 1));
+  return [
+    WAREHOUSE_PREPARE_COL_WIDTHS[0],
+    WAREHOUSE_PREPARE_COL_WIDTHS[1],
+    barcodeW,
+    WAREHOUSE_PREPARE_COL_WIDTHS[3],
+    WAREHOUSE_PREPARE_COL_WIDTHS[4],
+    WAREHOUSE_PREPARE_COL_WIDTHS[5],
+  ];
+}
 function warehousePreparePatchStylesXml(stylesXml) {
   const numStyle =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
@@ -12934,15 +12960,18 @@ function warehousePreparePatchStylesXml(stylesXml) {
   if (!stylesXml.includes(numStyle)) return stylesXml;
   return stylesXml.replace(numStyle, numStyleRight);
 }
-function warehousePrepareColsXml() {
-  return WAREHOUSE_PREPARE_COL_WIDTHS.map(
+function warehousePrepareColsXml(widths = WAREHOUSE_PREPARE_COL_WIDTHS) {
+  return widths.map(
     (width, index) =>
       `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
   ).join("");
 }
-function warehousePrepareWorksheetXml(rows, merges, lastRow) {
+function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${warehousePrepareColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  const cols = warehousePrepareColsXml(
+    colWidths || WAREHOUSE_PREPARE_COL_WIDTHS,
+  );
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildWarehousePrepareSheetXml(orders, workerIds) {
   const strings = [];
@@ -13125,7 +13154,12 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
   const lastRow = rowNum;
-  const sheetXml = warehousePrepareWorksheetXml(rows, merges, lastRow);
+  const sheetXml = warehousePrepareWorksheetXml(
+    rows,
+    merges,
+    lastRow,
+    warehousePrepareColWidthsFor(sections),
+  );
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
@@ -13193,10 +13227,10 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
 body { font-family: Arial, sans-serif; color: #000; }
 table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
 .prepare col:nth-child(1) { width: 345px; }
-.prepare col:nth-child(2) { width: 125px; }
-.prepare col:nth-child(3) { width: 205px; }
-.prepare col:nth-child(4) { width: 70px; }
-.prepare col:nth-child(5) { width: 80px; }
+.prepare col:nth-child(2) { width: 160px; }
+.prepare col:nth-child(3) { width: 150px; }
+.prepare col:nth-child(4) { width: 52px; }
+.prepare col:nth-child(5) { width: 60px; }
 .prepare col:nth-child(6) { width: 175px; }
 .prepare td, .prepare th { border: 1px solid #555; padding: 2px 4px; vertical-align: middle; }
 .prepare td:first-child { overflow-wrap: anywhere; }
