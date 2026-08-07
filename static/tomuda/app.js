@@ -819,8 +819,8 @@ function receiptPaymentTermText(f, o) {
   return receiptPaymentTermDisplay(o);
 }
 function receiptShouldShowGross(o) {
-  // «Хувь хасагдаагүй…» — шууд төлөлт (баримт дээрх төлбөрийн нөхцөлтэй ижил).
-  return receiptIsDirectPay(o);
+  // «Хувь хасагдаагүй…» — зөвхөн Зээлээр; шууд төлөлт дээр огт харуулахгүй.
+  return !receiptIsDirectPay(o);
 }
 function receiptGrandNote(o) {
   const discount = orderDiscountAmount(o);
@@ -8699,7 +8699,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
 
   pushRow(14.25, emptyCells(rowNum));
 
-  // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн шууд төлөлт
+  // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн Зээлээр
   if (receiptShouldShowGross(o)) {
     const grossRow = rowNum;
     // Label B→E: gray, no borders. Underline only F→K (nothing from D leftward).
