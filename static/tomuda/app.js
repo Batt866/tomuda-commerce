@@ -8023,13 +8023,15 @@ td, th { border: none; }
   font-size: 9px;
   white-space: nowrap;
   padding-right: 0 !important;
-  vertical-align: middle;
+  vertical-align: bottom;
   background: transparent !important;
 }
 .receipt-grid__iban-c b { font-weight: 700; font-size: 9px; }
 .receipt-grid__iban-nums {
   text-align: left !important;
+  vertical-align: top !important;
   line-height: 1.25;
+  white-space: normal;
 }
 .receipt-info__value,
 .receipt-info__address-text,
