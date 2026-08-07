@@ -7369,8 +7369,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A fits logo; B fits «Дансны дугаар:»; C holds right-flush IBAN */
-.receipt-grid__a { width: 10.0%; } .receipt-grid__b { width: 16.5%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
+/* A gutter нарийн; B fits «Дансны дугаар:»; C holds right-flush IBAN */
+.receipt-grid__a { width: 3.5%; } .receipt-grid__b { width: 18.0%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -7408,17 +7408,17 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: middle;
-  padding: 0 2px 0 0 !important;
+  padding: 0 1px 0 0 !important;
   overflow: hidden;
   max-width: 100%;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
-  width: 11mm !important;
-  height: 11mm !important;
-  min-width: 11mm !important;
-  max-width: 11mm !important;
-  min-height: 11mm !important;
-  max-height: 11mm !important;
+  width: 6.5mm !important;
+  height: 6.5mm !important;
+  min-width: 6.5mm !important;
+  max-width: 6.5mm !important;
+  min-height: 6.5mm !important;
+  max-height: 6.5mm !important;
   display: block;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
@@ -8294,9 +8294,9 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K: A fits logo (no overlap); B fits «Дансны дугаар:»; C right-flush «IBAN:»
+// ҮНДСЭН A–K: A gutter нарийн (лого жижиг); B fits «Дансны дугаар:»; C right-flush «IBAN:»
 const RECEIPT_XLSX_COL_WIDTHS = [
-  8.5, 15.75, 9.0, 2.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  3.0, 15.75, 9.0, 2.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -8411,14 +8411,11 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Logo must stay entirely inside column A — never overlap brand text in B.
-  // A width ≈ 8.5 Excel units; keep logo ≤ 11mm with small inset.
-  const logoMm = 11;
-  const emu = Math.round((logoMm / 25.4) * 914400);
-  const colOff = Math.round((0.35 / 25.4) * 914400);
-  const rowOff = Math.round((0.35 / 25.4) * 914400);
+  // Pin logo to column A only (A1:A2). twoCellAnchor scales it to narrow A
+  // so it never overflows into B / brand text.
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${colOff}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${emu}" cy="${emu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const pad = Math.round((0.2 / 25.4) * 914400);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoRow + 2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
