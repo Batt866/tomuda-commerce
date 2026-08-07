@@ -7381,8 +7381,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* Source jishee widths — wider C for Дансны дугаар + IBAN; E fits «Хэмжих нэгж» */
-.receipt-grid__a { width: 5.0%; } .receipt-grid__b { width: 3.2%; } .receipt-grid__c { width: 22.5%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
+/* Source jishee widths — A gutter нарийн; C өргөн (Дансны дугаар + IBAN); E fits «Хэмжих нэгж» */
+.receipt-grid__a { width: 3.5%; } .receipt-grid__b { width: 3.2%; } .receipt-grid__c { width: 24.0%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -7847,21 +7847,28 @@ td, th { border: none; }
   line-height: 1.15;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
-  background: ${RECEIPT_GRAND_BG} !important;
+  background: transparent !important;
   color: ${RECEIPT_TEXT} !important;
-  height: 18px;
-  padding: 1px 4px;
-  font-weight: 700;
-  font-size: 11px;
+  height: 15px;
+  padding: 0 4px;
+  font-weight: 400;
+  font-size: 9px;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   font-weight: 400 !important;
-  font-size: 10px !important;
+  font-size: 9px !important;
   letter-spacing: -0.02em;
+  background: transparent !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand,
+.receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-note {
+  background: transparent !important;
+  font-weight: 400 !important;
+  font-size: 9px !important;
+}
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
   background: ${RECEIPT_GRAND_BG} !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 9px; }
 .receipt-grid__summary-note {
@@ -8063,7 +8070,7 @@ td, th { border: none; }
   border: none !important;
 }
 .receipt-grid__summary-label--vat { font-weight: 700 !important; }
-.receipt-grid__summary-label--grand { font-weight: 400; color: ${RECEIPT_TEXT} !important; font-size: 10px !important; letter-spacing: -0.02em; }
+.receipt-grid__summary-label--grand { font-weight: 400; color: ${RECEIPT_TEXT} !important; font-size: 9px !important; letter-spacing: -0.02em; }
 .receipt-grid__summary-value {
   text-align: right;
   font-size: 11px;
@@ -8082,8 +8089,8 @@ td, th { border: none; }
   border-top: none !important;
   border-bottom: none !important;
 }
-.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 12px !important; }
-.receipt-grid__summary-value--grand { font-size: 12px !important; font-weight: 700 !important; }
+.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 11px !important; }
+.receipt-grid__summary-value--grand { font-size: 11px !important; font-weight: 700 !important; }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   border: none !important;
 }
@@ -8301,9 +8308,9 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K: wider C so «Дансны дугаар:» + «IBAN:» fit; E fits «Хэмжих нэгж»
+// ҮНДСЭН A–K: A gutter нарийн; C өргөн (Дансны дугаар + IBAN); E fits «Хэмжих нэгж»
 const RECEIPT_XLSX_COL_WIDTHS = [
-  4.25, 2.75, 19.0, 2.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  3.0, 2.75, 20.25, 2.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -8878,9 +8885,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
     // Label B:D — no borders. Amount E:K — horizontal lines only (right of D).
-    const labelStyle = grand ? 49 : 30;
+    // Grand: thin left label (58), amount keeps light gray band (50).
+    const labelStyle = grand ? 58 : 30;
     const valueStyle = grand ? 50 : decimals ? 29 : 47;
-    const midStyle = grand ? 49 : 1;
+    const midStyle = grand ? 58 : 1;
     merges.push(`B${r}:D${r}`);
     if (grand && note) {
       merges.push(`E${r}:J${r}`);
@@ -8900,7 +8908,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       cells.push(xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"));
       cells.push(...emptyCells(r, "F", "K", valueStyle));
     }
-    pushRow(grand ? 16.5 : 14.25, cells);
+    pushRow(14.25, cells);
   };
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
@@ -13253,21 +13261,28 @@ function buildStockInSheetXml(receipt, {
     xlsxCellXml(`G${totalRow}`, 10, receipt.totalAmount, "n"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
-  const sign1 = rowNum;
-  merges.push(`B${sign1}:G${sign1}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн:"), "s"),
-    xlsxCellXml(`B${sign1}`, 17, null, "empty"),
-    ...emptyCells(sign1, "C", STOCK_IN_LAST_COL, 17),
-  ]);
+  const signDots = "....................................................";
+  const pushSignatureBlock = (roleLabel) => {
+    const nameRow = rowNum;
+    merges.push(`C${nameRow}:G${nameRow}`);
+    pushRow(null, [
+      xlsxCellXml(`A${nameRow}`, 17, si(roleLabel), "s"),
+      xlsxCellXml(`B${nameRow}`, 18, si("Нэр"), "s"),
+      xlsxCellXml(`C${nameRow}`, 18, si(signDots), "s"),
+      ...emptyCells(nameRow, "D", STOCK_IN_LAST_COL, 18),
+    ]);
+    const signRow = rowNum;
+    merges.push(`C${signRow}:G${signRow}`);
+    pushRow(null, [
+      xlsxCellXml(`A${signRow}`, 12, null, "empty"),
+      xlsxCellXml(`B${signRow}`, 6, si("Гарын үсэг"), "s"),
+      xlsxCellXml(`C${signRow}`, 18, si(signDots), "s"),
+      ...emptyCells(signRow, "D", STOCK_IN_LAST_COL, 18),
+    ]);
+  };
+  pushSignatureBlock("Хүлээлгэн өгсөн:");
   pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
-  const sign3 = rowNum;
-  merges.push(`B${sign3}:G${sign3}`);
-  pushRow(null, [
-    xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан:"), "s"),
-    xlsxCellXml(`B${sign3}`, 17, null, "empty"),
-    ...emptyCells(sign3, "C", STOCK_IN_LAST_COL, 17),
-  ]);
+  pushSignatureBlock("Хүлээн авсан:");
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="8" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="12" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="14" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
@@ -16796,6 +16811,55 @@ function canEditWorkerOrder(order) {
     currentRole() === "admin"
   );
 }
+function canCancelWorkerOrder(order) {
+  if (!order) return false;
+  const status = String(order.status || "").toLowerCase();
+  if (status === "cancelled" || status === "delivered") return false;
+  if (
+    state.currentEmployee?.role === "sales" &&
+    String(order.employeeId) !== String(state.currentEmployee.id)
+  ) {
+    return false;
+  }
+  return (
+    hasPermission("orders.delete") ||
+    hasPermission("orders.edit") ||
+    hasPermission("orders.create") ||
+    currentRole() === "admin"
+  );
+}
+function cancelWorkerOrderNow(id) {
+  const order = state.orders.find((x) => String(x.id) === String(id));
+  if (!canCancelWorkerOrder(order)) {
+    return alertModal("Эрхгүй", "Захиалга цуцлах эрхгүй.");
+  }
+  if (String(order.status || "").toLowerCase() !== "cancelled") {
+    (order.items || []).forEach((i) => {
+      if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
+    });
+  }
+  order.status = "cancelled";
+  if (String(state.editingOrderId) === String(id)) {
+    clearWorkerOrderEditState();
+    state.workerStoreReady = false;
+    state.workerCustomer = "";
+    resetWorkerCart();
+    state.filters.worker = "orders";
+  }
+  if (state.selectedWarehouseOrderId === id) {
+    state.selectedWarehouseOrderId = "";
+  }
+  render();
+  showAppToast("Захиалга цуцлагдлаа", "success");
+  criticalBackendSave();
+}
+function workerOrderListRow(o) {
+  const canCancel = canCancelWorkerOrder(o);
+  const cancelBtn = canCancel
+    ? `<button type="button" class="worker-order-row__cancel" onclick="event.stopPropagation();cancelWorkerOrderNow('${esc(o.id)}')" aria-label="Захиалга цуцлах">Цуцлах</button>`
+    : "";
+  return `<div class="line-list__row worker-order-row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}"><button type="button" class="worker-order-row__open" onclick="workerOrderDetail('${esc(o.id)}')"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>${cancelBtn}</div>`;
+}
 function seedWorkerCartFromOrder(order) {
   resetWorkerCart();
   const qty = {};
@@ -16962,7 +17026,7 @@ function workerOrders(orders) {
     todayActive = day === today,
     todayBtnClass = `worker-orders-filters__chip${todayActive ? " is-active" : ""}`;
   // Өнөөдөр must always be clickable — even when a past date is selected.
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map((o) => `<button type="button" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" onclick="workerOrderDetail('${o.id}')" class="line-list__row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></button>`).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map(workerOrderListRow).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   openWorkerOrderEdit(id);
@@ -21210,6 +21274,7 @@ Object.assign(window, {
   confirmDelete,
   confirmCancelOrder,
   cancelOrderNow,
+  cancelWorkerOrderNow,
   confirmDeleteReceipt,
   deleteReceiptNow,
   deleteNow,
