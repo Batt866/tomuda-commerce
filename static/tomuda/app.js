@@ -623,11 +623,11 @@ function receiptPaymentTermDisplay(o) {
   if (term === "credit") return "Зээлээр";
   return "Шууд төлөх";
 }
-/** InvoiceHeader — logo A:B (2 rows), brand C:F, address C:I, title C:J, date K. */
+/** InvoiceHeader — logo A (2 rows), brand/address/title from B (flush to logo). */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td colspan="2" rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="4" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="7" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="2"></td><td colspan="8" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="9" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -8409,7 +8409,7 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // Logo sits in A1:B2 only (ҮНДСЭН) — never overlaps title row.
+  // Logo sits in column A only (rows 1–2) — brand starts at B so wide B doesn't gap the header.
   const logoMm = 15;
   const emu = Math.round((logoMm / 25.4) * 914400);
   const colOff = Math.round((0.1 / 25.4) * 914400);
