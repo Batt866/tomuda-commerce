@@ -10121,15 +10121,15 @@ textarea::placeholder {
     max-height: none;
   }
 
-  /* Доод панел навигацийн дээр бэхлэгдэнэ — жагсаалттай хамт гүйлгэхгүй */
+  /* Доод панел навигацийн дээр бэхлэгдэнэ — зайгүй нийлнэ (safe-area nav-д аль хэдийн орсон). */
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+    bottom: var(--mobile-nav-h);
     z-index: 40;
     margin: 0;
-    padding: 12px var(--app-gutter) 10px;
+    padding: 10px var(--app-gutter) 8px;
     background: var(--hex-background);
     box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
   }
