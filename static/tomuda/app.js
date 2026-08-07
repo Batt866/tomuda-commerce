@@ -14057,8 +14057,9 @@ function paymentRow(o) {
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || orderIsPaid(o)) return;
-  confirmModal("Төлбөр баталгаажуулах", "", {
+  confirmModal("", "Төлбөр төлснийг баталгаажуулах уу?", {
     confirmLabel: "Тийм",
+    cancelLabel: "Үгүй",
     onConfirm: () => setPaid(id, true),
   });
 }
