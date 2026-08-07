@@ -1207,8 +1207,9 @@ function orderInWarehouseLiveSession(o) {
 }
 function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
   const targetDay = normalizeIsoDateInput(day) || todayIso();
-  // Агуулах / Баримтууд = хүргэлтийн өдөр (авсан захиалгын createdAt биш).
-  return orderDeliveryDay(o) === targetDay;
+  // Нярав / Баримтууд жагсаалт = авсан өдөр. Баримт дээрх хүргэлт тусдаа (+1 хоног).
+  const created = isoDay(o?.createdAt);
+  return !!created && created === targetDay;
 }
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
@@ -1337,7 +1338,8 @@ function orderMatchesWorkerDate(o, day = state.filters.workerDate) {
   const targetDay = normalizeIsoDateInput(day) || "";
   if (!targetDay) return true;
   // Өнөөдөр / сонгосон өдөр = зөвхөн тухайн өдөр авсан захиалга (хүргэлтийн өдөр биш).
-  return orderCreatedDay(o) === targetDay;
+  const created = isoDay(o?.createdAt);
+  return !!created && created === targetDay;
 }
 function orderRetentionDays() {
   ensureSettings();
@@ -6458,7 +6460,7 @@ function warehouseLiveFilterBannerHtml() {
   const total = (state.orders || []).length;
   const visible = filterWarehouseOrders(state.orders || []).length;
   const hidden = Math.max(0, total - visible);
-  return `<div class="wh-date-banner" role="status"><strong>Зөвхөн өнөөдөр хүргэгдэх захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Авсан захиалгыг ХТ → Захиалга харах хэсгээс үзнэ үү.</span></div>`;
+  return `<div class="wh-date-banner" role="status"><strong>Зөвхөн өнөөдөр авсан захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Баримт дээрх хүргэлтийн огноо ихэвчлэн маргааш байдаг.</span></div>`;
 }
 async function mergeServerStateBeforeSave() {
   try {
@@ -9267,12 +9269,12 @@ function warehouseOrderStatusActions(o) {
 }
 function warehouseReceiptListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id;
-  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button>`;
+  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button>`;
 }
 function warehouseReceiptPrintListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id,
     checked = idList(state.receiptPrintOrderIds).includes(o.id);
-  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
+  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions(includeDelivered = true) {
   const opts = ["pending", "confirmed", "delivered", "cancelled"];
@@ -10260,7 +10262,7 @@ function warehouseDateFiltersHtml() {
     day = normalizeIsoDateInput(state.filters.warehouseDate) || today,
     isToday = day === today,
     display = warehouseDateDisplayText(day);
-  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" oninput="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Хүргэлтийн огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдөр хүргэгдэх" : "Сонгосон өдөр хүргэгдэх"}</span></div>`;
+  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" oninput="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Авсан огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдөр авсан" : "Сонгосон өдөр авсан"}</span></div>`;
 }
 function selectWarehouseToday() {
   commitDatePickerChange(() => {
@@ -13020,7 +13022,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     return idx;
   };
   const warehouseEmp = state.currentEmployee?.name || "-";
-  const orderDateLabel = "Хүргэлтийн огноо:";
+  const orderDateLabel = "Захиалгын огноо:";
   const orderDateValue = warehouseSheetDateValue(
     state.filters.warehouseDate || todayIso(),
   );
@@ -13292,7 +13294,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col></colgroup>
 <tr><td colspan="6" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Хүргэлтийн огноо:</td><td colspan="2" class="date-value">${h(orderDateValue)}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="2" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
@@ -16031,7 +16033,7 @@ function workerChooser(orders) {
       ? hasSelection
         ? "Сонгосон ХТ дээр захиалга алга"
         : "Худалдааны төлөөлөгч сонгоно уу"
-      : "Өнөөдөр хүргэгдэх захиалга алга",
+      : "Өнөөдөр авсан захиалга алга",
     pickerHtml = canPick
       ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${chooserLabel === "Сонгох" ? " is-placeholder" : ""}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
       : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></span></div>`;
