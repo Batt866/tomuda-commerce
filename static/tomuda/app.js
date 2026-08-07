@@ -8978,7 +8978,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ].forEach(([text, style, richParts], index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    const warnH = index === 0 ? 21.75 : 12;
+    const warnH = index === 0 ? 24 : 12;
     const value = richParts ? siRich(richParts) : si(text);
     pushRow(warnH, [
       xlsxCellXml(`B${r}`, style, value, "s"),
