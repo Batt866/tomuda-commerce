@@ -12957,9 +12957,33 @@ function warehousePreparePatchStylesXml(stylesXml) {
     'horizontal="left"',
     'horizontal="right"',
   );
-  if (!stylesXml.includes(numStyle)) return stylesXml;
-  return stylesXml.replace(numStyle, numStyleRight);
+  let out = stylesXml.includes(numStyle)
+    ? stylesXml.replace(numStyle, numStyleRight)
+    : stylesXml;
+
+  // Signature underline (B→E): bottom border only — template style 17 has no border.
+  const signBorder =
+    '<border><left /><right /><top /><bottom style="medium"><color theme="1" /></bottom><diagonal /></border>';
+  if (!out.includes(signBorder)) {
+    out = out.replace(
+      /(<borders count=")(\d+)(">)([\s\S]*?)(<\/borders>)/,
+      (_, a, count, c, body, end) =>
+        `${a}${Number(count) + 1}${c}${body}${signBorder}${end}`,
+    );
+  }
+  const signXf =
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
+  if (!out.includes(signXf)) {
+    out = out.replace(
+      /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
+      (_, a, count, c, body, end) =>
+        `${a}${Number(count) + 1}${c}${body}${signXf}${end}`,
+    );
+  }
+  return out;
 }
+/** cellXfs index after warehousePreparePatchStylesXml appends the sign-line xf. */
+const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 function warehousePrepareColsXml(widths = WAREHOUSE_PREPARE_COL_WIDTHS) {
   return widths.map(
     (width, index) =>
@@ -13145,9 +13169,12 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
     merges.push(`B${r}:E${r}`);
-    pushRow(18, [
+    const line = WAREHOUSE_PREPARE_SIGN_LINE_STYLE;
+    pushRow(22, [
       xlsxCellXml(`A${r}`, 3, si(role), "s"),
-      xlsxCellXml(`B${r}`, 17, null, "empty"),
+      xlsxCellXml(`B${r}`, line, null, "empty"),
+      ...emptyCells(r, "C", "E", line),
+      xlsxCellXml(`F${r}`, 1, null, "empty"),
     ]);
   };
   pushWarehousePrepareSignatureBlock("Хүлээлгэн өгсөн ажилтан:");
@@ -13260,9 +13287,9 @@ ${workerRows}
 <tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td></tr>
+<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="4" class="sign-line"></td><td></td></tr>
 <tr class="sign-block-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td></tr>
+<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="4" class="sign-line"></td><td></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
