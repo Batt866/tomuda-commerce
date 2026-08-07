@@ -14081,40 +14081,41 @@ textarea::placeholder {
 }
 
 .worker-order-row {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  padding: 0;
-  cursor: default;
+  display: block;
+  padding: 14px 16px;
+  cursor: pointer;
 }
 
 .worker-order-row:hover,
 .worker-order-row:focus-visible {
   background: color-mix(in srgb, var(--hex-secondary) 55%, transparent);
+  outline: none;
 }
 
-.worker-order-row__open {
-  flex: 1;
-  min-width: 0;
-  display: block;
-  padding: 14px 16px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
+.worker-order-row .line-list__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.worker-order-row__amount-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .worker-order-row__cancel {
   flex-shrink: 0;
-  align-self: center;
-  margin: 0 12px 0 0;
-  padding: 8px 12px;
+  padding: 5px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: color-mix(in srgb, #dc2626 12%, var(--hex-card));
   color: #b91c1c;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
