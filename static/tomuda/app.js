@@ -8425,13 +8425,12 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 function receiptDrawingXml() {
-  // A a bit wider; logo ~14mm fills A and extends slightly into B.
-  // Brand/address in B are indented so they never sit under the logo.
+  // Fixed ~14mm logo via oneCellAnchor (size does not depend on narrow column A).
+  // Brand/address in B stay indented so they clear the logo spill.
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
   const pad = Math.round((0.15 / 25.4) * 914400);
-  // ~7mm into B (A≈5.4mm + 7mm ≈ 12.4mm logo)
-  const intoB = Math.round((7.0 / 25.4) * 914400);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:to><xdr:col>1</xdr:col><xdr:colOff>${intoB}</xdr:colOff><xdr:row>${logoRow + 2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  const logoEmu = Math.round((14 / 25.4) * 914400);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -8562,10 +8561,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const deliveryDateText = receiptDeliveryDateDisplay(o);
   // Two lines under brand; clear of logo that extends into B
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  // Leading spaces clear the logo spill into B (A stays narrow).
-  const logoTextPad = "\u00A0".repeat(10);
+  // Leading spaces clear the fixed 14mm logo that spills into B.
+  const logoTextPad = "\u00A0".repeat(12);
 
-  // Header: logo spans A + start of B; brand/address indented in B; title full B
+  // Header: fixed-size logo from A; brand/address indented in B; title full B
   // Date: label J:K row1; value K row2
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
@@ -8577,7 +8576,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `B${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
   );
-  pushRow(16, [
+  pushRow(18, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 39, si(`${logoTextPad}ТОМУДА ГРУПП`), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
@@ -8595,9 +8594,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     RECEIPT_XLSX_COL_WIDTHS[7] +
     RECEIPT_XLSX_COL_WIDTHS[8];
   const companyAddrH = Math.max(
-    30,
+    32,
     receiptXlsxWrappedRowHeight(companyAddr, companyAddrColW - 4, {
-      min: 30,
+      min: 32,
       linePt: 11,
       pad: 4,
       max: 44,
