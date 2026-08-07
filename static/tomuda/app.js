@@ -8873,10 +8873,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const r = rowNum;
     // Non-grand: label B:D, amount E:K.
     // Grand: wider label B:E, amount F:K; thinner row.
-    // Grand label/value: bold 11pt + gray fill (styles 59 / 51) — same weight as the amount.
-    const labelStyle = grand ? 59 : 30;
-    const valueStyle = grand ? 51 : decimals ? 29 : 47;
-    const midStyle = grand ? 59 : 1;
+    // Grand label/value: bold 11pt + gray fill (styles 58 / 50) — same weight as the amount.
+    // cellXfs are 0..58 only — never use style 59+ (Excel "repair" dialog).
+    const labelStyle = grand ? 58 : 30;
+    const valueStyle = grand ? 50 : decimals ? 29 : 47;
+    const midStyle = grand ? 58 : 1;
     if (grand) {
       merges.push(`B${r}:E${r}`);
       if (note) merges.push(`F${r}:J${r}`);
