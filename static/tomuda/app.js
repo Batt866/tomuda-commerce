@@ -476,12 +476,24 @@ function receiptGridColgroup() {
 function receiptDeliveryDateValue(o) {
   return orderDeliveryDay(o) || "";
 }
-/** ҮНДСЭН sample displays delivery date as DD/MM/YYYY. */
+/** Display dates as MM/DD/YYYY (сар/өдөр/он). */
+function formatDisplayDateParts(y, m, d) {
+  const yy = String(y ?? "").padStart(4, "0");
+  const mm = String(m ?? "").padStart(2, "0");
+  const dd = String(d ?? "").padStart(2, "0");
+  if (!yy || mm === "00" || dd === "00") return "";
+  return `${mm}/${dd}/${yy}`;
+}
+function formatIsoDayDisplay(iso) {
+  const text = String(iso || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
+  const [y, m, d] = text.split("-");
+  return formatDisplayDateParts(y, m, d);
+}
+/** ҮНДСЭН / UI: delivery date as MM/DD/YYYY (сар/өдөр/он). */
 function receiptDeliveryDateDisplay(o) {
   const iso = receiptDeliveryDateValue(o);
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso || "";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
+  return formatIsoDayDisplay(iso) || iso || "";
 }
 function receiptPrintedDateValue() {
   return todayIso();
@@ -1114,15 +1126,12 @@ const dte = (d) => {
   const raw = String(d ?? "").trim();
   const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dateOnly) {
-    const y = Number(dateOnly[1]);
-    const m = Number(dateOnly[2]);
-    const day = Number(dateOnly[3]);
-    return new Date(y, m - 1, day).toLocaleDateString("mn-MN");
+    return formatDisplayDateParts(dateOnly[1], dateOnly[2], dateOnly[3]);
   }
   const day = isoDay(d);
   if (!day) return "";
-  const [y, m, dnum] = day.split("-").map(Number);
-  return new Date(y, m - 1, dnum).toLocaleDateString("mn-MN");
+  const [y, m, dnum] = day.split("-");
+  return formatDisplayDateParts(y, m, dnum);
 };
 const dteAt = (d) => {
   const x = new Date(d);
@@ -1130,10 +1139,14 @@ const dteAt = (d) => {
   const day = isoDay(d) || "";
   let dateLabel = "";
   if (day) {
-    const [y, m, dnum] = day.split("-").map(Number);
-    dateLabel = new Date(y, m - 1, dnum).toLocaleDateString("mn-MN");
+    const [y, m, dnum] = day.split("-");
+    dateLabel = formatDisplayDateParts(y, m, dnum);
   } else {
-    dateLabel = x.toLocaleDateString("mn-MN");
+    dateLabel = formatDisplayDateParts(
+      x.getFullYear(),
+      x.getMonth() + 1,
+      x.getDate(),
+    );
   }
   try {
     const hm = new Intl.DateTimeFormat("en-GB", {
@@ -11724,7 +11737,8 @@ function stockInPanel(list) {
     return `<div class="space-y-4 stock-in-view">${stockInReceiptPanel(state.stockInReceipt)}<button type="button" onclick="confirmNewStockIn()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ орлого</button></div>`;
   }
   const canFinish = stockInCanFinish();
-  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${stockInEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
+  const actions = `<div class="grid grid-cols-2 gap-2 stock-in-actions"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
+  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${actions}${stockInEntryList(list)}</div>`;
 }
 function stockOutPanel(list) {
   ensureStockOutSession();
@@ -11732,7 +11746,8 @@ function stockOutPanel(list) {
     return `<div class="space-y-4 stock-out-view">${stockOutReceiptPanel(state.stockOutReceipt)}<button type="button" onclick="confirmNewStockOut()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ зарлага</button></div>`;
   }
   const canFinish = stockOutCanFinish();
-  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${stockOutEntryList(list)}<div class="grid grid-cols-2 gap-2"><button type="button" onclick="confirmFinishStockOut()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockOut()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div></div>`;
+  const actions = `<div class="grid grid-cols-2 gap-2 stock-out-actions"><button type="button" onclick="confirmFinishStockOut()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockOut()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
+  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${actions}${stockOutEntryList(list)}</div>`;
 }
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
