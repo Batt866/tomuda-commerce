@@ -7369,8 +7369,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* Source jishee widths — B fits «Дансны дугаар:»; C holds right-flush IBAN */
-.receipt-grid__a { width: 3.5%; } .receipt-grid__b { width: 18.0%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
+/* A fits logo; B fits «Дансны дугаар:»; C holds right-flush IBAN */
+.receipt-grid__a { width: 10.0%; } .receipt-grid__b { width: 16.5%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -7410,14 +7410,16 @@ td, th { border: none; }
   vertical-align: middle;
   padding: 0 2px 0 0 !important;
   overflow: hidden;
+  max-width: 100%;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
-  width: 14mm !important;
-  height: 14mm !important;
-  min-width: 14mm !important;
-  max-width: 14mm !important;
-  min-height: 14mm !important;
-  max-height: 14mm !important;
+  width: 11mm !important;
+  height: 11mm !important;
+  min-width: 11mm !important;
+  max-width: 11mm !important;
+  min-height: 11mm !important;
+  max-height: 11mm !important;
+  display: block;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
@@ -8292,9 +8294,9 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K: B fits «Дансны дугаар:»; C right-flush «IBAN:»; E fits «Хэмжих нэгж»
+// ҮНДСЭН A–K: A fits logo (no overlap); B fits «Дансны дугаар:»; C right-flush «IBAN:»
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 15.75, 9.0, 2.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  8.5, 15.75, 9.0, 2.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
