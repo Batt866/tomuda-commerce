@@ -6416,7 +6416,7 @@ async function flushBackendSave() {
   persistOrderSnapshot();
   await saveBackendState();
   if (!localStateDirty()) return true;
-  await sleep(600);
+  // One immediate retry for races — no artificial delay.
   await saveBackendState();
   return !localStateDirty();
 }
@@ -6498,6 +6498,10 @@ function pendingOrderDeletionsWithoutLog(data = persistentState()) {
 async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
   if (!state.isLoggedIn || !state.currentEmployee?.id) return;
+  if (backendSaving) {
+    scheduleBackendSave();
+    return;
+  }
   if (importLoading) {
     scheduleBackendSave();
     return;
@@ -17728,9 +17732,12 @@ async function applyCustomerSave(data, id) {
     }
     if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
     saveLocalBackendCache({
-      state: payload?.state || persistentState(),
+      state: stateForBackendSave(),
       updatedAt: payload?.updatedAt || "",
     });
+    syncBackendSaveMarker(stateForBackendSave());
+    clearOrderPersistenceCache();
+    clearBackendSaveFailed();
   } catch (error) {
     upsertError = String(error?.message || "").trim();
     console.warn("Customer upsert failed", error);
@@ -17744,22 +17751,9 @@ async function applyCustomerSave(data, id) {
   }
   closeModal();
   focusSavedCustomer(customerId, customerName);
-  // Flush any other dirty local fields; customer row is already on the server.
-  let saved = upsertOk;
-  try {
-    const flushed = await criticalBackendSave();
-    saved = upsertOk || !!flushed;
-  } catch {
-    saved = upsertOk;
-  }
-  if (!saved) {
-    showAppToast(
-      `${customerName} хадгалагдлаа, серверт илгээхэд алдаа гарлаа`,
-      "error",
-    );
-  } else {
-    showAppToast(`${customerName} хадгалагдлаа`, "success");
-  }
+  // Customer is already on the server; sync leftover dirty data in background.
+  if (localStateDirty()) scheduleBackendSave();
+  showAppToast(`${customerName} хадгалагдлаа`, "success");
   return true;
 }
 async function saveCustomer(e, id) {
@@ -19667,9 +19661,14 @@ function applyOrderUpsertPayload(payload) {
   restoreSessionSnapshot(session);
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   saveLocalBackendCache({
-    state: payload.state,
+    state: stateForBackendSave(),
     updatedAt: payload.updatedAt || "",
   });
+  // Upsert already wrote order+stock on the server — mark clean so we do not
+  // immediately block the UI on a second full-state GET+POST.
+  syncBackendSaveMarker(stateForBackendSave());
+  clearOrderPersistenceCache();
+  clearBackendSaveFailed();
 }
 async function saveWorker() {
   if (orderSubmitLock) return;
@@ -19753,11 +19752,16 @@ async function saveWorker() {
       console.warn("Order upsert failed", error);
     }
     let saved = upsertOk;
-    try {
-      const flushed = await criticalBackendSave();
-      saved = upsertOk || !!flushed;
-    } catch {
-      saved = upsertOk;
+    if (upsertOk) {
+      // Full-state sync in background only if something else is still dirty.
+      if (localStateDirty()) scheduleBackendSave();
+    } else {
+      try {
+        const flushed = await criticalBackendSave();
+        saved = !!flushed;
+      } catch {
+        saved = false;
+      }
     }
     if (!ensureSavedOrderVisible(order)) render();
     if (saved) {
@@ -19862,11 +19866,15 @@ async function saveWorkerOrderEdit() {
       console.warn("Order edit upsert failed", error);
     }
     let saved = upsertOk;
-    try {
-      const flushed = await criticalBackendSave();
-      saved = upsertOk || !!flushed;
-    } catch {
-      saved = upsertOk;
+    if (upsertOk) {
+      if (localStateDirty()) scheduleBackendSave();
+    } else {
+      try {
+        const flushed = await criticalBackendSave();
+        saved = !!flushed;
+      } catch {
+        saved = false;
+      }
     }
     if (saved) {
       showAppToast("Захиалгын өөрчлөлт хадгалагдлаа", "success");
