@@ -7860,7 +7860,7 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
   background: ${RECEIPT_GRAND_BG} !important;
   font-weight: 700 !important;
-  font-size: 11px !important;
+  font-size: 9px !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 9px; }
 .receipt-grid__summary-note {
@@ -8081,8 +8081,8 @@ td, th { border: none; }
   border-top: none !important;
   border-bottom: none !important;
 }
-.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 11px !important; }
-.receipt-grid__summary-value--grand { font-size: 11px !important; font-weight: 700 !important; }
+.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9px !important; }
+.receipt-grid__summary-value--grand { font-size: 9px !important; font-weight: 700 !important; }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   border: none !important;
 }
@@ -8875,7 +8875,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
     // Non-grand: label B:D, amount E:K.
-    // Grand: same span B:D / E:K; label bold 9pt gray (58), amount bold 11pt gray (50).
+    // Grand: same span B:D / E:K; label + amount both bold 9pt gray (58 / 50).
     // cellXfs are 0..58 only — never use style 59+ (Excel "repair" dialog).
     const labelStyle = grand ? 58 : 30;
     const valueStyle = grand ? 50 : decimals ? 29 : 47;
