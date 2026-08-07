@@ -484,8 +484,8 @@ function receiptMetaRow(
   rightLabel = "",
   rightValue = "",
 ) {
-  // Sample R4–R7: B label | D:E value | F:H label | I:K value
-  return `<tr class="receipt-grid__meta"><td></td><td class="receipt-grid__label">${esc(leftLabel)}</td><td></td><td colspan="2" class="receipt-grid__value">${leftValue}</td><td colspan="3" class="receipt-grid__label">${esc(rightLabel)}</td><td colspan="3" class="receipt-grid__value">${rightValue}</td></tr>`;
+  // Sample R4–R7: B:C label | D:E value | F:H label | I:K value
+  return `<tr class="receipt-grid__meta"><td></td><td colspan="2" class="receipt-grid__label">${esc(leftLabel)}</td><td colspan="2" class="receipt-grid__value">${leftValue}</td><td colspan="3" class="receipt-grid__label">${esc(rightLabel)}</td><td colspan="3" class="receipt-grid__value">${rightValue}</td></tr>`;
 }
 function receiptInfoFieldRow(label, value, valueClass = "") {
   return `<tr class="receipt-info__row"><td class="receipt-info__label">${esc(label)}</td><td class="receipt-info__value${valueClass ? ` ${valueClass}` : ""}">${value}</td></tr>`;
@@ -843,7 +843,7 @@ function receiptCashSettleNoteText() {
 }
 /** PaymentInformation — ҮНДСЭН wording (нийлүүлэгч тал). */
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр,<br>ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр дэлгүүрийн нэр,<br>ААН-ийн РЕГИСТР-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
 }
 function PaymentInformation() {
   return receiptWarningRowsHtml();
@@ -872,7 +872,7 @@ function receiptSignatureRowsHtml(opts = {}) {
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
   const block = (role) =>
-    `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="6"></td></tr>`;
+    `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
   return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
 }
@@ -1694,6 +1694,35 @@ function excelIconHtml() {
 function importUploadIconHtml() {
   return `<svg class="ui-icon page-toolbar__excel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 19h16a2 2 0 0 0 2-2v-1H2v1a2 2 0 0 0 2 2z"/></svg>`;
 }
+function excelBusySpinnerHtml() {
+  return `<span class="btn--toolbar-excel__spinner" aria-hidden="true"></span>`;
+}
+let excelExportBusy = false;
+function markExcelExportButtonsBusy(busy) {
+  excelExportBusy = !!busy;
+  document.querySelectorAll("button.btn--toolbar-excel").forEach((btn) => {
+    if (busy) {
+      if (!btn.dataset.excelIdleHtml) btn.dataset.excelIdleHtml = btn.innerHTML;
+      btn.classList.add("is-busy");
+      btn.disabled = true;
+      btn.setAttribute("aria-busy", "true");
+      btn.innerHTML = `${excelBusySpinnerHtml()}<span class="btn--toolbar__label">Татаж байна...</span>`;
+    } else {
+      btn.classList.remove("is-busy");
+      btn.removeAttribute("aria-busy");
+      if (btn.dataset.excelIdleHtml) {
+        btn.innerHTML = btn.dataset.excelIdleHtml;
+        delete btn.dataset.excelIdleHtml;
+      }
+      // Keep original disabled if the button was meant to stay disabled
+      if (btn.hasAttribute("data-excel-keep-disabled")) {
+        btn.disabled = true;
+      } else {
+        btn.disabled = false;
+      }
+    }
+  });
+}
 function excelDownloadBtn(onclick, opts = {}) {
   const {
     label = EXCEL_FILE_DOWNLOAD,
@@ -1701,7 +1730,12 @@ function excelDownloadBtn(onclick, opts = {}) {
     disabled = false,
     extraClass = "",
   } = opts;
-  return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-excel ${extraClass}"${disabled ? " disabled" : ""} aria-label="${esc(label)}">${excelIconHtml()}<span class="btn--toolbar__label btn--toolbar__label--full">${esc(label)}</span><span class="btn--toolbar__label btn--toolbar__label--short">${esc(shortLabel)}</span></button>`;
+  const busy = excelExportBusy;
+  const keepDisabled = disabled ? ' data-excel-keep-disabled="1"' : "";
+  if (busy) {
+    return `<button type="button" class="btn btn--toolbar btn--toolbar-excel is-busy ${extraClass}" disabled aria-busy="true" aria-label="Татаж байна"${keepDisabled}>${excelBusySpinnerHtml()}<span class="btn--toolbar__label">Татаж байна...</span></button>`;
+  }
+  return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-excel ${extraClass}"${disabled ? " disabled" : ""}${keepDisabled} aria-label="${esc(label)}">${excelIconHtml()}<span class="btn--toolbar__label btn--toolbar__label--full">${esc(label)}</span><span class="btn--toolbar__label btn--toolbar__label--short">${esc(shortLabel)}</span></button>`;
 }
 function excelImportToolbar(kind) {
   if (!canImportExcel() && !canDownloadExcelTemplate()) return "";
@@ -7188,7 +7222,7 @@ function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: letter portrait; margin: 10mm 8mm 8mm 12mm; }
+@page { size: A4 portrait; margin: 10mm; }
 body {
   margin: 0;
   padding: 0;
@@ -7203,11 +7237,11 @@ td, th { border: none; }
 .receipt-excel-sheet { display: block; background: #fff; color: ${RECEIPT_TEXT}; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page {
-  width: 215.9mm;
-  max-width: 215.9mm;
+  width: 190mm;
+  max-width: 190mm;
   margin: 0 auto;
-  /* Letter page; ҮНДСЭН density — base 9pt Arial. */
-  padding: 4mm 6mm 3mm 8mm;
+  /* A4 page; ҮНДСЭН density — base 9pt Arial. */
+  padding: 4mm 4mm 3mm 4mm;
   box-sizing: border-box;
   font-size: 9px;
   line-height: 1.15;
@@ -7227,8 +7261,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* Source jishee widths — A:B logo (B slim), C wide for names */
-.receipt-grid__a { width: 6.5%; } .receipt-grid__b { width: 3.2%; } .receipt-grid__c { width: 21.3%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 11.8%; }
+/* Source jishee widths — A narrow, B slim, E fits «Хэмжих нэгж» */
+.receipt-grid__a { width: 5.0%; } .receipt-grid__b { width: 3.2%; } .receipt-grid__c { width: 21.3%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.3%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -7339,7 +7373,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--promo-gap > td {
   border: none !important;
-  height: 16px;
+  height: 8px;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -7679,7 +7713,6 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
   text-align: right;
   border: none !important;
-  border-top: 0.4pt solid #777 !important;
   border-bottom: 0.4pt solid #777 !important;
   background: #d9d9d9 !important;
 }
@@ -7700,6 +7733,11 @@ td, th { border: none; }
   padding: 1px 4px;
   font-weight: 700;
   font-size: 11px;
+}
+.receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
+  font-weight: 400 !important;
+  font-size: 10px !important;
+  letter-spacing: -0.02em;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand,
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
@@ -7731,7 +7769,13 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
   font-weight: 400;
 }
-.receipt-grid--sheet .receipt-grid__sign-line { border: none !important; }
+.receipt-grid--sheet .receipt-grid__sign-line {
+  border: none !important;
+  border-bottom: 0.4pt dotted #666 !important;
+  height: 14px;
+  padding: 0 !important;
+  vertical-align: bottom;
+}
 .receipt-grid__header-cell {
   padding: 0 0 4px !important;
   vertical-align: top;
@@ -7847,15 +7891,16 @@ td, th { border: none; }
   align-items: baseline;
   justify-content: space-between;
   gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
   white-space: nowrap;
   font-size: 9px;
 }
-.receipt-grid__iban-label { text-align: right; padding-right: 4px; font-weight: 700; white-space: nowrap; vertical-align: top; }
+.receipt-grid__iban-label { text-align: right; margin-left: auto; padding-right: 0; font-weight: 700; white-space: nowrap; vertical-align: top; }
 .receipt-info__value,
 .receipt-info__address-text,
 .receipt-items__promo-label,
-.receipt-grid__money--strong,
-.receipt-grid__summary-label--grand {
+.receipt-grid__money--strong {
   font-weight: 700;
   font-family: ${RECEIPT_FONT};
 }
@@ -7889,7 +7934,7 @@ td, th { border: none; }
   border: none !important;
 }
 .receipt-grid__summary-label--vat { font-weight: 700 !important; }
-.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 12px !important; }
+.receipt-grid__summary-label--grand { font-weight: 400; color: ${RECEIPT_TEXT} !important; font-size: 10px !important; letter-spacing: -0.02em; }
 .receipt-grid__summary-value {
   text-align: right;
   font-size: 11px;
@@ -7937,6 +7982,7 @@ td, th { border: none; }
 .receipt-grid__warn-line:last-child,
 .receipt-grid__warn-line--last { margin-bottom: 0; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
+.receipt-grid__warn-em { font-weight: 700; font-size: 8.5px; }
 .receipt-grid__sign-label {
   font-size: 11px;
   font-weight: 400;
@@ -7952,17 +7998,17 @@ td, th { border: none; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 @media print {
   html, body {
-    width: 215.9mm;
+    width: auto;
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
   }
   .receipt-page {
-    width: 100%;
-    max-width: none;
+    width: 190mm;
+    max-width: 190mm;
     min-height: auto;
-    padding: 3mm 5mm 3mm 6mm;
-    margin: 0;
+    padding: 2mm 0;
+    margin: 0 auto;
     box-shadow: none !important;
     overflow: visible;
     font-size: 9px;
@@ -8000,7 +8046,10 @@ td, th { border: none; }
     border: none !important;
   }
   .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-rule,
-  .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money,
+  .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
+    border-top: none !important;
+    border-bottom: 0.5pt solid #000 !important;
+  }
   .receipt-grid__summary-note {
     border-top: 0.5pt solid #000 !important;
     border-bottom: 0.5pt solid #000 !important;
@@ -8123,9 +8172,9 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K: logo A:B (B narrow so brand in C sits close), wide C for names
+// ҮНДСЭН A–K: A narrow, B slim (unchanged), E wide enough for «Хэмжих нэгж»
 const RECEIPT_XLSX_COL_WIDTHS = [
-  5.5, 2.75, 18.0, 3.875, 10.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  4.25, 2.75, 18.0, 3.875, 12.0, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
@@ -8207,14 +8256,23 @@ function createReceiptStringContext() {
     strIndex.set(key, idx);
     return idx;
   };
-  return { strings, si };
+  /** Rich shared string: parts = [{ t, b?, sz? }, ...] */
+  const siRich = (parts) => {
+    const key = `\0rich:${JSON.stringify(parts)}`;
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push({ __rich: parts });
+    strIndex.set(key, idx);
+    return idx;
+  };
+  return { strings, si, siRich };
 }
 function receiptXlsxStylesXml() {
   // Built-in numFmtIds: 0 General, 3 #,##0, 4 #,##0.00, 14 date, 49 @ (text).
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="7"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="56"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="59"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" shrinkToFit="1"/></xf></cellXfs>Id="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -8310,7 +8368,7 @@ function xlsxZipWriteUtf8(zip, path, xml) {
 // Appends one receipt's rows/merges starting at startRow; returns next free row.
 // Layout mirrors zarlaga-receipt-undsen.xls (11 cols A–K) exactly.
 function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
-  const { si } = ctx;
+  const { si, siRich } = ctx;
   let rowNum = startRow;
   const emptyCells = (
     row,
@@ -8405,32 +8463,37 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(hr3, "D", "J", 40),
   ]);
 
-  const pushMetaPairRow = (leftLabel, leftValue, rightLabel, rightValue, { rightBold = false } = {}) => {
+  const pushMetaPairRow = (leftLabel, leftValue, rightLabel, rightValue, { rightBold = false, singleLine = false } = {}) => {
     const r = rowNum;
     const left = plain(leftValue);
     const right = plain(rightValue);
     // B:C merge — full left labels (e.g. Худалдааны төлөөлөгчийн утас:)
     merges.push(`B${r}:C${r}`, `D${r}:E${r}`, `F${r}:H${r}`, `I${r}:K${r}`);
     const bcW = RECEIPT_XLSX_COL_WIDTHS[1] + RECEIPT_XLSX_COL_WIDTHS[2];
-    const labelH = receiptXlsxWrappedRowHeight(leftLabel, bcW, {
-      min: 14.25,
-      linePt: 11,
-      pad: 2,
-      max: 28,
-    });
+    const labelStyle = singleLine ? 56 : 5;
+    const labelH = singleLine
+      ? 14.25
+      : receiptXlsxWrappedRowHeight(leftLabel, bcW, {
+          min: 14.25,
+          linePt: 11,
+          pad: 2,
+          max: 28,
+        });
     pushRow(labelH, [
-      xlsxCellXml(`B${r}`, 5, si(leftLabel), "s"),
+      xlsxCellXml(`B${r}`, labelStyle, si(leftLabel), "s"),
       xlsxCellXml(`D${r}`, 5, si(left), "s"),
       xlsxCellXml(`F${r}`, 5, si(rightLabel), "s"),
       xlsxCellXml(`I${r}`, rightBold ? 4 : 5, si(right), "s"),
-      ...emptyCells(r, "C", "C", 5),
+      ...emptyCells(r, "C", "C", labelStyle),
       ...emptyCells(r, "E", "E", 5),
       ...emptyCells(r, "G", "H", 5),
       ...emptyCells(r, "J", "K", rightBold ? 4 : 5),
     ]);
   };
   pushMetaPairRow("Худалдааны төлөөлөгч:", f.salesName, "Харилцагч:", f.customerName, { rightBold: true });
-  pushMetaPairRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg);
+  pushMetaPairRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg, {
+    singleLine: true,
+  });
   pushMetaPairRow("Түгээгчийн нэр:", f.deliveryName, "Компаний нэр:", f.companyName);
   pushMetaPairRow("Түгээгчийн утас:", f.deliveryPhone, "Утасны дугаар:", f.customerPhone);
   // Always show И-мэйл row (blank when no customer email)
@@ -8467,8 +8530,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // Keep B column width unchanged: label uses B:C merge; IBAN sits at right of that merge
-    `B${bankR4}:C${bankR4}`,
+    // B = Дансны дугаар:, C = IBAN: (right-aligned), D:E = number
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
@@ -8496,20 +8558,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR3, "E", "E", 5),
   ]);
   {
-    const left = "Дансны дугаар:";
-    const right = "IBAN:";
-    const slot = Math.max(
-      20,
-      Math.round(
-        (RECEIPT_XLSX_COL_WIDTHS[1] + RECEIPT_XLSX_COL_WIDTHS[2]) * 1.3,
-      ),
-    );
-    const pad = Math.max(1, slot - [...left].length - [...right].length);
-    const ibanLabel = `${left}${"\u00A0".repeat(pad)}${right}`;
     pushRow(perBankH, [
-      xlsxCellXml(`B${bankR4}`, 5, si(ibanLabel), "s"),
+      xlsxCellXml(`B${bankR4}`, 58, si("Дансны дугаар:"), "s"),
+      xlsxCellXml(`C${bankR4}`, 3, si("IBAN:"), "s"),
       xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
-      ...emptyCells(bankR4, "C", "C", 5),
       ...emptyCells(bankR4, "E", "E", 4),
     ]);
   }
@@ -8669,8 +8721,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   });
 
-  // Extra blank row between Урамшуулал and summary labels
-  pushRow(18, emptyCells(rowNum, "A", RECEIPT_XLSX_LAST_COL, 1));
+  // One blank row before summary when promo exists (no promo → keep the single prior spacer only)
+  if (promoLines.length) {
+    pushRow(10, emptyCells(rowNum, "A", RECEIPT_XLSX_LAST_COL, 1));
+  }
 
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
@@ -8735,31 +8789,45 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
 
   [
     [
-      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж гүйлгээний утга дээр дэлгүүрийн нэр,\nААН-ийн РЕГИСТР-ийг бичээрэй.",
+      null,
       42,
+      [
+        {
+          t: "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж ",
+          sz: 8,
+        },
+        { t: "гүйлгээний утга", b: true, sz: 8 },
+        {
+          t: " дээр дэлгүүрийн нэр,\nААН-ийн РЕГИСТР-ийг бичээрэй.",
+          sz: 8,
+        },
+      ],
     ],
     ["Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай. ", 43],
     ["Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно", 42],
-    ["Барааг сайтар шалгаж тоо ширхэгийг тулгаж хүлээн авахыг анхаарна уу!", 42],
-  ].forEach(([text, style], index) => {
+    ["Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!", 42],
+  ].forEach(([text, style, richParts], index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
     const warnH = index === 0 ? 21.75 : 12;
+    const value = richParts ? siRich(richParts) : si(text);
     pushRow(warnH, [
-      xlsxCellXml(`B${r}`, style, si(text), "s"),
+      xlsxCellXml(`B${r}`, style, value, "s"),
       ...emptyCells(r, "C", "K", style),
     ]);
   });
 
   pushRow(14.25, emptyCells(rowNum));
-  // Right-aligned through E — text sits at the right edge of column E (B width unchanged)
+  // Label B:E right-aligned; finest dotted signature line F→J
   const pushSignRow = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:E${r}`);
+    merges.push(`B${r}:E${r}`, `F${r}:J${r}`);
     pushRow(18, [
       xlsxCellXml(`B${r}`, 30, si(role), "s"),
       ...emptyCells(r, "C", "E", 30),
-      ...emptyCells(r, "F", "K", 1),
+      xlsxCellXml(`F${r}`, 57, null, "empty"),
+      ...emptyCells(r, "G", "J", 57),
+      ...emptyCells(r, "K", "K", 1),
     ]);
   };
   pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
@@ -8778,8 +8846,8 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
     : "";
   // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
-  // Fit width to one page; do not crush row heights (keeps wrapped text readable).
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<pageMargins left="0.5" right="0.4" top="0.4" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="1" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  // Fit width to one A4 page, horizontally centered.
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.4" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -8904,9 +8972,9 @@ function isMacDesktop() {
   );
 }
 function prefersExcelFileShare() {
-  // Mobile + Mac: share sheet lets the user pick Microsoft Excel
-  // instead of auto-opening Numbers.
-  return prefersMobileExcelShare() || isMacDesktop();
+  // Mobile only — Mac share-sheet after async zip often fails/cancels and feels like
+  // the download button needs 2–3 clicks.
+  return prefersMobileExcelShare();
 }
 async function forceDownloadXlsxFile(blob, filename) {
   // Always deliver a real .xlsx Excel workbook.
@@ -8917,7 +8985,8 @@ async function forceDownloadXlsxFile(blob, filename) {
     type: "application/octet-stream",
   });
 
-  // Share-to-Excel first (Mac/iOS/Android). On Mac this avoids Numbers auto-open.
+  // Share-to-Excel on phones (Files / Excel). Skip on desktop — gesture is lost
+  // after async zip and Mac share Abort looks like a failed click.
   if (
     prefersExcelFileShare() &&
     typeof navigator.share === "function" &&
@@ -8939,32 +9008,11 @@ async function forceDownloadXlsxFile(blob, filename) {
   }
 
   if (typeof navigator.msSaveOrOpenBlob === "function") {
-    // Windows / legacy Edge — opens with Microsoft Excel.
     navigator.msSaveOrOpenBlob(excelBlob, name);
     return true;
   }
 
-  // Desktop Chrome/Edge: Save As Excel file (Windows then opens Excel).
-  if (typeof window.showSaveFilePicker === "function") {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: name,
-        types: [
-          {
-            description: "Excel (.xlsx)",
-            accept: { [XLSX_MIME]: [".xlsx"] },
-          },
-        ],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(excelBlob);
-      await writable.close();
-      return true;
-    } catch (err) {
-      if (err?.name === "AbortError") return false;
-    }
-  }
-
+  // Direct <a download> — works after async build without a fresh user gesture.
   const url = URL.createObjectURL(downloadBlob);
   try {
     const a = document.createElement("a");
@@ -9006,6 +9054,8 @@ async function exportOrderReceiptsExcelLegacy(orders) {
 }
 async function exportOrderReceiptsExcel(orders) {
   if (!orders.length) return alert("Захиалга олдсонгүй");
+  if (excelExportBusy) return;
+  markExcelExportButtonsBusy(true);
   try {
     await exportOrderReceiptsExcelXlsx(orders);
     showInstallToast("Excel файл татагдлаа");
@@ -9016,6 +9066,10 @@ async function exportOrderReceiptsExcel(orders) {
       "Мэдээлэл татах амжилтгүй",
       "Excel (.xlsx) файл үүсгэхэд алдаа гарлаа. Хуудсыг дахин ачаалаад дахин оролдоно уу.",
     );
+  } finally {
+    excelExportBusy = false;
+    if (window.__tomudaBooted) render();
+    else markExcelExportButtonsBusy(false);
   }
 }
 function orderReceiptExportSnapshots(
@@ -9110,18 +9164,13 @@ function confirmOrderReceiptsExcel(
         : "Захиалга олдсонгүй",
     );
   }
-  confirmDataExport(
-    "Мэдээлэл татах",
-    () => exportOrderReceiptsExcel(rows),
-    `${rows.length} баримт татах уу?`,
-  );
+  // One click → download (busy/skeleton on the button while building).
+  void exportOrderReceiptsExcel(rows);
 }
 function confirmSingleOrderReceiptExcel(orderId) {
   const o = state.orders.find((x) => x.id === orderId);
   if (!o) return alert("Захиалга олдсонгүй");
-  confirmDataExport("Мэдээлэл татах", () =>
-    exportOrderReceiptsExcel([orderReceiptSnapshot(o)]),
-  );
+  void exportOrderReceiptsExcel([orderReceiptSnapshot(o)]);
 }
 function ordersView() {
   return `<div class="space-y-5">${orderReceiptsPanel({ title: "Захиалга", searchKey: "orders", showCreate: true })}</div>`;
@@ -12159,6 +12208,22 @@ function xlsxColName(n) {
 function xlsxSharedStringsXml(strings) {
   const items = strings
     .map((s) => {
+      if (s && typeof s === "object" && Array.isArray(s.__rich)) {
+        const runs = s.__rich
+          .map((part) => {
+            const raw = String(part?.t ?? "");
+            const text = xlsxXmlEsc(raw);
+            const preserve =
+              /^\s|\s$/.test(raw) || raw.includes("\n")
+                ? ' xml:space="preserve"'
+                : "";
+            const bold = part?.b ? "<b/>" : "";
+            const sz = Number(part?.sz) || 8;
+            return `<r><rPr>${bold}<sz val="${sz}"/><color rgb="FF000000"/><rFont val="Arial"/></rPr><t${preserve}>${text}</t></r>`;
+          })
+          .join("");
+        return `<si>${runs}</si>`;
+      }
       const raw = String(s ?? "");
       const text = xlsxXmlEsc(raw);
       // Newlines / edge spaces must be preserved or Excel collapses IBAN lines.
@@ -18662,8 +18727,8 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: letter portrait; margin: 10mm 8mm 8mm 12mm; }
-  .receipt-page { width: 100%; max-width: none; padding: 0; }
+  @page { size: A4 portrait; margin: 10mm; }
+  .receipt-page { width: 190mm; max-width: 190mm; margin: 0 auto; padding: 2mm 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
     const cleanup = () => {
