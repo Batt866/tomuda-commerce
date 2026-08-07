@@ -13477,7 +13477,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D pack · E piece · F stock */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [38, 14, 14, 6, 7, 14];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [38, 14, 14, 6, 7, 11];
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -13516,14 +13516,18 @@ function warehousePreparePatchStylesXml(stylesXml) {
     ? stylesXml.replace(numStyle, numStyleRight)
     : stylesXml;
 
-  // Signature underline (B→E): bottom border only — template style 17 has no border.
-  const signBorder =
+  // Signature underline (B→E): thinnest hairline bottom border.
+  const signBorderHair =
+    '<border><left /><right /><top /><bottom style="hair"><color theme="1" /></bottom><diagonal /></border>';
+  const signBorderMedium =
     '<border><left /><right /><top /><bottom style="medium"><color theme="1" /></bottom><diagonal /></border>';
-  if (!out.includes(signBorder)) {
+  if (out.includes(signBorderMedium)) {
+    out = out.replace(signBorderMedium, signBorderHair);
+  } else if (!out.includes(signBorderHair)) {
     out = out.replace(
       /(<borders count=")(\d+)(">)([\s\S]*?)(<\/borders>)/,
       (_, a, count, c, body, end) =>
-        `${a}${Number(count) + 1}${c}${body}${signBorder}${end}`,
+        `${a}${Number(count) + 1}${c}${body}${signBorderHair}${end}`,
     );
   }
   const signXf =
