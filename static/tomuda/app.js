@@ -13833,7 +13833,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .num { text-align: right; }
 .spacer td { height: 88px; }
 .sign-label { text-align: right; font-weight: 700; }
-.sign-line { border-bottom: 2px solid #000 !important; }
+.sign-line { border-bottom: 0.5pt solid #000 !important; }
 .sign-hint { text-align: left; font-size: 14px; border-top: none !important; }
 .sign-gap td { height: 10px; border: none !important; }
 .sign-block-gap td { height: 22px; border: none !important; }
