@@ -1426,11 +1426,20 @@ img.worker-pick-card__avatar {
 }
 
 .worker-pick-card__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
   font-size: 15px;
   font-weight: 700;
   line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.worker-pick-card__loc {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
   white-space: nowrap;
 }
 
@@ -4916,6 +4925,11 @@ button:focus-visible,
   font-size: 1.05rem;
 }
 
+#picker-order-title .worker-order-store__loc {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 #picker-order-title .worker-order-store__reg,
 #picker-order-title .worker-order-store__phone {
   margin-top: 2px;
@@ -6525,10 +6539,25 @@ textarea::placeholder {
 
 .worker-order-store__name {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.25;
   color: var(--hex-foreground);
+}
+
+.worker-order-store__name-text {
+  min-width: 0;
+}
+
+.worker-order-store__loc {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+  white-space: nowrap;
 }
 
 .worker-order-store__reg {

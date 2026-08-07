@@ -6041,6 +6041,19 @@ function initPickerModalActions() {
       setPickerCategory(catBtn.getAttribute("data-picker-cat") || "");
       return;
     }
+    const clearSearchBtn = e.target.closest("[data-picker-clear-search]");
+    if (clearSearchBtn) {
+      state.searches.workerProduct = "";
+      const input = modal.querySelector("[data-picker-search]");
+      if (input) input.value = "";
+      clearSearchBtn.hidden = true;
+      if (refreshPickerList()) {
+        input?.focus();
+        return;
+      }
+      pickerModal();
+      return;
+    }
     const clearCartBtn = e.target.closest("[data-picker-clear-cart]");
     if (clearCartBtn) {
       clearPickerCart();
@@ -10629,12 +10642,16 @@ function customerRow(c) {
 }
 function workerPickCard(c) {
   const active = state.workerCustomer === c.id;
+  const loc = customerDistrictKhoroo(c);
   const sub = customerSubtitle(c);
   const phone = customerPhonesList(c)[0] || "";
   const reg = customerRegistrationDisplay(c);
   const id = esc(c.id);
   const line2 = sub || reg || phone;
-  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}</span>${line2 ? `<span class="worker-pick-card__sub">${esc(line2)}</span>` : ""}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
+  const subHtml = line2
+    ? `<span class="worker-pick-card__sub">${esc(line2)}</span>`
+    : "";
+  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
 function productsView() {
   const q = state.searches.products || "",
@@ -16702,6 +16719,9 @@ function detailRow(x) {
   const p = x.product;
   return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${x.qty} ш</b></div>`;
 }
+function customerDistrictKhoroo(c) {
+  return [c?.district, c?.khoroo].filter(Boolean).join(" · ");
+}
 function workerStoreSummary(c, compact = false) {
   if (!c)
     return `<p class="text-sm text-muted-foreground">Харилцагч сонгоогүй</p>`;
@@ -16709,9 +16729,13 @@ function workerStoreSummary(c, compact = false) {
     .filter(Boolean)
     .join(", ");
   const reg = customerRegistrationDisplay(c) || "—";
+  const loc = customerDistrictKhoroo(c);
+  const locHtml = loc
+    ? `<span class="worker-order-store__loc">${esc(loc)}</span>`
+    : "";
   if (compact)
-    return `<div class="worker-order-store"><p class="worker-order-store__name">${esc(c.name)}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
-  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold">${esc(c.name)}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
+    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(c.name)}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(c.name)}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
 }
 function workerOrderAgentField() {
   ensureOrderEmployeeSelection();
@@ -19574,14 +19598,48 @@ function applyStock(id, type, qty, costPrice) {
   return true;
 }
 function pickerProductsInView() {
-  const cat = state.filters.workerCategory || "";
+  const q = (state.searches.workerProduct || "").toLowerCase().trim(),
+    cat = state.filters.workerCategory || "";
   return state.products
-    .filter((p) => !cat || p.category === cat)
+    .filter((p) => {
+      if (cat && p.category !== cat) return false;
+      if (!q) return true;
+      return (
+        String(p.name || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(p.barcode || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(p.category || "")
+          .toLowerCase()
+          .includes(q)
+      );
+    })
     .sort((a, b) => {
       const byCat = (a.category || "").localeCompare(b.category || "", "mn");
       if (byCat) return byCat;
       return (a.name || "").localeCompare(b.name || "", "mn");
     });
+}
+function pickerSearchToolsHtml() {
+  const q = state.searches.workerProduct || "";
+  return `<div class="picker-search-tools"><input data-picker-search type="search" inputmode="search" value="${esc(q)}" oninput="pickerSearch(this.value)" placeholder="Бараа, баркодоор хайх..." class="picker-search-input app-input" autocomplete="off" aria-label="Бараа хайх"><button type="button" data-picker-clear-search class="btn btn--secondary btn--sm picker-search-clear"${q ? "" : " hidden"}>Цэвэрлэх</button></div>`;
+}
+function pickerSearch(value) {
+  state.searches.workerProduct = String(value || "");
+  const clearBtn = modal.querySelector("[data-picker-clear-search]");
+  if (clearBtn) clearBtn.hidden = !String(value || "").trim();
+  if (refreshPickerList()) return;
+  pickerModal();
+  const el = modal.querySelector("[data-picker-search]");
+  if (el) {
+    el.focus();
+    const len = el.value.length;
+    try {
+      el.setSelectionRange(len, len);
+    } catch (_) {}
+  }
 }
 function pickerCategoryChipsHtml() {
   const active = state.filters.workerCategory || "",
@@ -19892,6 +19950,13 @@ function clearPickerFilter() {
   state.filters.workerCategory = "";
   state.pickerStatus = "";
   state.pickerBarcode = "";
+  if (refreshPickerList()) {
+    const input = modal.querySelector("[data-picker-search]");
+    if (input) input.value = "";
+    const clearBtn = modal.querySelector("[data-picker-clear-search]");
+    if (clearBtn) clearBtn.hidden = true;
+    return;
+  }
   pickerModal();
 }
 function handleScannedBarcode(code) {
@@ -20064,7 +20129,7 @@ function pickerModal() {
     : "";
   box(
     pickerModalTitleHtml(),
-    `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions">${pickerCartSummaryBarHtml()}<div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
+    `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerSearchToolsHtml()}${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions">${pickerCartSummaryBarHtml()}<div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
     "max-w-2xl",
     {
       titleId: "picker-order-title",
@@ -21183,6 +21248,7 @@ Object.assign(window, {
   qtyCommit,
   openPickerModal,
   pickerModal,
+  pickerSearch,
   backToPickerCategories,
   clearPickerCart,
   setPickerCategory,
