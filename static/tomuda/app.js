@@ -7370,7 +7370,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* A logo бага зэрэг өргөн; B:C bank labels; C also used in other rows */
-.receipt-grid__a { width: 3.2%; } .receipt-grid__b { width: 17.8%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
+.receipt-grid__a { width: 4.0%; } .receipt-grid__b { width: 17.0%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.3%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
