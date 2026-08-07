@@ -8544,30 +8544,31 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
   const deliveryDateText = receiptDeliveryDateDisplay(o);
-  // Two lines under brand; flush toward logo (C), full text visible
+  // Two lines under brand; flush toward logo (B), full text visible
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header: logo A:B (sample proportions); brand C:F, addr C:I, title C:J
+  // Header: logo A only (rows 1–2); brand/address/title from B — keeps wide B without header gap
   // Date: label J:K row1; value K row2
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
   merges.push(
-    `A${hr1}:B${hr2}`,
-    `C${hr1}:F${hr1}`,
-    `C${hr2}:I${hr2}`,
-    `C${hr3}:J${hr3}`,
+    `A${hr1}:A${hr2}`,
+    `B${hr1}:F${hr1}`,
+    `B${hr2}:I${hr2}`,
+    `B${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
   );
   pushRow(14.25, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
-    xlsxCellXml(`C${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
+    xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
-    ...emptyCells(hr1, "D", "F", 39),
+    ...emptyCells(hr1, "C", "F", 39),
     ...emptyCells(hr1, "I", "I", 3),
     ...emptyCells(hr1, "K", "K", 3),
   ]);
   const companyAddrColW =
+    RECEIPT_XLSX_COL_WIDTHS[1] +
     RECEIPT_XLSX_COL_WIDTHS[2] +
     RECEIPT_XLSX_COL_WIDTHS[3] +
     RECEIPT_XLSX_COL_WIDTHS[4] +
@@ -8585,13 +8586,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     }),
   );
   pushRow(companyAddrH, [
-    xlsxCellXml(`C${hr2}`, 5, si(companyAddr), "s"),
+    xlsxCellXml(`B${hr2}`, 5, si(companyAddr), "s"),
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
-    ...emptyCells(hr2, "D", "I", 5),
+    ...emptyCells(hr2, "C", "I", 5),
   ]);
   pushRow(31.5, [
-    xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr3, "D", "J", 40),
+    xlsxCellXml(`B${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(hr3, "C", "J", 40),
   ]);
 
   const pushMetaPairRow = (leftLabel, leftValue, rightLabel, rightValue, { rightBold = false, singleLine = false } = {}) => {
