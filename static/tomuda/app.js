@@ -87,6 +87,7 @@ const state = {
   stockInReceipts: [],
   stockInHighlightId: "",
   customerHighlightId: "",
+  productHighlightId: "",
   stockOutEmployeeId: "",
   stockOutDraft: {},
   stockOutDone: false,
@@ -2010,16 +2011,22 @@ function setImportLoading(active, message = "Excel импорт хийж бай�
 }
 function showAppToast(message, type = "success") {
   document.querySelector(".app-toast")?.remove();
+  const text = String(message || "").trim();
+  if (!text) return;
   const el = document.createElement("div");
   el.className = `app-toast app-toast--${type}`;
   el.setAttribute("role", "status");
-  el.textContent = message;
+  el.setAttribute("aria-live", "polite");
+  el.textContent = text;
   document.body.appendChild(el);
-  requestAnimationFrame(() => el.classList.add("app-toast--visible"));
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => el.classList.add("app-toast--visible"));
+  });
+  const holdMs = type === "error" ? 4200 : 3800;
   setTimeout(() => {
     el.classList.remove("app-toast--visible");
     setTimeout(() => el.remove(), 220);
-  }, 3200);
+  }, holdMs);
 }
 function importActorPayload() {
   return state.currentEmployee
@@ -11475,6 +11482,39 @@ function workerPickCard(c) {
     : "";
   return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
+function focusSavedProduct(productId, productName, opts = {}) {
+  const name = String(productName || "Бараа").trim() || "Бараа";
+  const toastType = opts.toastType || "success";
+  const toastMessage =
+    opts.toastMessage ||
+    (opts.created ? `${name} нэмэгдлээ` : `${name} хадгалагдлаа`);
+  closeModal();
+  if (!productId) {
+    render();
+    showAppToast(toastMessage, toastType);
+    return;
+  }
+  state.currentView = "products";
+  state.searches.products = "";
+  state.filters.category = "all";
+  state.productHighlightId = productId;
+  render();
+  showAppToast(toastMessage, toastType);
+  const scrollToSaved = () => {
+    const card = [...document.querySelectorAll("[data-product-card-id]")].find(
+      (el) => el.getAttribute("data-product-card-id") === String(productId),
+    );
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  requestAnimationFrame(() => requestAnimationFrame(scrollToSaved));
+  setTimeout(scrollToSaved, 280);
+  setTimeout(() => {
+    if (state.productHighlightId !== productId) return;
+    state.productHighlightId = "";
+    if (state.currentView === "products") render();
+  }, 5000);
+}
 function productsView() {
   const q = state.searches.products || "",
     cat = state.filters.category,
@@ -11485,6 +11525,14 @@ function productsView() {
         (cat === "all" || p.category === cat),
     ),
     low = lowStockProducts().length;
+  const highlightId = state.productHighlightId || "";
+  if (highlightId) {
+    const idx = list.findIndex((p) => String(p.id) === String(highlightId));
+    if (idx > 0) {
+      const [hit] = list.splice(idx, 1);
+      list.unshift(hit);
+    }
+  }
   const toolbarFilters = `${pageToolbarSearch({ focusKey: "products", value: q, placeholder: "Хайх..." })}<select onchange="setProductCategory(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input"><option value="all">Бүх төрөл</option>${cats()
     .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
     .join("")}</select>`;
@@ -11504,7 +11552,7 @@ function productsView() {
     .filter(Boolean)
     .join("");
   const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${canViewProductCost() ? " product-list--show-cost" : ""}`;
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map(productCard).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = canManageProducts(),
@@ -11582,7 +11630,7 @@ function productDetail(id) {
   if (!p) return;
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
-function productCard(p) {
+function productCard(p, active = false) {
   const catLine = p.category || "—";
   const packLabel = productPackLabel(p);
   const packCell = packLabel
@@ -11597,7 +11645,7 @@ function productCard(p) {
   const low = isLowStock(p);
   const stock = p.stock ?? 0;
   const unit = esc(p.unit || "ш");
-  return `<article class="product-card product-card--clickable" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><span class="product-card__media" aria-hidden="true"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-card__img" width="72" height="72" loading="lazy" decoding="async" alt=""></span><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд</span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
+  return `<article class="product-card product-card--clickable${active ? " product-card--active" : ""}" data-product-card-id="${esc(p.id)}" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><span class="product-card__media" aria-hidden="true"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-card__img" width="72" height="72" loading="lazy" decoding="async" alt=""></span><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд</span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
 }
 function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   const cat = state.filters.inventoryCategory,
@@ -20442,23 +20490,20 @@ async function applyProductSave(data, id) {
         "Бараа түр хадгалагдлаа. Интернетээ шалгаад дахин оролдоно уу.",
     );
   }
-  closeModal();
-  render();
+  const savedProduct =
+    state.products.find((p) => String(p.id) === String(productId)) || product;
+  const savedName = savedProduct?.name || "Бараа";
   if (softSaved) {
-    showAppToast(
-      upsertError
+    focusSavedProduct(productId, savedName, {
+      toastType: "error",
+      toastMessage: upsertError
         ? `Түр хадгаллаа (${upsertError}). Сервертэй холбогдоод автоматаар илгээнэ.`
         : "Бараа серверт хадгалагдаагүй — дахин оролдоно уу",
-      "error",
-    );
+      created: !id,
+    });
     return false;
   }
-  showAppToast(
-    id
-      ? `${product?.name || "Бараа"} хадгалагдлаа`
-      : `${product?.name || "Бараа"} нэмэгдлээ`,
-    "success",
-  );
+  focusSavedProduct(productId, savedName, { created: !id });
   return true;
 }
 async function saveProduct(e, id) {
@@ -20469,41 +20514,76 @@ async function saveProduct(e, id) {
     return alertModal("Эрхгүй", "Бараа хадгалах эрхгүй.");
   }
   e.preventDefault();
-  if (productImageCompressTask) {
-    try {
-      await Promise.race([
-        productImageCompressTask,
-        sleep(8000).then(() => {
-          throw new Error("compress timeout");
-        }),
-      ]);
-    } catch (error) {
-      console.warn("Product image compress wait failed", error);
-      productImageCompressTask = null;
-      showAppToast("Зургийг алгасаад барааг хадгална", "warning");
+  const form = e.target;
+  const submitBtn = form?.querySelector?.('button[type="submit"]');
+  if (submitBtn?.disabled) return;
+  const prevLabel = submitBtn?.textContent || "Хадгалах";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Хадгалж байна...";
+  }
+  try {
+    if (productImageCompressTask) {
+      try {
+        await Promise.race([
+          productImageCompressTask,
+          sleep(8000).then(() => {
+            throw new Error("compress timeout");
+          }),
+        ]);
+      } catch (error) {
+        console.warn("Product image compress wait failed", error);
+        productImageCompressTask = null;
+        showAppToast("Зургийг алгасаад барааг хадгална", "warning");
+      }
+    }
+    const built = buildProductDataFromForm(form);
+    if (built.error) {
+      if (submitBtn?.isConnected) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = prevLabel;
+      }
+      return alert(built.error);
+    }
+    if (id) {
+      const existing = state.products.find((p) => p.id === id);
+      if (!existing) {
+        if (submitBtn?.isConnected) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = prevLabel;
+        }
+        return alert("Бараа олдсонгүй");
+      }
+      const name = built.data.name || existing.name || "Бараа";
+      confirmModal(
+        "Засвар хадгалах",
+        `<p><b>${esc(name)}</b> засаж дууслаа. Хадгалах уу?</p>`,
+        {
+          confirmLabel: "Хадгалах",
+          cancelLabel: "Үгүй",
+          closable: true,
+          onConfirm: () => {
+            void applyProductSave(built.data, id);
+          },
+          onCancel: () => {
+            if (submitBtn?.isConnected) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = prevLabel;
+            }
+          },
+        },
+      );
+      return;
+    }
+    await applyProductSave(built.data, id);
+  } catch (error) {
+    console.warn("Product save failed", error);
+    showAppToast("Бараа хадгалахад алдаа гарлаа", "error");
+    if (submitBtn?.isConnected) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = prevLabel;
     }
   }
-  const built = buildProductDataFromForm(e.target);
-  if (built.error) return alert(built.error);
-  if (id) {
-    const existing = state.products.find((p) => p.id === id);
-    if (!existing) return alert("Бараа олдсонгүй");
-    const name = built.data.name || existing.name || "Бараа";
-    confirmModal(
-      "Засвар хадгалах",
-      `<p><b>${esc(name)}</b> засаж дууслаа. Хадгалах уу?</p>`,
-      {
-        confirmLabel: "Хадгалах",
-        cancelLabel: "Үгүй",
-        closable: true,
-        onConfirm: () => {
-          void applyProductSave(built.data, id);
-        },
-      },
-    );
-    return;
-  }
-  await applyProductSave(built.data, id);
 }
 function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
