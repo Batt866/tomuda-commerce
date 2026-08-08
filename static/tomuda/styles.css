@@ -1497,23 +1497,25 @@ img.worker-pick-card__avatar {
 
 .list-panel--customers .customer-card__avatar,
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  border-radius: 10px;
-  border: 1px solid var(--hex-border);
-  background: #fff;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
   overflow: hidden;
 }
 
 .list-panel--customers .customer-card__avatar {
-  font-size: 15px;
+  font-size: 22px;
+  background: var(--hex-primary);
+  color: var(--hex-primary-foreground);
 }
 
 .list-panel--customers .customer-card__avatar-img {
   object-fit: cover;
   object-position: center;
-  background: #fff;
+  background: transparent;
 }
 
 .list-action-toolbar {
@@ -3092,16 +3094,21 @@ img[data-product-img],
 
   .list-panel--customers .customer-card__avatar,
   .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    border-radius: 10px;
-    border: 1px solid var(--hex-border);
-    background: #fff;
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: var(--hex-primary);
   }
 
   .list-panel--customers .customer-card__avatar {
-    font-size: 15px;
+    font-size: 22px;
+  }
+
+  .list-panel--customers .customer-card__avatar-img {
+    background: transparent;
   }
 
   .customer-card__head {
