@@ -13230,7 +13230,6 @@ const STOCK_IN_COL_WIDTHS = [6, 14, 16, 14, 11, 10, 11, 13];
 /** receiptXlsxStylesXml indices used by BM-1 stock-in sheet. */
 const STOCK_IN_STYLES = {
   blank: 0,
-  formCode: 15, // unused; kept near metaLabel
   title: 13, // 18pt bold center
   receiptNo: 14, // 14pt bold center
   metaLabel: 15, // bold 9 left
