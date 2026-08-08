@@ -5990,9 +5990,38 @@ function productPackSize(p) {
   const n = Number(p?.boxQuantity);
   return Number.isFinite(n) && n > 1 ? Math.floor(n) : 0;
 }
+/** How many жижиг хайрцаг in one том хайрцаг. */
+function productLargeBoxCount(p) {
+  const n = Number(p?.largeBoxQuantity);
+  return Number.isFinite(n) && n > 1 ? Math.floor(n) : 0;
+}
+/** Pieces in one том хайрцаг (= том × жижиг). */
+function productLargeBoxPieceCount(p) {
+  const small = productPackSize(p);
+  const large = productLargeBoxCount(p);
+  if (!small || !large) return 0;
+  return small * large;
+}
+function productBoxQtyTotal(
+  p,
+  { largePacks = 0, packs = 0, qty = 0 } = {},
+) {
+  const small = productPackSize(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+  const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const pc = Math.max(0, Math.floor(Number(qty) || 0));
+  let total = pc;
+  if (small) total += pk * small;
+  if (largePieces) total += lp * largePieces;
+  return total;
+}
 function productPackLabel(p) {
-  const packSize = productPackSize(p);
-  return packSize ? `${packSize}ш/багц` : "";
+  const small = productPackSize(p);
+  const large = productLargeBoxCount(p);
+  if (small && large) return `Том ${large}×жижиг · ${small}ш`;
+  if (small) return `${small}ш/жижиг хайрцаг`;
+  return "";
 }
 function ensureWorkerQtyParts() {
   if (!state.workerQtyParts || typeof state.workerQtyParts !== "object") {
@@ -11408,7 +11437,7 @@ function productListHead() {
   const cols = [
     `<span class="product-list__col product-list__col--name">Бараа</span>`,
     `<span class="product-list__col product-list__col--cat">Төрөл</span>`,
-    `<span class="product-list__col product-list__col--pack">Багц</span>`,
+    `<span class="product-list__col product-list__col--pack">Хайрцаг</span>`,
     `<span class="product-list__col product-list__col--price">Үнэ</span>`,
     showCost
       ? `<span class="product-list__col product-list__col--cost">Өртөг</span>`
@@ -11445,8 +11474,17 @@ function productDetailHtml(p, id) {
       productDetailRow("Борлуулалтын үнэ", esc(fmt(p.price))),
       productDetailRow("Үлдэгдэл", stockValue),
     ];
+  const largeCount = productLargeBoxCount(p);
   if (packSize) {
-    rows.push(productDetailRow("Багц", `${packSize} ш/багц`));
+    rows.push(productDetailRow("Жижиг хайрцаг", `${packSize} ш/жижиг`));
+  }
+  if (largeCount && packSize) {
+    rows.push(
+      productDetailRow(
+        "Том хайрцаг",
+        `${largeCount} жижиг (${packSize * largeCount} ш)`,
+      ),
+    );
   }
   if (canViewProductCost()) {
     const cost = productCostPrice(p);
@@ -11477,9 +11515,8 @@ function productDetail(id) {
 function productCard(p) {
   const catLine = p.category || "—";
   const packLabel = productPackLabel(p);
-  const packSize = productPackSize(p);
   const packCell = packLabel
-    ? `<span class="product-card__pack" title="1 багц = ${packSize} ширхэг">${esc(packLabel)}</span>`
+    ? `<span class="product-card__pack" title="${esc(packLabel)}">${esc(packLabel)}</span>`
     : `<span class="product-card__pack product-card__pack--empty">—</span>`;
   const adminActions = canManageProducts()
     ? `<div class="product-card__actions" onclick="event.stopPropagation()">${editIconButton({ className: "product-card__action-btn product-card__action-btn--edit", attrs: `onclick="confirmEditProduct('${esc(p.id)}')"`, label: "Бараа засах" })}${deleteIconButton({ className: "product-card__action-btn product-card__action-btn--delete", attrs: `data-confirm-delete="product" data-id="${esc(p.id)}"`, label: "Бараа устгах" })}</div>`
@@ -11640,11 +11677,11 @@ function stockInDraftEntry(id) {
 }
 function stockInLineQty(p) {
   const d = state.stockInDraft[p.id] || {};
-  const packSize = productPackSize(p);
-  const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
-  const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
-  if (packSize) return packs * packSize + pieces;
-  return pieces;
+  return productBoxQtyTotal(p, {
+    largePacks: d.largePacks,
+    packs: d.packs,
+    qty: d.qty,
+  });
 }
 function stockInLineCost(p) {
   const d = state.stockInDraft[p.id] || {};
@@ -11744,11 +11781,11 @@ function stockOutDraftEntry(id) {
 }
 function stockOutLineQty(p) {
   const d = state.stockOutDraft[p.id] || {};
-  const packSize = productPackSize(p);
-  const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
-  const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
-  if (packSize) return packs * packSize + pieces;
-  return pieces;
+  return productBoxQtyTotal(p, {
+    largePacks: d.largePacks,
+    packs: d.packs,
+    qty: d.qty,
+  });
 }
 function stockOutHasEntries() {
   return state.products.some((p) => stockOutLineQty(p) > 0);
@@ -11822,6 +11859,7 @@ function buildStockOutReceiptSnapshot(productIds = null) {
   const lines = products.map((p) => {
     const d = state.stockOutDraft[p.id] || {};
     const qty = stockOutLineQty(p);
+    const largePacks = Math.max(0, Math.floor(Number(d.largePacks) || 0));
     const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
     const unitPrice = productSalesPrice(p) || productCostPrice(p) || 0;
     return {
@@ -11829,6 +11867,7 @@ function buildStockOutReceiptSnapshot(productIds = null) {
       productName: p.name,
       category: p.category || "",
       barcode: p.barcode || "",
+      largePacks,
       packs,
       quantity: qty,
       unitPrice,
@@ -11882,6 +11921,7 @@ function applyStockOutReceipt(receipt) {
       type: "out",
       quantity: qty,
       packs: line.packs,
+      largePacks: line.largePacks,
       date: saved.createdAt,
       employeeName: saved.employeeName,
       receiptId: saved.id,
@@ -12073,6 +12113,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
   const lines = products.map((p) => {
     const d = state.stockInDraft[p.id] || {};
     const qty = stockInLineQty(p);
+    const largePacks = Math.max(0, Math.floor(Number(d.largePacks) || 0));
     const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
     const cost = stockInLineCost(p);
     return {
@@ -12080,6 +12121,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
       productName: p.name,
       category: p.category || "",
       barcode: p.barcode || "",
+      largePacks,
       packs,
       quantity: qty,
       costPrice: cost,
@@ -12125,6 +12167,7 @@ function applyStockInReceipt(receipt) {
       quantity: qty,
       costPrice: line.costPrice,
       packs: line.packs,
+      largePacks: line.largePacks,
       date: saved.createdAt,
       employeeName: saved.employeeName,
       receiptId: saved.id,
@@ -12321,27 +12364,47 @@ function stockInPackDerivedPieces(packs, packSize) {
   const size = Math.max(0, Math.floor(Number(packSize) || 0));
   return pk * size;
 }
-function stockInEntryTotalQty(packs, pieces, packSize) {
-  return (
-    stockInPackDerivedPieces(packs, packSize) +
-    Math.max(0, Math.floor(Number(pieces) || 0))
-  );
+function stockInEntryTotalQty(largePacks, packs, pieces, p) {
+  return productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
 }
-function stockInQtyFieldsInput(_el, packSize) {
-  const form = _el?.closest?.("form");
-  if (!form) return;
+function stockInQtyFieldsInput(_el) {
+  const root =
+    _el?.closest?.(".stock-in-qty-fields") || _el?.closest?.("form");
+  if (!root) return;
+  const form = _el?.closest?.("form") || root;
+  const largePacks = form.querySelector('input[name="largePacks"]')?.value ?? "";
   const packs = form.querySelector('input[name="packs"]')?.value ?? "";
   const pieces = form.querySelector('input[name="qty"]')?.value ?? "";
+  const smallSize = Math.max(
+    0,
+    Math.floor(Number(root.dataset.smallBoxSize || 0) || 0),
+  );
+  const largeCount = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
+  );
+  const largePieces = smallSize && largeCount ? smallSize * largeCount : 0;
+  const largePreview = form.querySelector("[data-stock-in-large-preview]");
   const packPreview = form.querySelector("[data-stock-in-pack-preview]");
   const totalPreview = form.querySelector("[data-stock-in-qty-total]");
-  const size = Math.max(0, Math.floor(Number(packSize) || 0));
-  const derived = stockInPackDerivedPieces(packs, size);
-  const total = stockInEntryTotalQty(packs, pieces, size);
+  const largeDerived = stockInPackDerivedPieces(largePacks, largePieces);
+  const smallDerived = stockInPackDerivedPieces(packs, smallSize);
+  const total =
+    largeDerived +
+    smallDerived +
+    Math.max(0, Math.floor(Number(pieces) || 0));
+  if (largePreview) {
+    largePreview.textContent = largeDerived
+      ? `= ${largeDerived} ширхэг`
+      : largePieces
+        ? `1 том = ${largeCount} жижиг (${largePieces} ш)`
+        : "";
+  }
   if (packPreview) {
-    packPreview.textContent = derived
-      ? `= ${derived} ширхэг`
-      : size
-        ? `1 багц = ${size} ширхэг`
+    packPreview.textContent = smallDerived
+      ? `= ${smallDerived} ширхэг`
+      : smallSize
+        ? `1 жижиг = ${smallSize} ширхэг`
         : "";
   }
   if (totalPreview) {
@@ -12349,20 +12412,36 @@ function stockInQtyFieldsInput(_el, packSize) {
   }
 }
 function stockInPackQtyFieldsHtml(p, d = {}) {
-  const packSize = productPackSize(p);
+  const smallSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const largeVal =
+    d.largePacks != null && d.largePacks !== ""
+      ? esc(String(d.largePacks))
+      : "";
   const packsVal =
     d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
   const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
-  if (!packSize) {
+  if (!smallSize) {
     return `<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label>`;
   }
-  const derived = stockInPackDerivedPieces(d.packs, packSize);
-  const total = stockInEntryTotalQty(d.packs, d.qty, packSize);
-  const packPreviewText = derived
-    ? `= ${derived} ширхэг`
-    : `1 багц = ${packSize} ширхэг`;
+  const total = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
+  const largePreviewText = stockInPackDerivedPieces(d.largePacks, largePieces)
+    ? `= ${stockInPackDerivedPieces(d.largePacks, largePieces)} ширхэг`
+    : largePieces
+      ? `1 том = ${largeCount} жижиг (${largePieces} ш)`
+      : "";
+  const packPreviewText = stockInPackDerivedPieces(d.packs, smallSize)
+    ? `= ${stockInPackDerivedPieces(d.packs, smallSize)} ширхэг`
+    : `1 жижиг = ${smallSize} ширхэг`;
   const totalPreviewText = total > 0 ? `Нийт: ${total} ширхэг` : "";
-  return `<div class="stock-in-qty-fields"><div class="grid grid-cols-2 gap-2"><label class="block"><span class="field-label">Багцийн тоо</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} багцийн тоо" oninput="stockInQtyFieldsInput(this, ${packSize})"><p class="stock-in-pack-preview" data-stock-in-pack-preview>${packPreviewText}</p></label><label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this, ${packSize})"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
+  const largeField = largePieces
+    ? `<label class="block"><span class="field-label">Том хайрцаг</span><input name="largePacks" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${largeVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} том хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-large-preview>${largePreviewText}</p></label>`
+    : "";
+  const gridClass = largePieces
+    ? "grid grid-cols-1 sm:grid-cols-3 gap-2"
+    : "grid grid-cols-2 gap-2";
+  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}"><div class="${gridClass}">${largeField}<label class="block"><span class="field-label">Жижиг хайрцаг</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} жижиг хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-pack-preview>${packPreviewText}</p></label><label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
 }
 function stockInEntryModal(id) {
   const p = state.products.find((x) => x.id === id);
@@ -12389,10 +12468,13 @@ function applyStockInEntryModal(e, id) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   const formData = new FormData(e.target);
-  const packSize = productPackSize(p);
+  const largePacks = Math.max(
+    0,
+    Math.floor(Number(formData.get("largePacks") || 0)),
+  );
   const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
   const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
-  const qty = packSize ? packs * packSize + pieces : pieces;
+  const qty = productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
   if (qty <= 0) {
     delete state.stockInDraft[id];
     state.stockInDone = false;
@@ -12407,14 +12489,18 @@ function applyStockInEntryModal(e, id) {
     return;
   }
   const entry = stockInDraftEntry(id);
-  if (packSize) {
-    if (packs > 0) entry.packs = String(packs);
-    else delete entry.packs;
-    if (pieces > 0) entry.qty = String(pieces);
-    else delete entry.qty;
-  } else {
+  const smallSize = productPackSize(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  if (largePieces && largePacks > 0) entry.largePacks = String(largePacks);
+  else delete entry.largePacks;
+  if (smallSize && packs > 0) entry.packs = String(packs);
+  else delete entry.packs;
+  if (pieces > 0) entry.qty = String(pieces);
+  else delete entry.qty;
+  if (!smallSize) {
     entry.qty = String(pieces);
     delete entry.packs;
+    delete entry.largePacks;
   }
   if (Number.isFinite(costPrice) && costPrice > 0) {
     entry.costPrice = String(Math.floor(costPrice));
@@ -12427,16 +12513,24 @@ function applyStockInEntryModal(e, id) {
   render();
   showAppToast(`${p.name} · ${qty} ш нэмэгдлээ`, "success");
 }
+function stockReceiptPackCell(line) {
+  const parts = [];
+  const large = Math.max(0, Math.floor(Number(line?.largePacks) || 0));
+  const packs = Math.max(0, Math.floor(Number(line?.packs) || 0));
+  if (large) parts.push(`${large} том`);
+  if (packs) parts.push(`${packs} жижиг`);
+  return parts.length ? parts.join(" · ") : "-";
+}
 function stockInReceiptRow(line) {
   const unitPrice = stockInReceiptLineUnitPrice(line);
   const totalPrice = stockInReceiptLineTotal(line);
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(totalPrice)}</span></div>`;
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${esc(stockReceiptPackCell(line))}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(totalPrice)}</span></div>`;
 }
 function stockInTableHead(mode = "entry") {
   if (mode === "entry") {
-    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Багцийн тоо</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
+    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Хайрцаг</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
   }
-  return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Багцийн тоо</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
+  return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Хайрцаг</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
 }
 function stockInEntryList(list) {
   const filled = list.filter((p) => stockInLineQty(p) > 0);
@@ -12641,7 +12735,7 @@ function stockOutEntryList(list) {
   return `<div class="space-y-3">${section("Зарлага гаргах бараанууд", filled, "Зарлага сонгоогүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
 }
 function stockOutReceiptRow(line) {
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice || 0)}</span></div>`;
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${esc(stockReceiptPackCell(line))}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice || 0)}</span></div>`;
 }
 function stockOutReceiptPanel(receipt) {
   const groups = stockInReceiptGroupedLines(receipt.lines || []);
@@ -12684,10 +12778,13 @@ function applyStockOutModal(e, id) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   const formData = new FormData(e.target);
-  const packSize = productPackSize(p);
+  const largePacks = Math.max(
+    0,
+    Math.floor(Number(formData.get("largePacks") || 0)),
+  );
   const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
   const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
-  const qty = packSize ? packs * packSize + pieces : pieces;
+  const qty = productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
   if (qty <= 0) {
     delete state.stockOutDraft[id];
     state.stockOutDone = false;
@@ -12702,14 +12799,18 @@ function applyStockOutModal(e, id) {
     return;
   }
   const entry = stockOutDraftEntry(id);
-  if (packSize) {
-    if (packs > 0) entry.packs = String(packs);
-    else delete entry.packs;
-    if (pieces > 0) entry.qty = String(pieces);
-    else delete entry.qty;
-  } else {
+  const smallSize = productPackSize(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  if (largePieces && largePacks > 0) entry.largePacks = String(largePacks);
+  else delete entry.largePacks;
+  if (smallSize && packs > 0) entry.packs = String(packs);
+  else delete entry.packs;
+  if (pieces > 0) entry.qty = String(pieces);
+  else delete entry.qty;
+  if (!smallSize) {
     entry.qty = String(pieces);
     delete entry.packs;
+    delete entry.largePacks;
   }
   state.stockOutDone = false;
   state.stockOutReceipt = null;
@@ -12742,7 +12843,7 @@ function exportStockOutExcelFallback(receipt) {
       }
       const line = item.line;
       const unitPrice = Number(line.unitPrice) || 0;
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${h(stockReceiptPackCell(line) === "-" ? "" : stockReceiptPackCell(line))}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -12764,7 +12865,7 @@ table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; 
 <tr><td colspan="7" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
 <tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
 <tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Нэгж үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Хайрцаг</th><th>Тоо ширхэг</th><th>Нэгж үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
 <tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
@@ -14230,7 +14331,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
   pushRow(30.75, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
-    xlsxCellXml(`C${headerRow}`, 7, si("Багц"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, si("Хайрцаг"), "s"),
     xlsxCellXml(`D${headerRow}`, 7, si("Тоо ширхэг"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Өртөг үнэ"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Нэгж үнэ"), "s"),
@@ -14259,10 +14360,13 @@ function buildStockOutSheetXmlLegacy(receipt, {
     const line = item.line;
     const r = rowNum;
     const unitPrice = stockInReceiptLineUnitPrice(line);
+    const packCell = stockReceiptPackCell(line);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
       xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
-      xlsxOptionalNum(`C${r}`, 10, line.packs),
+      packCell === "-"
+        ? xlsxCellXml(`C${r}`, 10, null, "empty")
+        : xlsxCellXml(`C${r}`, 8, si(packCell), "s"),
       xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
       xlsxCellXml(`E${r}`, 10, unitPrice, "n"),
       xlsxCellXml(`F${r}`, 10, unitPrice, "n"),
@@ -19716,14 +19820,22 @@ function productModal(id) {
   const p = state.products.find((x) => x.id === id) || {
     unit: "ширхэг",
     boxQuantity: 1,
+    largeBoxQuantity: 0,
     price: 0,
     stock: 0,
     minStock: 0,
     country: "Монгол",
   };
-  const packQtyVal =
+  const smallBoxVal =
     Number(p.boxQuantity) > 1 ? String(Math.floor(Number(p.boxQuantity))) : "";
-  const packFieldAttrs = inputAttrs(packQtyVal, "24", {
+  const largeBoxVal =
+    Number(p.largeBoxQuantity) > 1
+      ? String(Math.floor(Number(p.largeBoxQuantity)))
+      : "";
+  const smallBoxAttrs = inputAttrs(smallBoxVal, "24", {
+    treatZeroAsEmpty: true,
+  });
+  const largeBoxAttrs = inputAttrs(largeBoxVal, "12", {
     treatZeroAsEmpty: true,
   });
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
@@ -19736,7 +19848,7 @@ function productModal(id) {
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><label><span class="block text-sm font-medium mb-2">Багц</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${packFieldAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 багц = хэдэн ширхэг? (жишээ нь 24). 1 эсвэл хоосон бол зөвхөн ширхгээр тоолно.</p></label>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Агуулах → Орлого авах</b> цэснээс оруулна.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 24). Хоосон/1 бол зөвхөн ширхэг.</p></label><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 12). Жижиг тохируулсны дараа.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -19956,9 +20068,24 @@ function buildProductDataFromForm(form) {
   } else {
     const pack = Math.floor(Number(packRaw));
     if (!Number.isFinite(pack) || pack < 1) {
-      return { error: "Багцад зөв ширхэгийн тоо оруулна уу" };
+      return { error: "Жижиг хайрцагт зөв ширхэгийн тоо оруулна уу" };
     }
     data.boxQuantity = pack;
+  }
+  const largeRaw = String(data.largeBoxQuantity ?? "").trim();
+  if (!largeRaw) {
+    data.largeBoxQuantity = 0;
+  } else {
+    const large = Math.floor(Number(largeRaw));
+    if (!Number.isFinite(large) || large < 1) {
+      return { error: "Том хайрцагт зөв тоо оруулна уу" };
+    }
+    if (large > 1 && data.boxQuantity <= 1) {
+      return {
+        error: "Том хайрцаг оруулахын тулд эхлээд жижиг хайрцаг тохируулна уу",
+      };
+    }
+    data.largeBoxQuantity = large;
   }
   data.country = String(data.country || "").trim() || "Монгол";
   const image = readProductImageFromForm(form);
