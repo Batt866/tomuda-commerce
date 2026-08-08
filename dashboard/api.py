@@ -242,8 +242,17 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
                 and str(entry.get("id") or "") == customer_id
             )
         ]
-        data, _ = sanitize_app_state(data)
-        data, _ = _hydrate_all_images(data)
+        # Avoid deepcopy/hydrate of the whole catalog on every customer edit —
+        # that was timing out ("Failed to fetch") on large AppState rows.
+        image = str(saved_customer.get("image") or "")
+        if image.startswith("data:image/") and len(image) > 180_000:
+            saved_customer = dict(saved_customer)
+            saved_customer.pop("image", None)
+            if existing_idx >= 0:
+                customers[existing_idx] = saved_customer
+            else:
+                customers[-1] = saved_customer
+            data["customers"] = customers
         row.data = data
         row.save(update_fields=["data", "updated_at"])
         updated_at = row.updated_at.isoformat()
@@ -251,7 +260,6 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
     return {
         "ok": True,
         "customer": saved_customer,
-        "state": data,
         "updatedAt": updated_at,
     }
 

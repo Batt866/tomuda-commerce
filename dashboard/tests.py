@@ -943,13 +943,13 @@ class CustomerUpsertApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 200, response.content)
         payload = response.json()
-        ids = {c["id"] for c in payload["state"]["customers"]}
-        self.assertIn("c-existing", ids)
-        self.assertIn("c-new-device", ids)
+        self.assertEqual(payload["customer"]["id"], "c-new-device")
+        self.assertEqual(payload["customer"]["name"], "New from phone")
 
         row = AppState.objects.get(key="main")
         db_ids = {c["id"] for c in row.data["customers"]}
         self.assertIn("c-new-device", db_ids)
+        self.assertIn("c-existing", db_ids)
 
         # Peer device full-state save without the new customer must not wipe it.
         peer = default_state()
@@ -1004,13 +1004,18 @@ class CustomerUpsertApiTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(upsert.status_code, 200, upsert.content)
-        saved = next(
-            c for c in upsert.json()["state"]["customers"] if c["id"] == "c-ulz"
-        )
+        saved = upsert.json()["customer"]
+        self.assertEqual(saved["id"], "c-ulz")
         self.assertEqual(saved["name"], "Улз")
         self.assertEqual(float(saved["latitude"]), 47.918)
         self.assertEqual(float(saved["longitude"]), 106.917)
         self.assertTrue(saved.get("updatedAt"))
+
+        row = AppState.objects.get(key="main")
+        db_customer = next(c for c in row.data["customers"] if c["id"] == "c-ulz")
+        self.assertEqual(db_customer["name"], "Улз")
+        self.assertEqual(float(db_customer["latitude"]), 47.918)
+        self.assertEqual(float(db_customer["longitude"]), 106.917)
 
         peer = default_state()
         peer["customers"] = [

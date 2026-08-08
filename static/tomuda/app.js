@@ -19397,34 +19397,53 @@ async function upsertCustomerOnServer(customer) {
   const bodyCustomer = { ...customer };
   const image = String(bodyCustomer.image || "").trim();
   if (image.startsWith("data:image/")) delete bodyCustomer.image;
-  const res = await fetch(`${API_BASE}/customers/upsert`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      customer: bodyCustomer,
-      actor: state.currentEmployee
-        ? {
-            id: state.currentEmployee.id,
-            email: state.currentEmployee.email,
-          }
-        : null,
-    }),
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    let msg = "Харилцагч серверт хадгалахад алдаа гарлаа";
+  const csrf = csrfTokenFromCookie();
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (csrf) headers["X-CSRFToken"] = csrf;
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const err = await res.json();
-      if (err?.detail) msg = String(err.detail);
-    } catch {
-      /* ignore */
+      const res = await fetch(`${API_BASE}/customers/upsert`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          customer: bodyCustomer,
+          actor: state.currentEmployee
+            ? {
+                id: state.currentEmployee.id,
+                email: state.currentEmployee.email,
+              }
+            : null,
+        }),
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        let msg = "Харилцагч серверт хадгалахад алдаа гарлаа";
+        try {
+          const err = await res.json();
+          if (err?.detail) msg = String(err.detail);
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      return res.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await sleep(400);
     }
-    throw new Error(msg);
   }
-  return res.json();
+  const raw = String(lastError?.message || lastError || "").trim();
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) {
+    throw new Error(
+      "Сервертэй холбогдож чадсангүй. Интернетээ шалгаад дахин оролдоно уу.",
+    );
+  }
+  throw lastError instanceof Error ? lastError : new Error(raw || "Хадгалах амжилтгүй");
 }
 async function applyCustomerSave(data, id) {
   const incomingImage = String(data.image || "").trim();
@@ -19475,6 +19494,7 @@ async function applyCustomerSave(data, id) {
   const customerName = customer?.name || customer?.companyName || "Харилцагч";
   let upsertOk = false;
   let upsertError = "";
+  let softSaved = false;
   try {
     const payload = await upsertCustomerOnServer(customer);
     upsertOk = true;
@@ -19500,11 +19520,11 @@ async function applyCustomerSave(data, id) {
       state: payload?.state || stateForBackendSave(),
       updatedAt: payload?.updatedAt || "",
     });
-    // Baseline against server (or keep dirty). Never mark all local rows clean
-    // after a single-customer upsert — other unsaved products would never POST.
     if (payload?.state) {
       reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
-    } else if (localStateDirty()) {
+    } else {
+      // Lightweight upsert no longer returns full state — keep local dirty
+      // so peer sync still POSTs any other pending rows.
       scheduleBackendSave();
     }
     clearOrderPersistenceCache();
@@ -19514,28 +19534,38 @@ async function applyCustomerSave(data, id) {
     console.warn("Customer upsert failed", error);
   }
   if (!upsertOk) {
-    alertModal(
-      "Хадгалах амжилтгүй",
-      upsertError || "Серверт хадгалахад алдаа гарлаа. Дахин оролдоно уу.",
-    );
-    return false;
+    // Fall back to full-state save, then soft-local pending so edits are not lost.
+    try {
+      if (await flushBackendSave()) {
+        upsertOk = true;
+      }
+    } catch (error) {
+      console.warn("Customer full-state fallback failed", error);
+    }
+  }
+  if (!upsertOk) {
+    persistOrderSnapshot();
+    scheduleBackendSave();
+    softSaved = true;
   }
   const savedCustomer =
     state.customers.find((c) => String(c.id) === String(customerId)) ||
     customer;
   const syncedOrders = syncOrdersCustomerName(savedCustomer);
+  if (syncedOrders > 0) scheduleBackendSave();
   closeModal();
   focusSavedCustomer(
     customerId,
     savedCustomer?.name || savedCustomer?.companyName || customerName,
   );
-  if (syncedOrders > 0 || localStateDirty() || entityStateDirty()) {
-    scheduleBackendSave();
+  if (softSaved) {
+    showAppToast(
+      upsertError
+        ? `Түр хадгаллаа (${upsertError}). Сервертэй холбогдоод автоматаар илгээнэ.`
+        : "Түр хадгаллаа. Сервертэй холбогдоод автоматаар илгээнэ.",
+      "warning",
+    );
   }
-  showAppToast(
-    `${savedCustomer?.name || savedCustomer?.companyName || customerName} хадгалагдлаа`,
-    "success",
-  );
   return true;
 }
 async function saveCustomer(e, id) {
