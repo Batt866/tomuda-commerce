@@ -86,6 +86,7 @@ const state = {
   stockInSessionStartedAt: null,
   stockInReceipts: [],
   stockInHighlightId: "",
+  stockInScanQuery: "",
   customerHighlightId: "",
   productHighlightId: "",
   stockOutEmployeeId: "",
@@ -350,6 +351,8 @@ let whReceiptPickerSuppressDismissUntil = 0;
 let whReceiptPickerSkipAnim = false;
 let settlementRenderPending = false;
 let settlementBlurTimer = null;
+let stockInScanRenderPending = false;
+let stockInScanBlurTimer = null;
 let loginFormActiveUntil = 0;
 let loginFormGuardBound = false;
 let tombudaHistoryDepth = 0;
@@ -5127,6 +5130,7 @@ function shouldDeferBackendSync() {
   if (isEditingCountQty()) return true;
   if (isWarehouseDateEditing()) return true;
   if (isEditingSettlementText()) return true;
+  if (isEditingStockInScan()) return true;
   if (isWhReceiptPickerOpen()) return true;
   if (isReceiptStatusSelecting()) return true;
   if (isToolbarSelectActive()) return true;
@@ -5274,6 +5278,23 @@ function isEditingSettlementText() {
     (el.matches?.("[data-settlement-input]") ||
       el.matches?.(".worker-order-opt__input"))
   );
+}
+function isEditingStockInScan() {
+  const el = document.activeElement;
+  return !!el?.matches?.("#stockInBarcodeInput, [data-focus='stockInScan']");
+}
+function stockInScanFocus() {
+  clearTimeout(stockInScanBlurTimer);
+}
+function stockInScanBlur() {
+  clearTimeout(stockInScanBlurTimer);
+  stockInScanBlurTimer = setTimeout(flushPendingStockInScanRender, 150);
+}
+function flushPendingStockInScanRender() {
+  if (isEditingStockInScan()) return;
+  if (!stockInScanRenderPending) return;
+  stockInScanRenderPending = false;
+  render();
 }
 function isEditingLoginForm() {
   const el = document.activeElement;
@@ -5487,6 +5508,10 @@ function safeRender() {
   }
   if (isUserScrolling()) return;
   if (isEditingSettlementText()) return;
+  if (isEditingStockInScan()) {
+    stockInScanRenderPending = true;
+    return;
+  }
   countRenderPending = false;
   warehouseDateRenderPending = false;
   receiptStatusFilterPending = false;
@@ -12739,7 +12764,7 @@ function barcodeScannerPanelHtml() {
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
-  return `<div class="stock-in-scan"><label class="stock-in-scan__field"><span class="stock-in-scan__label">Баркод / нэр</span><div class="barcode-input-row barcode-input-row--scan"><input id="stockInBarcodeInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" spellcheck="false" class="field-input app-input stock-in-scan__input" placeholder="Баркод эсвэл барааны нэр..." value="${q}" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Баркод эсвэл барааны нэр"><button type="button" onclick="stockInScanSubmit()" class="btn btn--secondary btn--sm stock-in-scan__btn">Хайх</button><button type="button" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Scan</button></div></label>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Баркод эсвэл нэрээр хайна. Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
+  return `<div class="stock-in-scan"><div class="stock-in-scan__field"><span class="stock-in-scan__label" id="stockInScanLabel">Баркод / нэр</span><div class="barcode-input-row barcode-input-row--scan"><input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="field-input app-input stock-in-scan__input" placeholder="Баркод эсвэл барааны нэр..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-labelledby="stockInScanLabel"><button type="button" onclick="stockInScanSubmit()" class="btn btn--secondary btn--sm stock-in-scan__btn">Хайх</button><button type="button" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Scan</button></div></div>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Баркод эсвэл нэрээр хайна. Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
 }
 function stockInScanDraft(el) {
   state.stockInScanQuery = String(el?.value || "");
@@ -18811,10 +18836,16 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
+  if (isEditingStockInScan()) {
+    stockInScanRenderPending = true;
+    if (localStateDirty()) scheduleBackendSave();
+    return;
+  }
   if (!state.isLoggedIn && isLoginFormActive()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
   settlementRenderPending = false;
+  stockInScanRenderPending = false;
   if (!state.isLoggedIn) {
     mountLoginView();
     return;
@@ -23206,6 +23237,9 @@ Object.assign(window, {
   growSettlementInput,
   settlementInputFocus,
   settlementInputBlur,
+  stockInScanFocus,
+  stockInScanBlur,
+  stockInScanDraft,
   fillProductFromBarcode,
   fillCustomerFromRegistration,
   scheduleCustomerRegistryLookup,

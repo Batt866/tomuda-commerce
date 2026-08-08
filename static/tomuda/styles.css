@@ -14994,9 +14994,10 @@ body.image-lightbox-open {
 .stock-in-scan__input {
   flex: 1;
   min-width: 0;
-  pointer-events: auto;
-  -webkit-user-select: text;
-  user-select: text;
+  pointer-events: auto !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: manipulation;
 }
 
 .stock-in-scan__btn {
