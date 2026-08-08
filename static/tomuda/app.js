@@ -4350,7 +4350,12 @@ function normalizeDeletionLog(log = []) {
   if (!Array.isArray(log)) return [];
   const seen = new Set();
   return log
-    .filter((entry) => entry && entry.type && entry.id)
+    .filter((entry) => entry && entry.type && entry.id != null && entry.id !== "")
+    .map((entry) => ({
+      ...entry,
+      type: String(entry.type),
+      id: String(entry.id),
+    }))
     .filter((entry) => {
       const key = `${entry.type}:${entry.id}`;
       if (seen.has(key)) return false;
@@ -4683,12 +4688,10 @@ function applyCountSessionMerge(remote, local, merged) {
 function mergePersistentStates(remote = {}, local = {}, opts = {}) {
   const merged = {};
   const pullFromServer = !!opts.pullFromServer;
-  const deletionLog = pullFromServer
-    ? normalizeDeletionLog(remote.deletionLog || [])
-    : mergedDeletionLog(remote, local);
-  const promotionDeletionLog = pullFromServer
-    ? normalizePromotionDeletionLog(remote.promotionDeletionLog || [])
-    : mergedPromotionDeletionLog(remote, local);
+  // Always union tombstones — dropping local deletionLog on pull resurrected
+  // deleted customers/products/orders from the still-present server row.
+  const deletionLog = mergedDeletionLog(remote, local);
+  const promotionDeletionLog = mergedPromotionDeletionLog(remote, local);
   for (const key of MERGE_BY_ID_KEYS) {
     const mergeFn =
       key === "products" || key === "customers" || key === "employees"
@@ -4802,11 +4805,14 @@ function protectAccidentalDeletions(data) {
   for (const key of DELETION_GUARDED_KEYS) {
     const current = protectedData[key] || [];
     const base = baseline[key] || [];
-    const currentIds = new Set(current.map((x) => x.id));
+    const currentIds = new Set(
+      current.map((x) => String(x?.id ?? "")).filter(Boolean),
+    );
     const deletionType = deletionKeyForCollection(key);
     const restored = base.filter(
       (x) =>
-        !currentIds.has(x.id) &&
+        x?.id != null &&
+        !currentIds.has(String(x.id)) &&
         !deletionLogHas(deletionLog, deletionType, x.id),
     );
     if (restored.length) protectedData[key] = [...current, ...restored];
@@ -4815,23 +4821,46 @@ function protectAccidentalDeletions(data) {
     for (const key of ["employees"]) {
       const current = protectedData[key] || [];
       const base = baseline[key] || [];
-      const currentIds = new Set(current.map((x) => x.id));
-      const restored = base.filter((x) => !currentIds.has(x.id));
+      const currentIds = new Set(
+        current.map((x) => String(x?.id ?? "")).filter(Boolean),
+      );
+      const restored = base.filter(
+        (x) =>
+          x?.id != null &&
+          !currentIds.has(String(x.id)) &&
+          !deletionLogHas(deletionLog, "employee", x.id),
+      );
       if (restored.length) protectedData[key] = [...current, ...restored];
     }
   }
   if (baseline.orders && protectedData.orders) {
-    const baseMap = Object.fromEntries(baseline.orders.map((o) => [o.id, o]));
+    const baseMap = Object.fromEntries(
+      baseline.orders
+        .filter((o) => o?.id != null)
+        .map((o) => [String(o.id), o]),
+    );
     protectedData.orders = protectedData.orders.map((o) => {
-      const base = baseMap[o.id];
-      if (base && base.status !== "cancelled" && o.status === "cancelled") {
+      const base = baseMap[String(o.id)];
+      // Do not undo intentional cancels that are already tombstoned/deleted.
+      if (
+        base &&
+        base.status !== "cancelled" &&
+        o.status === "cancelled" &&
+        !deletionLogHas(deletionLog, "order", o.id)
+      ) {
         return { ...o, status: base.status };
       }
       return o;
     });
-    const currentOrderIds = new Set(protectedData.orders.map((o) => o.id));
+    const currentOrderIds = new Set(
+      protectedData.orders.map((o) => String(o?.id ?? "")).filter(Boolean),
+    );
     const restoredOrders = baseline.orders.filter(
-      (o) => !currentOrderIds.has(o.id) && orderWithinRetention(o),
+      (o) =>
+        o?.id != null &&
+        !currentOrderIds.has(String(o.id)) &&
+        orderWithinRetention(o) &&
+        !deletionLogHas(deletionLog, "order", o.id),
     );
     if (restoredOrders.length) {
       protectedData.orders = [...protectedData.orders, ...restoredOrders];
@@ -4874,12 +4903,30 @@ function applyPersistentState(data) {
   syncCurrentEmployeeFromState();
   ensureDeliverySelection();
   state.orders = retainedOrders(state.orders);
+  // Hard-apply tombstones so resurrected rows cannot linger after a bad merge.
+  applyDeletionLogToCollections();
   normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
   return true;
+}
+function applyDeletionLogToCollections() {
+  const log = state.deletionLog || [];
+  if (!log.length) return;
+  state.customers = (state.customers || []).filter(
+    (c) => !deletionLogHas(log, "customer", c.id),
+  );
+  state.products = (state.products || []).filter(
+    (p) => !deletionLogHas(log, "product", p.id),
+  );
+  state.employees = (state.employees || []).filter(
+    (e) => !deletionLogHas(log, "employee", e.id),
+  );
+  state.orders = retainedOrders(
+    (state.orders || []).filter((o) => !deletionLogHas(log, "order", o.id)),
+  );
 }
 function localStateDirty() {
   return backendStateSnapshot() !== backendLastSaved;
@@ -4961,15 +5008,23 @@ function localOnlyEntityIds(serverState = {}, localState = persistentState()) {
 function hasLocalOnlyEntities(serverState = {}) {
   return localOnlyEntityIds(serverState).length > 0;
 }
+function hasUnsyncedDeletions(serverState = {}, localState = persistentState()) {
+  const remoteLog = normalizeDeletionLog(serverState.deletionLog || []);
+  return normalizeDeletionLog(localState.deletionLog || []).some(
+    (entry) => !deletionLogHas(remoteLog, entry.type, entry.id),
+  );
+}
 /**
- * After peer pull / upsert: keep dirty only when this device has never-POSTed
- * entity ids. Otherwise mark the merged local memory clean so field-order /
- * normalization diffs cannot loop the sync banner forever.
+ * After peer pull / upsert: keep dirty when this device has never-POSTed
+ * entity ids OR deletion tombstones. Otherwise mark merged memory clean.
  */
 function reconcileBackendMarkerFromServer(serverState, updatedAt = "") {
   if (updatedAt) serverUpdatedAt = updatedAt;
   if (!serverState || typeof serverState !== "object") return false;
-  if (hasLocalOnlyEntities(serverState)) {
+  if (
+    hasLocalOnlyEntities(serverState) ||
+    hasUnsyncedDeletions(serverState)
+  ) {
     syncBackendSaveMarker(serverState);
     if (canAutoSaveBackendState()) scheduleBackendSave();
     return true;
@@ -5388,6 +5443,7 @@ function applyRemoteState(payload, opts = {}) {
     !backendSaving &&
     !backendSaveFailedMessage &&
     !hasLocalOnlyEntities(payload.state) &&
+    !hasUnsyncedDeletions(payload.state) &&
     serverSnapshotLooksFresherThanLocal(
       payload.state,
       payload.updatedAt || "",
@@ -21635,7 +21691,7 @@ function deleteReceiptNow(id) {
   closeModal();
   render();
   showAppToast(`Баримт ${receiptLabel} устгагдлаа`, "success");
-  criticalBackendSave();
+  return criticalBackendSave();
 }
 function recordDeletion(type, id) {
   if (!["product", "customer", "employee", "order"].includes(type) || !id)
@@ -21644,7 +21700,7 @@ function recordDeletion(type, id) {
     ...(state.deletionLog || []),
     {
       type,
-      id,
+      id: String(id),
       deletedAt: new Date().toISOString(),
       actorId: state.currentEmployee?.id || "",
     },
@@ -21662,20 +21718,24 @@ function deleteNow(type, id) {
           : "Мөр";
   if (type === "product") {
     recordDeletion("product", id);
-    state.products = state.products.filter((p) => p.id !== id);
+    state.products = state.products.filter((p) => String(p.id) !== String(id));
   }
   if (type === "employee") {
     recordDeletion("employee", id);
-    state.employees = state.employees.filter((e) => e.id !== id);
-    if (state.currentEmployee?.id === id) {
+    state.employees = state.employees.filter(
+      (e) => String(e.id) !== String(id),
+    );
+    if (String(state.currentEmployee?.id) === String(id)) {
       state.currentEmployee = null;
       state.isLoggedIn = false;
     }
   }
   if (type === "customer") {
     recordDeletion("customer", id);
-    state.customers = state.customers.filter((c) => c.id !== id);
-    if (state.workerCustomer === id) {
+    state.customers = state.customers.filter(
+      (c) => String(c.id) !== String(id),
+    );
+    if (String(state.workerCustomer) === String(id)) {
       state.workerCustomer = "";
       state.workerStoreReady = false;
       resetWorkerCart();
@@ -21684,7 +21744,7 @@ function deleteNow(type, id) {
   closeModal();
   render();
   showAppToast(`${label} устгагдлаа`, "success");
-  criticalBackendSave();
+  return criticalBackendSave();
 }
 function delEmployee(id) {
   confirmDelete("employee", id);
