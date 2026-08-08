@@ -2032,8 +2032,12 @@ function importReportHint(report = {}) {
   if (!first?.message) return "";
   return ` (${first.message}, мөр ${first.row || "?"})`;
 }
-async function waitForBackendSaveIdle() {
-  while (backendSaving) await sleep(50);
+async function waitForBackendSaveIdle(timeoutMs = 15000) {
+  const started = Date.now();
+  while (backendSaving) {
+    if (Date.now() - started > timeoutMs) break;
+    await sleep(50);
+  }
 }
 function showImportReportModal(report, kind) {
   const label = kind === "customers" ? "Харилцагч" : "Бараа";
@@ -6486,6 +6490,12 @@ function canAutoSaveBackendState() {
     hasPermission("customers.edit") ||
     hasPermission("customers.create") ||
     hasPermission("warehouse.edit") ||
+    hasPermission("stockIn.create") ||
+    hasPermission("stockIn.edit") ||
+    hasPermission("stockOut.create") ||
+    hasPermission("stockOut.edit") ||
+    hasPermission("count.create") ||
+    hasPermission("count.edit") ||
     hasPermission("employees.edit") ||
     hasPermission("employees.create") ||
     hasPermission("settings.view")
@@ -6511,14 +6521,27 @@ async function revertBackendStateFromServer() {
   }
 }
 async function flushBackendSave() {
-  if (!backendReady) return false;
+  if (!backendReady) {
+    markBackendSaveFailed(
+      "Сервертэй холбогдоогүй байна. Хуудсыг дахин ачаална уу.",
+    );
+    return false;
+  }
   clearTimeout(backendSaveTimer);
   backendSaveTimer = null;
   persistOrderSnapshot();
-  await saveBackendState();
-  if (!localStateDirty()) return true;
-  // One immediate retry for races — no artificial delay.
-  await saveBackendState();
+  await waitForBackendSaveIdle();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!localStateDirty()) return true;
+    await saveBackendState();
+    await waitForBackendSaveIdle();
+    if (!localStateDirty()) return true;
+  }
+  if (localStateDirty() && !backendSaveFailedMessage) {
+    markBackendSaveFailed(
+      "Серверт хадгалахад алдаа гарлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+    );
+  }
   return !localStateDirty();
 }
 function markBackendSaveFailed(message = "") {
@@ -6535,7 +6558,12 @@ function hasUnsavedLocalData() {
 }
 function criticalBackendSave() {
   persistOrderSnapshot();
-  if (!backendReady) return Promise.resolve(false);
+  if (!backendReady) {
+    markBackendSaveFailed(
+      "Сервертэй холбогдоогүй байна. Хуудсыг дахин ачаална уу.",
+    );
+    return Promise.resolve(false);
+  }
   return flushBackendSave().catch((error) => {
     console.warn("Backend save failed", error);
     markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
@@ -6598,8 +6626,12 @@ function pendingOrderDeletionsWithoutLog(data = persistentState()) {
 }
 async function saveBackendState(retry = 0) {
   backendSaveTimer = null;
-  if (!state.isLoggedIn || !state.currentEmployee?.id) return;
+  if (!state.isLoggedIn || !state.currentEmployee?.id) {
+    markBackendSaveFailed("Нэвтэрсэн ажилтан олдсонгүй. Дахин нэвтэрнэ үү.");
+    return;
+  }
   if (backendSaving) {
+    // Critical flushes wait for idle first; autosave just reschedules.
     scheduleBackendSave();
     return;
   }
@@ -11232,13 +11264,21 @@ async function finishStockOutReceipt(
       startStockOutSession();
     }
     render();
-    const ok = await criticalBackendSave();
+    persistOrderSnapshot();
+    await waitForBackendSaveIdle();
+    let ok = await criticalBackendSave();
+    if (!ok) {
+      await sleep(500);
+      await waitForBackendSaveIdle();
+      ok = await criticalBackendSave();
+    }
     if (!ok) {
       const msg =
         backendSaveFailedMessage ||
         "Зарлага түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
       showAppToast(msg, "error");
       alertModal("Хадгалах амжилтгүй", esc(msg));
+      if (downloadExcel) exportStockOutExcel(saved);
       return;
     }
     showAppToast("Зарлага хадгалагдлаа", "success");
@@ -11458,13 +11498,22 @@ async function finishStockInReceipt(
       startStockInSession();
     }
     render();
-    const ok = await criticalBackendSave();
+    persistOrderSnapshot();
+    await waitForBackendSaveIdle();
+    let ok = await criticalBackendSave();
+    if (!ok) {
+      await sleep(500);
+      await waitForBackendSaveIdle();
+      ok = await criticalBackendSave();
+    }
     if (!ok) {
       const msg =
         backendSaveFailedMessage ||
         "Орлого түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
       showAppToast(msg, "error");
       alertModal("Хадгалах амжилтгүй", esc(msg));
+      // Local receipt already applied — still offer Excel so work is not lost.
+      if (downloadExcel) exportStockInExcel(saved);
       return;
     }
     showAppToast("Орлого хадгалагдлаа", "success");

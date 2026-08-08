@@ -534,8 +534,10 @@ def _is_stock_in_product_update(
     stock_increase = new_stock - old_stock
     if stock_increase <= 0 or abs(stock_increase - allowed_increase) > 0.0001:
         return False
-    old_copy["stock"] = new_copy["stock"]
-    old_copy["costPrice"] = new_copy.get("costPrice")
+    # Stock-in may also refresh cost/image; ignore those when matching the receipt.
+    for key in ("stock", "costPrice", "image"):
+        old_copy.pop(key, None)
+        new_copy.pop(key, None)
     return old_copy == new_copy
 
 
