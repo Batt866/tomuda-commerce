@@ -6014,13 +6014,21 @@ function productBoxQtyTotal(
   { largePacks = 0, packs = 0, qty = 0 } = {},
 ) {
   const small = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
   const largePieces = productLargeBoxPieceCount(p);
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
   const pc = Math.max(0, Math.floor(Number(qty) || 0));
   let total = pc;
-  if (small) total += pk * small;
-  if (largePieces) total += lp * largePieces;
+  if (small) {
+    const fromLarge = largeCount ? lp * largeCount : 0;
+    // packs = нийт жижиг (том-оос автоматаар орсон тоо орно); хоосон бол зөвхөн томоос
+    if (pk > 0) total += pk * small;
+    else if (fromLarge > 0) total += fromLarge * small;
+    else if (largePieces && lp > 0) total += lp * largePieces;
+  } else if (largePieces) {
+    total += lp * largePieces;
+  }
   return total;
 }
 function productPackLabel(p) {
@@ -11890,9 +11898,21 @@ function stockInQtyFieldsInput(_el) {
     form;
   if (!root) return;
   const scope = form || root;
-  const largePacks =
-    scope.querySelector('input[name="largePacks"]')?.value ?? "";
-  const packs = scope.querySelector('input[name="packs"]')?.value ?? "";
+  const largeInput = scope.querySelector('input[name="largePacks"]');
+  const packsInput = scope.querySelector('input[name="packs"]');
+  let largePacks = largeInput?.value ?? "";
+  let packs = packsInput?.value ?? "";
+  const largeCount = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
+  );
+  // Том оруулахад жижиг хайрцаг = том × (1 том дахь жижиг)
+  if (_el === largeInput && packsInput && largeCount > 0) {
+    const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+    const derived = lp * largeCount;
+    packsInput.value = derived > 0 ? String(derived) : "";
+    packs = packsInput.value;
+  }
   const pieces = scope.querySelector('input[name="qty"]')?.value ?? "";
   const costInput = scope.querySelector('input[name="costPrice"]');
   const costRaw = costInput?.value ?? "";
@@ -11909,17 +11929,24 @@ function stockInQtyFieldsInput(_el) {
     0,
     Math.floor(Number(root.dataset.largeBoxSize || 0) || 0),
   );
-  const largeCount = Math.max(
-    0,
-    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
-  );
   const largePreview = scope.querySelector("[data-stock-in-large-preview]");
   const packPreview = scope.querySelector("[data-stock-in-pack-preview]");
   const totalPreview = scope.querySelector("[data-stock-in-qty-total]");
   const totalQtyInput = scope.querySelector("[data-stock-in-total-qty]");
   const totalCostEl = scope.querySelector("[data-stock-in-total-cost]");
-  const largeDerived = stockInPackDerivedPieces(largePacks, largePieces);
-  const smallDerived = stockInPackDerivedPieces(packs, smallSize);
+  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+  const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const fromLarge = largeCount ? lp * largeCount : 0;
+  const largeDerived =
+    pk > 0
+      ? 0
+      : stockInPackDerivedPieces(largePacks, largePieces);
+  const smallDerived =
+    pk > 0
+      ? pk * smallSize
+      : fromLarge > 0
+        ? fromLarge * smallSize
+        : 0;
   const total =
     largeDerived +
     smallDerived +
@@ -11935,8 +11962,8 @@ function stockInQtyFieldsInput(_el) {
     );
   }
   if (largePreview) {
-    if (largeDerived) {
-      largePreview.textContent = `= ${largeDerived} ширхэг`;
+    if (lp > 0 && largeCount) {
+      largePreview.textContent = `= ${lp * largeCount} жижиг`;
     } else if (largeCount && smallSize) {
       largePreview.textContent = `1 том = ${largeCount} жижиг (= ${largePieces} ш)`;
     } else {
@@ -12003,7 +12030,15 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const priorCost = productCostPrice(p) || 0;
   const largeVal =
     d.largePacks != null && d.largePacks !== "" ? String(d.largePacks) : "";
-  const packsVal = d.packs != null && d.packs !== "" ? String(d.packs) : "";
+  let packsVal = d.packs != null && d.packs !== "" ? String(d.packs) : "";
+  if (
+    !packsVal &&
+    largeVal &&
+    largeCount > 0 &&
+    Math.floor(Number(largeVal) || 0) > 0
+  ) {
+    packsVal = String(Math.floor(Number(largeVal)) * largeCount);
+  }
   const qtyVal = d.qty != null && d.qty !== "" ? String(d.qty) : "";
   const costVal =
     d.costPrice != null && d.costPrice !== "" ? String(d.costPrice) : "";
@@ -12012,7 +12047,12 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const costExceeds = !isOut
     ? stockInCostExceedsSalesPrice(costVal || d.costPrice, p)
     : false;
-  const initialTotal = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
+  const initialTotal = stockInEntryTotalQty(
+    largeVal,
+    packsVal || d.packs,
+    d.qty,
+    p,
+  );
   const effectiveUnitCost = costVal
     ? Math.max(0, Math.floor(Number(costVal) || 0))
     : priorCost;
@@ -12104,7 +12144,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const onsubmit = isOut
     ? `applyStockOutModal(event,'${esc(p.id)}')`
     : `applyStockInEntryModal(event,'${esc(p.id)}')`;
-  return `<form onsubmit="${onsubmit}" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}" data-prior-cost="${priorCost}"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p>${packRules}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div>${noteHtml}${costBlock}<button type="submit" class="${submitClass}">${stockInTakeIcon("save")}<span>${submitLabel}</span></button></form>`;
+  return `<form onsubmit="${onsubmit}" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}" data-prior-cost="${priorCost}"><div class="stock-in-take__body"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p>${packRules}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div>${noteHtml}${costBlock}</div><button type="submit" class="${submitClass}">${stockInTakeIcon("save")}<span>${submitLabel}</span></button></form>`;
 }
 function stockInEntryModal(id) {
   const p = state.products.find((x) => x.id === id);

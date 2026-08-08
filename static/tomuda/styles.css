@@ -15043,10 +15043,14 @@ body.image-lightbox-open {
 }
 
 .modal-panel.stock-in-take-modal {
-  max-height: min(92vh, 760px);
+  display: flex;
+  flex-direction: column;
+  max-height: min(90vh, 760px);
+  overflow: hidden;
 }
 
 .modal-panel.stock-in-take-modal .modal-panel__head {
+  flex-shrink: 0;
   padding: 14px 16px;
   background: var(--hex-primary);
   border-bottom: none;
@@ -15067,11 +15071,22 @@ body.image-lightbox-open {
 .stock-in-take {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 12px;
-  padding: 14px 14px 16px;
+  padding: 14px 14px max(16px, env(safe-area-inset-bottom, 0px));
   background: var(--hex-background);
+  overflow: hidden;
+}
+
+.stock-in-take__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  max-height: calc(92vh - 64px);
+  -webkit-overflow-scrolling: touch;
 }
 
 .stock-in-take__product {
@@ -15277,6 +15292,7 @@ body.image-lightbox-open {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  flex-shrink: 0;
   width: 100%;
   min-height: 48px;
   border: none;
