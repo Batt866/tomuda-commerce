@@ -477,7 +477,7 @@ function receiptPartyFields(o) {
     salesPhone: esc(o.employeePhone || sales.phone || "-"),
     deliveryName: esc(delivery.deliveryName),
     deliveryPhone: esc(delivery.deliveryPhone),
-    customerName: esc(c.name || o.customerName),
+    customerName: esc(c.name || c.companyName || o.customerName || "-"),
     customerReg: esc(c.registrationNumber || "-"),
     companyName: esc(c.companyName || "-"),
     customerPhone: esc(customerPhonesList(c).join(", ") || "-"),
@@ -1296,10 +1296,47 @@ function orderMatchesWarehouseDate(o, day = state.filters.warehouseDate) {
 function filterWarehouseOrders(orders) {
   return orders.filter((o) => orderMatchesWarehouseDate(o));
 }
-const mapsLink = (lat, lng) =>
-  lat && lng && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))
-    ? `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`
-    : "";
+function mapsLink(lat, lng, label = "") {
+  if (
+    lat === undefined ||
+    lat === null ||
+    lat === "" ||
+    lng === undefined ||
+    lng === null ||
+    lng === "" ||
+    Number.isNaN(Number(lat)) ||
+    Number.isNaN(Number(lng))
+  ) {
+    return "";
+  }
+  const name = String(label || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  // Include the store name so Google Maps / saved places are not anonymous pins.
+  const query = name
+    ? `${Number(lat)},${Number(lng)} (${name})`
+    : `${Number(lat)},${Number(lng)}`;
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
+}
+function appleMapsLink(lat, lng, label = "") {
+  if (
+    lat === undefined ||
+    lat === null ||
+    lat === "" ||
+    lng === undefined ||
+    lng === null ||
+    lng === "" ||
+    Number.isNaN(Number(lat)) ||
+    Number.isNaN(Number(lng))
+  ) {
+    return "";
+  }
+  const name = String(label || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  const q = encodeURIComponent(name || "Дэлгүүр");
+  return `https://maps.apple.com/?ll=${Number(lat)},${Number(lng)}&q=${q}`;
+}
 const esc = (s = "") =>
   String(s).replace(
     /[&<>"']/g,
@@ -3312,7 +3349,7 @@ function currentPageTitle(nav) {
     state.workerCustomer
   ) {
     const c = state.customers.find((x) => x.id === state.workerCustomer);
-    if (c?.name) return c.name;
+    if (c) return customerDisplayName(c);
   }
   if (state.currentView === "promotions" && state.filters.promotionDetail) {
     return promotionTypeLabel(state.filters.promotionDetail);
@@ -9634,7 +9671,7 @@ function customerAvatarHtml(c, className = "customer-card__avatar") {
   if (src) {
     return `<img src="${esc(src)}" alt="" class="${className} customer-card__avatar-img" loading="lazy" decoding="async">`;
   }
-  return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(c.name))}</span>`;
+  return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(customerDisplayName(c)))}</span>`;
 }
 function customerImageField(c) {
   const preview = c.image || customerStoreImage(c);
@@ -9867,8 +9904,13 @@ function customerDetailHtml(c) {
   const addr = [c.province, c.district, c.khoroo, c.address]
       .filter(Boolean)
       .join(", "),
-    link = mapsLink(c.latitude, c.longitude),
+    displayName = customerDisplayName(c),
+    link = mapsLink(c.latitude, c.longitude, displayName),
+    apple = appleMapsLink(c.latitude, c.longitude, displayName),
     rd = customerRegistrationDisplay(c);
+  const mapsHtml = link
+    ? `<span class="customer-detail__maps-row"><a href="${link}" target="_blank" rel="noopener" class="customer-detail__maps">Google Maps · ${esc(displayName)}</a>${apple ? `<a href="${apple}" target="_blank" rel="noopener" class="customer-detail__maps customer-detail__maps--apple">Apple Maps</a>` : ""}</span>`
+    : `<span class="customer-detail__muted">Бүртгэгдээгүй</span>`;
   const rows = [
     customerDetailRow(
       "Регистр",
@@ -9892,15 +9934,9 @@ function customerDetailHtml(c) {
       addr ? esc(addr) : `<span class="customer-detail__muted">—</span>`,
       customerCardPinIcon(),
     ),
-    customerDetailRow(
-      "Байршил",
-      link
-        ? `<a href="${link}" target="_blank" rel="noopener" class="customer-detail__maps">Google Maps дээр нээх</a>`
-        : `<span class="customer-detail__muted">Бүртгэгдээгүй</span>`,
-      customerCardPinIcon(),
-    ),
+    customerDetailRow("Байршил", mapsHtml, customerCardPinIcon()),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text">${c.companyName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div></div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name">${esc(displayName)}</p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div></div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -10109,7 +10145,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(c.name)}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName) {
   if (!customerId) return;
@@ -10751,6 +10787,14 @@ function customerAddress(c) {
     "-"
   );
 }
+/** Store label for delivery / maps — never blank if companyName exists. */
+function customerDisplayName(c) {
+  return (
+    String(c?.name || "").trim() ||
+    String(c?.companyName || "").trim() ||
+    "Дэлгүүр"
+  );
+}
 function customerRow(c) {
   const id = esc(c.id);
   const editBtn = canEditCustomer()
@@ -10784,7 +10828,7 @@ function workerPickCard(c) {
   const subHtml = line2
     ? `<span class="worker-pick-card__sub">${esc(line2)}</span>`
     : "";
-  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(c.name)}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
+  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
 }
 function productsView() {
   const q = state.searches.products || "",
@@ -16680,8 +16724,8 @@ function deliveryStoresWithOrders() {
     })
     .filter(Boolean)
     .sort((a, b) =>
-      String(a.customer.name || "").localeCompare(
-        String(b.customer.name || ""),
+      String(customerDisplayName(a.customer) || "").localeCompare(
+        String(customerDisplayName(b.customer) || ""),
         "mn",
       ),
     );
@@ -16716,10 +16760,12 @@ function customerHasCoords(c) {
 function customerStoreImage(c) {
   const src = entityImageSrc(c?.image);
   if (src) return src;
-  const name = String(c?.name || "Дэлгүүр").slice(0, 16);
+  const name = String(customerDisplayName(c)).slice(0, 16);
   const hue =
-    [...String(c?.name || "Д")].reduce((s, ch) => s + ch.charCodeAt(0), 0) %
-    360;
+    [...String(customerDisplayName(c) || "Д")].reduce(
+      (s, ch) => s + ch.charCodeAt(0),
+      0,
+    ) % 360;
   const bg = `hsl(${hue} 48% 90%)`;
   const accent = `hsl(${hue} 58% 40%)`;
   const safe = name.replace(/[<>&"]/g, "");
@@ -16728,12 +16774,17 @@ function customerStoreImage(c) {
 function deliveryStoreCard(entry, active = false) {
   const c = entry.customer,
     id = esc(c.id),
+    displayName = customerDisplayName(c),
     addr = customerAddress(c),
     meta = [customerPhonesList(c)[0] || "", addr !== "-" ? addr : ""]
       .filter(Boolean)
       .join(" · "),
     markAction = deliveryStoreCardMarkAction(c.id);
-  return `<div class="delivery-store-card-wrap${active ? " is-active" : ""}"><button type="button" class="delivery-store-card${active ? " is-active" : ""}" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><div class="delivery-store-card__media"><img src="${customerStoreImage(c)}" alt="" class="delivery-store-card__img" loading="lazy" decoding="async"><span class="delivery-store-card__pin" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>${entry.orderCount ? `<span class="delivery-store-card__badge">${entry.orderCount} захиалга</span>` : ""}</div><div class="delivery-store-card__body"><p class="delivery-store-card__name">${esc(c.name)}</p>${c.companyName ? `<p class="delivery-store-card__company">${esc(c.companyName)}</p>` : ""}<p class="delivery-store-card__meta">${esc(meta || "—")}</p><p class="delivery-store-card__total">${fmt(entry.total)}</p></div></button>${markAction}</div>`;
+  const companyLine =
+    c.companyName && String(c.companyName).trim() !== displayName
+      ? `<p class="delivery-store-card__company">${esc(c.companyName)}</p>`
+      : "";
+  return `<div class="delivery-store-card-wrap${active ? " is-active" : ""}"><button type="button" class="delivery-store-card${active ? " is-active" : ""}" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><div class="delivery-store-card__media"><img src="${customerStoreImage(c)}" alt="" class="delivery-store-card__img" loading="lazy" decoding="async"><span class="delivery-store-card__pin" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>${entry.orderCount ? `<span class="delivery-store-card__badge">${entry.orderCount} захиалга</span>` : ""}</div><div class="delivery-store-card__body"><p class="delivery-store-card__name">${esc(displayName)}</p>${companyLine}<p class="delivery-store-card__meta">${esc(meta || "—")}</p><p class="delivery-store-card__total">${fmt(entry.total)}</p></div></button>${markAction}</div>`;
 }
 function deliveryStorePickStep() {
   const q = state.searches.deliveryStore || "",
@@ -16754,9 +16805,14 @@ function deliveryStoreMapStep() {
     rows = filterDeliveryStores(deliveryStoresWithOrders(), q),
     orders = selected ? deliveryOrdersForStore(selected.id) : [],
     addr = selected ? customerAddress(selected) : "-",
+    displayName = selected ? customerDisplayName(selected) : "",
     maps =
       selected && customerHasCoords(selected)
-        ? mapsLink(selected.latitude, selected.longitude)
+        ? mapsLink(selected.latitude, selected.longitude, displayName)
+        : "",
+    apple =
+      selected && customerHasCoords(selected)
+        ? appleMapsLink(selected.latitude, selected.longitude, displayName)
         : "";
   if (!selected) {
     state.deliveryStoreReady = false;
@@ -16776,7 +16832,10 @@ function deliveryStoreMapStep() {
     .filter((entry) => entry.customer.id !== selected.id)
     .map((entry) => deliveryStoreCard(entry, false))
     .join("");
-  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(selected.name)}</h2></div>${banner}<div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}${maps ? `<a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps нээх</a>` : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
+  const mapsLinks = maps
+    ? `<div class="delivery-store-detail__maps-row"><a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps · ${esc(displayName)}</a>${apple ? `<a href="${apple}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps delivery-store-detail__maps--apple">Apple Maps</a>` : ""}</div>`
+    : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`;
+  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(displayName)}</h2></div>${banner}<div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}${mapsLinks}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
 }
 function deliveryView() {
   if (!state.deliveryStoreReady || !state.deliveryStoreId) {
@@ -16868,7 +16927,7 @@ function initDeliveryRouteMap(stores, selectedId) {
       id: c.id,
       lat: Number(c.latitude),
       lng: Number(c.longitude),
-      name: c.name,
+      name: customerDisplayName(c),
     }));
   const selected = points.find((p) => p.id === selectedId) || points[0],
     start = selected ? [selected.lat, selected.lng] : [47.9189, 106.9176];
@@ -16884,15 +16943,19 @@ function initDeliveryRouteMap(stores, selectedId) {
   const bounds = [];
   points.forEach((p) => {
     const isActive = p.id === selectedId;
+    const label = esc(String(p.name || "Дэлгүүр").slice(0, 22));
     const icon = L.divIcon({
       className: `delivery-map-pin${isActive ? " delivery-map-pin--active" : ""}`,
-      html: `<span class="delivery-map-pin__dot" aria-hidden="true"></span>`,
-      iconSize: [28, 28],
-      iconAnchor: [14, 28],
+      html: `<span class="delivery-map-pin__dot" aria-hidden="true"></span><span class="delivery-map-pin__label">${label}</span>`,
+      iconSize: [120, 44],
+      iconAnchor: [60, 28],
     });
     const marker = L.marker([p.lat, p.lng], { icon })
       .addTo(window.deliveryMap)
-      .bindTooltip(String(p.name || ""), { direction: "top" });
+      .bindTooltip(String(p.name || "Дэлгүүр"), {
+        direction: "top",
+        permanent: false,
+      });
     marker.on("click", () => pickDeliveryStore(p.id));
     window.deliveryMapMarkers.push(marker);
     bounds.push([p.lat, p.lng]);
@@ -17095,8 +17158,8 @@ function workerStoreSummary(c, compact = false) {
     ? `<span class="worker-order-store__loc">${esc(loc)}</span>`
     : "";
   if (compact)
-    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(c.name)}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
-  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(c.name)}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
+    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
 }
 function workerOrderAgentField() {
   ensureOrderEmployeeSelection();
@@ -18528,7 +18591,7 @@ function customerModal(id, draft = null) {
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" novalidate onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр", c.name)}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cid}" novalidate onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр / Дэлгүүрийн нэр", c.name, "text", "Жишээ: Номин 5-р хороо")}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}${field("locationText", "Олж очих заавар (түгээгчид)", c.locationText || "", "text", "Жишээ: 12-р байрны 1 давхар, улаан хаалга")}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -18673,6 +18736,12 @@ async function applyCustomerSave(data, id) {
   if (productMediaPathFromUrl(incomingImage)) {
     data.image = productMediaPathFromUrl(incomingImage);
   }
+  const company = String(data.companyName || "").trim();
+  const name = String(data.name || "").trim();
+  if (!name && company) data.name = company;
+  else data.name = name;
+  data.companyName = company;
+  data.locationText = String(data.locationText || "").trim();
   applyCustomerPhoneFields(
     data,
     Array.isArray(data.phones)
@@ -18835,7 +18904,7 @@ async function saveCustomer(e, id) {
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
   if (!c) return;
-  box(c.name, customerDetailHtml(c), "max-w-xl");
+  box(customerDisplayName(c), customerDetailHtml(c), "max-w-xl");
 }
 function productModal(id) {
   if (
@@ -19511,7 +19580,7 @@ function saveOrder(e) {
   state.orders.push(
     buildNewOrder({
       customerId: c.id,
-      customerName: c.name,
+      customerName: c.name || c.companyName || "",
       items,
       total: items.reduce((s, i) => s + i.total, 0),
       status: "pending",
@@ -20619,7 +20688,7 @@ function storePickerModal() {
     );
   box(
     "Харилцагч сонгох",
-    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, РД-ээр хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${c.name}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${customerPhonesList(c)[0] || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
+    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, РД-ээр хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${esc(customerDisplayName(c))}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${customerPhonesList(c)[0] || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
     "max-w-3xl",
   );
   const el = document.querySelector("[data-store-search]");
@@ -20744,7 +20813,7 @@ async function saveWorker() {
   try {
     const order = buildNewOrder({
       customerId: c.id,
-      customerName: c.name,
+      customerName: c.name || c.companyName || "",
       items,
       grossTotal: cart.gross,
       applyPercentDiscount: workerPercentDiscountActive(),

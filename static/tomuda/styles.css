@@ -905,6 +905,13 @@ textarea.text-sm,
   display: none;
 }
 
+.customer-detail__maps-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
 .customer-detail__maps {
   display: inline-flex;
   align-items: center;
@@ -916,6 +923,11 @@ textarea.text-sm,
 
 .customer-detail__maps:hover {
   text-decoration: underline;
+}
+
+.customer-detail__maps--apple {
+  color: var(--hex-muted-foreground);
+  font-weight: 500;
 }
 
 .customer-detail__muted {
@@ -9076,7 +9088,7 @@ textarea::placeholder {
   display: block;
   width: 18px;
   height: 18px;
-  margin: 0 auto 4px;
+  margin: 0 auto 2px;
   border-radius: 999px 999px 999px 0;
   transform: rotate(-45deg);
   background: var(--hex-danger, #c43c52);
@@ -9088,6 +9100,42 @@ textarea::placeholder {
   width: 22px;
   height: 22px;
   background: var(--hex-primary);
+}
+
+.delivery-map-pin__label {
+  display: block;
+  max-width: 112px;
+  margin: 0 auto;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.94);
+  border: 1px solid var(--hex-border);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  color: var(--hex-foreground, #182032);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delivery-map-pin--active .delivery-map-pin__label {
+  border-color: var(--hex-primary);
+  color: var(--hex-primary);
+}
+
+.delivery-store-detail__maps-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+.delivery-store-detail__maps--apple {
+  color: var(--hex-muted-foreground);
+  font-weight: 500;
 }
 
 .delivery-store-detail {
