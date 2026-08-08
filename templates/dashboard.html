@@ -279,7 +279,7 @@
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260808-boot-fix"
+      href="{% static 'tomuda/app.js' %}?v=20260808-boot-v562"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -427,13 +427,21 @@
         navigator.serviceWorker
           .getRegistrations()
           .then(function (regs) {
-            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            return Promise.all(
+              regs.map(function (r) {
+                return r.unregister();
+              }),
+            );
           })
           .catch(function () {})
           .then(function () {
             if (!("caches" in window)) return;
             return caches.keys().then(function (keys) {
-              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+              return Promise.all(
+                keys.map(function (k) {
+                  return caches.delete(k);
+                }),
+              );
             });
           })
           .catch(function () {})
@@ -441,22 +449,63 @@
       };
       window.__loadTomudaApp = function () {
         var sources = [
-          "{% static 'tomuda/app.js' %}?v=20260808-boot-fix",
+          "{% static 'tomuda/app.js' %}?v=20260808-boot-v562",
+          "{% static 'tomuda/app.js' %}?v=" + Date.now(),
           "{% static 'tomuda/app.js' %}",
         ];
         var i = 0;
+        var timer = null;
+        var settled = false;
+
+        function fail() {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          __showTomudaFatal(
+            "App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.",
+          );
+        }
+
         function tryNext() {
+          if (settled) return;
           if (i >= sources.length) {
-            __showTomudaFatal(
-              "App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.",
-            );
+            fail();
             return;
           }
           var s = document.createElement("script");
-          s.src = sources[i++];
-          s.onerror = tryNext;
+          var src = sources[i++];
+          var done = false;
+          s.src = src;
+          s.async = false;
+          s.onload = function () {
+            if (done || settled) return;
+            done = true;
+            settled = true;
+            if (timer) clearTimeout(timer);
+          };
+          s.onerror = function () {
+            if (done || settled) return;
+            done = true;
+            tryNext();
+          };
           document.body.appendChild(s);
         }
+
+        timer = setTimeout(function () {
+          if (settled) return;
+          if (window.__tomudaBooted) {
+            settled = true;
+            return;
+          }
+          // Hung request — clear SW cache and hard reload once.
+          if (!sessionStorage.getItem("tomuda-boot-retry")) {
+            sessionStorage.setItem("tomuda-boot-retry", "1");
+            __tomudaHardReload();
+            return;
+          }
+          fail();
+        }, 20000);
+
         tryNext();
       };
     </script>

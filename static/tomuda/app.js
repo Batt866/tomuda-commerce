@@ -5524,7 +5524,7 @@ function onVisibilityPoll() {
   if (document.visibilityState === "visible") pullBackendStateNow();
 }
 function bootScreenHtml(message = BOOT_LOADING_TEXT, showRetry = false) {
-  return `<div class="boot-screen${showRetry ? " boot-screen--error" : ""}" aria-live="polite"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="${BRAND.logoBlue}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Импорт, түгээлт</p></div></div><div class="boot-screen__copy"><p id="boot-title" class="boot-screen__title">${BOOT_TITLE_TEXT}</p><p id="boot-detail" class="boot-screen__detail">${esc(message)}</p></div><div class="boot-screen__progress" aria-hidden="true"><span></span></div><div class="boot-screen__status-row" aria-hidden="true"><span class="boot-screen__pulse"></span><span>Сервертэй холбогдож байна</span></div><div class="boot-screen__preview" aria-hidden="true"><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span></div><button type="button" id="boot-retry" class="boot-screen__retry${showRetry ? "" : " hidden"}" onclick="location.reload()">Дахин оролдох</button></div></div>`;
+  return `<div class="boot-screen${showRetry ? " boot-screen--error" : ""}" aria-live="polite"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="${BRAND.logoBlue}" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Импорт, түгээлт</p></div></div><div class="boot-screen__copy"><p id="boot-title" class="boot-screen__title">${BOOT_TITLE_TEXT}</p><p id="boot-detail" class="boot-screen__detail">${esc(message)}</p></div><div class="boot-screen__progress" aria-hidden="true"><span></span></div><div class="boot-screen__status-row" aria-hidden="true"><span class="boot-screen__pulse"></span><span>Сервертэй холбогдож байна</span></div><div class="boot-screen__preview" aria-hidden="true"><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span><span class="boot-screen__preview-row"></span></div><button type="button" id="boot-retry" class="boot-screen__retry${showRetry ? "" : " hidden"}" onclick="(window.__tomudaHardReload||location.reload.bind(location))()">Дахин оролдох</button></div></div>`;
 }
 function showBootRetry() {
   document.querySelector(".boot-screen")?.classList.add("boot-screen--error");
@@ -5568,6 +5568,9 @@ function completeBootUiInit(options = {}) {
   initPageUnloadPersist();
   initAppBack();
   window.__tomudaBooted = true;
+  try {
+    sessionStorage.removeItem("tomuda-boot-retry");
+  } catch (_) {}
   render();
   initPwa();
   if (startPoll) startBackendPoll();
