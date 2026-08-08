@@ -7425,7 +7425,6 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["warehouse", "Нярав", "warehouse", "warehouse.view"],
-    ["inventory", "Агуулах", "inventory", "warehouse.view"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
@@ -7437,8 +7436,6 @@ function adminHubHtml() {
     if (id === "promotions") return canManagePromotions();
     if (id === "warehouseReceipts") return canManageReceipts();
     if (id === "count") return canManageCount();
-    if (id === "inventory")
-      return hasPermission("warehouse.view") || hasPermission("warehouse.edit");
     return hasPermission(perm);
   });
   const settings = [];
