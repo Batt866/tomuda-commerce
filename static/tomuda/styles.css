@@ -10026,7 +10026,7 @@ textarea::placeholder {
     > div
     > :not(.border-b):not(.picker-step2):not(.picker-step1):not(
       .stock-alert-form
-    ):not(.employee-form) {
+    ):not(.employee-form):not(.product-form) {
     max-height: calc(100dvh - 55px);
     overflow-y: auto;
   }
@@ -10064,6 +10064,17 @@ textarea::placeholder {
     flex-direction: column !important;
   }
 
+  #modal > div > div > .product-form {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
   .employee-form__body {
     flex: 1 1 auto !important;
     min-height: 0 !important;
@@ -10072,7 +10083,19 @@ textarea::placeholder {
     -webkit-overflow-scrolling: touch;
   }
 
+  .product-form__body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .employee-form__foot {
+    flex-shrink: 0;
+  }
+
+  .product-form__foot {
     flex-shrink: 0;
   }
 

@@ -19839,14 +19839,14 @@ function productModal(id) {
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form onsubmit="saveProduct(event,'${id || ""}')" class="p-6 space-y-4 modal-scroll overflow-y-auto"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
+    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
       .map(
         (c) =>
           `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 24). Хоосон бол ашиглахгүй.</p></label><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн ширхэг? (жишээ нь 288). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p><button class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 24). Хоосон бол ашиглахгүй.</p></label><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн ширхэг? (жишээ нь 288). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -20032,7 +20032,15 @@ async function fillProductFromBarcode(code) {
       country: productCountryFromBarcodeData(product),
     };
     Object.entries(values).forEach(([key, value]) => {
-      if (value && form.elements[key]) form.elements[key].value = value;
+      if (!value || !form.elements[key]) return;
+      if (key === "category") {
+        const match = cats().find(
+          (c) => String(c).toLowerCase() === String(value).toLowerCase(),
+        );
+        if (match) form.elements[key].value = match;
+        return;
+      }
+      form.elements[key].value = value;
     });
     const image = product.image_url || "",
       imageValue = document.getElementById("productImageValue"),
@@ -20050,6 +20058,8 @@ async function fillProductFromBarcode(code) {
 }
 function buildProductDataFromForm(form) {
   const data = Object.fromEntries(new FormData(form));
+  data.name = String(data.name || "").trim();
+  if (!data.name) return { error: "Барааны нэр оруулна уу" };
   if (!data.category?.trim()) return { error: "Төрөл сонгоно уу" };
   if (data.category === "__new__") {
     const custom = prompt("Шинэ төрлийн нэр");
@@ -20151,8 +20161,21 @@ async function applyProductSave(data, id) {
     });
   }
   const product = state.products.find((p) => p.id === productId);
-  if (product) {
-    await persistProductImageToMedia(product);
+  if (product && storedProductImage(product)) {
+    try {
+      await Promise.race([
+        persistProductImageToMedia(product),
+        sleep(12000).then(() => {
+          throw new Error("image timeout");
+        }),
+      ]);
+    } catch (error) {
+      console.warn("Product image persist skipped", error);
+      // Keep product even if image upload hangs / fails.
+      if (String(product.image || "").startsWith("http")) {
+        /* remote preview URL may remain until retry */
+      }
+    }
   }
   const saved = await flushBackendSave().catch((error) => {
     console.warn("Product backend save failed", error);
@@ -20179,14 +20202,22 @@ async function saveProduct(e, id) {
   if (
     id ? !hasPermission("products.edit") : !hasPermission("products.create")
   ) {
+    e?.preventDefault?.();
     return alertModal("Эрхгүй", "Бараа хадгалах эрхгүй.");
   }
   e.preventDefault();
   if (productImageCompressTask) {
     try {
-      await productImageCompressTask;
-    } catch {
-      return;
+      await Promise.race([
+        productImageCompressTask,
+        sleep(8000).then(() => {
+          throw new Error("compress timeout");
+        }),
+      ]);
+    } catch (error) {
+      console.warn("Product image compress wait failed", error);
+      productImageCompressTask = null;
+      showAppToast("Зургийг алгасаад барааг хадгална", "warning");
     }
   }
   const built = buildProductDataFromForm(e.target);
