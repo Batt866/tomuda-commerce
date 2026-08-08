@@ -14770,7 +14770,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D том · E жижиг · F ширхэг · G stock */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [34, 12, 13, 7, 7, 7, 10];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [32, 12, 12, 9, 11, 9, 10];
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -15115,9 +15115,9 @@ table.prepare { width: 1100px; border-collapse: collapse; table-layout: fixed; f
 .prepare col:nth-child(1) { width: 420px; }
 .prepare col:nth-child(2) { width: 130px; }
 .prepare col:nth-child(3) { width: 140px; }
-.prepare col:nth-child(4) { width: 70px; }
-.prepare col:nth-child(5) { width: 70px; }
-.prepare col:nth-child(6) { width: 70px; }
+.prepare col:nth-child(4) { width: 95px; }
+.prepare col:nth-child(5) { width: 110px; }
+.prepare col:nth-child(6) { width: 95px; }
 .prepare col:nth-child(7) { width: 120px; }
 .prepare td, .prepare th { border: 1px solid #555; padding: 2px 4px; vertical-align: middle; }
 .prepare td:first-child { overflow-wrap: anywhere; }
@@ -15127,7 +15127,7 @@ table.prepare { width: 1100px; border-collapse: collapse; table-layout: fixed; f
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .blank td { height: 30px; }
-.head th { height: 52px; text-align: center; font-size: 18px; font-weight: 800; border: 2px solid #000; }
+.head th { height: 52px; text-align: center; font-size: 18px; font-weight: 800; border: 2px solid #000; white-space: nowrap; }
 .cat { text-align: center; font-weight: 800; height: 36px; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; }
