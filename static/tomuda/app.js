@@ -11800,58 +11800,67 @@ function confirmStockOutExcel() {
 }
 function exportStockInExcelFallback(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
-  const receivedDateValue = warehouseSheetDateValue(
+  const dateValue = warehouseSheetDateValue(
     receipt.createdAt
       ? isoDay(receipt.createdAt) || todayIso()
       : todayIso(),
-  );
-  const printedDateValue = warehouseSheetDateValue(todayIso());
+  ).trim();
   const h = (value) => xlsxXmlEsc(value ?? "");
-  const bodyRows = stockInReceiptGroupedLines(receipt.lines)
-    .map((item) => {
-      if (item.type === "cat") {
-        return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
-      }
-      if (item.type === "catTotal") {
-        return `<tr class="cat-total"><td colspan="6" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
-      }
-      const line = item.line;
-      const unitPrice = stockInReceiptLineUnitPrice(line);
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${line.packs || ""}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
+  const lines = (receipt.lines || []).filter(
+    (line) => (Number(line.quantity) || 0) > 0,
+  );
+  const grossInclusive = Number(receipt.totalAmount) || 0;
+  const netExVat = grossInclusive / 1.1;
+  const vatAmount = grossInclusive - netExVat;
+  const qtyTotal = lines.reduce(
+    (sum, line) => sum + (Number(line.quantity) || 0),
+    0,
+  );
+  const bodyRows = lines
+    .map((line, idx) => {
+      const p =
+        state.products.find((x) => String(x.id) === String(line.productId)) ||
+        {};
+      const unitText =
+        String(line.unit || p.unit || "ширхэг").trim() || "ширхэг";
+      return `<tr><td class="num">${idx + 1}</td><td colspan="2">${h(line.productName || "-")}</td><td class="barcode">${h(line.barcode || "")}</td><td class="center">${h(unitText)}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(stockInReceiptLineUnitPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
+  const receiptNo = receipt.receiptNumber
+    ? `Орлогын баримт №: ${h(receipt.receiptNumber)}`
+    : "Орлогын баримт";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
-.stock-in col:nth-child(1) { width: 260px; }
-.stock-in col:nth-child(2) { width: 140px; }
-.stock-in col:nth-child(3) { width: 80px; }
-.stock-in col:nth-child(4) { width: 100px; }
-.stock-in col:nth-child(5) { width: 120px; }
-.stock-in col:nth-child(6) { width: 120px; }
-.stock-in col:nth-child(7) { width: 140px; }
-.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
-.title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
-.meta td { border: none; padding: 4px 0; }
-.date-label { text-align: right; white-space: nowrap; }
-.date-value { text-align: left; white-space: nowrap; }
+@page { size: A4 portrait; margin: 18mm 14mm 16mm 18mm; }
+body { font-family: Arial, sans-serif; color: #000; margin: 0; }
+table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
+.form-code td { border: none; font-size: 11px; }
+.title { text-align: center; font-size: 15px; font-weight: 800; border: none; }
+.sub { text-align: center; font-weight: 700; border: none; }
+.meta td { border: none; padding: 3px 0; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; }
-.cat { text-align: center; font-weight: 800; background: #f7f7f7; }
-.cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
+.center { text-align: center; }
 .num { text-align: right; }
 .total td { font-weight: 800; }
-.sign td { border: none; padding-top: 18px; }
+.sign td { border: none; padding-top: 14px; }
 </style></head><body><table class="stock-in">
-<colgroup><col><col><col><col><col><col><col></colgroup>
-<tr><td colspan="7" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
-<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${receipt.lines.length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Багц</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<tr class="form-code"><td colspan="5">НХМаяг БМ-1</td><td colspan="3" style="text-align:right;white-space:pre-line">Сангийн сайдын 2017 оны 347 дугаар
+тушаалын хавсралт</td></tr>
+<tr><td colspan="8" class="title">БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ</td></tr>
+<tr><td colspan="8" class="sub">${receiptNo}</td></tr>
+<tr class="meta"><td colspan="2">Байгууллагын нэр:</td><td colspan="2">${h(STOCK_IN_COMPANY_NAME)}</td><td colspan="2">Огноо:</td><td colspan="2">${h(dateValue)}</td></tr>
+<tr class="meta"><td colspan="2">Регистрийн дугаар:</td><td colspan="2">${h(STOCK_IN_COMPANY_REG)}</td><td colspan="2">Агуулах / Байршил:</td><td colspan="2">${h(STOCK_IN_WAREHOUSE_DEFAULT)}</td></tr>
+<tr class="meta"><td colspan="2">Бэлтгэн нийлүүлэгч:</td><td colspan="2">-</td><td colspan="2">Дагалдах баримт №:</td><td colspan="2">${h(receipt.receiptNumber || "-")}</td></tr>
+<tr class="meta"><td colspan="2">Харилцах утас:</td><td colspan="2">${h(RECEIPT_COMPANY_PHONE)}</td><td colspan="2">Хүлээн авсан ажилтан:</td><td colspan="2">${h(receipt.employeeName || "-")}</td></tr>
+<tr class="head"><th>№</th><th colspan="2">Бараа, материалын нэр, зэрэг</th><th>Баркод / Код</th><th>Хэмжих нэгж</th><th>Тоо хэмжээ</th><th>Нэгж үнэ (₮)</th><th>Нийт дүн (₮)</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount)}</td></tr>
-<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________</td></tr>
+<tr class="total"><td colspan="5">ДҮН (Нийт орлогод авсан барааны дүн)</td><td class="num">${qtyTotal}</td><td></td><td class="num">${fmtExcelMoney(netExVat)}</td></tr>
+<tr><td colspan="7">НӨАТ (10%):</td><td class="num">${fmtExcelMoney(vatAmount)}</td></tr>
+<tr class="total"><td colspan="7">НИЙТ ДҮН (НӨАТ-тай):</td><td class="num">${fmtExcelMoney(grossInclusive)}</td></tr>
+<tr class="sign"><td colspan="5">Хүлээлгэн өгсөн (Бэлтгэн нийлүүлэгч/Төлөөлөгч):</td><td colspan="3">.................................... /                              /</td></tr>
+<tr class="sign"><td colspan="5">Хүлээн авсан эд хариуцагч (Нярав):</td><td colspan="3">.................................... /                              /</td></tr>
+<tr class="sign"><td colspan="5">Шалгасан нягтлан бодогч:</td><td colspan="3">.................................... /                              /</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -13160,12 +13169,17 @@ async function exportCountExcelXlsx() {
 const WAREHOUSE_PREPARE_LAST_COL = "F";
 const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
-const STOCK_IN_LAST_COL = "G";
+const STOCK_IN_LAST_COL = "H";
 const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
+const STOCK_IN_COMPANY_NAME = "ТОМУДА ГРУПП ХХК";
+const STOCK_IN_COMPANY_REG = "5397987";
+const STOCK_IN_WAREHOUSE_DEFAULT = "Төв агуулах";
+/** Official BM-1 style stock-in receipt (A4). */
 function buildStockInSheetXml(receipt, {
   titleText = null,
   receivedLabel = "Орлого авсан огноо:",
 } = {}) {
+  void receivedLabel;
   receipt = normalizeStockInReceiptTotals(receipt);
   const strings = [];
   const strIndex = new Map();
@@ -13177,137 +13191,198 @@ function buildStockInSheetXml(receipt, {
     strIndex.set(key, idx);
     return idx;
   };
-  const receivedDateValue = warehouseSheetDateValue(
-    receipt.createdAt
-      ? isoDay(receipt.createdAt) || todayIso()
-      : todayIso(),
+  const dateValue = warehouseSheetDateValue(
+    receipt.createdAt ? isoDay(receipt.createdAt) || todayIso() : todayIso(),
   );
-  const printedDateValue = warehouseSheetDateValue(todayIso());
-  const groups = stockInReceiptGroupedLines(receipt.lines);
+  const lines = (receipt.lines || []).filter(
+    (line) => (Number(line.quantity) || 0) > 0,
+  );
+  const grossInclusive = xlsxSafeNumber(Number(receipt.totalAmount) || 0);
+  // App amounts are VAT-inclusive (same as зарлагын баримт) — do not add VAT again.
+  const netExVat = xlsxSafeNumber(grossInclusive / 1.1);
+  const vatAmount = xlsxSafeNumber(grossInclusive - netExVat);
+  const qtyTotal = lines.reduce(
+    (sum, line) => sum + (Number(line.quantity) || 0),
+    0,
+  );
   const rows = [];
-  const merges = [`A1:${STOCK_IN_LAST_COL}1`, `A2:B2`, `C2:E2`, `C3:E3`];
+  const merges = [];
   let rowNum = 1;
+  const COLS = "ABCDEFGH";
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
     rowNum += 1;
   };
   const emptyCells = (row, from = "A", to = STOCK_IN_LAST_COL, style = 1) => {
-    const cols = "ABCDEFG".slice(
-      "ABCDEFG".indexOf(from),
-      "ABCDEFG".indexOf(to) + 1,
-    );
+    const cols = COLS.slice(COLS.indexOf(from), COLS.indexOf(to) + 1);
     return cols
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
-  const sheetTitle = titleText || stockInReceiptTitle(receipt);
-  pushRow(43.5, [
-    xlsxCellXml("A1", 13, si(sheetTitle), "s"),
-    ...emptyCells(1, "B", STOCK_IN_LAST_COL, 13),
-  ]);
-  pushRow(20.25, [
+  const metaPair = (l1, v1, l2, v2) => {
+    const r = rowNum;
+    pushRow(16.5, [
+      xlsxCellXml(`A${r}`, 5, si(l1), "s"),
+      xlsxCellXml(`B${r}`, 4, si(v1 || "-"), "s"),
+      xlsxCellXml(`C${r}`, 4, null, "empty"),
+      xlsxCellXml(`D${r}`, 5, si(l2), "s"),
+      xlsxCellXml(`E${r}`, 4, si(v2 || "-"), "s"),
+      ...emptyCells(r, "F", "H", 1),
+    ]);
+    merges.push(`B${r}:C${r}`, `E${r}:H${r}`);
+  };
+
+  // R1 form header — matches НХМаяг БМ-1 sample
+  pushRow(18, [
+    xlsxCellXml("A1", 5, si("НХМаяг БМ-1"), "s"),
+    ...emptyCells(1, "B", "E", 1),
     xlsxCellXml(
-      "A2",
-      4,
-      si(
-        `Ажилтан: ${receipt.employeeName || "-"} · ${receipt.lines.length} бараа`,
-      ),
+      "F1",
+      2,
+      si("Сангийн сайдын 2017 оны 347 дугаар\nтушаалын хавсралт"),
       "s",
     ),
-    xlsxCellXml("B2", 4, null, "empty"),
-    xlsxCellXml("C2", 14, si(receivedLabel), "s"),
-    xlsxCellXml("D2", 14, null, "empty"),
-    xlsxCellXml("E2", 14, null, "empty"),
-    xlsxCellXml("F2", 14, si(receivedDateValue), "s"),
-    xlsxCellXml("G2", 14, null, "empty"),
+    ...emptyCells(1, "G", "H", 2),
   ]);
-  pushRow(20.25, [
-    xlsxCellXml("A3", 6, null, "empty"),
-    xlsxCellXml("B3", 6, null, "empty"),
-    xlsxCellXml("C3", 14, si("Хэвлэсэн огноо:"), "s"),
-    xlsxCellXml("D3", 14, null, "empty"),
-    xlsxCellXml("E3", 14, null, "empty"),
-    xlsxCellXml("F3", 14, si(printedDateValue), "s"),
-    xlsxCellXml("G3", 14, null, "empty"),
+  merges.push("F1:H1");
+  pushRow(8, emptyCells(rowNum));
+
+  const title =
+    titleText || "БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ";
+  pushRow(22, [
+    xlsxCellXml(`A${rowNum}`, 13, si(title), "s"),
+    ...emptyCells(rowNum, "B", "H", 13),
   ]);
-  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
+  merges.push(`A${rowNum - 1}:H${rowNum - 1}`);
+  const receiptNo = receipt.receiptNumber
+    ? `Орлогын баримт №: ${receipt.receiptNumber}`
+    : "Орлогын баримт";
+  pushRow(16, [
+    xlsxCellXml(`A${rowNum}`, 6, si(receiptNo), "s"),
+    ...emptyCells(rowNum, "B", "H", 6),
+  ]);
+  merges.push(`A${rowNum - 1}:H${rowNum - 1}`);
+  pushRow(8, emptyCells(rowNum));
+
+  metaPair(
+    "Байгууллагын нэр:",
+    STOCK_IN_COMPANY_NAME,
+    "Огноо:",
+    dateValue.trim(),
+  );
+  metaPair(
+    "Регистрийн дугаар:",
+    STOCK_IN_COMPANY_REG,
+    "Агуулах / Байршил:",
+    STOCK_IN_WAREHOUSE_DEFAULT,
+  );
+  metaPair(
+    "Бэлтгэн нийлүүлэгч:",
+    "-",
+    "Дагалдах баримт №:",
+    receipt.receiptNumber || "-",
+  );
+  metaPair(
+    "Харилцах утас:",
+    RECEIPT_COMPANY_PHONE,
+    "Хүлээн авсан ажилтан:",
+    receipt.employeeName || "-",
+  );
+  pushRow(10, emptyCells(rowNum));
+
   const headerRow = rowNum;
-  pushRow(30.75, [
-    xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
-    xlsxCellXml(`C${headerRow}`, 7, si("Багц"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Тоо ширхэг"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Өртөг үнэ"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Нэгж үнэ"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, si("Нийт үнэ"), "s"),
+  merges.push(`B${headerRow}:C${headerRow}`);
+  pushRow(28, [
+    xlsxCellXml(`A${headerRow}`, 7, si("№"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Бараа, материалын нэр, зэрэг"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, null, "empty"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Баркод / Код"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Тоо хэмжээ"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Нэгж үнэ (₮)"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Нийт дүн (₮)"), "s"),
   ]);
-  for (const item of groups) {
-    if (item.type === "cat") {
-      const r = rowNum;
-      merges.push(`A${r}:${STOCK_IN_LAST_COL}${r}`);
-      pushRow(24, [
-        xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
-        ...emptyCells(r, "B", STOCK_IN_LAST_COL, 15),
-      ]);
-      continue;
-    }
-    if (item.type === "catTotal") {
-      const r = rowNum;
-      merges.push(`A${r}:F${r}`);
-      pushRow(16.5, [
-        xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
-        ...emptyCells(r, "B", "F", 3),
-        xlsxCellXml(`G${r}`, 10, item.amount, "n"),
-      ]);
-      continue;
-    }
-    const line = item.line;
+
+  let itemIndex = 0;
+  for (const line of lines) {
+    itemIndex += 1;
     const r = rowNum;
-    const unitPrice = stockInReceiptLineUnitPrice(line);
-    pushRow(15, [
-      xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
-      xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
-      xlsxOptionalNum(`C${r}`, 10, line.packs),
-      xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
-      xlsxCellXml(`E${r}`, 10, unitPrice, "n"),
-      xlsxCellXml(`F${r}`, 10, unitPrice, "n"),
-      xlsxCellXml(`G${r}`, 10, stockInReceiptLineTotal(line), "n"),
+    const qty = Number(line.quantity) || 0;
+    const unitPrice = xlsxSafeNumber(stockInReceiptLineUnitPrice(line));
+    const lineTotal = xlsxSafeNumber(stockInReceiptLineTotal(line));
+    const p =
+      state.products.find((x) => String(x.id) === String(line.productId)) || {};
+    const unitText = String(line.unit || p.unit || "ширхэг").trim() || "ширхэг";
+    const zebra = itemIndex % 2 === 0;
+    const centerStyle = zebra ? 9 : 8;
+    const nameStyle = zebra ? 14 : 8;
+    const numStyle = 10;
+    merges.push(`B${r}:C${r}`);
+    pushRow(18, [
+      xlsxCellXml(`A${r}`, centerStyle, itemIndex, "n"),
+      xlsxCellXml(`B${r}`, nameStyle, si(line.productName || "-"), "s"),
+      xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
+      xlsxBarcodeCell(`D${r}`, centerStyle, line.barcode, si),
+      xlsxCellXml(`E${r}`, centerStyle, si(unitText), "s"),
+      xlsxCellXml(`F${r}`, numStyle, qty, "n"),
+      xlsxCellXml(`G${r}`, numStyle, unitPrice, "n"),
+      xlsxCellXml(`H${r}`, numStyle, lineTotal, "n"),
     ]);
   }
-  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
-  const totalRow = rowNum;
-  merges.push(`A${totalRow}:F${totalRow}`);
-  pushRow(16.5, [
-    xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
-    ...emptyCells(totalRow, "B", "F", 10),
-    xlsxCellXml(`G${totalRow}`, 10, receipt.totalAmount, "n"),
+
+  pushRow(8, emptyCells(rowNum));
+  const sumRow = rowNum;
+  // Sample: label A:E, qty sum F, amount H (ex-VAT for ДҮН)
+  merges.push(`A${sumRow}:E${sumRow}`);
+  pushRow(18, [
+    xlsxCellXml(
+      `A${sumRow}`,
+      19,
+      si("ДҮН (Нийт орлогод авсан барааны дүн)"),
+      "s",
+    ),
+    ...emptyCells(sumRow, "B", "E", 19),
+    xlsxCellXml(`F${sumRow}`, 20, qtyTotal, "n"),
+    xlsxCellXml(`G${sumRow}`, 19, null, "empty"),
+    xlsxCellXml(`H${sumRow}`, 20, netExVat, "n"),
   ]);
-  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
-  const signDots = "....................................................";
-  const pushSignatureBlock = (roleLabel) => {
-    const nameRow = rowNum;
-    merges.push(`C${nameRow}:G${nameRow}`);
-    pushRow(null, [
-      xlsxCellXml(`A${nameRow}`, 17, si(roleLabel), "s"),
-      xlsxCellXml(`B${nameRow}`, 18, si("Нэр"), "s"),
-      xlsxCellXml(`C${nameRow}`, 18, si(signDots), "s"),
-      ...emptyCells(nameRow, "D", STOCK_IN_LAST_COL, 18),
+  const vatRow = rowNum;
+  merges.push(`A${vatRow}:G${vatRow}`);
+  pushRow(16.5, [
+    xlsxCellXml(`A${vatRow}`, 5, si("НӨАТ (10%):"), "s"),
+    ...emptyCells(vatRow, "B", "G", 5),
+    xlsxCellXml(`H${vatRow}`, 10, vatAmount, "n"),
+  ]);
+  const totalRow = rowNum;
+  merges.push(`A${totalRow}:G${totalRow}`);
+  pushRow(18, [
+    xlsxCellXml(`A${totalRow}`, 19, si("НИЙТ ДҮН (НӨАТ-тай):"), "s"),
+    ...emptyCells(totalRow, "B", "G", 19),
+    xlsxCellXml(`H${totalRow}`, 20, grossInclusive, "n"),
+  ]);
+
+  pushRow(14, emptyCells(rowNum));
+  const signLine =
+    ".................................... /                              /";
+  const pushSign = (label) => {
+    const r = rowNum;
+    merges.push(`F${r}:H${r}`);
+    pushRow(18, [
+      xlsxCellXml(`A${r}`, 5, si(label), "s"),
+      ...emptyCells(r, "B", "E", 1),
+      xlsxCellXml(`F${r}`, 4, si(signLine), "s"),
+      ...emptyCells(r, "G", "H", 4),
     ]);
-    const signRow = rowNum;
-    merges.push(`C${signRow}:G${signRow}`);
-    pushRow(null, [
-      xlsxCellXml(`A${signRow}`, 12, null, "empty"),
-      xlsxCellXml(`B${signRow}`, 6, si("Гарын үсэг"), "s"),
-      xlsxCellXml(`C${signRow}`, 18, si(signDots), "s"),
-      ...emptyCells(signRow, "D", STOCK_IN_LAST_COL, 18),
-    ]);
+    pushRow(10, emptyCells(rowNum));
   };
-  pushSignatureBlock("Хүлээлгэн өгсөн:");
-  pushRow(16.5, emptyCells(rowNum, "A", STOCK_IN_LAST_COL, 2));
-  pushSignatureBlock("Хүлээн авсан:");
-  const lastRow = rowNum;
+  pushSign("Хүлээлгэн өгсөн (Бэлтгэн нийлүүлэгч/Төлөөлөгч):");
+  pushSign("Хүлээн авсан эд хариуцагч (Нярав):");
+  pushSign("Шалгасан нягтлан бодогч:");
+
+  const lastRow = Math.max(1, rowNum - 1);
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="8" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="12" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="14" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  // A4 portrait; slightly more top/left margin than the BM-1 sample for print.
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="6" customWidth="1"/><col min="2" max="2" width="22" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="18" customWidth="1"/><col min="5" max="5" width="14" customWidth="1"/><col min="6" max="6" width="14" customWidth="1"/><col min="7" max="7" width="16" customWidth="1"/><col min="8" max="8" width="18" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="0" verticalCentered="0"/><pageMargins left="0.95" right="0.7" top="1.2" bottom="0.85" header="0.4" footer="0.4"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0" scale="100"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportStockInExcelXlsx(receipt) {
@@ -13339,11 +13414,159 @@ function buildStockOutSheetXml(receipt) {
           (Number(line.unitPrice) || Number(line.costPrice) || 0),
     })),
   });
-  return buildStockInSheetXml(asIn, {
+  return buildStockOutSheetXmlLegacy(asIn, {
     titleText: stockOutReceiptTitle(receipt),
     receivedLabel: "Зарлага гарсан огноо:",
   });
 }
+function buildStockOutSheetXmlLegacy(receipt, {
+  titleText = null,
+  receivedLabel = "Зарлага гарсан огноо:",
+} = {}) {
+  receipt = normalizeStockInReceiptTotals(receipt);
+  const lastCol = "G";
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const receivedDateValue = warehouseSheetDateValue(
+    receipt.createdAt ? isoDay(receipt.createdAt) || todayIso() : todayIso(),
+  );
+  const printedDateValue = warehouseSheetDateValue(todayIso());
+  const groups = stockInReceiptGroupedLines(receipt.lines);
+  const rows = [];
+  const merges = [`A1:${lastCol}1`, `A2:B2`, `C2:E2`, `C3:E3`];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(xlsxRowXml(rowNum, height, cells, lastCol));
+    rowNum += 1;
+  };
+  const emptyCells = (row, from = "A", to = lastCol, style = 1) => {
+    const cols = "ABCDEFG".slice(
+      "ABCDEFG".indexOf(from),
+      "ABCDEFG".indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
+  const sheetTitle = titleText || stockOutReceiptTitle(receipt);
+  pushRow(43.5, [
+    xlsxCellXml("A1", 13, si(sheetTitle), "s"),
+    ...emptyCells(1, "B", lastCol, 13),
+  ]);
+  pushRow(20.25, [
+    xlsxCellXml(
+      "A2",
+      4,
+      si(
+        `Ажилтан: ${receipt.employeeName || "-"} · ${receipt.lines.length} бараа`,
+      ),
+      "s",
+    ),
+    xlsxCellXml("B2", 4, null, "empty"),
+    xlsxCellXml("C2", 14, si(receivedLabel), "s"),
+    xlsxCellXml("D2", 14, null, "empty"),
+    xlsxCellXml("E2", 14, null, "empty"),
+    xlsxCellXml("F2", 14, si(receivedDateValue), "s"),
+    xlsxCellXml("G2", 14, null, "empty"),
+  ]);
+  pushRow(20.25, [
+    xlsxCellXml("A3", 6, null, "empty"),
+    xlsxCellXml("B3", 6, null, "empty"),
+    xlsxCellXml("C3", 14, si("Хэвлэсэн огноо:"), "s"),
+    xlsxCellXml("D3", 14, null, "empty"),
+    xlsxCellXml("E3", 14, null, "empty"),
+    xlsxCellXml("F3", 14, si(printedDateValue), "s"),
+    xlsxCellXml("G3", 14, null, "empty"),
+  ]);
+  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
+  const headerRow = rowNum;
+  pushRow(30.75, [
+    xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
+    xlsxCellXml(`C${headerRow}`, 7, si("Багц"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Тоо ширхэг"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Нэгж үнэ"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Нийт үнэ"), "s"),
+  ]);
+  for (const item of groups) {
+    if (item.type === "cat") {
+      const r = rowNum;
+      merges.push(`A${r}:${lastCol}${r}`);
+      pushRow(24, [
+        xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
+        ...emptyCells(r, "B", lastCol, 15),
+      ]);
+      continue;
+    }
+    if (item.type === "catTotal") {
+      const r = rowNum;
+      merges.push(`A${r}:F${r}`);
+      pushRow(16.5, [
+        xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
+        ...emptyCells(r, "B", "F", 3),
+        xlsxCellXml(`G${r}`, 10, item.amount, "n"),
+      ]);
+      continue;
+    }
+    const line = item.line;
+    const r = rowNum;
+    const unitPrice = stockInReceiptLineUnitPrice(line);
+    pushRow(15, [
+      xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
+      xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
+      xlsxOptionalNum(`C${r}`, 10, line.packs),
+      xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
+      xlsxCellXml(`E${r}`, 10, unitPrice, "n"),
+      xlsxCellXml(`F${r}`, 10, unitPrice, "n"),
+      xlsxCellXml(`G${r}`, 10, stockInReceiptLineTotal(line), "n"),
+    ]);
+  }
+  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
+  const totalRow = rowNum;
+  merges.push(`A${totalRow}:F${totalRow}`);
+  pushRow(16.5, [
+    xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
+    ...emptyCells(totalRow, "B", "F", 10),
+    xlsxCellXml(`G${totalRow}`, 10, receipt.totalAmount, "n"),
+  ]);
+  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
+  const signDots = "....................................................";
+  const pushSignatureBlock = (roleLabel) => {
+    const nameRow = rowNum;
+    merges.push(`C${nameRow}:G${nameRow}`);
+    pushRow(null, [
+      xlsxCellXml(`A${nameRow}`, 17, si(roleLabel), "s"),
+      xlsxCellXml(`B${nameRow}`, 18, si("Нэр"), "s"),
+      xlsxCellXml(`C${nameRow}`, 18, si(signDots), "s"),
+      ...emptyCells(nameRow, "D", lastCol, 18),
+    ]);
+    const signRow = rowNum;
+    merges.push(`C${signRow}:G${signRow}`);
+    pushRow(null, [
+      xlsxCellXml(`A${signRow}`, 12, null, "empty"),
+      xlsxCellXml(`B${signRow}`, 6, si("Гарын үсэг"), "s"),
+      xlsxCellXml(`C${signRow}`, 18, si(signDots), "s"),
+      ...emptyCells(signRow, "D", lastCol, 18),
+    ]);
+  };
+  pushSignatureBlock("Хүлээлгэн өгсөн:");
+  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
+  pushSignatureBlock("Хүлээн авсан:");
+  const lastRow = rowNum;
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="8" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="12" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="14" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.95" right="0.7" top="1.2" bottom="0.85" header="0.4" footer="0.4"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+}
+
 async function exportStockOutExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
