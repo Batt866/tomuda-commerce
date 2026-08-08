@@ -11859,8 +11859,6 @@ function exportStockInExcelFallback(receipt) {
     (line) => (Number(line.quantity) || 0) > 0,
   );
   const grossInclusive = Number(receipt.totalAmount) || 0;
-  const netExVat = grossInclusive / 1.1;
-  const vatAmount = grossInclusive - netExVat;
   const qtyTotal = lines.reduce(
     (sum, line) => sum + (Number(line.quantity) || 0),
     0,
@@ -11902,7 +11900,6 @@ table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; fo
 .sign td { border: none; padding-top: 14px; }
 </style></head><body><table class="stock-in">
 <colgroup><col class="c-no"><col class="c-name"><col class="c-name"><col class="c-code"><col class="c-unit"><col class="c-qty"><col class="c-price"><col class="c-total"></colgroup>
-<tr class="form-code"><td colspan="8">НХМаяг БМ-1</td></tr>
 <tr><td colspan="8" class="title">БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ</td></tr>
 <tr><td colspan="8" class="sub">${receiptNo}</td></tr>
 <tr class="meta"><td colspan="2">Байгууллагын нэр:</td><td>${h(STOCK_IN_COMPANY_NAME)}</td><td colspan="2">Огноо:</td><td colspan="3">${h(dateValue)}</td></tr>
@@ -11911,9 +11908,7 @@ table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; fo
 <tr class="meta"><td colspan="2">Харилцах утас:</td><td>${h(RECEIPT_COMPANY_PHONE)}</td><td colspan="2">Хүлээн авсан ажилтан:</td><td colspan="3">${h(receipt.employeeName || "-")}</td></tr>
 <tr class="head"><th>№</th><th colspan="2">Бараа, материалын нэр, зэрэг</th><th>Баркод / Код</th><th>Хэмжих нэгж</th><th>Тоо хэмжээ</th><th>Нэгж үнэ (₮)</th><th>Нийт дүн (₮)</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="5">ДҮН (Нийт орлогод авсан барааны дүн)</td><td class="num">${qtyTotal}</td><td></td><td class="num">${fmtExcelMoney(netExVat)}</td></tr>
-<tr><td colspan="7">НӨАТ (10%):</td><td class="num">${fmtExcelMoney(vatAmount)}</td></tr>
-<tr class="total"><td colspan="7">НИЙТ ДҮН (НӨАТ-тай):</td><td class="num">${fmtExcelMoney(grossInclusive)}</td></tr>
+<tr class="total"><td colspan="5">ДҮН (Нийт орлогод авсан барааны дүн)</td><td class="num">${qtyTotal}</td><td></td><td class="num">${fmtExcelMoney(grossInclusive)}</td></tr>
 <tr class="sign"><td colspan="5">Хүлээлгэн өгсөн:</td><td colspan="3">.................................... /                              /</td></tr>
 <tr class="sign"><td colspan="5">Хүлээн авсан эд хариуцагч:</td><td colspan="3">.................................... /                              /</td></tr>
 <tr class="sign"><td colspan="5">Шалгасан нягтлан бодогч:</td><td colspan="3">.................................... /                              /</td></tr>
@@ -13235,7 +13230,7 @@ const STOCK_IN_COL_WIDTHS = [6, 14, 16, 14, 11, 10, 11, 13];
 /** receiptXlsxStylesXml indices used by BM-1 stock-in sheet. */
 const STOCK_IN_STYLES = {
   blank: 0,
-  formCode: 15, // bold 9 left
+  formCode: 15, // unused; kept near metaLabel
   title: 13, // 18pt bold center
   receiptNo: 14, // 14pt bold center
   metaLabel: 15, // bold 9 left
@@ -13250,10 +13245,6 @@ const STOCK_IN_STYLES = {
   zebraNum: 27,
   sumLabel: 25, // left gray fill border
   sumNum: 27, // right #,##0 gray fill border
-  vatLabel: 8,
-  vatNum: 10,
-  totalLabel: 25,
-  totalNum: 27,
   signLabel: 15,
   signLine: 51,
 };
@@ -13290,9 +13281,6 @@ function buildStockInSheetXml(receipt, {
     (line) => (Number(line.quantity) || 0) > 0,
   );
   const grossInclusive = xlsxSafeNumber(Number(receipt.totalAmount) || 0);
-  // App amounts are VAT-inclusive (same as зарлагын баримт) — do not add VAT again.
-  const netExVat = xlsxSafeNumber(grossInclusive / 1.1);
-  const vatAmount = xlsxSafeNumber(grossInclusive - netExVat);
   const qtyTotal = lines.reduce(
     (sum, line) => sum + (Number(line.quantity) || 0),
     0,
@@ -13325,14 +13313,6 @@ function buildStockInSheetXml(receipt, {
     ]);
     merges.push(`A${r}:B${r}`, `D${r}:E${r}`, `F${r}:H${r}`);
   };
-
-  // R1 form code only
-  pushRow(18, [
-    xlsxCellXml("A1", S.formCode, si("НХМаяг БМ-1"), "s"),
-    ...emptyCells(1, "B", "H", S.blank),
-  ]);
-  merges.push("A1:B1");
-  pushRow(6, emptyCells(rowNum));
 
   const title =
     titleText || "БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ";
@@ -13418,7 +13398,6 @@ function buildStockInSheetXml(receipt, {
   }
 
   const sumRow = rowNum;
-  // Sample: label A:E, qty sum F, amount H (ex-VAT for ДҮН)
   merges.push(`A${sumRow}:E${sumRow}`);
   pushRow(20, [
     xlsxCellXml(
@@ -13430,21 +13409,7 @@ function buildStockInSheetXml(receipt, {
     ...emptyCells(sumRow, "B", "E", S.sumLabel),
     xlsxCellXml(`F${sumRow}`, S.sumNum, qtyTotal, "n"),
     xlsxCellXml(`G${sumRow}`, S.sumLabel, null, "empty"),
-    xlsxCellXml(`H${sumRow}`, S.sumNum, netExVat, "n"),
-  ]);
-  const vatRow = rowNum;
-  merges.push(`A${vatRow}:G${vatRow}`);
-  pushRow(20, [
-    xlsxCellXml(`A${vatRow}`, S.vatLabel, si("НӨАТ (10%):"), "s"),
-    ...emptyCells(vatRow, "B", "G", S.vatLabel),
-    xlsxCellXml(`H${vatRow}`, S.vatNum, vatAmount, "n"),
-  ]);
-  const totalRow = rowNum;
-  merges.push(`A${totalRow}:G${totalRow}`);
-  pushRow(20, [
-    xlsxCellXml(`A${totalRow}`, S.totalLabel, si("НИЙТ ДҮН (НӨАТ-тай):"), "s"),
-    ...emptyCells(totalRow, "B", "G", S.totalLabel),
-    xlsxCellXml(`H${totalRow}`, S.totalNum, grossInclusive, "n"),
+    xlsxCellXml(`H${sumRow}`, S.sumNum, grossInclusive, "n"),
   ]);
 
   pushRow(12, emptyCells(rowNum));
