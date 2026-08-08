@@ -14769,8 +14769,8 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
   return xlsxCellXml(ref, 9, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
-/** A name · B unit · C barcode · D том · E жижиг · F ширхэг · G stock */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [32, 12, 12, 9, 11, 9, 10];
+/** A name · B unit · C barcode · D том · E жижиг · F ширхэг · G stock — A4 portrait. */
+const WAREHOUSE_PREPARE_COL_WIDTHS = [29, 10, 11, 7, 8, 7, 9];
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -14784,11 +14784,13 @@ function warehousePrepareMaxBarcodeLen(sections) {
   scan(sections?.promo);
   return maxLen;
 }
-/** Column widths: unit fits «Хэмжих нэгж»; barcode ≈ digit length; box cols narrow. */
+/** Column widths tuned for A4 fitToWidth; qty headers wrap so text stays full. */
 function warehousePrepareColWidthsFor(sections) {
   const barcodeChars = warehousePrepareMaxBarcodeLen(sections);
-  // Digits ≈ 1 Excel unit each; +1 padding so last digit isn't clipped.
-  const barcodeW = Math.min(20, Math.max(10, Math.round(barcodeChars * 1.05) + 1));
+  const barcodeW = Math.min(
+    13,
+    Math.max(9, Math.round(barcodeChars * 1.05) + 1),
+  );
   return [
     WAREHOUSE_PREPARE_COL_WIDTHS[0],
     WAREHOUSE_PREPARE_COL_WIDTHS[1],
@@ -14809,6 +14811,15 @@ function warehousePreparePatchStylesXml(stylesXml) {
   let out = stylesXml.includes(numStyle)
     ? stylesXml.replace(numStyle, numStyleRight)
     : stylesXml;
+
+  // Header cells (style 7): wrap so Том/х · Жижиг/х · Тоо/ш stay fully visible in narrow A4 cols.
+  const headerXf =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+  const headerXfWrap =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" /></xf>';
+  if (out.includes(headerXf)) {
+    out = out.replace(headerXf, headerXfWrap);
+  }
 
   // Signature underline (B→E): thinnest hairline bottom border.
   const signBorderHair =
@@ -14972,13 +14983,13 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
-  pushRow(30.75, [
+  pushRow(36, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих\nнэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Том/х"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/х"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Том/\nх"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/\nх"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Тоо/\nш"), "s"),
     xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл"), "s"),
   ]);
   const pushPrepareGroups = (groups) => {
@@ -15111,23 +15122,23 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.prepare { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
-.prepare col:nth-child(1) { width: 420px; }
-.prepare col:nth-child(2) { width: 130px; }
-.prepare col:nth-child(3) { width: 140px; }
-.prepare col:nth-child(4) { width: 95px; }
-.prepare col:nth-child(5) { width: 110px; }
-.prepare col:nth-child(6) { width: 95px; }
-.prepare col:nth-child(7) { width: 120px; }
-.prepare td, .prepare th { border: 1px solid #555; padding: 2px 4px; vertical-align: middle; }
+table.prepare { width: 980px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+.prepare col:nth-child(1) { width: 340px; }
+.prepare col:nth-child(2) { width: 100px; }
+.prepare col:nth-child(3) { width: 120px; }
+.prepare col:nth-child(4) { width: 72px; }
+.prepare col:nth-child(5) { width: 84px; }
+.prepare col:nth-child(6) { width: 72px; }
+.prepare col:nth-child(7) { width: 92px; }
+.prepare td, .prepare th { border: 1px solid #555; padding: 2px 3px; vertical-align: middle; }
 .prepare td:first-child { overflow-wrap: anywhere; }
-.title { height: 72px; text-align: center; font-size: 32px; font-weight: 800; }
+.title { height: 72px; text-align: center; font-size: 28px; font-weight: 800; }
 .meta-label { text-align: right; font-weight: 700; white-space: nowrap; }
 .meta-value { font-weight: 400; white-space: nowrap; }
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .blank td { height: 30px; }
-.head th { height: 52px; text-align: center; font-size: 18px; font-weight: 800; border: 2px solid #000; white-space: nowrap; }
+.head th { height: 52px; text-align: center; font-size: 15px; font-weight: 800; border: 2px solid #000; white-space: normal; line-height: 1.15; word-break: keep-all; }
 .cat { text-align: center; font-weight: 800; height: 36px; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; }
@@ -15144,7 +15155,7 @@ table.prepare { width: 1100px; border-collapse: collapse; table-layout: fixed; f
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Том/х</th><th>Жижиг/х</th><th>Тоо/ш</th><th>Үлдэгдэл</th></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих<br>нэгж</th><th>Баркод</th><th>Том/<br>х</th><th>Жижиг/<br>х</th><th>Тоо/<br>ш</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
