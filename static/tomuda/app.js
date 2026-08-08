@@ -16931,7 +16931,8 @@ function openWorkerOrderEdit(id) {
   state.settlementText = order.settlementText || "";
   state.settlementMonth = order.settlementMonth || "";
   state.settlementDay = order.settlementDay || "";
-  state.applyPercentDiscount = !!order.applyPercentDiscount;
+  state.applyPercentDiscount =
+    state.paymentTerm === "cash" && !!order.applyPercentDiscount;
   state.deliveryDate = orderDeliveryDay(order) || todayIso();
   seedWorkerCartFromOrder(order);
   state.filters.worker = "new";
