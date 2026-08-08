@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from django.db import transaction
@@ -175,6 +176,9 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
     if not isinstance(raw_customer, dict) or raw_customer.get("id") is None:
         raise HttpError(400, "Харилцагчийн мэдээлэл дутуу байна")
     customer = _strip_customer_inline_image(raw_customer)
+    customer["updatedAt"] = (
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
     customer_id = str(customer.get("id"))
     actor = _actor_payload(payload)
 

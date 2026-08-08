@@ -3831,6 +3831,7 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   const preferRemote =
     !!opts.preferRemote &&
     (!!opts.pullFromServer || !businessEntityDirty());
+  const useUpdatedAt = opts.entityKind === "customers";
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), { ...item });
@@ -3842,6 +3843,8 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     let merged;
     if (!prev) {
       merged = { ...item };
+    } else if (useUpdatedAt) {
+      merged = mergeEntityRecordByUpdatedAt(prev, item, preferRemote);
     } else if (preferRemote) {
       merged = { ...item, ...prev };
     } else {
@@ -3896,6 +3899,28 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     }
   }
   return Array.from(map.values());
+}
+function entityUpdatedAtMs(item) {
+  const text = String(item?.updatedAt || "").trim();
+  if (!text) return 0;
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) ? ms : 0;
+}
+function mergeEntityRecordByUpdatedAt(remoteItem, localItem, preferRemote) {
+  const remoteMs = entityUpdatedAtMs(remoteItem);
+  const localMs = entityUpdatedAtMs(localItem);
+  if (remoteMs && localMs) {
+    if (localMs > remoteMs) return { ...remoteItem, ...localItem };
+    if (remoteMs > localMs) return { ...localItem, ...remoteItem };
+    return preferRemote
+      ? { ...localItem, ...remoteItem }
+      : { ...remoteItem, ...localItem };
+  }
+  if (remoteMs && !localMs) return { ...localItem, ...remoteItem };
+  if (localMs && !remoteMs) return { ...remoteItem, ...localItem };
+  return preferRemote
+    ? { ...localItem, ...remoteItem }
+    : { ...remoteItem, ...localItem };
 }
 function preferredEntityImage(localImage, remoteImage) {
   const local = String(localImage || "").trim();
@@ -4253,6 +4278,16 @@ function peerCollectionsGrew(prevState, nextState) {
   return keys.some(
     (key) => entityIdCount(nextState, key) > entityIdCount(prevState, key),
   );
+}
+function peerCustomersChanged(prevState, nextState) {
+  try {
+    return (
+      JSON.stringify(prevState?.customers || []) !==
+      JSON.stringify(nextState?.customers || [])
+    );
+  } catch {
+    return true;
+  }
 }
 function mergeBootState(serverState, serverUpdatedAt = "") {
   let pendingState = readLocalPendingState();
@@ -5454,6 +5489,7 @@ function applyRemoteState(payload, opts = {}) {
     return false;
   }
   const grew = peerCollectionsGrew(beforeState, merged);
+  const customersChanged = peerCustomersChanged(beforeState, merged);
   const session = captureSessionSnapshot();
   const pickerCategory = state.filters.workerCategory;
   const reopenPicker = pickerOpen();
@@ -5487,8 +5523,14 @@ function applyRemoteState(payload, opts = {}) {
     updatedAt: payload.updatedAt || "",
   });
   if (!state.isLoggedIn) return true;
-  if (forceRender || grew || !shouldDeferBackendSync()) safeRender();
-  if (reopenPicker && pickerCategory) {
+  if (
+    forceRender ||
+    grew ||
+    customersChanged ||
+    !shouldDeferBackendSync()
+  ) {
+    safeRender();
+  }  if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
     pickerModal();
   }
@@ -11713,7 +11755,7 @@ function confirmFinishStockOut() {
   }
   if (!stockOutCanFinish()) {
     if (!state.stockOutEmployeeId) return alert("Ажилтан сонгоно уу");
-    return alert("Зарлага оруулна уу");
+    return alert("Зарлага гаргах бараа сонгоно уу");
   }
   const receipt = buildStockOutReceiptSnapshot();
   if (!receipt?.lines?.length) return;
@@ -12437,7 +12479,7 @@ function stockOutEntryRow(p) {
   const displayStock = Math.max(0, stockNow - (hasEntry ? qty : 0));
   const entryMeta = hasEntry
     ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">−${qty} ${esc(p.unit || "ш")}</span></span>`
-    : `<span class="stock-in-entry-row__hint">Тоо ширхэг оруулах</span>`;
+    : `<span class="stock-in-entry-row__hint">Зарлага гаргах</span>`;
   return `<button type="button" onclick="stockOutModal('${esc(p.id)}')" data-stock-out-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockOutHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (−${qty} хүлээгдэж байна)</span>` : ""}</span></div>${entryMeta}</button>`;
 }
 function stockOutEntryList(list) {
@@ -12454,7 +12496,7 @@ function stockOutEntryList(list) {
       .join("");
     return `<div class="stock-in-entry-section"><div class="stock-in-entry-section__title">${esc(title)}${products.length ? ` · ${products.length}` : ""}</div><div class="divide-y divide-border">${rows || `<div class="p-6 text-center text-sm text-muted-foreground">${esc(emptyText)}</div>`}</div></div>`;
   };
-  return `<div class="space-y-3">${section("Зарлага гарсан бараанууд", filled, "Сонгосон бараа байхгүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
+  return `<div class="space-y-3">${section("Зарлага гаргах бараанууд", filled, "Зарлага сонгоогүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
 }
 function stockOutReceiptRow(line) {
   return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${line.packs || "-"}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice || 0)}</span></div>`;
@@ -12486,7 +12528,7 @@ function stockOutModal(id) {
   const qtyFields = stockInPackQtyFieldsHtml(p, d);
   box(
     "Зарлага гаргах",
-    `<form onsubmit="applyStockOutModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${Number(p.stock) || 0} ${esc(p.unit || "ш")}</b></p></div></div>${qtyFields}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--danger">Нэмэх</button></div></form>`,
+    `<form onsubmit="applyStockOutModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${Number(p.stock) || 0} ${esc(p.unit || "ш")}</b></p></div></div><p class="text-sm text-muted-foreground">Оруулсан тоо үлдэгдлээс хасагдана.</p>${qtyFields}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--danger">Хасах</button></div></form>`,
     "max-w-md",
   );
 }
@@ -12599,14 +12641,17 @@ function inventoryStockModal(id, tab) {
   if (!p) return;
   const isIn = tab === "in",
     title = isIn ? "Орлого авах" : "Зарлага гаргах",
-    actionLabel = isIn ? "Орлого" : "Зарлага",
+    actionLabel = isIn ? "Нэмэх" : "Хасах",
     btnClass = isIn ? "btn--primary" : "btn--danger",
+    hint = isIn
+      ? ""
+      : `<p class="text-sm text-muted-foreground">Оруулсан тоо үлдэгдлээс хасагдана.</p>`,
     costField = isIn
       ? `<label class="block"><span class="field-label">Өртөг үнэ</span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" step="1" value="${productCostPrice(p) || ""}" required class="field-input app-input" aria-label="Өртөг үнэ"></label><p class="text-xs text-muted-foreground">Тооллогын зөрүү дүн тооцоолох өртөг үнэ.</p>`
       : "";
   box(
     title,
-    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div><label class="block"><span class="field-label">Тоо</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required ${isIn ? "" : "autofocus"} class="field-input app-input"></label>${costField}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
+    `<form onsubmit="applyStockFromModal(event,'${esc(id)}','${tab}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock} ${esc(p.unit || "ш")}</b></p></div></div>${hint}<label class="block"><span class="field-label">Тоо</span><input name="quantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="1" placeholder="1" required ${isIn ? "" : "autofocus"} class="field-input app-input"></label>${costField}<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn ${btnClass}">${actionLabel}</button></div></form>`,
     "max-w-md",
   );
 }
@@ -19364,6 +19409,7 @@ async function applyCustomerSave(data, id) {
     state.customers.push(customer);
   }
   if (customer) {
+    customer.updatedAt = new Date().toISOString();
     await persistProfileImageToMedia(customer, "customer");
   }
   const customerId = customer?.id || "";

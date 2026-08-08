@@ -744,6 +744,47 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertEqual(shared["name"], "Shared updated")
         self.assertEqual(shared["phone1"], "99000001")
 
+    def test_merge_keeps_newer_customer_fields_from_upsert(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "customers": [
+                {
+                    "id": "c-ulz",
+                    "name": "Улз",
+                    "latitude": 47.918,
+                    "longitude": 106.917,
+                    "updatedAt": "2026-08-08T10:00:00Z",
+                }
+            ],
+            "products": [],
+            "employees": [],
+            "orders": [],
+            "deletionLog": [],
+        }
+        # Stale peer full-state blob without the rename/map stamp.
+        local = {
+            "customers": [
+                {
+                    "id": "c-ulz",
+                    "name": "Old store",
+                    "latitude": "",
+                    "longitude": "",
+                }
+            ],
+            "products": [],
+            "employees": [],
+            "orders": [],
+            "deletionLog": [],
+        }
+
+        merged = merge_app_states(remote, local)
+        customer = next(c for c in merged["customers"] if c["id"] == "c-ulz")
+        self.assertEqual(customer["name"], "Улз")
+        self.assertEqual(customer["latitude"], 47.918)
+        self.assertEqual(customer["longitude"], 106.917)
+        self.assertEqual(customer["updatedAt"], "2026-08-08T10:00:00Z")
+
     def test_save_state_does_not_wipe_peer_device_customer(self):
         state = default_state()
         state["customers"] = [
@@ -932,6 +973,73 @@ class CustomerUpsertApiTests(TestCase):
         peer_ids = {c["id"] for c in peer_response.json()["state"]["customers"]}
         self.assertIn("c-new-device", peer_ids)
         self.assertIn("c-existing", peer_ids)
+
+    def test_upsert_name_and_map_survive_stale_peer_state_save(self):
+        state = default_state()
+        state["customers"] = [
+            {
+                "id": "c-ulz",
+                "name": "Old store",
+                "companyName": "",
+                "phone1": "99111111",
+                "latitude": "",
+                "longitude": "",
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        upsert = self.client.post(
+            "/api/customers/upsert",
+            {
+                "customer": {
+                    "id": "c-ulz",
+                    "name": "Улз",
+                    "companyName": "",
+                    "phone1": "99111111",
+                    "latitude": 47.918,
+                    "longitude": 106.917,
+                },
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(upsert.status_code, 200, upsert.content)
+        saved = next(
+            c for c in upsert.json()["state"]["customers"] if c["id"] == "c-ulz"
+        )
+        self.assertEqual(saved["name"], "Улз")
+        self.assertEqual(float(saved["latitude"]), 47.918)
+        self.assertEqual(float(saved["longitude"]), 106.917)
+        self.assertTrue(saved.get("updatedAt"))
+
+        peer = default_state()
+        peer["customers"] = [
+            {
+                "id": "c-ulz",
+                "name": "Old store",
+                "companyName": "",
+                "phone1": "99111111",
+                "latitude": "",
+                "longitude": "",
+            }
+        ]
+        peer_response = self.client.post(
+            "/api/state",
+            {
+                "state": peer,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(peer_response.status_code, 200, peer_response.content)
+        after = next(
+            c
+            for c in peer_response.json()["state"]["customers"]
+            if c["id"] == "c-ulz"
+        )
+        self.assertEqual(after["name"], "Улз")
+        self.assertEqual(float(after["latitude"]), 47.918)
+        self.assertEqual(float(after["longitude"]), 106.917)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)

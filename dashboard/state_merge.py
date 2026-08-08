@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 ENTITY_KEYS = ("customers", "products", "employees", "orders")
@@ -13,6 +14,9 @@ DELETION_TYPE = {
     "employees": "employee",
     "orders": "order",
 }
+# Field-level last-writer-wins only for collections that stamp updatedAt on edit.
+# Products keep stock via separate rules — do not use updatedAt for products.
+UPDATED_AT_ENTITY_KEYS = frozenset({"customers"})
 
 
 def _as_list(value: Any) -> list:
@@ -22,6 +26,47 @@ def _as_list(value: Any) -> list:
 def _as_dict(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
 
+
+def entity_updated_at_ms(item: Any) -> float:
+    if not isinstance(item, dict):
+        return 0.0
+    text = str(item.get("updatedAt") or "").strip()
+    if not text:
+        return 0.0
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def merge_entity_record_fields(
+    remote_item: dict[str, Any],
+    local_item: dict[str, Any],
+    *,
+    use_updated_at: bool = False,
+) -> dict[str, Any]:
+    """
+    Merge two versions of the same entity id.
+
+    Default: incoming/local fields win (legacy full-state save behavior).
+    With use_updated_at: newer updatedAt wins; a stamped record beats an
+    unstamped peer blob so upserts are not overwritten by stale devices.
+    """
+    if not use_updated_at:
+        return {**remote_item, **local_item}
+    remote_ms = entity_updated_at_ms(remote_item)
+    local_ms = entity_updated_at_ms(local_item)
+    if remote_ms and local_ms:
+        if local_ms > remote_ms:
+            return {**remote_item, **local_item}
+        if remote_ms > local_ms:
+            return {**local_item, **remote_item}
+        return {**remote_item, **local_item}
+    if remote_ms and not local_ms:
+        return {**local_item, **remote_item}
+    if local_ms and not remote_ms:
+        return {**remote_item, **local_item}
+    return {**remote_item, **local_item}
 
 def normalize_deletion_log(log: Any) -> list[dict[str, Any]]:
     if not isinstance(log, list):
@@ -77,6 +122,7 @@ def merge_entity_records(
     *,
     deletion_log: list[dict[str, Any]] | None = None,
     deletion_type: str = "",
+    use_updated_at: bool = False,
 ) -> list[dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
     for item in _as_list(remote):
@@ -88,7 +134,12 @@ def merge_entity_records(
             continue
         item_id = str(item["id"])
         prev = merged.get(item_id)
-        next_item = {**(prev or {}), **item}
+        if not prev:
+            next_item = dict(item)
+        else:
+            next_item = merge_entity_record_fields(
+                prev, item, use_updated_at=use_updated_at
+            )
         image = preferred_entity_image(item.get("image"), (prev or {}).get("image"))
         if image:
             next_item["image"] = image
@@ -346,6 +397,7 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
                 local_state.get(key),
                 deletion_log=deletion_log,
                 deletion_type=deletion_type,
+                use_updated_at=key in UPDATED_AT_ENTITY_KEYS,
             )
 
     for key in ARRAY_BY_ID_KEYS:
