@@ -4962,26 +4962,21 @@ function hasLocalOnlyEntities(serverState = {}) {
   return localOnlyEntityIds(serverState).length > 0;
 }
 /**
- * After a peer pull or single-entity upsert, baseline against the SERVER
- * snapshot so unsaved local-only rows stay dirty and get POSTed next.
- * Never mark the full local memory as clean unless it matches the server.
+ * After peer pull / upsert: keep dirty only when this device has never-POSTed
+ * entity ids. Otherwise mark the merged local memory clean so field-order /
+ * normalization diffs cannot loop the sync banner forever.
  */
 function reconcileBackendMarkerFromServer(serverState, updatedAt = "") {
   if (updatedAt) serverUpdatedAt = updatedAt;
   if (!serverState || typeof serverState !== "object") return false;
-  syncBackendSaveMarker(serverState);
-  const stillDirty =
-    JSON.stringify(businessEntitySlice(persistentState())) !==
-    JSON.stringify(businessEntitySlice(serverState));
-  if (!stillDirty) return false;
-  if (canAutoSaveBackendState()) {
-    scheduleBackendSave();
-  } else {
-    markBackendSaveFailed(
-      "Шинэ өгөгдөл серверт хадгалагдаагүй байна. Эрхээ шалгаад дахин хадгална уу.",
-    );
+  if (hasLocalOnlyEntities(serverState)) {
+    syncBackendSaveMarker(serverState);
+    if (canAutoSaveBackendState()) scheduleBackendSave();
+    return true;
   }
-  return true;
+  syncBackendSaveMarker();
+  clearLocalPendingState();
+  return false;
 }
 function shouldDeferBackendSync() {
   if (isLoginFormActive()) return true;
@@ -6859,17 +6854,18 @@ function criticalBackendSave() {
   });
 }
 async function retryPendingBackendSave() {
+  clearBackendSaveFailed();
   const ok = await flushBackendSave();
-  if (ok) clearBackendSaveFailed();
+  if (ok) {
+    clearBackendSaveFailed();
+    clearLocalPendingState();
+  }
   render();
 }
 function dataSaveBannerHtml() {
-  const pending = !!readLocalPendingState();
-  if (!backendSaveFailedMessage && !businessEntityDirty() && !pending) return "";
-  const msg =
-    backendSaveFailedMessage ||
-    "Серверт хадгалагдаагүй өгөгдөл байна. Дахин хадгална уу.";
-  return `<div class="data-save-banner" role="alert"><div class="data-save-banner__copy"><strong>Өгөгдөл синк хийгдээгүй</strong><p>${esc(msg)}</p></div><button type="button" class="btn btn--primary btn--sm" onclick="retryPendingBackendSave()">Дахин хадгалах</button></div>`;
+  // Only show after a real failed save — not while autosave is merely pending.
+  if (!backendSaveFailedMessage) return "";
+  return `<div class="data-save-banner" role="alert"><div class="data-save-banner__copy"><strong>Өгөгдөл синк хийгдээгүй</strong><p>${esc(backendSaveFailedMessage)}</p></div><button type="button" class="btn btn--primary btn--sm" onclick="retryPendingBackendSave()">Дахин хадгалах</button></div>`;
 }
 function warehouseDateFilterActive() {
   return (
@@ -6903,6 +6899,41 @@ async function mergeServerStateBeforeSave() {
     return true;
   } catch (error) {
     console.warn("Backend pre-save merge failed", error);
+    return false;
+  }
+}
+/** After a stock/cost 403, force local products to match server stock/cost. */
+async function realignLocalProductStockFromServer() {
+  try {
+    const latest = await fetchBackendPayload();
+    if (!latest?.state?.products) return false;
+    const remoteById = new Map(
+      (latest.state.products || [])
+        .filter((p) => p?.id != null)
+        .map((p) => [String(p.id), p]),
+    );
+    let changed = false;
+    state.products = (state.products || []).map((p) => {
+      const remote = remoteById.get(String(p.id));
+      if (!remote) return p;
+      const next = { ...p };
+      if (Number(next.stock) !== Number(remote.stock)) {
+        next.stock = Number(remote.stock) || 0;
+        changed = true;
+      }
+      if (
+        remote.costPrice != null &&
+        Number(next.costPrice) !== Number(remote.costPrice)
+      ) {
+        next.costPrice = remote.costPrice;
+        changed = true;
+      }
+      return next;
+    });
+    if (latest.updatedAt) serverUpdatedAt = latest.updatedAt;
+    return changed;
+  } catch (error) {
+    console.warn("Stock realign failed", error);
     return false;
   }
 }
@@ -6988,6 +7019,8 @@ async function saveBackendState(retry = 0) {
     const snapshot = backendStateSnapshot(payloadState);
     if (snapshot === backendLastSaved) {
       clearOrderPersistenceCache();
+      clearBackendSaveFailed();
+      clearLocalPendingState();
       return;
     }
     if (importLoading) {
@@ -17772,7 +17805,8 @@ function render() {
       );
   }
   bindProductImages(app);
-  if (businessEntityDirty() || backendSaveFailedMessage) scheduleBackendSave();
+  // Don't auto-retry while a failure banner is up — that spam-loops 403s.
+  if (businessEntityDirty() && !backendSaveFailedMessage) scheduleBackendSave();
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     requestAnimationFrame(() => {
