@@ -15195,6 +15195,49 @@ body.image-lightbox-open {
   color: var(--hex-primary-dark);
 }
 
+.stock-in-take__input--soft {
+  color: var(--hex-muted-foreground);
+  font-weight: 600;
+}
+
+.stock-in-take__input--soft::placeholder {
+  color: color-mix(in srgb, var(--hex-muted-foreground) 88%, transparent);
+  opacity: 1;
+}
+
+.stock-in-take__note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hex-card);
+  border: 1px solid var(--hex-border);
+}
+
+.stock-in-take__note-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-foreground);
+}
+
+.stock-in-take__note-input {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--hex-foreground);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.stock-in-take__note-input::placeholder {
+  color: var(--hex-muted-foreground);
+}
+
 .stock-in-take__suffix {
   font-size: 13px;
   font-weight: 700;
@@ -15252,6 +15295,14 @@ body.image-lightbox-open {
 
 .stock-in-take__submit:active {
   background: var(--hex-primary-dark);
+}
+
+.stock-in-take__submit--danger {
+  background: var(--hex-destructive, #dc2626);
+}
+
+.stock-in-take__submit--danger:active {
+  background: color-mix(in srgb, var(--hex-destructive, #dc2626) 88%, #000);
 }
 
 .stock-in-receipt-panel {
@@ -15420,6 +15471,14 @@ body.image-lightbox-open {
   font-weight: 600;
   line-height: 1.3;
   min-width: 0;
+}
+
+.stock-in-table__note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hex-muted-foreground);
 }
 
 .stock-in-table__barcode {
