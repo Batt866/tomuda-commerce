@@ -7464,7 +7464,7 @@ function adminHubActionCard(action, label, iconKey) {
 function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
-    ["warehouse", "Нярав", "warehouse", "warehouse.view"],
+    ["warehouse", "Бараа бэлдэх", "warehouse", "warehouse.view"],
     ["stockReports", "Тайлан", "reports", "__stock_reports__"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
@@ -7507,7 +7507,15 @@ function adminHubHtml() {
   if (!main.length && !settingsHtml) {
     return `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`;
   }
-  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => (id === "stockReports" ? adminHubActionCard("openStockReportsHub()", label, icon) : adminHubCard(id, label, icon))).join("")}</div>` : ""}${settingsHtml}</section>`;
+  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => {
+    if (id === "stockReports") {
+      return adminHubActionCard("openStockReportsHub()", label, icon);
+    }
+    if (id === "warehouse") {
+      return adminHubActionCard("openWarehousePrepare()", label, icon);
+    }
+    return adminHubCard(id, label, icon);
+  }).join("")}</div>` : ""}${settingsHtml}</section>`;
 }
 function adminView() {
   ensureSettings();
@@ -11045,7 +11053,19 @@ function confirmEmployeeExcel() {
   if (canPickWarehouseWorkers() && !state.selectedWorkers.length)
     return alert("Ажилтан сонгоно уу");
   if (!warehouseScopeWorkerIds().length) return alert("Ажилтан сонгоно уу");
-  confirmDataExport("Мэдээлэл татах", employeeExcel);
+  confirmDataExport("Бараа бэлдэх", employeeExcel, "Бараа бэлдэх хуудас татах уу?");
+}
+function openWarehousePrepare() {
+  if (!canAccessView("warehouse")) {
+    return alertModal("Эрхгүй", "Нярав харах эрхгүй.");
+  }
+  state.filters.warehouseTab = "orders";
+  if (state.currentView !== "warehouse") {
+    go("warehouse");
+    return;
+  }
+  render();
+  scrollAppMainToTop();
 }
 function customerExcel() {
   if (!canExportExcel()) return;
@@ -17186,7 +17206,7 @@ function warehouseView() {
     hasPermission("stockIn.view") ||
     hasPermission("stockOut.view") ||
     hasPermission("warehouse.edit");
-  const tabs = [["orders", "Захиалга"]];
+  const tabs = [["orders", "Бараа бэлдэх"]];
   if (canStockMove) {
     tabs.push(["in", "Орлого"], ["out", "Зарлага"]);
   }
@@ -17570,7 +17590,7 @@ function workerChooser(orders) {
     pickerHtml = canPick
       ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${chooserLabel === "Сонгох" ? " is-placeholder" : ""}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
       : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></span></div>`;
-  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: canExportExcel() ? excelDownloadBtn("confirmEmployeeExcel()") : "" })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
+  return `<section class="bg-card rounded p-3 space-y-3">${warehouseLiveFilterBannerHtml()}${pageToolbarHtml({ filters: warehouseDateFiltersHtml(), actions: canExportExcel() ? excelDownloadBtn("confirmEmployeeExcel()", { label: "Бараа бэлдэх", shortLabel: "Бэлдэх" }) : "" })}${pickerHtml}<div class="grid grid-cols-3 gap-2 text-sm bg-secondary/50 rounded p-2 text-center"><div><b>${activeWorkerIds.length}</b><p class="text-xs text-muted-foreground">Ажилтан</p></div><div><b>${qty}</b><p class="text-xs text-muted-foreground">Ширхэг</p></div><div><b class="text-primary">${fmt(total)}</b><p class="text-xs text-muted-foreground">Дүн</p></div></div><div class="divide-y divide-border">${detail.length ? detail.map(detailRow).join("") : `<p class="p-3 text-sm text-muted-foreground text-center">${emptyText}</p>`}</div></section>`;
 }
 function deliveryInitial(name) {
   const n = String(name || "").trim();
@@ -22171,6 +22191,7 @@ Object.assign(window, {
   stockInQtyFieldsInput,
   confirmReportExport,
   confirmEmployeeExcel,
+  openWarehousePrepare,
   confirmOrderReceiptsExcel,
   confirmWarehouseReceiptsExcel,
   confirmVisibleOrderReceiptsExcel,
