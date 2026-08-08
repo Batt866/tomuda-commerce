@@ -11830,14 +11830,247 @@ function stockInCostExceedsSalesPrice(costPrice, p) {
   return Number.isFinite(cost) && cost > 0 && sales > 0 && cost > sales;
 }
 function stockInCostPriceWarn(el, salesPrice) {
-  const warn = el
-    ?.closest?.("form")
-    ?.querySelector("[data-stock-in-cost-warn]");
-  if (!warn) return;
-  const cost = Number(el.value || 0);
-  const show =
-    Number.isFinite(cost) && cost > 0 && salesPrice > 0 && cost > salesPrice;
-  warn.classList.toggle("hidden", !show);
+  const form = el?.closest?.("form");
+  const warn = form?.querySelector("[data-stock-in-cost-warn]");
+  if (warn) {
+    const cost = Number(el.value || 0);
+    const show =
+      Number.isFinite(cost) && cost > 0 && salesPrice > 0 && cost > salesPrice;
+    warn.classList.toggle("hidden", !show);
+  }
+  stockInQtyFieldsInput(el);
+}
+function stockInTakeIcon(kind) {
+  const common =
+    'class="stock-in-take__svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  if (kind === "box") {
+    return `<svg ${common}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg>`;
+  }
+  if (kind === "piece") {
+    return `<svg ${common}><rect x="4" y="6" width="16" height="12" rx="1.5"/><path d="M4 10h16"/></svg>`;
+  }
+  if (kind === "sum") {
+    return `<svg ${common}><path d="M6 6h12M6 12h12M6 18h12"/><path d="M9 9v0M9 15v0"/></svg>`;
+  }
+  if (kind === "tag") {
+    return `<svg ${common}><path d="M20.6 13.4 12.4 21.6a2 2 0 0 1-2.8 0L2.4 14.4a2 2 0 0 1 0-2.8L10.6 3.4A2 2 0 0 1 12 3h6a2 2 0 0 1 2 2v6a2 2 0 0 1-.4 1.4z"/><circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+  }
+  if (kind === "calc") {
+    return `<svg ${common}><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M16 12h0M8 16h2M12 16h2M16 16h0"/></svg>`;
+  }
+  if (kind === "save") {
+    return `<svg ${common}><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg>`;
+  }
+  return "";
+}
+function stockInTakeRowHtml({
+  icon,
+  label,
+  name,
+  value = "",
+  suffix = "ш",
+  readonly = false,
+  accent = false,
+  oninput = "stockInQtyFieldsInput(this)",
+  placeholder = "0",
+  ariaLabel = "",
+}) {
+  const inputAttrs = readonly
+    ? `readonly tabindex="-1" data-stock-in-${name}`
+    : `name="${name}" oninput="${oninput}"`;
+  const inputClass = `stock-in-take__input${accent ? " stock-in-take__input--accent" : ""}`;
+  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><span class="stock-in-take__label">${label}</span><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label></div>`;
+}
+function stockInQtyFieldsInput(_el) {
+  const form = _el?.closest?.("form");
+  const root =
+    _el?.closest?.(".stock-in-take") ||
+    _el?.closest?.(".stock-in-qty-fields") ||
+    form;
+  if (!root) return;
+  const scope = form || root;
+  const largePacks =
+    scope.querySelector('input[name="largePacks"]')?.value ?? "";
+  const packs = scope.querySelector('input[name="packs"]')?.value ?? "";
+  const pieces = scope.querySelector('input[name="qty"]')?.value ?? "";
+  const costRaw = scope.querySelector('input[name="costPrice"]')?.value ?? "";
+  const smallSize = Math.max(
+    0,
+    Math.floor(Number(root.dataset.smallBoxSize || 0) || 0),
+  );
+  const largePieces = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxSize || 0) || 0),
+  );
+  const largeCount = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
+  );
+  const largePreview = scope.querySelector("[data-stock-in-large-preview]");
+  const packPreview = scope.querySelector("[data-stock-in-pack-preview]");
+  const totalPreview = scope.querySelector("[data-stock-in-qty-total]");
+  const totalQtyInput = scope.querySelector("[data-stock-in-total-qty]");
+  const totalCostEl = scope.querySelector("[data-stock-in-total-cost]");
+  const largeDerived = stockInPackDerivedPieces(largePacks, largePieces);
+  const smallDerived = stockInPackDerivedPieces(packs, smallSize);
+  const total =
+    largeDerived +
+    smallDerived +
+    Math.max(0, Math.floor(Number(pieces) || 0));
+  const unitCost = Math.max(0, Math.floor(Number(costRaw) || 0));
+  const totalCost = total > 0 && unitCost > 0 ? total * unitCost : 0;
+  if (largePreview) {
+    if (largeDerived) {
+      largePreview.textContent = `= ${largeDerived} ширхэг`;
+    } else if (largeCount && smallSize) {
+      largePreview.textContent = `1 том = ${largeCount} жижиг (= ${largePieces} ш)`;
+    } else {
+      largePreview.textContent = "";
+    }
+  }
+  if (packPreview) {
+    packPreview.textContent = smallDerived
+      ? `= ${smallDerived} ширхэг`
+      : smallSize
+        ? `1 жижиг = ${smallSize} ширхэг`
+        : "";
+  }
+  if (totalPreview) {
+    totalPreview.textContent = total > 0 ? `Нийт: ${total} ширхэг` : "";
+  }
+  if (totalQtyInput) totalQtyInput.value = String(total || 0);
+  if (totalCostEl) totalCostEl.textContent = `${fmt(totalCost)}`;
+}
+function stockInPackQtyFieldsHtml(p, d = {}) {
+  const smallSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const largeVal =
+    d.largePacks != null && d.largePacks !== ""
+      ? esc(String(d.largePacks))
+      : "";
+  const packsVal =
+    d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
+  const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
+  if (!smallSize && !largePieces) {
+    return `<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label>`;
+  }
+  const total = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
+  const largePreviewText = stockInPackDerivedPieces(d.largePacks, largePieces)
+    ? `= ${stockInPackDerivedPieces(d.largePacks, largePieces)} ширхэг`
+    : largeCount && smallSize
+      ? `1 том = ${largeCount} жижиг (= ${largePieces} ш)`
+      : "";
+  const packPreviewText = smallSize
+    ? stockInPackDerivedPieces(d.packs, smallSize)
+      ? `= ${stockInPackDerivedPieces(d.packs, smallSize)} ширхэг`
+      : `1 жижиг = ${smallSize} ширхэг`
+    : "";
+  const totalPreviewText = total > 0 ? `Нийт: ${total} ширхэг` : "";
+  const largeField = largePieces
+    ? `<label class="block"><span class="field-label">Том хайрцаг</span><input name="largePacks" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${largeVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} том хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-large-preview>${largePreviewText}</p></label>`
+    : "";
+  const smallField = smallSize
+    ? `<label class="block"><span class="field-label">Жижиг хайрцаг</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} жижиг хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-pack-preview>${packPreviewText}</p></label>`
+    : "";
+  const fieldCount = 1 + (largePieces ? 1 : 0) + (smallSize ? 1 : 0);
+  const gridClass =
+    fieldCount >= 3
+      ? "grid grid-cols-1 sm:grid-cols-3 gap-2"
+      : "grid grid-cols-2 gap-2";
+  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}"><div class="${gridClass}">${largeField}${smallField}<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
+}
+function stockInEntryModal(id) {
+  const p = state.products.find((x) => x.id === id);
+  if (!p) return;
+  ensureStockInSession();
+  const d = state.stockInDraft[p.id] || {};
+  const smallSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const largeVal =
+    d.largePacks != null && d.largePacks !== "" ? String(d.largePacks) : "";
+  const packsVal = d.packs != null && d.packs !== "" ? String(d.packs) : "";
+  const qtyVal = d.qty != null && d.qty !== "" ? String(d.qty) : "";
+  const costVal =
+    d.costPrice != null && d.costPrice !== "" ? String(d.costPrice) : "";
+  const salesPrice = productSalesPrice(p);
+  const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
+  const initialTotal = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
+  const initialCost =
+    initialTotal > 0 && Number(costVal) > 0
+      ? initialTotal * Math.floor(Number(costVal))
+      : 0;
+  const packRules = [
+    smallSize
+      ? `<p class="stock-in-take__rule">1 жижиг хайрцаг = <b>${smallSize}</b> ширхэг</p>`
+      : "",
+    largeCount && smallSize
+      ? `<p class="stock-in-take__rule">1 том хайрцаг = <b>${largeCount}</b> жижиг хайрцаг (<b>${largePieces}</b> ширхэг)</p>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  const qtyRows = [];
+  if (largePieces) {
+    qtyRows.push(
+      stockInTakeRowHtml({
+        icon: stockInTakeIcon("box"),
+        label: "Том хайрцагны тоо",
+        name: "largePacks",
+        value: largeVal,
+        ariaLabel: `${p.name} том хайрцаг`,
+      }),
+    );
+  }
+  if (smallSize) {
+    qtyRows.push(
+      stockInTakeRowHtml({
+        icon: stockInTakeIcon("box"),
+        label: "Жижиг хайрцагны тоо",
+        name: "packs",
+        value: packsVal,
+        ariaLabel: `${p.name} жижиг хайрцаг`,
+      }),
+    );
+  }
+  qtyRows.push(
+    stockInTakeRowHtml({
+      icon: stockInTakeIcon("piece"),
+      label: "Тоо ширхэг",
+      name: "qty",
+      value: qtyVal,
+      ariaLabel: `${p.name} тоо ширхэг`,
+    }),
+  );
+  qtyRows.push(
+    stockInTakeRowHtml({
+      icon: stockInTakeIcon("sum"),
+      label: "Нийт тоо ширхэг",
+      name: "total-qty",
+      value: String(initialTotal || 0),
+      readonly: true,
+      accent: true,
+      ariaLabel: "Нийт тоо ширхэг",
+    }),
+  );
+  qtyRows.push(
+    stockInTakeRowHtml({
+      icon: stockInTakeIcon("tag"),
+      label: "Нэгжийн өртөг үнэ",
+      name: "costPrice",
+      value: costVal,
+      suffix: "₮",
+      placeholder: productCostPrice(p) ? String(productCostPrice(p)) : "0",
+      oninput: `stockInCostPriceWarn(this, ${salesPrice})`,
+      ariaLabel: "Нэгжийн өртөг үнэ",
+    }),
+  );
+  box(
+    "Орлого авах",
+    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p>${packRules || `<p class="stock-in-take__rule">Үлдэгдэл: <b>${p.stock ?? 0}</b> ${esc(p.unit || "ш")}</p>`}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div><p class="stock-in-take__warn text-sm text-tone-warning${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p><div class="stock-in-take__total"><span class="stock-in-take__icon">${stockInTakeIcon("calc")}</span><span class="stock-in-take__total-label">Нийт өртөг дүн</span><strong class="stock-in-take__total-value" data-stock-in-total-cost>${fmt(initialCost)}</strong></div><button type="submit" class="stock-in-take__submit">${stockInTakeIcon("save")}<span>Хадгалах</span></button></form>`,
+    "max-w-md stock-in-take-modal",
+  );
 }
 function stockInReceiptLineUnitPrice(line) {
   const unitPrice = Number(line?.unitPrice ?? line?.costPrice);
@@ -12544,110 +12777,6 @@ function stockInPackDerivedPieces(packs, packSize) {
 }
 function stockInEntryTotalQty(largePacks, packs, pieces, p) {
   return productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
-}
-function stockInQtyFieldsInput(_el) {
-  const root =
-    _el?.closest?.(".stock-in-qty-fields") || _el?.closest?.("form");
-  if (!root) return;
-  const form = _el?.closest?.("form") || root;
-  const largePacks = form.querySelector('input[name="largePacks"]')?.value ?? "";
-  const packs = form.querySelector('input[name="packs"]')?.value ?? "";
-  const pieces = form.querySelector('input[name="qty"]')?.value ?? "";
-  const smallSize = Math.max(
-    0,
-    Math.floor(Number(root.dataset.smallBoxSize || 0) || 0),
-  );
-  const largePieces = Math.max(
-    0,
-    Math.floor(Number(root.dataset.largeBoxSize || 0) || 0),
-  );
-  const largeCount = Math.max(
-    0,
-    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
-  );
-  const largePreview = form.querySelector("[data-stock-in-large-preview]");
-  const packPreview = form.querySelector("[data-stock-in-pack-preview]");
-  const totalPreview = form.querySelector("[data-stock-in-qty-total]");
-  const largeDerived = stockInPackDerivedPieces(largePacks, largePieces);
-  const smallDerived = stockInPackDerivedPieces(packs, smallSize);
-  const total =
-    largeDerived +
-    smallDerived +
-    Math.max(0, Math.floor(Number(pieces) || 0));
-  if (largePreview) {
-    if (largeDerived) {
-      largePreview.textContent = `= ${largeDerived} ширхэг`;
-    } else if (largeCount && smallSize) {
-      largePreview.textContent = `1 том = ${largeCount} жижиг (= ${largePieces} ш)`;
-    } else {
-      largePreview.textContent = "";
-    }
-  }
-  if (packPreview) {
-    packPreview.textContent = smallDerived
-      ? `= ${smallDerived} ширхэг`
-      : smallSize
-        ? `1 жижиг = ${smallSize} ширхэг`
-        : "";
-  }
-  if (totalPreview) {
-    totalPreview.textContent = total > 0 ? `Нийт: ${total} ширхэг` : "";
-  }
-}
-function stockInPackQtyFieldsHtml(p, d = {}) {
-  const smallSize = productPackSize(p);
-  const largeCount = productLargeBoxCount(p);
-  const largePieces = productLargeBoxPieceCount(p);
-  const largeVal =
-    d.largePacks != null && d.largePacks !== ""
-      ? esc(String(d.largePacks))
-      : "";
-  const packsVal =
-    d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
-  const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
-  if (!smallSize && !largePieces) {
-    return `<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label>`;
-  }
-  const total = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
-  const largePreviewText = stockInPackDerivedPieces(d.largePacks, largePieces)
-    ? `= ${stockInPackDerivedPieces(d.largePacks, largePieces)} ширхэг`
-    : largeCount && smallSize
-      ? `1 том = ${largeCount} жижиг (= ${largePieces} ш)`
-      : "";
-  const packPreviewText = smallSize
-    ? stockInPackDerivedPieces(d.packs, smallSize)
-      ? `= ${stockInPackDerivedPieces(d.packs, smallSize)} ширхэг`
-      : `1 жижиг = ${smallSize} ширхэг`
-    : "";
-  const totalPreviewText = total > 0 ? `Нийт: ${total} ширхэг` : "";
-  const largeField = largePieces
-    ? `<label class="block"><span class="field-label">Том хайрцаг</span><input name="largePacks" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${largeVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} том хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-large-preview>${largePreviewText}</p></label>`
-    : "";
-  const smallField = smallSize
-    ? `<label class="block"><span class="field-label">Жижиг хайрцаг</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} жижиг хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-pack-preview>${packPreviewText}</p></label>`
-    : "";
-  const fieldCount = 1 + (largePieces ? 1 : 0) + (smallSize ? 1 : 0);
-  const gridClass =
-    fieldCount >= 3
-      ? "grid grid-cols-1 sm:grid-cols-3 gap-2"
-      : "grid grid-cols-2 gap-2";
-  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}"><div class="${gridClass}">${largeField}${smallField}<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
-}
-function stockInEntryModal(id) {
-  const p = state.products.find((x) => x.id === id);
-  if (!p) return;
-  ensureStockInSession();
-  const d = state.stockInDraft[p.id] || {};
-  const costVal =
-    d.costPrice != null && d.costPrice !== "" ? esc(String(d.costPrice)) : "";
-  const qtyFields = stockInPackQtyFieldsHtml(p, d);
-  const salesPrice = productSalesPrice(p);
-  const costExceeds = stockInCostExceedsSalesPrice(costVal || d.costPrice, p);
-  box(
-    "Орлого оруулах",
-    `<form onsubmit="applyStockInEntryModal(event,'${esc(id)}')" class="inventory-stock-modal p-5 space-y-4"><div class="inventory-stock-modal__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="product-thumb inventory-stock-modal__thumb"><div class="inventory-stock-modal__info"><p class="inventory-stock-modal__name">${esc(p.name)}</p><p class="inventory-stock-modal__barcode">${esc(p.barcode || "-")}</p><p class="inventory-stock-modal__stock">Үлдэгдэл: <b>${p.stock ?? 0} ${esc(p.unit || "ш")}</b></p><p class="inventory-stock-modal__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p></div></div>${qtyFields}<label class="block"><span class="field-label">Өртөг үнэ <span class="text-muted-foreground font-normal">(сонголттой)</span></span><input name="costPrice" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="0" step="1" value="${costVal}" placeholder="${productCostPrice(p) ? esc(String(productCostPrice(p))) : "0"}" class="field-input app-input text-muted-foreground" aria-label="Өртөг үнэ" oninput="stockInCostPriceWarn(this, ${salesPrice})"><p class="text-sm text-tone-warning mt-1${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p></label><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="btn btn--secondary">Буцах</button><button type="submit" class="btn btn--primary">Нэмэх</button></div></form>`,
-    "max-w-md",
-  );
 }
 function applyStockInEntryModal(e, id) {
   e.preventDefault();
@@ -22951,6 +23080,7 @@ Object.assign(window, {
   stockInEntryModal,
   applyStockInEntryModal,
   stockInQtyFieldsInput,
+  stockInCostPriceWarn,
   confirmReportExport,
   confirmEmployeeExcel,
   openWarehousePrepare,

@@ -15042,6 +15042,218 @@ body.image-lightbox-open {
   margin-bottom: 2px;
 }
 
+.modal-panel.stock-in-take-modal {
+  max-height: min(92vh, 760px);
+}
+
+.modal-panel.stock-in-take-modal .modal-panel__head {
+  padding: 14px 16px;
+  background: var(--hex-primary);
+  border-bottom: none;
+  color: var(--hex-primary-foreground);
+}
+
+.modal-panel.stock-in-take-modal .modal-panel__title {
+  color: var(--hex-primary-foreground);
+  font-weight: 800;
+}
+
+.modal-panel.stock-in-take-modal .modal-close {
+  background: color-mix(in srgb, #fff 18%, transparent);
+  color: var(--hex-primary-foreground);
+  border: none;
+}
+
+.stock-in-take {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 16px;
+  background: var(--hex-background);
+  overflow-y: auto;
+  max-height: calc(92vh - 64px);
+}
+
+.stock-in-take__product {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--hex-card);
+  border: 1px solid var(--hex-border);
+}
+
+.stock-in-take__thumb {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--hex-secondary);
+}
+
+.stock-in-take__product-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.stock-in-take__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--hex-foreground);
+}
+
+.stock-in-take__rule {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-take__rule b {
+  color: var(--hex-foreground);
+  font-weight: 700;
+}
+
+.stock-in-take__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stock-in-take__row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hex-card);
+  border: 1px solid var(--hex-border);
+}
+
+.stock-in-take__row--accent {
+  background: color-mix(in srgb, var(--hex-primary-soft) 70%, var(--hex-card));
+  border-color: color-mix(in srgb, var(--hex-primary) 28%, var(--hex-border));
+}
+
+.stock-in-take__icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--hex-primary-soft);
+  color: var(--hex-primary);
+  flex-shrink: 0;
+}
+
+.stock-in-take__svg {
+  width: 20px;
+  height: 20px;
+}
+
+.stock-in-take__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-foreground);
+  line-height: 1.25;
+}
+
+.stock-in-take__control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 96px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--hex-border);
+  background: var(--hex-card);
+}
+
+.stock-in-take__row--accent .stock-in-take__control {
+  background: color-mix(in srgb, var(--hex-primary-soft) 55%, #fff);
+  border-color: color-mix(in srgb, var(--hex-primary) 30%, var(--hex-border));
+}
+
+.stock-in-take__input {
+  width: 64px;
+  border: none;
+  outline: none;
+  background: transparent;
+  text-align: right;
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+}
+
+.stock-in-take__input--accent {
+  color: var(--hex-primary-dark);
+}
+
+.stock-in-take__suffix {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-take__warn {
+  margin: 0;
+}
+
+.stock-in-take__total {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  background: var(--hex-card);
+  border: 1px solid var(--hex-border);
+}
+
+.stock-in-take__total-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--hex-foreground);
+}
+
+.stock-in-take__total-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--hex-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-in-take__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: var(--hex-primary);
+  color: var(--hex-primary-foreground);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stock-in-take__submit .stock-in-take__svg {
+  width: 22px;
+  height: 22px;
+}
+
+.stock-in-take__submit:active {
+  background: var(--hex-primary-dark);
+}
+
 .stock-in-receipt-panel {
   overflow: hidden;
   border: 1px solid var(--hex-border);
