@@ -3845,15 +3845,20 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
-    // Prefer server stock unless this device has pending stock receipts/orders.
-    if (
-      opts.entityKind === "products" &&
-      prev &&
-      ((opts.pullFromServer && !opts.keepLocalProductStock) ||
-        (!opts.pullFromServer && !businessEntityDirty()))
-    ) {
-      merged.stock = Number(prev.stock) || 0;
-      if (prev.costPrice != null) merged.costPrice = prev.costPrice;
+    // Product stock: remote wins on peer pull UNLESS this device has pending
+    // stock-in/out/order mutations (keepLocalProductStock). preferRemote spread
+    // already copied remote.stock — restore local stock in that case.
+    if (opts.entityKind === "products" && prev) {
+      if (opts.pullFromServer && opts.keepLocalProductStock) {
+        if (item.stock != null) merged.stock = Number(item.stock) || 0;
+        if (item.costPrice != null) merged.costPrice = item.costPrice;
+      } else if (
+        (opts.pullFromServer && !opts.keepLocalProductStock) ||
+        (!opts.pullFromServer && !businessEntityDirty())
+      ) {
+        merged.stock = Number(prev.stock) || 0;
+        if (prev.costPrice != null) merged.costPrice = prev.costPrice;
+      }
     }
     // Never let a stale device republish older role/permissions after a pull.
     if (opts.entityKind === "employees" && prev && opts.pullFromServer) {
@@ -5436,6 +5441,7 @@ function applyRemoteState(payload, opts = {}) {
   const merged = protectAccidentalDeletions(
     mergePersistentStates(payload.state, persistentState(), {
       pullFromServer: true,
+      keepLocalProductStock: pendingLocalStockMutation(payload.state),
     }),
   );
   if (JSON.stringify(merged) === JSON.stringify(persistentState())) {
