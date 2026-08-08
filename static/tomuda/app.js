@@ -493,7 +493,7 @@ function receiptPartyFields(o) {
     salesPhone: esc(o.employeePhone || sales.phone || "-"),
     deliveryName: esc(delivery.deliveryName),
     deliveryPhone: esc(delivery.deliveryPhone),
-    customerName: esc(c.name || c.companyName || o.customerName || "-"),
+    customerName: esc(orderCustomerName(o)),
     customerReg: esc(c.registrationNumber || "-"),
     companyName: esc(c.companyName || "-"),
     customerPhone: esc(customerPhonesList(c).join(", ") || "-"),
@@ -9987,12 +9987,12 @@ function warehouseOrderStatusActions(o) {
 }
 function warehouseReceiptListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id;
-  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button>`;
+  return `<button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__item${active ? " is-active" : ""}">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(orderCustomerName(o))}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button>`;
 }
 function warehouseReceiptPrintListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id,
     checked = idList(state.receiptPrintOrderIds).includes(o.id);
-  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(o.customerName)}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(o.customerName)}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
+  return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(orderCustomerName(o))}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(orderCustomerName(o))}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions(includeDelivered = true) {
   const opts = ["pending", "confirmed", "delivered", "cancelled"];
@@ -10102,7 +10102,7 @@ function ensureReceiptScreenStyles() {
 `;
 }
 function orderRow(o) {
-  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(o.customerName)}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(orderTakenDay(o))}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
+  return `<tr class="hover:bg-secondary/30"><td class="px-4 py-3"><div class="flex flex-wrap items-center gap-2"><p class="font-medium">${esc(orderCustomerName(o))}</p>${receiptNo(o, "xs")}</div><p class="text-xs text-muted-foreground mt-0.5">${dte(orderTakenDay(o))}</p></td><td class="px-4 py-3 text-sm">${o.employeeName || "-"}</td><td class="px-4 py-3 text-sm">${o.items.length} бараа</td><td class="px-4 py-3"><span class="inline-flex px-2.5 py-1 rounded text-xs font-medium ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></td><td class="px-4 py-3 text-right text-sm font-semibold">${fmt(orderAmount(o))}</td><td class="px-4 py-3"><div class="flex justify-end gap-2 whitespace-nowrap"><button onclick="orderReceiptModal('${o.id}')" class="px-3 py-1.5 bg-secondary rounded text-sm">Баримт</button><button onclick="printOrderReceipt('${o.id}')" class="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm">Хэвлэх</button>${warehouseOrderStatusActions(o)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm">Устгах</button>` : ""}</div></td></tr>`;
 }
 function customerAvatarHtml(c, className = "customer-card__avatar") {
   const src = entityImageSrc(c?.image);
@@ -11246,6 +11246,39 @@ function customerDisplayName(c) {
     String(c?.companyName || "").trim() ||
     "Дэлгүүр"
   );
+}
+/** Prefer live customer name so renamed stores show on older orders. */
+function orderCustomerName(o) {
+  const customerId = String(o?.customerId || "").trim();
+  if (customerId) {
+    const c = state.customers.find((x) => String(x.id) === customerId);
+    if (c) {
+      const live =
+        String(c.name || "").trim() || String(c.companyName || "").trim();
+      if (live) return live;
+    }
+  }
+  return (
+    String(o?.customerName || "").trim() ||
+    String(o?.companyName || "").trim() ||
+    "Харилцагч"
+  );
+}
+function syncOrdersCustomerName(customer) {
+  if (!customer?.id) return 0;
+  const name =
+    String(customer.name || "").trim() ||
+    String(customer.companyName || "").trim();
+  if (!name) return 0;
+  const customerId = String(customer.id);
+  let changed = 0;
+  for (const o of state.orders || []) {
+    if (String(o.customerId || "") !== customerId) continue;
+    if (String(o.customerName || "").trim() === name) continue;
+    o.customerName = name;
+    changed += 1;
+  }
+  return changed;
 }
 function customerRow(c) {
   const id = esc(c.id);
@@ -15152,7 +15185,7 @@ function paymentRow(o) {
     actions = paid
       ? ""
       : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Төлбөр баталгаажуулах</button>`;
-  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(o.customerName)}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Тооцоо дууссан" : "Төлбөрийн үлдэгдэлтэй"}</span><div class="payment-row__actions">${actions}</div></div>`;
+  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(orderCustomerName(o))}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Тооцоо дууссан" : "Төлбөрийн үлдэгдэлтэй"}</span><div class="payment-row__actions">${actions}</div></div>`;
 }
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
@@ -17968,7 +18001,7 @@ function workerOrderListRow(o) {
   const cancelBtn = canCancel
     ? `<button type="button" class="worker-order-row__cancel" onclick="event.stopPropagation();confirmCancelWorkerOrder('${esc(o.id)}')" aria-label="Захиалга цуцлах">Захиалга цуцлах</button>`
     : "";
-  return `<div class="line-list__row worker-order-row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" role="button" tabindex="0" onclick="workerOrderDetail('${esc(o.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();workerOrderDetail('${esc(o.id)}')}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(o.customerName)}</span><span class="worker-order-row__amount-wrap">${cancelBtn}<b class="line-list__amount">${fmt(orderAmount(o))}</b></span></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></div>`;
+  return `<div class="line-list__row worker-order-row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" role="button" tabindex="0" onclick="workerOrderDetail('${esc(o.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();workerOrderDetail('${esc(o.id)}')}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(orderCustomerName(o))}</span><span class="worker-order-row__amount-wrap">${cancelBtn}<b class="line-list__amount">${fmt(orderAmount(o))}</b></span></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></div>`;
 }
 function seedWorkerCartFromOrder(order) {
   resetWorkerCart();
@@ -19487,10 +19520,22 @@ async function applyCustomerSave(data, id) {
     );
     return false;
   }
+  const savedCustomer =
+    state.customers.find((c) => String(c.id) === String(customerId)) ||
+    customer;
+  const syncedOrders = syncOrdersCustomerName(savedCustomer);
   closeModal();
-  focusSavedCustomer(customerId, customerName);
-  if (localStateDirty() || entityStateDirty()) scheduleBackendSave();
-  showAppToast(`${customerName} хадгалагдлаа`, "success");
+  focusSavedCustomer(
+    customerId,
+    savedCustomer?.name || savedCustomer?.companyName || customerName,
+  );
+  if (syncedOrders > 0 || localStateDirty() || entityStateDirty()) {
+    scheduleBackendSave();
+  }
+  showAppToast(
+    `${savedCustomer?.name || savedCustomer?.companyName || customerName} хадгалагдлаа`,
+    "success",
+  );
   return true;
 }
 async function saveCustomer(e, id) {
@@ -20257,7 +20302,7 @@ function saveOrder(e) {
   state.orders.push(
     buildNewOrder({
       customerId: c.id,
-      customerName: c.name || c.companyName || "",
+      customerName: customerDisplayName(c),
       items,
       total: items.reduce((s, i) => s + i.total, 0),
       status: "pending",
@@ -20447,7 +20492,7 @@ function orderReceiptModal(id, keepDraft = false) {
   const draft = receiptEditDraftOrder();
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(o.customerName)}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
+    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
@@ -21489,7 +21534,7 @@ async function saveWorker() {
   try {
     const order = buildNewOrder({
       customerId: c.id,
-      customerName: c.name || c.companyName || "",
+      customerName: customerDisplayName(c),
       items,
       grossTotal: cart.gross,
       applyPercentDiscount: workerPercentDiscountActive(),
