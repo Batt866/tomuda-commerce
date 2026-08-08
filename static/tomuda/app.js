@@ -5997,14 +5997,17 @@ function productPackSize(p) {
   const n = Number(p?.boxQuantity);
   return Number.isFinite(n) && n > 1 ? Math.floor(n) : 0;
 }
-/** Pieces in one том хайрцаг (independent of жижиг). */
-function productLargeBoxPieceCount(p) {
+/** How many жижиг хайрцаг fit in one том хайрцаг. */
+function productLargeBoxCount(p) {
   const n = Number(p?.largeBoxQuantity);
   return Number.isFinite(n) && n > 1 ? Math.floor(n) : 0;
 }
-/** @deprecated alias — том = ширхэг/том */
-function productLargeBoxCount(p) {
-  return productLargeBoxPieceCount(p);
+/** Pieces in one том хайрцаг (= том × жижиг × ширхэг). */
+function productLargeBoxPieceCount(p) {
+  const small = productPackSize(p);
+  const large = productLargeBoxCount(p);
+  if (!small || !large) return 0;
+  return small * large;
 }
 function productBoxQtyTotal(
   p,
@@ -6022,9 +6025,8 @@ function productBoxQtyTotal(
 }
 function productPackLabel(p) {
   const small = productPackSize(p);
-  const large = productLargeBoxPieceCount(p);
-  if (small && large) return `Том ${large}ш · Жижиг ${small}ш`;
-  if (large) return `${large}ш/том хайрцаг`;
+  const large = productLargeBoxCount(p);
+  if (small && large) return `Том ${large}×жижиг · ${small}ш`;
   if (small) return `${small}ш/жижиг хайрцаг`;
   return "";
 }
@@ -6143,9 +6145,13 @@ function orderItemPrepareParts(item, product) {
     Number(item.boxQuantity) > 1
       ? Math.floor(Number(item.boxQuantity))
       : productPackSize(product);
-  const largeSize =
+  const largeCount =
     Number(item.largeBoxQuantity) > 1
       ? Math.floor(Number(item.largeBoxQuantity))
+      : productLargeBoxCount(product);
+  const largeSize =
+    packSize > 1 && largeCount > 1
+      ? packSize * largeCount
       : productLargeBoxPieceCount(product);
   const largePacks =
     item.largePacks != null && item.largePacks !== ""
@@ -6197,9 +6203,12 @@ function warehousePreparePackSize(item, product) {
   return productPackSize(product);
 }
 function warehousePrepareLargeSize(item, product) {
-  if (Number(item?.largeBoxQuantity) > 1) {
-    return Math.floor(Number(item.largeBoxQuantity));
-  }
+  const packSize = warehousePreparePackSize(item, product);
+  const largeCount =
+    Number(item?.largeBoxQuantity) > 1
+      ? Math.floor(Number(item.largeBoxQuantity))
+      : productLargeBoxCount(product);
+  if (packSize > 1 && largeCount > 1) return packSize * largeCount;
   return productLargeBoxPieceCount(product);
 }
 function warehousePreparePrintParts(item, product) {
@@ -11598,8 +11607,14 @@ function productDetailHtml(p, id) {
       productDetailRow("Үлдэгдэл", stockValue),
     ];
   const largePieces = productLargeBoxPieceCount(p);
-  if (largePieces) {
-    rows.push(productDetailRow("Том хайрцаг", `${largePieces} ш/том`));
+  const largeCount = productLargeBoxCount(p);
+  if (largeCount && packSize) {
+    rows.push(
+      productDetailRow(
+        "Том хайрцаг",
+        `${largeCount} жижиг/том (= ${largePieces} ш)`,
+      ),
+    );
   }
   if (packSize) {
     rows.push(productDetailRow("Жижиг хайрцаг", `${packSize} ш/жижиг`));
@@ -12546,6 +12561,10 @@ function stockInQtyFieldsInput(_el) {
     0,
     Math.floor(Number(root.dataset.largeBoxSize || 0) || 0),
   );
+  const largeCount = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
+  );
   const largePreview = form.querySelector("[data-stock-in-large-preview]");
   const packPreview = form.querySelector("[data-stock-in-pack-preview]");
   const totalPreview = form.querySelector("[data-stock-in-qty-total]");
@@ -12556,11 +12575,13 @@ function stockInQtyFieldsInput(_el) {
     smallDerived +
     Math.max(0, Math.floor(Number(pieces) || 0));
   if (largePreview) {
-    largePreview.textContent = largeDerived
-      ? `= ${largeDerived} ширхэг`
-      : largePieces
-        ? `1 том = ${largePieces} ширхэг`
-        : "";
+    if (largeDerived) {
+      largePreview.textContent = `= ${largeDerived} ширхэг`;
+    } else if (largeCount && smallSize) {
+      largePreview.textContent = `1 том = ${largeCount} жижиг (= ${largePieces} ш)`;
+    } else {
+      largePreview.textContent = "";
+    }
   }
   if (packPreview) {
     packPreview.textContent = smallDerived
@@ -12575,6 +12596,7 @@ function stockInQtyFieldsInput(_el) {
 }
 function stockInPackQtyFieldsHtml(p, d = {}) {
   const smallSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
   const largePieces = productLargeBoxPieceCount(p);
   const largeVal =
     d.largePacks != null && d.largePacks !== ""
@@ -12589,8 +12611,8 @@ function stockInPackQtyFieldsHtml(p, d = {}) {
   const total = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
   const largePreviewText = stockInPackDerivedPieces(d.largePacks, largePieces)
     ? `= ${stockInPackDerivedPieces(d.largePacks, largePieces)} ширхэг`
-    : largePieces
-      ? `1 том = ${largePieces} ширхэг`
+    : largeCount && smallSize
+      ? `1 том = ${largeCount} жижиг (= ${largePieces} ш)`
       : "";
   const packPreviewText = smallSize
     ? stockInPackDerivedPieces(d.packs, smallSize)
@@ -12609,7 +12631,7 @@ function stockInPackQtyFieldsHtml(p, d = {}) {
     fieldCount >= 3
       ? "grid grid-cols-1 sm:grid-cols-3 gap-2"
       : "grid grid-cols-2 gap-2";
-  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-size="${largePieces}"><div class="${gridClass}">${largeField}${smallField}<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
+  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}"><div class="${gridClass}">${largeField}${smallField}<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
 }
 function stockInEntryModal(id) {
   const p = state.products.find((x) => x.id === id);
@@ -14684,8 +14706,8 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
       }
       if (Number(i.largeBoxQuantity) > 1) {
         map[key].largeBoxQuantity = Math.floor(Number(i.largeBoxQuantity));
-      } else if (productLargeBoxPieceCount(prod) > 1) {
-        map[key].largeBoxQuantity = productLargeBoxPieceCount(prod);
+      } else if (productLargeBoxCount(prod) > 1) {
+        map[key].largeBoxQuantity = productLargeBoxCount(prod);
       }
     }),
   );
@@ -20034,10 +20056,10 @@ function productModal(id) {
     Number(p.largeBoxQuantity) > 1
       ? String(Math.floor(Number(p.largeBoxQuantity)))
       : "";
-  const smallBoxAttrs = inputAttrs(smallBoxVal, "24", {
+  const smallBoxAttrs = inputAttrs(smallBoxVal, "10", {
     treatZeroAsEmpty: true,
   });
-  const largeBoxAttrs = inputAttrs(largeBoxVal, "288", {
+  const largeBoxAttrs = inputAttrs(largeBoxVal, "10", {
     treatZeroAsEmpty: true,
   });
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
@@ -20050,7 +20072,7 @@ function productModal(id) {
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн ширхэг? (жишээ нь 288). Хоосон бол ашиглахгүй.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 24). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -20291,6 +20313,11 @@ function buildProductDataFromForm(form) {
     const large = Math.floor(Number(largeRaw));
     if (!Number.isFinite(large) || large < 1) {
       return { error: "Том хайрцагт зөв тоо оруулна уу" };
+    }
+    if (!data.boxQuantity || data.boxQuantity <= 1) {
+      return {
+        error: "Том хайрцаг оруулахын тулд эхлээд жижиг хайрцаг тохируулна уу",
+      };
     }
     data.largeBoxQuantity = large;
   }
