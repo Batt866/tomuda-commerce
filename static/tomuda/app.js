@@ -7071,6 +7071,16 @@ async function saveBackendState(retry = 0) {
         } catch {
           /* ignore */
         }
+        const stockDenied =
+          /үлдэгдэл|өртөг|орлого\/зарлага/i.test(msg) && retry < 2;
+        if (stockDenied) {
+          await realignLocalProductStockFromServer();
+          persistOrderSnapshot();
+          handoffRetry = true;
+          backendSaving = false;
+          await sleep(400);
+          return saveBackendState(retry + 1);
+        }
         persistOrderSnapshot();
         markBackendSaveFailed(msg);
         if (!shouldDeferBackendSync()) safeRender();
