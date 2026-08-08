@@ -274,6 +274,25 @@ const persistKeys = [
   "deliveryPhone",
   "settings",
 ];
+/** Shared business data — session UI keys must not block peer merges. */
+const SYNC_ENTITY_KEYS = [
+  "customers",
+  "products",
+  "employees",
+  "orders",
+  "extraCategories",
+  "inventoryLogs",
+  "stockInReceipts",
+  "stockOutReceipts",
+  "deletionLog",
+  "promotionDeletionLog",
+  "countQty",
+  "countDone",
+  "countOpeningStock",
+  "countSessionStartedAt",
+  "promotionRules",
+  "settings",
+];
 function newEntityId(prefix = "id") {
   const rand =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -3717,7 +3736,12 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
-    if (opts.entityKind === "products" && prev && !localStateDirty()) {
+    // On peer pull always take server stock/cost; otherwise only when entity-clean.
+    if (
+      opts.entityKind === "products" &&
+      prev &&
+      (opts.pullFromServer || !entityStateDirty())
+    ) {
       merged.stock = Number(prev.stock) || 0;
       if (prev.costPrice != null) merged.costPrice = prev.costPrice;
     }
@@ -4053,8 +4077,31 @@ function serverSnapshotLooksFresherThanLocal(serverState, serverUpdatedAt) {
   return (
     entityIdCount(serverState, "customers") >
       entityIdCount(local, "customers") ||
-    entityIdCount(serverState, "products") > entityIdCount(local, "products") ||
-    entityIdCount(serverState, "orders") > entityIdCount(local, "orders")
+    entityIdCount(serverState, "products") >
+      entityIdCount(local, "products") ||
+    entityIdCount(serverState, "orders") > entityIdCount(local, "orders") ||
+    entityIdCount(serverState, "stockInReceipts") >
+      entityIdCount(local, "stockInReceipts") ||
+    entityIdCount(serverState, "stockOutReceipts") >
+      entityIdCount(local, "stockOutReceipts") ||
+    entityIdCount(serverState, "inventoryLogs") >
+      entityIdCount(local, "inventoryLogs") ||
+    entityIdCount(serverState, "employees") >
+      entityIdCount(local, "employees")
+  );
+}
+function peerCollectionsGrew(prevState, nextState) {
+  const keys = [
+    "customers",
+    "products",
+    "orders",
+    "employees",
+    "stockInReceipts",
+    "stockOutReceipts",
+    "inventoryLogs",
+  ];
+  return keys.some(
+    (key) => entityIdCount(nextState, key) > entityIdCount(prevState, key),
   );
 }
 function mergeBootState(serverState, serverUpdatedAt = "") {
@@ -4198,7 +4245,10 @@ function mergedDeletionLog(remote = {}, local = {}) {
   ]);
 }
 function mergeArrayById(remote = [], local = [], opts = {}) {
-  const preferRemote = !!opts.preferRemote && !localStateDirty();
+  // Prefer remote on conflicts when pulling peers, or when entity data is clean.
+  const preferRemote =
+    !!opts.preferRemote &&
+    (!!opts.pullFromServer || !entityStateDirty());
   const map = new Map();
   const first = preferRemote ? local : remote;
   const second = preferRemote ? remote : local;
@@ -4506,10 +4556,11 @@ function applyCountSessionMerge(remote, local, merged) {
 }
 function mergePersistentStates(remote = {}, local = {}, opts = {}) {
   const merged = {};
-  const deletionLog = opts.pullFromServer
+  const pullFromServer = !!opts.pullFromServer;
+  const deletionLog = pullFromServer
     ? normalizeDeletionLog(remote.deletionLog || [])
     : mergedDeletionLog(remote, local);
-  const promotionDeletionLog = opts.pullFromServer
+  const promotionDeletionLog = pullFromServer
     ? normalizePromotionDeletionLog(remote.promotionDeletionLog || [])
     : mergedPromotionDeletionLog(remote, local);
   for (const key of MERGE_BY_ID_KEYS) {
@@ -4524,6 +4575,7 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
         : "",
       entityKind: key,
       preferRemote: key !== "orders",
+      pullFromServer,
     });
     if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
@@ -4568,7 +4620,7 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       merged.inventoryLogs = mergeArrayById(
         remote.inventoryLogs,
         local.inventoryLogs,
-        { preferRemote: true },
+        { preferRemote: true, pullFromServer },
       );
       continue;
     }
@@ -4576,6 +4628,7 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       merged.stockInReceipts = mergeArrayById(
         remote.stockInReceipts,
         local.stockInReceipts,
+        { preferRemote: true, pullFromServer },
       );
       continue;
     }
@@ -4583,7 +4636,7 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       merged.stockOutReceipts = mergeArrayById(
         remote.stockOutReceipts,
         local.stockOutReceipts,
-        { preferRemote: true },
+        { preferRemote: true, pullFromServer },
       );
       continue;
     }
@@ -4703,6 +4756,26 @@ function applyPersistentState(data) {
 }
 function localStateDirty() {
   return backendStateSnapshot() !== backendLastSaved;
+}
+function entityStateSlice(data = {}) {
+  const slice = {};
+  for (const key of SYNC_ENTITY_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) slice[key] = data[key];
+  }
+  return comparableBackendState(slice);
+}
+/** Dirty check ignoring session UI fields (customer picker, delivery draft, …). */
+function entityStateDirty() {
+  try {
+    const baseline = JSON.parse(backendLastSaved || "{}").state;
+    if (!baseline) return localStateDirty();
+    return (
+      JSON.stringify(entityStateSlice(persistentState())) !==
+      JSON.stringify(entityStateSlice(baseline))
+    );
+  } catch {
+    return localStateDirty();
+  }
 }
 function shouldDeferBackendSync() {
   if (isLoginFormActive()) return true;
@@ -5079,6 +5152,7 @@ function flushPendingCountRender() {
 function applyRemoteState(payload, opts = {}) {
   if (!payload?.state) return false;
   const forceRender = !!opts.forceRender;
+  const beforeState = persistentState();
   // Always merge server data into local memory. Only rendering may be deferred
   // (typing/scrolling); otherwise peer-device customers never appear.
   const merged = protectAccidentalDeletions(
@@ -5090,6 +5164,7 @@ function applyRemoteState(payload, opts = {}) {
     if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
     return false;
   }
+  const grew = peerCollectionsGrew(beforeState, merged);
   const session = captureSessionSnapshot();
   const pickerCategory = state.filters.workerCategory;
   const reopenPicker = pickerOpen();
@@ -5102,16 +5177,22 @@ function applyRemoteState(payload, opts = {}) {
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
-  if (JSON.stringify(stateForBackendSave()) !== JSON.stringify(payload.state)) {
-    if (canAutoSaveBackendState()) scheduleBackendSave();
-    else syncBackendSaveMarker();
+  // Only push back when shared business data still differs — not session UI keys.
+  if (entityStateDirty() && canAutoSaveBackendState()) {
+    // Re-check against server entities after stock/receipt merge.
+    const serverEntities = entityStateSlice(payload.state);
+    const localEntities = entityStateSlice(persistentState());
+    if (JSON.stringify(localEntities) !== JSON.stringify(serverEntities)) {
+      scheduleBackendSave();
+    } else {
+      syncBackendSaveMarker();
+    }
   } else {
     syncBackendSaveMarker();
   }
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   if (
     !backendSaving &&
-    !backendSaveTimer &&
     !backendSaveFailedMessage &&
     serverSnapshotLooksFresherThanLocal(
       payload.state,
@@ -5126,7 +5207,7 @@ function applyRemoteState(payload, opts = {}) {
     updatedAt: payload.updatedAt || "",
   });
   if (!state.isLoggedIn) return true;
-  if (forceRender || !shouldDeferBackendSync()) safeRender();
+  if (forceRender || grew || !shouldDeferBackendSync()) safeRender();
   if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
     pickerModal();
@@ -5153,7 +5234,8 @@ async function pullBackendStateNow(opts = {}) {
   }
 }
 async function pollBackendState() {
-  if (!backendReady || backendSaving || backendSaveTimer || importLoading || stockInSaveLock || stockOutSaveLock)
+  // Do not skip on backendSaveTimer — pending autosave must not starve peer pulls.
+  if (!backendReady || backendSaving || importLoading || stockInSaveLock || stockOutSaveLock)
     return;
   try {
     const payload = await fetchBackendPayload();
@@ -11150,7 +11232,7 @@ function buildStockOutReceiptSnapshot(productIds = null) {
     };
   });
   return {
-    id: String(Date.now()),
+    id: newEntityId("sor"),
     createdAt: new Date().toISOString(),
     employeeId: state.stockOutEmployeeId,
     employeeName: stockOutEmployeeName(),
@@ -11402,7 +11484,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
     };
   });
   return normalizeStockInReceiptTotals({
-    id: String(Date.now()),
+    id: newEntityId("sir"),
     createdAt: new Date().toISOString(),
     employeeId: state.stockInEmployeeId,
     employeeName: stockInEmployeeName(),
