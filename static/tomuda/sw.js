@@ -1,8 +1,9 @@
-const CACHE = "tomuda-v560";
+const CACHE = "tomuda-v561";
 const MEDIA_CACHE = "tomuda-media-v1";
 const PRECACHE = [
   "/static/tomuda/styles.css",
   "/static/tomuda/data.js",
+  "/static/tomuda/app.js",
   "/static/tomuda/vendor/jszip.min.js",
   "/static/tomuda/vendor/tailwindcdn.js",
   "/static/tomuda/templates/warehouse-prepare-template.xls",
@@ -37,6 +38,14 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+async function matchAppJs(request) {
+  return (
+    (await caches.match(request)) ||
+    (await caches.match(request, { ignoreSearch: true })) ||
+    (await caches.match("/static/tomuda/app.js"))
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -58,12 +67,16 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((res) => {
           if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
+            const forVersioned = res.clone();
+            const forPlain = res.clone();
+            caches.open(CACHE).then((cache) => {
+              cache.put(request, forVersioned);
+              cache.put("/static/tomuda/app.js", forPlain);
+            });
           }
           return res;
         })
-        .catch(() => caches.match(request)),
+        .catch(() => matchAppJs(request)),
     );
     return;
   }

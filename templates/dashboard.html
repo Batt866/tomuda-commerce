@@ -279,7 +279,7 @@
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260808-aguulah-nav"
+      href="{% static 'tomuda/app.js' %}?v=20260808-boot-fix"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -412,19 +412,59 @@
         el.innerHTML =
           '<div class="boot-screen boot-screen--error"><div class="boot-screen__card" role="status"><div class="boot-screen__brand"><img src="/static/tomuda/branding/logo-blue.png" alt="" class="boot-screen__logo" width="52" height="52" decoding="async"><div class="boot-screen__brand-copy"><p class="boot-screen__brand-name">ТОМУДА</p><p class="boot-screen__brand-sub">Импорт, түгээлт</p></div></div><div class="boot-screen__copy"><p class="boot-screen__title">Алдаа</p><p class="boot-screen__detail">' +
           safe +
-          '</p></div><button type="button" class="boot-screen__retry" onclick="location.reload()">Дахин оролдох</button></div></div>';
+          '</p></div><button type="button" class="boot-screen__retry" onclick="__tomudaHardReload()">Дахин оролдох</button></div></div>';
+      };
+      window.__tomudaHardReload = function () {
+        var done = function () {
+          var url = new URL(location.href);
+          url.searchParams.set("_reload", String(Date.now()));
+          location.replace(url.toString());
+        };
+        if (!("serviceWorker" in navigator)) {
+          done();
+          return;
+        }
+        navigator.serviceWorker
+          .getRegistrations()
+          .then(function (regs) {
+            return Promise.all(regs.map(function (r) { return r.unregister(); }));
+          })
+          .catch(function () {})
+          .then(function () {
+            if (!("caches" in window)) return;
+            return caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            });
+          })
+          .catch(function () {})
+          .then(done);
+      };
+      window.__loadTomudaApp = function () {
+        var sources = [
+          "{% static 'tomuda/app.js' %}?v=20260808-boot-fix",
+          "{% static 'tomuda/app.js' %}",
+        ];
+        var i = 0;
+        function tryNext() {
+          if (i >= sources.length) {
+            __showTomudaFatal(
+              "App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.",
+            );
+            return;
+          }
+          var s = document.createElement("script");
+          s.src = sources[i++];
+          s.onerror = tryNext;
+          document.body.appendChild(s);
+        }
+        tryNext();
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
     <script src="{% static 'tomuda/permissions.js' %}?v=20260808-delete-stick"></script>
     <script src="{% static 'tomuda/capacitor-geolocation.js' %}?v=20260705-promo-labels"></script>
-    <script
-      src="{% static 'tomuda/app.js' %}?v=20260808-aguulah-nav"
-      onerror="
-        __showTomudaFatal(
-          'App файл ачаалагдсангүй. Интернет шалгаад дахин ачаална уу.',
-        )
-      "
-    ></script>
+    <script>
+      __loadTomudaApp();
+    </script>
   </body>
 </html>
