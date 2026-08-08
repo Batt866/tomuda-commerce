@@ -839,8 +839,9 @@ function receiptPaymentTermText(f, o) {
   return receiptPaymentTermDisplay(o);
 }
 function receiptShouldShowGross(o) {
-  // «Хувь хасагдаагүй…» — зөвхөн Зээлээр; шууд төлөлт дээр огт харуулахгүй.
-  return !receiptIsDirectPay(o);
+  // «Хувь хасагдаагүй…» — зөвхөн Шууд төлөх; Зээлээр огт харуулахгүй.
+  // (Settle note uses the same rule — see receiptShouldShowCashSettleNote.)
+  return receiptIsDirectPay(o);
 }
 function receiptGrandNote(o) {
   const discount = orderDiscountAmount(o);
@@ -1644,7 +1645,15 @@ function normalizeOrderPayments() {
   for (const o of state.orders) {
     if (!o.paymentTerm) o.paymentTerm = "cash";
     if (o.paymentTerm === "cash") o.isPaid = true;
-    else if (o.paymentTerm === "credit") o.isPaid = !!o.isPaid;
+    else if (o.paymentTerm === "credit") {
+      o.isPaid = !!o.isPaid;
+      // Credit never keeps cash % discount — clear stale flags from cash→credit edits.
+      if (o.applyPercentDiscount) {
+        o.applyPercentDiscount = false;
+        o.percentDiscount = 0;
+        recalcOrderTotals(o);
+      }
+    }
   }
 }
 function normalizeOrderDeliveryDates() {
@@ -7298,7 +7307,10 @@ function buildOrderReceiptExcelRows(o) {
     rows.push(["Урамшуулал", "Бараа", "Тоо", "Дүн"]);
     promoItems.forEach((i) => rows.push(["", i.productName, i.quantity, 0]));
   }
-  rows.push([], ["Хувь хасагдаагүй нийт үнийн дүн", "", "", "", "", "", gross]);
+  rows.push([]);
+  if (receiptShouldShowGross(o)) {
+    rows.push(["Хувь хасагдаагүй нийт үнийн дүн", "", "", "", "", "", gross]);
+  }
   if (discount)
     rows.push([`Хөнгөлөлт (${pct}%)`, "", "", "", "", "", -discount]);
   rows.push(
@@ -8815,7 +8827,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
 
   pushRow(14.25, emptyCells(rowNum));
 
-  // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн Зээлээр
+  // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн Шууд төлөх
   if (receiptShouldShowGross(o)) {
     const grossRow = rowNum;
     // Label B→E: gray, no borders. Underline only F→K (nothing from D leftward).
