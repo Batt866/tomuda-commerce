@@ -293,6 +293,20 @@ const SYNC_ENTITY_KEYS = [
   "promotionRules",
   "settings",
 ];
+/** Dirty keys that should block preferRemote / indicate real peer-sync work. */
+const BUSINESS_ENTITY_KEYS = [
+  "customers",
+  "products",
+  "employees",
+  "orders",
+  "extraCategories",
+  "inventoryLogs",
+  "stockInReceipts",
+  "stockOutReceipts",
+  "deletionLog",
+  "promotionDeletionLog",
+  "promotionRules",
+];
 function newEntityId(prefix = "id") {
   const rand =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -3792,7 +3806,7 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   // employees/permissions or wipe peer product/customer fields.
   const preferRemote =
     !!opts.preferRemote &&
-    (!!opts.pullFromServer || !entityStateDirty());
+    (!!opts.pullFromServer || !businessEntityDirty());
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), { ...item });
@@ -3812,11 +3826,12 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
-    // On peer pull always take server stock/cost; otherwise only when entity-clean.
+    // Prefer server stock unless this device has pending stock receipts/orders.
     if (
       opts.entityKind === "products" &&
       prev &&
-      (opts.pullFromServer || !entityStateDirty())
+      ((opts.pullFromServer && !opts.keepLocalProductStock) ||
+        (!opts.pullFromServer && !businessEntityDirty()))
     ) {
       merged.stock = Number(prev.stock) || 0;
       if (prev.costPrice != null) merged.costPrice = prev.costPrice;
@@ -3838,8 +3853,17 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   });
   const tombstones = opts.deletionLog || [];
   if (opts.deletionType) {
+    const remoteIds = new Set(
+      (remote || []).map((item) => String(item?.id)).filter(Boolean),
+    );
+    const localIds = new Set(
+      (local || []).map((item) => String(item?.id)).filter(Boolean),
+    );
     for (const id of [...map.keys()]) {
-      if (deletionLogHas(tombstones, opts.deletionType, id)) map.delete(id);
+      if (!deletionLogHas(tombstones, opts.deletionType, id)) continue;
+      // Keep local-only creates until they sync (same rule as mergeArrayById).
+      if (!remoteIds.has(id) && localIds.has(id)) continue;
+      map.delete(id);
     }
   }
   return Array.from(map.values());
@@ -4130,7 +4154,15 @@ function readLocalPendingStateMeta() {
     return null;
   }
 }
-function shouldUsePendingAtBoot(serverUpdatedAt, pendingMeta) {
+function shouldUsePendingAtBoot(serverUpdatedAt, pendingMeta, pendingState, serverState) {
+  // Never drop never-POSTed local rows just because the server clock is newer.
+  if (
+    pendingState &&
+    serverState &&
+    localOnlyEntityIds(serverState, pendingState).length
+  ) {
+    return true;
+  }
   if (!pendingMeta?.savedAt) return true;
   const serverMs = Date.parse(serverUpdatedAt || "");
   const pendingMs = Date.parse(pendingMeta.savedAt || "");
@@ -4199,7 +4231,12 @@ function mergeBootState(serverState, serverUpdatedAt = "") {
   if (
     pendingState &&
     pendingMeta &&
-    !shouldUsePendingAtBoot(serverUpdatedAt, pendingMeta)
+    !shouldUsePendingAtBoot(
+      serverUpdatedAt,
+      pendingMeta,
+      pendingState,
+      serverState,
+    )
   ) {
     pendingState = null;
     clearLocalPendingState();
@@ -4337,7 +4374,7 @@ function mergeArrayById(remote = [], local = [], opts = {}) {
   // Prefer remote on conflicts when pulling peers, or when entity data is clean.
   const preferRemote =
     !!opts.preferRemote &&
-    (!!opts.pullFromServer || !entityStateDirty());
+    (!!opts.pullFromServer || !businessEntityDirty());
   const map = new Map();
   const first = preferRemote ? local : remote;
   const second = preferRemote ? remote : local;
@@ -4665,6 +4702,7 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       entityKind: key,
       preferRemote: key !== "orders",
       pullFromServer,
+      keepLocalProductStock: !!opts.keepLocalProductStock,
     });
     if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
@@ -4853,6 +4891,13 @@ function entityStateSlice(data = {}) {
   }
   return comparableBackendState(slice);
 }
+function businessEntitySlice(data = {}) {
+  const slice = {};
+  for (const key of BUSINESS_ENTITY_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) slice[key] = data[key];
+  }
+  return comparableBackendState(slice);
+}
 /** Dirty check ignoring session UI fields (customer picker, delivery draft, …). */
 function entityStateDirty() {
   try {
@@ -4865,6 +4910,28 @@ function entityStateDirty() {
   } catch {
     return localStateDirty();
   }
+}
+/** Dirty check excluding count session / settings (those must not block peer stock). */
+function businessEntityDirty() {
+  try {
+    const baseline = JSON.parse(backendLastSaved || "{}").state;
+    if (!baseline) return localStateDirty();
+    return (
+      JSON.stringify(businessEntitySlice(persistentState())) !==
+      JSON.stringify(businessEntitySlice(baseline))
+    );
+  } catch {
+    return localStateDirty();
+  }
+}
+function pendingLocalStockMutation(serverState = {}) {
+  return localOnlyEntityIds(serverState).some(
+    (key) =>
+      key.startsWith("stockInReceipts:") ||
+      key.startsWith("stockOutReceipts:") ||
+      key.startsWith("inventoryLogs:") ||
+      key.startsWith("orders:"),
+  );
 }
 const ENTITY_ID_KEYS = [
   "customers",
@@ -4904,10 +4971,16 @@ function reconcileBackendMarkerFromServer(serverState, updatedAt = "") {
   if (!serverState || typeof serverState !== "object") return false;
   syncBackendSaveMarker(serverState);
   const stillDirty =
-    JSON.stringify(entityStateSlice(persistentState())) !==
-    JSON.stringify(entityStateSlice(serverState));
+    JSON.stringify(businessEntitySlice(persistentState())) !==
+    JSON.stringify(businessEntitySlice(serverState));
   if (!stillDirty) return false;
-  if (canAutoSaveBackendState()) scheduleBackendSave();
+  if (canAutoSaveBackendState()) {
+    scheduleBackendSave();
+  } else {
+    markBackendSaveFailed(
+      "Шинэ өгөгдөл серверт хадгалагдаагүй байна. Эрхээ шалгаад дахин хадгална уу.",
+    );
+  }
   return true;
 }
 function shouldDeferBackendSync() {
@@ -5360,14 +5433,13 @@ async function pullBackendStateNow(opts = {}) {
   }
 }
 async function pollBackendState() {
-  // Skip poll while a dirty entity save is queued/running so we don't race the POST.
+  // Keep polling during queued autosave so peers still arrive; only skip while POST runs.
   if (
     !backendReady ||
     backendSaving ||
     importLoading ||
     stockInSaveLock ||
-    stockOutSaveLock ||
-    (backendSaveTimer && entityStateDirty())
+    stockOutSaveLock
   )
     return;
   try {
@@ -6705,6 +6777,7 @@ function canAutoSaveBackendState() {
     hasPermission("customers.edit") ||
     hasPermission("customers.create") ||
     hasPermission("warehouse.edit") ||
+    hasPermission("warehouse.view") ||
     hasPermission("stockIn.create") ||
     hasPermission("stockIn.edit") ||
     hasPermission("stockOut.create") ||
@@ -6791,7 +6864,12 @@ async function retryPendingBackendSave() {
   render();
 }
 function dataSaveBannerHtml() {
-  return "";
+  const pending = !!readLocalPendingState();
+  if (!backendSaveFailedMessage && !businessEntityDirty() && !pending) return "";
+  const msg =
+    backendSaveFailedMessage ||
+    "Серверт хадгалагдаагүй өгөгдөл байна. Дахин хадгална уу.";
+  return `<div class="data-save-banner" role="alert"><div class="data-save-banner__copy"><strong>Өгөгдөл синк хийгдээгүй</strong><p>${esc(msg)}</p></div><button type="button" class="btn btn--primary btn--sm" onclick="retryPendingBackendSave()">Дахин хадгалах</button></div>`;
 }
 function warehouseDateFilterActive() {
   return (
@@ -6811,7 +6889,11 @@ async function mergeServerStateBeforeSave() {
     const latest = await fetchBackendPayload();
     if (!latest?.state) return false;
     const session = captureSessionSnapshot();
-    const merged = mergePersistentStates(latest.state, persistentState());
+    const keepLocalProductStock = pendingLocalStockMutation(latest.state);
+    const merged = mergePersistentStates(latest.state, persistentState(), {
+      pullFromServer: true,
+      keepLocalProductStock,
+    });
     if (JSON.stringify(merged) !== JSON.stringify(persistentState())) {
       applyPersistentState(merged);
       restoreSessionSnapshot(session);
@@ -7056,10 +7138,21 @@ function go(view, opts = {}) {
   state.mobileOpen = false;
   if (changed && view !== "promotions") state.filters.promotionDetail = "";
   if (changed && view === "promotions") state.filters.promotionDetail = "";
-  if (changed && (view === "warehouse" || view === "warehouseReceipts")) {
+  if (changed && view === "warehouseReceipts") {
     state.filters.warehouseTab = "orders";
     state.filters.warehouseDate = todayIso();
     state.selectedWarehouseOrderId = "";
+  }
+  if (changed && view === "warehouse") {
+    state.filters.warehouseDate = todayIso();
+    state.selectedWarehouseOrderId = "";
+    // Keep Орлого/Зарлага when setWarehouseTab() called go("warehouse").
+    if (
+      state.filters.warehouseTab !== "in" &&
+      state.filters.warehouseTab !== "out"
+    ) {
+      state.filters.warehouseTab = "orders";
+    }
   }
   saveAuthSession();
   render();
@@ -11068,34 +11161,15 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
 }
 function inventoryView() {
-  const tab =
-    state.filters.inventory === "in" || state.filters.inventory === "out"
-      ? state.filters.inventory
-      : "stock";
-  state.filters.inventory = tab;
-  return `<div class="space-y-4">${pageHead("Агуулах")}<div class="seg-tabs seg-tabs--3">${[
-    ["stock", "Үлдэгдэл"],
-    ["in", "Орлого"],
-    ["out", "Зарлага"],
-  ]
-    .map(
-      ([id, label]) =>
-        `<button type="button" onclick="setInventoryTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
-    )
-    .join("")}</div>${inventoryRegisterBody(tab)}</div>`;
+  // Агуулах = зөвхөн үлдэгдлийн бүртгэл. Орлого/Зарлага нь Нярав дотор.
+  state.filters.inventory = "stock";
+  return `<div class="space-y-4">${pageHead("Агуулах")}${inventoryRegisterBody("stock")}</div>`;
 }
 function setWarehouseTab(tab) {
-  state.filters.warehouseTab = "orders";
-  if (tab === "stock" || tab === "in" || tab === "out") {
-    setInventoryTab(tab);
-    return;
-  }
-  render();
-}
-function setInventoryTab(tab) {
-  const next = tab === "in" || tab === "out" || tab === "stock" ? tab : "stock";
+  const next =
+    tab === "in" || tab === "out" || tab === "orders" ? tab : "orders";
   if (next !== "in") stopBarcodeScan();
-  state.filters.inventory = next;
+  state.filters.warehouseTab = next;
   if (next === "in") {
     state.stockInEmployeeId = defaultInventoryEmployeeId();
     ensureStockInSession();
@@ -11104,6 +11178,19 @@ function setInventoryTab(tab) {
     state.stockOutEmployeeId = defaultInventoryEmployeeId();
     ensureStockOutSession();
   }
+  if (state.currentView !== "warehouse") {
+    go("warehouse");
+    return;
+  }
+  render();
+  scrollAppMainToTop();
+}
+function setInventoryTab(tab) {
+  if (tab === "in" || tab === "out") {
+    setWarehouseTab(tab);
+    return;
+  }
+  state.filters.inventory = "stock";
   if (state.currentView !== "inventory") {
     go("inventory");
     return;
@@ -16768,8 +16855,35 @@ function scrollWarehouseReceiptListToActive() {
   });
 }
 function warehouseView() {
-  const orders = warehouseOrdersForSelectedWorkers();
-  return `<div class="space-y-3">${pageHead("Нярав")}<div class="grid grid-cols-1 gap-3">${workerChooser(orders)}</div></div>`;
+  const tab =
+    state.filters.warehouseTab === "in" || state.filters.warehouseTab === "out"
+      ? state.filters.warehouseTab
+      : "orders";
+  state.filters.warehouseTab = tab;
+  const canStockMove =
+    canAccessView("warehouse") ||
+    hasPermission("stockIn.view") ||
+    hasPermission("stockOut.view") ||
+    hasPermission("warehouse.edit");
+  const tabs = [["orders", "Захиалга"]];
+  if (canStockMove) {
+    tabs.push(["in", "Орлого"], ["out", "Зарлага"]);
+  }
+  const body =
+    tab === "orders"
+      ? `<div class="grid grid-cols-1 gap-3">${workerChooser(warehouseOrdersForSelectedWorkers())}</div>`
+      : inventoryRegisterBody(tab);
+  const tabClass = tabs.length > 2 ? "seg-tabs seg-tabs--3" : "seg-tabs";
+  return `<div class="space-y-3">${pageHead("Нярав")}${
+    tabs.length > 1
+      ? `<div class="${tabClass}">${tabs
+          .map(
+            ([id, label]) =>
+              `<button type="button" onclick="setWarehouseTab('${id}')" class="seg-tab ${tab === id ? "is-active" : ""}">${label}</button>`,
+          )
+          .join("")}</div>`
+      : ""
+  }${body}</div>`;
 }
 function deliveryRelevantOrders() {
   const empId = state.currentEmployee?.id || "";
@@ -17658,7 +17772,7 @@ function render() {
       );
   }
   bindProductImages(app);
-  if (localStateDirty()) scheduleBackendSave();
+  if (businessEntityDirty() || backendSaveFailedMessage) scheduleBackendSave();
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     requestAnimationFrame(() => {
