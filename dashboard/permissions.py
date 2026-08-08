@@ -148,6 +148,7 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "employeeAdd.create": ["employees.create"],
     "employeeAdd.edit": ["employees.create", "employees.edit"],
     "employeeAdd.delete": ["employees.create"],
+    "warehouse.view": ["warehouse.edit"],
     "stockIn.view": ["warehouse.edit", "warehouse.view"],
     "stockIn.create": ["warehouse.edit"],
     "stockIn.edit": ["warehouse.edit"],
@@ -156,7 +157,7 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "stockOut.create": ["warehouse.edit"],
     "stockOut.edit": ["warehouse.edit"],
     "stockOut.delete": ["warehouse.edit"],
-    "receipts.view": ["warehouse.view"],
+    "receipts.view": ["warehouse.view", "warehouse.edit"],
     "receipts.create": ["warehouse.view", "warehouse.edit"],
     "receipts.edit": ["warehouse.edit"],
     "receipts.delete": ["warehouse.edit"],
@@ -223,9 +224,11 @@ def expand_legacy_permissions(raw: list[str]) -> list[str]:
         if "settings.view" in ALL_PERMISSION_KEY_SET:
             keys.add("settings.view")
     if "warehouse.edit" in keys:
+        if "warehouse.view" in ALL_PERMISSION_KEY_SET:
+            keys.add("warehouse.view")
         for module_id in ("count", "stockIn", "stockOut"):
             _add_crud(keys, module_id)
-    if "warehouse.view" in keys:
+    if "warehouse.view" in keys or "warehouse.edit" in keys:
         _add_crud(keys, "receipts")
     if "customers.create" in keys:
         _add_crud(keys, "customerAdd")

@@ -131,6 +131,7 @@
     "employeeAdd.create": ["employees.create"],
     "employeeAdd.edit": ["employees.create", "employees.edit"],
     "employeeAdd.delete": ["employees.create"],
+    "warehouse.view": ["warehouse.edit"],
     "stockIn.view": ["warehouse.edit", "warehouse.view"],
     "stockIn.create": ["warehouse.edit"],
     "stockIn.edit": ["warehouse.edit"],
@@ -139,7 +140,7 @@
     "stockOut.create": ["warehouse.edit"],
     "stockOut.edit": ["warehouse.edit"],
     "stockOut.delete": ["warehouse.edit"],
-    "receipts.view": ["warehouse.view"],
+    "receipts.view": ["warehouse.view", "warehouse.edit"],
     "receipts.create": ["warehouse.view", "warehouse.edit"],
     "receipts.edit": ["warehouse.edit"],
     "receipts.delete": ["warehouse.edit"],
@@ -203,9 +204,10 @@
       if (ALL_KEY_SET.has("settings.view")) set.add("settings.view");
     }
     if (set.has("warehouse.edit")) {
+      if (ALL_KEY_SET.has("warehouse.view")) set.add("warehouse.view");
       ["count", "stockIn", "stockOut"].forEach(addCrud);
     }
-    if (set.has("warehouse.view")) addCrud("receipts");
+    if (set.has("warehouse.view") || set.has("warehouse.edit")) addCrud("receipts");
     if (set.has("customers.create")) addCrud("customerAdd");
     if (set.has("products.create")) {
       addCrud("productAdd");
@@ -318,12 +320,19 @@
   function canAccessView(viewId, emp) {
     const perm = VIEW_PERMISSION[viewId];
     if (!perm) return false;
+    if (viewId === "warehouse" || viewId === "inventory") {
+      return (
+        hasPermission("warehouse.view", emp) || hasPermission("warehouse.edit", emp)
+      );
+    }
     if (viewId === "count") {
       return hasPermission("count.view", emp) || hasPermission("warehouse.edit", emp);
     }
     if (viewId === "warehouseReceipts") {
       return (
-        hasPermission("receipts.view", emp) || hasPermission("warehouse.view", emp)
+        hasPermission("receipts.view", emp) ||
+        hasPermission("warehouse.view", emp) ||
+        hasPermission("warehouse.edit", emp)
       );
     }
     if (viewId === "promotions") {

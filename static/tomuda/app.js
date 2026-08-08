@@ -2696,7 +2696,10 @@ function requireAdminDelete() {
   return false;
 }
 function defaultViewForRole(r) {
-  const emp = state.employees.find((e) => e.role === r);
+  const emp =
+    (state.currentEmployee?.role === r && state.currentEmployee) ||
+    state.employees.find((e) => e.id === state.currentEmployee?.id) ||
+    state.employees.find((e) => e.role === r);
   if (emp && permApi()) {
     const nav = permApi().allowedNavForEmployee(emp);
     if (nav.length) return nav[0][0];
@@ -2710,7 +2713,15 @@ function canAccessView(viewId) {
   if (viewId === "employeePermissions" && canManageEmployeePermissions()) {
     return true;
   }
-  if (permApi()) return permApi().canAccessView(viewId, state.currentEmployee);
+  if (permApi()) {
+    if (
+      (viewId === "warehouse" || viewId === "inventory") &&
+      (hasPermission("warehouse.view") || hasPermission("warehouse.edit"))
+    ) {
+      return true;
+    }
+    return permApi().canAccessView(viewId, state.currentEmployee);
+  }
   const r = currentRole();
   if (r === "admin") return true;
   if (r === "delivery") return viewId === "delivery";
@@ -2746,6 +2757,7 @@ function allowedNavIds() {
 function ensureEmployeePermissions() {
   if (!permApi()) return;
   const valid = new Set(permApi().ALL_KEYS || []);
+  const warehouseTpl = new Set(permApi().templateForRole?.("warehouse") || []);
   state.employees.forEach((e) => {
     if (!Array.isArray(e.permissions)) {
       e.permissions = [];
@@ -2753,6 +2765,21 @@ function ensureEmployeePermissions() {
     }
     // Keep stored keys literal — expandLegacyKeys is for runtime checks only.
     e.permissions = e.permissions.filter((k) => valid.has(k));
+    // Heal warehouse clerks whose custom grant lost Нярав/Агуулах view after a
+    // stale multi-device overwrite, while keeping any extra grants they have.
+    if (
+      e.role === "warehouse" &&
+      e.permissions.length &&
+      !e.permissions.includes("warehouse.view") &&
+      !e.permissions.includes("warehouse.edit")
+    ) {
+      e.permissions = [
+        ...new Set([
+          ...e.permissions,
+          ...[...warehouseTpl].filter((k) => valid.has(k)),
+        ]),
+      ];
+    }
   });
 }
 function employeePermissionsSelected(e, role = "sales") {
@@ -3761,6 +3788,11 @@ function initProductImageField(p) {
   if (preview) preview.src = productImage(p);
 }
 function mergeEntityRecords(remote = [], local = [], opts = {}) {
+  // Honor preferRemote (peer pull): stale local must not overwrite server
+  // employees/permissions or wipe peer product/customer fields.
+  const preferRemote =
+    !!opts.preferRemote &&
+    (!!opts.pullFromServer || !entityStateDirty());
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), { ...item });
@@ -3769,7 +3801,14 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     if (item?.id == null) return;
     const id = String(item.id);
     const prev = map.get(id);
-    const merged = prev ? { ...prev, ...item } : { ...item };
+    let merged;
+    if (!prev) {
+      merged = { ...item };
+    } else if (preferRemote) {
+      merged = { ...item, ...prev };
+    } else {
+      merged = { ...prev, ...item };
+    }
     const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
@@ -3781,6 +3820,19 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     ) {
       merged.stock = Number(prev.stock) || 0;
       if (prev.costPrice != null) merged.costPrice = prev.costPrice;
+    }
+    // Never let a stale device republish older role/permissions after a pull.
+    if (opts.entityKind === "employees" && prev && opts.pullFromServer) {
+      if (prev.role != null) merged.role = prev.role;
+      if (Array.isArray(prev.permissions)) {
+        merged.permissions = [...prev.permissions];
+      }
+      if (prev.password != null && prev.password !== "") {
+        merged.password = prev.password;
+      }
+      if (prev.percentDiscount != null) {
+        merged.percentDiscount = prev.percentDiscount;
+      }
     }
     map.set(id, merged);
   });
@@ -4906,6 +4958,9 @@ function captureSessionSnapshot() {
 }
 function restoreSessionSnapshot(session) {
   Object.assign(state, session);
+  // Keep login session keys, but always rebind to the fresh employees[] row
+  // so peer sync cannot leave stale role/permissions on screen.
+  syncCurrentEmployeeFromState();
 }
 function syncBackendMarkers(payload, stateData) {
   if (stateData) applyPersistentState(stateData);
@@ -17516,8 +17571,11 @@ function render() {
   }
   syncCurrentEmployeeFromState();
   const r = currentRole();
-  if (!canAccessView(state.currentView, r)) {
-    state.currentView = defaultViewForRole(r);
+  if (!canAccessView(state.currentView)) {
+    const fallback = defaultViewForRole(r);
+    state.currentView = canAccessView(fallback)
+      ? fallback
+      : allowedNavIds()[0] || fallback;
   }
   saveAuthSession();
   const map = {
