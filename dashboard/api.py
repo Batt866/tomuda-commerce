@@ -157,16 +157,24 @@ def _actor_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
     return actor if isinstance(actor, dict) else None
 
 
-def _strip_customer_inline_image(customer: dict[str, Any]) -> dict[str, Any]:
-    next_customer = dict(customer)
-    image = str(next_customer.get("image") or "").strip()
+def _strip_inline_entity_image(entity: dict[str, Any]) -> dict[str, Any]:
+    next_entity = dict(entity)
+    image = str(next_entity.get("image") or "").strip()
     if image.startswith("data:image/"):
-        next_customer.pop("image", None)
+        next_entity.pop("image", None)
     elif image:
-        next_customer["image"] = image
+        next_entity["image"] = image
     else:
-        next_customer.pop("image", None)
-    return next_customer
+        next_entity.pop("image", None)
+    return next_entity
+
+
+def _strip_customer_inline_image(customer: dict[str, Any]) -> dict[str, Any]:
+    return _strip_inline_entity_image(customer)
+
+
+def _strip_product_inline_image(product: dict[str, Any]) -> dict[str, Any]:
+    return _strip_inline_entity_image(product)
 
 
 @api.post("/customers/upsert")
@@ -260,6 +268,112 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
     return {
         "ok": True,
         "customer": saved_customer,
+        "updatedAt": updated_at,
+    }
+
+
+@api.post("/products/upsert")
+def upsert_product(request, payload: dict[str, Any] = Body(...)):
+    """Atomically create/update one product without a full-state POST."""
+    raw_product = payload.get("product")
+    if not isinstance(raw_product, dict) or raw_product.get("id") is None:
+        raise HttpError(400, "Барааны мэдээлэл дутуу байна")
+    if not str(raw_product.get("name") or "").strip():
+        raise HttpError(400, "Барааны нэр оруулна уу")
+    product = _strip_product_inline_image(raw_product)
+    product["updatedAt"] = (
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    product_id = str(product.get("id"))
+    actor = _actor_payload(payload)
+
+    with transaction.atomic():
+        row, _ = AppState.objects.get_or_create(
+            key="main",
+            defaults={"data": default_state()},
+        )
+        row = AppState.objects.select_for_update().get(pk=row.pk)
+        current = dict(row.data or default_state())
+        employee = find_employee(current, actor)
+        if not employee:
+            raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
+
+        products = [
+            dict(item)
+            for item in (current.get("products") or [])
+            if isinstance(item, dict) and item.get("id") is not None
+        ]
+        existing_idx = next(
+            (
+                index
+                for index, item in enumerate(products)
+                if str(item.get("id")) == product_id
+            ),
+            -1,
+        )
+        if existing_idx >= 0:
+            if not (
+                has_permission(employee, "products.edit")
+                or has_permission(employee, "products.create")
+                or has_permission(employee, "productAdd.edit")
+                or has_permission(employee, "productAdd.create")
+            ):
+                raise HttpError(403, "Бараа засах эрхгүй")
+            previous = products[existing_idx]
+            merged_product = {**previous, **product}
+            if not merged_product.get("image") and previous.get("image"):
+                merged_product["image"] = previous["image"]
+            # Product form does not edit warehouse fields — keep server values
+            # unless the client explicitly sent numeric stock/cost updates.
+            for key in ("stock", "costPrice", "minStock"):
+                if key not in raw_product:
+                    if key in previous:
+                        merged_product[key] = previous[key]
+            products[existing_idx] = merged_product
+            saved_product = merged_product
+        else:
+            if not (
+                has_permission(employee, "products.create")
+                or has_permission(employee, "productAdd.create")
+                or has_permission(employee, "productAdd.view")
+            ):
+                raise HttpError(403, "Бараа нэмэх эрхгүй")
+            if "stock" not in product:
+                product["stock"] = 0
+            if "minStock" not in product:
+                product["minStock"] = 0
+            if "costPrice" not in product:
+                product["costPrice"] = 0
+            products.append(product)
+            saved_product = product
+
+        data = dict(current)
+        data["products"] = products
+        data["deletionLog"] = [
+            entry
+            for entry in (data.get("deletionLog") or [])
+            if not (
+                isinstance(entry, dict)
+                and str(entry.get("type") or "") == "product"
+                and str(entry.get("id") or "") == product_id
+            )
+        ]
+        image = str(saved_product.get("image") or "")
+        if image.startswith("data:image/") and len(image) > 180_000:
+            saved_product = dict(saved_product)
+            saved_product.pop("image", None)
+            if existing_idx >= 0:
+                products[existing_idx] = saved_product
+            else:
+                products[-1] = saved_product
+            data["products"] = products
+        row.data = data
+        row.save(update_fields=["data", "updated_at"])
+        updated_at = row.updated_at.isoformat()
+
+    return {
+        "ok": True,
+        "product": saved_product,
         "updatedAt": updated_at,
     }
 

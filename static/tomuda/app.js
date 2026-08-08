@@ -6053,39 +6053,82 @@ function workerQtyPartsForProduct(p, qty) {
   const split = pickerQtyToParts(total, p);
   return { packs: split.packs, loosePieces: split.pieces };
 }
-/** Split qty into bagts + loose shirheg for warehouse prepare Excel.
- *  Preserves explicit splits (e.g. 2 багц + 10ш @ 20ш/багц → 50 нийт).
- *  Falls back to canonical floor/mod when packs are missing or inconsistent. */
-function resolveWarehousePrepareParts(totalQty, packs, loosePieces, packSize) {
+/** Split qty into том / жижиг / ширхэг for warehouse prepare sheets. */
+function resolveWarehousePrepareParts(
+  totalQty,
+  packs,
+  loosePieces,
+  packSize,
+  largePacks = 0,
+  largeSize = 0,
+) {
   const total = Math.max(0, Math.floor(Number(totalQty) || 0));
-  const size = Math.floor(Number(packSize) || 0);
-  if (!size || size <= 1) {
-    return { packs: 0, loosePieces: total, totalQty: total };
+  const small = Math.floor(Number(packSize) || 0);
+  const large = Math.floor(Number(largeSize) || 0);
+  if ((!small || small <= 1) && (!large || large <= 1)) {
+    return { largePacks: 0, packs: 0, loosePieces: total, totalQty: total };
   }
   const hasExplicit =
-    packs != null &&
-    packs !== "" &&
-    (Number(packs) > 0 ||
-      (loosePieces != null && loosePieces !== "" && Number(loosePieces) >= 0));
+    (packs != null &&
+      packs !== "" &&
+      (Number(packs) > 0 ||
+        (loosePieces != null &&
+          loosePieces !== "" &&
+          Number(loosePieces) >= 0))) ||
+    (largePacks != null &&
+      largePacks !== "" &&
+      Number(largePacks) > 0);
   if (hasExplicit) {
+    let lp = Math.max(0, Math.floor(Number(largePacks) || 0));
     let pk = Math.max(0, Math.floor(Number(packs) || 0));
     let loose = Math.max(0, Math.floor(Number(loosePieces) || 0));
-    if (loose >= size) {
-      pk += Math.floor(loose / size);
-      loose = loose % size;
+    if (small > 1 && loose >= small) {
+      pk += Math.floor(loose / small);
+      loose = loose % small;
     }
-    if (pk * size + loose === total) {
-      return { packs: pk, loosePieces: loose, totalQty: total };
+    if (large > 1 && small > 1 && pk * small >= large) {
+      // keep as entered if totals match
+    }
+    const rebuilt =
+      (large > 1 ? lp * large : 0) + (small > 1 ? pk * small : 0) + loose;
+    if (rebuilt === total) {
+      return { largePacks: lp, packs: pk, loosePieces: loose, totalQty: total };
     }
   }
+  let rem = total;
+  let lp = 0;
+  let pk = 0;
+  if (large > 1) {
+    lp = Math.floor(rem / large);
+    rem = rem % large;
+  }
+  if (small > 1) {
+    pk = Math.floor(rem / small);
+    rem = rem % small;
+  }
   return {
-    packs: Math.floor(total / size),
-    loosePieces: total % size,
+    largePacks: lp,
+    packs: pk,
+    loosePieces: rem,
     totalQty: total,
   };
 }
-function normalizeWarehousePrepareParts(totalQty, packs, loosePieces, packSize) {
-  return resolveWarehousePrepareParts(totalQty, packs, loosePieces, packSize);
+function normalizeWarehousePrepareParts(
+  totalQty,
+  packs,
+  loosePieces,
+  packSize,
+  largePacks = 0,
+  largeSize = 0,
+) {
+  return resolveWarehousePrepareParts(
+    totalQty,
+    packs,
+    loosePieces,
+    packSize,
+    largePacks,
+    largeSize,
+  );
 }
 function orderItemPrepareParts(item, product) {
   const totalQty = Math.max(0, Math.floor(Number(item.quantity) || 0));
@@ -6093,28 +6136,51 @@ function orderItemPrepareParts(item, product) {
     Number(item.boxQuantity) > 1
       ? Math.floor(Number(item.boxQuantity))
       : productPackSize(product);
-  if (!packSize) {
-    return { packs: 0, loosePieces: totalQty, totalQty };
+  const largeSize =
+    Number(item.largeBoxQuantity) > 1
+      ? Math.floor(Number(item.largeBoxQuantity))
+      : productLargeBoxPieceCount(product);
+  const largePacks =
+    item.largePacks != null && item.largePacks !== ""
+      ? Math.max(0, Math.floor(Number(item.largePacks) || 0))
+      : 0;
+  if (!packSize && !largeSize) {
+    return { largePacks: 0, packs: 0, loosePieces: totalQty, totalQty };
   }
-  if ("packs" in item && item.packs != null && item.packs !== "") {
+  if (
+    ("packs" in item && item.packs != null && item.packs !== "") ||
+    largePacks > 0
+  ) {
     const packs = Math.max(0, Math.floor(Number(item.packs) || 0));
     const loosePieces =
       item.loosePieces != null && item.loosePieces !== ""
         ? Math.max(0, Math.floor(Number(item.loosePieces) || 0))
-        : Math.max(0, totalQty - packs * packSize);
+        : Math.max(
+            0,
+            totalQty -
+              largePacks * (largeSize || 0) -
+              packs * (packSize || 0),
+          );
     return resolveWarehousePrepareParts(
       totalQty,
       packs,
       loosePieces,
       packSize,
+      largePacks,
+      largeSize,
     );
   }
-  const split = pickerQtyToParts(totalQty, { ...product, boxQuantity: packSize });
+  const split = pickerQtyToParts(totalQty, {
+    ...product,
+    boxQuantity: packSize,
+  });
   return resolveWarehousePrepareParts(
     totalQty,
     split.packs,
     split.pieces,
     packSize,
+    0,
+    largeSize,
   );
 }
 function warehousePreparePackSize(item, product) {
@@ -6123,13 +6189,22 @@ function warehousePreparePackSize(item, product) {
   }
   return productPackSize(product);
 }
+function warehousePrepareLargeSize(item, product) {
+  if (Number(item?.largeBoxQuantity) > 1) {
+    return Math.floor(Number(item.largeBoxQuantity));
+  }
+  return productLargeBoxPieceCount(product);
+}
 function warehousePreparePrintParts(item, product) {
   const packSize = warehousePreparePackSize(item, product);
+  const largeSize = warehousePrepareLargeSize(item, product);
   return resolveWarehousePrepareParts(
     item.qty,
     item.packs,
     item.loosePieces,
     packSize,
+    item.largePacks,
+    largeSize,
   );
 }
 function pickerQtyFromParts(packs, pieces, p) {
@@ -11475,11 +11550,11 @@ function productDetailHtml(p, id) {
       productDetailRow("Үлдэгдэл", stockValue),
     ];
   const largePieces = productLargeBoxPieceCount(p);
-  if (packSize) {
-    rows.push(productDetailRow("Жижиг хайрцаг", `${packSize} ш/жижиг`));
-  }
   if (largePieces) {
     rows.push(productDetailRow("Том хайрцаг", `${largePieces} ш/том`));
+  }
+  if (packSize) {
+    rows.push(productDetailRow("Жижиг хайрцаг", `${packSize} ш/жижиг`));
   }
   if (canViewProductCost()) {
     const cost = productCostPrice(p);
@@ -14052,7 +14127,7 @@ async function exportCountExcelXlsx() {
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `toollogo-${stamp}.xlsx`);
 }
-const WAREHOUSE_PREPARE_LAST_COL = "F";
+const WAREHOUSE_PREPARE_LAST_COL = "G";
 const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
 const STOCK_IN_LAST_COL = "H";
@@ -14530,6 +14605,7 @@ function warehousePrepareProduct(row) {
     barcode: "",
     stock: 0,
     boxQuantity: 0,
+    largeBoxQuantity: 0,
   };
 }
 function warehouseOrderProductsGrouped(orders, opts = {}) {
@@ -14544,6 +14620,7 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
           productId: i.productId,
           productName: i.productName,
           qty: 0,
+          largePacks: 0,
           packs: 0,
           loosePieces: 0,
         };
@@ -14551,10 +14628,16 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
       map[key].qty += Math.max(0, Math.floor(Number(i.quantity) || 0));
       const prod = warehousePrepareProduct(map[key]);
       const parts = orderItemPrepareParts(i, prod);
+      map[key].largePacks += parts.largePacks || 0;
       map[key].packs += parts.packs;
       map[key].loosePieces += parts.loosePieces;
       if (Number(i.boxQuantity) > 1) {
         map[key].boxQuantity = Math.floor(Number(i.boxQuantity));
+      }
+      if (Number(i.largeBoxQuantity) > 1) {
+        map[key].largeBoxQuantity = Math.floor(Number(i.largeBoxQuantity));
+      } else if (productLargeBoxPieceCount(prod) > 1) {
+        map[key].largeBoxQuantity = productLargeBoxPieceCount(prod);
       }
     }),
   );
@@ -14562,18 +14645,23 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
     .map((row) => {
       const p = warehousePrepareProduct(row);
       const packSize = warehousePreparePackSize(row, p);
+      const largeSize = warehousePrepareLargeSize(row, p);
       const normalized = resolveWarehousePrepareParts(
         row.qty,
         row.packs,
         row.loosePieces,
         packSize,
+        row.largePacks,
+        largeSize,
       );
       return {
         product: p,
         qty: normalized.totalQty,
+        largePacks: normalized.largePacks,
         packs: normalized.packs,
         loosePieces: normalized.loosePieces,
         boxQuantity: packSize,
+        largeBoxQuantity: largeSize,
       };
     })
     .sort(
@@ -14599,9 +14687,11 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
       type: "product",
       product: item.product,
       qty: item.qty,
+      largePacks: item.largePacks,
       packs: item.packs,
       loosePieces: item.loosePieces,
       boxQuantity: item.boxQuantity,
+      largeBoxQuantity: item.largeBoxQuantity,
     });
   }
   return groups;
@@ -14631,8 +14721,8 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
   return xlsxCellXml(ref, 9, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
-/** A name · B unit · C barcode · D pack · E piece · F stock */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [38, 14, 14, 6, 7, 11];
+/** A name · B unit · C barcode · D том · E жижиг · F ширхэг · G stock */
+const WAREHOUSE_PREPARE_COL_WIDTHS = [34, 12, 13, 7, 7, 7, 10];
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -14646,7 +14736,7 @@ function warehousePrepareMaxBarcodeLen(sections) {
   scan(sections?.promo);
   return maxLen;
 }
-/** Column widths: unit fits «Хэмжих нэгж»; barcode ≈ digit length; pack/piece slightly narrow. */
+/** Column widths: unit fits «Хэмжих нэгж»; barcode ≈ digit length; box cols narrow. */
 function warehousePrepareColWidthsFor(sections) {
   const barcodeChars = warehousePrepareMaxBarcodeLen(sections);
   // Digits ≈ 1 Excel unit each; +1 padding so last digit isn't clipped.
@@ -14658,6 +14748,7 @@ function warehousePrepareColWidthsFor(sections) {
     WAREHOUSE_PREPARE_COL_WIDTHS[3],
     WAREHOUSE_PREPARE_COL_WIDTHS[4],
     WAREHOUSE_PREPARE_COL_WIDTHS[5],
+    WAREHOUSE_PREPARE_COL_WIDTHS[6],
   ];
 }
 function warehousePreparePatchStylesXml(stylesXml) {
@@ -14749,7 +14840,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`B${row}`, 4, si(value), "s"),
     xlsxCellXml(`C${row}`, 5, null, "empty"),
     xlsxCellXml(`D${row}`, 12, si(dateLabel), "s"),
-    xlsxCellXml(`E${row}`, 4, si(String(dateValue || "").trim()), "s"),
+    xlsxCellXml(`E${row}`, 4, null, "empty"),
+    xlsxCellXml(`F${row}`, 4, si(String(dateValue || "").trim()), "s"),
+    xlsxCellXml(`G${row}`, 4, null, "empty"),
   ];
   const warehousePrepareWorkerExtraRow = (row, name) => [
     xlsxCellXml(`A${row}`, 6, null, "empty"),
@@ -14758,6 +14851,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`D${row}`, 6, null, "empty"),
     xlsxCellXml(`E${row}`, 5, null, "empty"),
     xlsxCellXml(`F${row}`, 6, null, "empty"),
+    xlsxCellXml(`G${row}`, 6, null, "empty"),
   ];
   const warehousePrepareBlankMetaRow = (row) => [
     xlsxCellXml(`A${row}`, 6, null, "empty"),
@@ -14766,6 +14860,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`D${row}`, 6, null, "empty"),
     xlsxCellXml(`E${row}`, 5, null, "empty"),
     xlsxCellXml(`F${row}`, 6, null, "empty"),
+    xlsxCellXml(`G${row}`, 6, null, "empty"),
   ];
   const emptyCells = (
     row,
@@ -14773,9 +14868,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     to = WAREHOUSE_PREPARE_LAST_COL,
     style = 1,
   ) => {
-    const cols = "ABCDEF".slice(
-      "ABCDEF".indexOf(from),
-      "ABCDEF".indexOf(to) + 1,
+    const cols = "ABCDEFG".slice(
+      "ABCDEFG".indexOf(from),
+      "ABCDEFG".indexOf(to) + 1,
     );
     return cols
       .split("")
@@ -14786,7 +14881,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
   ]);
   const metaRow1 = rowNum;
-  merges.push(`E${metaRow1}:F${metaRow1}`);
+  merges.push(`F${metaRow1}:G${metaRow1}`);
   pushRow(
     28.5,
     warehousePrepareMetaRow(
@@ -14799,7 +14894,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   );
   if (workerNames.length) {
     const metaRow2 = rowNum;
-    merges.push(`E${metaRow2}:F${metaRow2}`);
+    merges.push(`F${metaRow2}:G${metaRow2}`);
     pushRow(
       20.25,
       warehousePrepareMetaRow(
@@ -14815,7 +14910,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     }
   } else {
     const metaRow2 = rowNum;
-    merges.push(`E${metaRow2}:F${metaRow2}`);
+    merges.push(`F${metaRow2}:G${metaRow2}`);
     pushRow(
       20.25,
       warehousePrepareMetaRow(
@@ -14833,9 +14928,10 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Багц"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Ширхэг"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Үлдэгдэл"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Том/х"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/х"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл"), "s"),
   ]);
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
@@ -14860,9 +14956,10 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
-        xlsxOptionalNum(`D${r}`, 10, parts.packs),
-        xlsxOptionalNum(`E${r}`, 10, parts.loosePieces),
-        xlsxCellXml(`F${r}`, 10, Number(p.stock) || 0, "n"),
+        xlsxOptionalNum(`D${r}`, 10, parts.largePacks),
+        xlsxOptionalNum(`E${r}`, 10, parts.packs),
+        xlsxOptionalNum(`F${r}`, 10, parts.loosePieces),
+        xlsxCellXml(`G${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
   };
@@ -14882,13 +14979,13 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:E${r}`);
+    merges.push(`B${r}:F${r}`);
     const line = WAREHOUSE_PREPARE_SIGN_LINE_STYLE;
     pushRow(22, [
       xlsxCellXml(`A${r}`, 3, si(role), "s"),
       xlsxCellXml(`B${r}`, line, null, "empty"),
-      ...emptyCells(r, "C", "E", line),
-      xlsxCellXml(`F${r}`, 1, null, "empty"),
+      ...emptyCells(r, "C", "F", line),
+      xlsxCellXml(`G${r}`, 1, null, "empty"),
     ]);
   };
   pushWarehousePrepareSignatureBlock("Хүлээлгэн өгсөн ажилтан:");
@@ -14946,33 +15043,34 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? workerNames
         .map(
           (name, idx) =>
-            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue)}</td>` : "<td></td><td></td><td></td><td></td>"}</tr>`,
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td>` : "<td></td><td></td><td></td><td></td><td></td>"}</tr>`,
         )
         .join("")
-    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue)}</td></tr>`;
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td></tr>`;
   const renderGroupRows = (groups) =>
     groups
       .map((item) => {
         if (item.type === "cat") {
-          return `<tr><td colspan="6" class="cat">${h(item.name)}</td></tr>`;
+          return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
-        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${parts.packs || ""}</td><td class="num">${parts.loosePieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
+        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${parts.largePacks || ""}</td><td class="num">${parts.packs || ""}</td><td class="num">${parts.loosePieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
       })
       .join("");
   const promoRows = sections.promo.length
-    ? `<tr><td colspan="6" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
+    ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; font-size: 20px; }
-.prepare col:nth-child(1) { width: 480px; }
-.prepare col:nth-child(2) { width: 160px; }
-.prepare col:nth-child(3) { width: 150px; }
-.prepare col:nth-child(4) { width: 52px; }
-.prepare col:nth-child(5) { width: 60px; }
-.prepare col:nth-child(6) { width: 175px; }
+table.prepare { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+.prepare col:nth-child(1) { width: 420px; }
+.prepare col:nth-child(2) { width: 130px; }
+.prepare col:nth-child(3) { width: 140px; }
+.prepare col:nth-child(4) { width: 70px; }
+.prepare col:nth-child(5) { width: 70px; }
+.prepare col:nth-child(6) { width: 70px; }
+.prepare col:nth-child(7) { width: 120px; }
 .prepare td, .prepare th { border: 1px solid #555; padding: 2px 4px; vertical-align: middle; }
 .prepare td:first-child { overflow-wrap: anywhere; }
 .title { height: 72px; text-align: center; font-size: 32px; font-weight: 800; }
@@ -14981,7 +15079,7 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .blank td { height: 30px; }
-.head th { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: 2px solid #000; }
+.head th { height: 52px; text-align: center; font-size: 18px; font-weight: 800; border: 2px solid #000; }
 .cat { text-align: center; font-weight: 800; height: 36px; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; }
@@ -14993,17 +15091,17 @@ table.prepare { width: 1000px; border-collapse: collapse; table-layout: fixed; f
 .sign-gap td { height: 10px; border: none !important; }
 .sign-block-gap td { height: 22px; border: none !important; }
 </style></head><body><table class="prepare">
-<colgroup><col><col><col><col><col><col></colgroup>
-<tr><td colspan="6" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="2" class="date-value">${h(orderDateValue)}</td></tr>
+<colgroup><col><col><col><col><col><col><col></colgroup>
+<tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
-<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Багц</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
+<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Том/х</th><th>Жижиг/х</th><th>Тоо/ш</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
-<tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="4" class="sign-line"></td><td></td></tr>
-<tr class="sign-block-gap"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="4" class="sign-line"></td><td></td></tr>
+<tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
+<tr class="sign-block-gap"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
@@ -19880,7 +19978,7 @@ function productModal(id) {
   const smallBoxAttrs = inputAttrs(smallBoxVal, "24", {
     treatZeroAsEmpty: true,
   });
-  const largeBoxAttrs = inputAttrs(largeBoxVal, "12", {
+  const largeBoxAttrs = inputAttrs(largeBoxVal, "288", {
     treatZeroAsEmpty: true,
   });
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
@@ -19893,7 +19991,7 @@ function productModal(id) {
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 24). Хоосон бол ашиглахгүй.</p></label><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн ширхэг? (жишээ нь 288). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн ширхэг? (жишээ нь 288). Хоосон бол ашиглахгүй.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 24). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -20183,6 +20281,67 @@ async function persistProductImageToMedia(product) {
   }
   return image;
 }
+async function upsertProductOnServer(product) {
+  if (!product?.id) throw new Error("Бараа олдсонгүй");
+  const bodyProduct = { ...product };
+  const image = String(bodyProduct.image || "").trim();
+  if (image.startsWith("data:image/")) delete bodyProduct.image;
+  // Product form does not edit warehouse qty/cost — omit so server keeps truth.
+  delete bodyProduct.stock;
+  delete bodyProduct.costPrice;
+  delete bodyProduct.minStock;
+  const csrf = csrfTokenFromCookie();
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (csrf) headers["X-CSRFToken"] = csrf;
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch(`${API_BASE}/products/upsert`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          product: bodyProduct,
+          actor: state.currentEmployee
+            ? {
+                id: state.currentEmployee.id,
+                email: state.currentEmployee.email,
+              }
+            : null,
+        }),
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        let msg = "Бараа серверт хадгалахад алдаа гарлаа";
+        try {
+          const err = await res.json();
+          if (err?.detail) msg = String(err.detail);
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      return res.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) await sleep(400);
+    }
+  }
+  const raw = String(lastError?.message || lastError || "").trim();
+  if (
+    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
+  ) {
+    throw new Error(
+      "Сервертэй холбогдож чадсангүй. Интернетээ шалгаад дахин оролдоно уу.",
+    );
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(raw || "Хадгалах амжилтгүй");
+}
 async function applyProductSave(data, id) {
   const incomingImage = String(data.image || "").trim();
   if (productMediaPathFromUrl(incomingImage)) {
@@ -20208,6 +20367,9 @@ async function applyProductSave(data, id) {
     });
   }
   const product = state.products.find((p) => p.id === productId);
+  if (product) {
+    product.updatedAt = new Date().toISOString();
+  }
   if (product && storedProductImage(product)) {
     try {
       await Promise.race([
@@ -20218,23 +20380,77 @@ async function applyProductSave(data, id) {
       ]);
     } catch (error) {
       console.warn("Product image persist skipped", error);
-      // Keep product even if image upload hangs / fails.
       if (String(product.image || "").startsWith("http")) {
         /* remote preview URL may remain until retry */
       }
     }
   }
-  const saved = await flushBackendSave().catch((error) => {
-    console.warn("Product backend save failed", error);
-    return false;
-  });
+  let upsertOk = false;
+  let upsertError = "";
+  let softSaved = false;
+  try {
+    const payload = await upsertProductOnServer(product);
+    upsertOk = true;
+    if (payload?.product?.id) {
+      const idx = state.products.findIndex(
+        (p) => String(p.id) === String(payload.product.id),
+      );
+      if (idx >= 0) {
+        state.products[idx] = {
+          ...state.products[idx],
+          ...payload.product,
+        };
+      }
+    }
+    if (payload?.state) {
+      const session = captureSessionSnapshot();
+      const merged = mergePersistentStates(payload.state, persistentState());
+      applyPersistentState(merged);
+      restoreSessionSnapshot(session);
+    }
+    if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
+    saveLocalBackendCache({
+      state: payload?.state || stateForBackendSave(),
+      updatedAt: payload?.updatedAt || "",
+    });
+    if (payload?.state) {
+      reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
+    } else {
+      scheduleBackendSave();
+    }
+    clearOrderPersistenceCache();
+    clearBackendSaveFailed();
+  } catch (error) {
+    upsertError = String(error?.message || "").trim();
+    console.warn("Product upsert failed", error);
+  }
+  if (!upsertOk) {
+    try {
+      if (await flushBackendSave()) {
+        upsertOk = true;
+      }
+    } catch (error) {
+      console.warn("Product full-state fallback failed", error);
+    }
+  }
+  if (!upsertOk) {
+    persistOrderSnapshot();
+    scheduleBackendSave();
+    softSaved = true;
+    markBackendSaveFailed(
+      upsertError ||
+        "Бараа түр хадгалагдлаа. Интернетээ шалгаад дахин оролдоно уу.",
+    );
+  }
   closeModal();
   render();
-  if (!saved) {
-    markBackendSaveFailed(
-      "Бараа түр хадгалагдлаа. Интернетээ шалгаад дахин оролдоно уу.",
+  if (softSaved) {
+    showAppToast(
+      upsertError
+        ? `Түр хадгаллаа (${upsertError}). Сервертэй холбогдоод автоматаар илгээнэ.`
+        : "Бараа серверт хадгалагдаагүй — дахин оролдоно уу",
+      "error",
     );
-    showAppToast("Бараа серверт хадгалагдаагүй — дахин оролдоно уу", "error");
     return false;
   }
   showAppToast(

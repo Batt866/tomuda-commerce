@@ -1048,6 +1048,78 @@ class CustomerUpsertApiTests(TestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
+class ProductUpsertApiTests(TestCase):
+    def test_upsert_adds_product_and_keeps_stock_on_edit(self):
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "p-existing",
+                "name": "Existing",
+                "category": "Ундаа",
+                "unit": "ширхэг",
+                "boxQuantity": 24,
+                "price": 1000,
+                "stock": 73,
+                "costPrice": 500,
+                "minStock": 0,
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        create_response = self.client.post(
+            "/api/products/upsert",
+            {
+                "product": {
+                    "id": "p-new-device",
+                    "name": "New snack",
+                    "category": "Амттан",
+                    "unit": "ширхэг",
+                    "boxQuantity": 24,
+                    "largeBoxQuantity": 288,
+                    "price": 2450,
+                    "country": "Germany",
+                },
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(create_response.status_code, 200, create_response.content)
+        created = create_response.json()["product"]
+        self.assertEqual(created["id"], "p-new-device")
+        self.assertEqual(created["largeBoxQuantity"], 288)
+        self.assertEqual(created.get("stock", 0), 0)
+
+        edit_response = self.client.post(
+            "/api/products/upsert",
+            {
+                "product": {
+                    "id": "p-existing",
+                    "name": "Existing renamed",
+                    "category": "Ундаа",
+                    "unit": "ширхэг",
+                    "boxQuantity": 24,
+                    "largeBoxQuantity": 12,
+                    "price": 1100,
+                    "country": "Монгол",
+                },
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(edit_response.status_code, 200, edit_response.content)
+        edited = edit_response.json()["product"]
+        self.assertEqual(edited["name"], "Existing renamed")
+        self.assertEqual(edited["largeBoxQuantity"], 12)
+        self.assertEqual(edited["stock"], 73)
+        self.assertEqual(edited["costPrice"], 500)
+
+        row = AppState.objects.get(key="main")
+        by_id = {p["id"]: p for p in row.data["products"]}
+        self.assertIn("p-new-device", by_id)
+        self.assertEqual(by_id["p-existing"]["stock"], 73)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
 class OrderUpsertApiTests(TestCase):
     def test_upsert_adds_order_and_survives_peer_state_save(self):
         state = default_state()
