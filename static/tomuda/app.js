@@ -3154,7 +3154,7 @@ function confirmMarkOrderDelivered(id) {
   if (!o || !canMarkOrderDelivered(o)) return;
   confirmModal(
     "",
-    `<strong>${esc(o.customerName || "Захиалга")}</strong> бараа хүргэснийг баталгаажуулах уу?`,
+    `<strong>${esc(orderCustomerName(o))}</strong> бараа хүргэснийг баталгаажуулах уу?`,
     {
       confirmLabel: "Тийм",
       onConfirm: () => markOrderDelivered(id),
@@ -3182,7 +3182,7 @@ function confirmOrderDeliveryModal(id) {
   if (!o || !canConfirmOrderDelivery(o)) return;
   confirmModal(
     "Хүргэлт баталгаажуулах",
-    `${esc(o.customerName || "Захиалга")} захиалгын хүргэлтийг баталгаажуулах уу?`,
+    `${esc(orderCustomerName(o))} захиалгын хүргэлтийг баталгаажуулах уу?`,
     {
       confirmLabel: "Баталгаажуулах",
       onConfirm: () => confirmOrderDelivery(id),
@@ -4991,6 +4991,7 @@ function applyPersistentState(data) {
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
+  healOrderCustomerNames();
   return true;
 }
 function applyDeletionLogToCollections() {
@@ -7865,7 +7866,7 @@ function buildOrderReceiptExcelRows(o) {
       ["Түгээгч", delivery.deliveryName],
       ["Түгээгчийн утас", delivery.deliveryPhone],
       [],
-      ["Харилцагч", c.name || o.customerName],
+      ["Харилцагч", orderCustomerName(o)],
       ["Регистр", c.registrationNumber || "-"],
       ["Компани", c.companyName || "-"],
       ["Утас", customerPhonesList(c).join(", ") || "-"],
@@ -11247,36 +11248,91 @@ function customerDisplayName(c) {
     "Дэлгүүр"
   );
 }
-/** Prefer live customer name so renamed stores show on older orders. */
-function orderCustomerName(o) {
-  const customerId = String(o?.customerId || "").trim();
-  if (customerId) {
-    const c = state.customers.find((x) => String(x.id) === customerId);
-    if (c) {
-      const live =
-        String(c.name || "").trim() || String(c.companyName || "").trim();
-      if (live) return live;
+function customerLookupMap() {
+  const byId = new Map();
+  for (const c of state.customers || []) {
+    if (c?.id == null) continue;
+    const id = String(c.id);
+    byId.set(id, c);
+    const bare = id.replace(/^c-/i, "");
+    if (bare) {
+      if (!byId.has(bare)) byId.set(bare, c);
+      if (!byId.has(`c-${bare}`)) byId.set(`c-${bare}`, c);
     }
   }
-  return (
+  return byId;
+}
+function findCustomerForOrder(o, byId = null) {
+  const map = byId || customerLookupMap();
+  const customerId = String(o?.customerId || "").trim();
+  if (customerId) {
+    const hit =
+      map.get(customerId) ||
+      map.get(customerId.replace(/^c-/i, "")) ||
+      map.get(`c-${customerId.replace(/^c-/i, "")}`);
+    if (hit) return hit;
+  }
+  return null;
+}
+/** Prefer live customer name so renamed stores show on older orders. */
+function orderCustomerName(o) {
+  const c = findCustomerForOrder(o);
+  if (c) {
+    const live = customerDisplayName(c);
+    if (live && live !== "Дэлгүүр") return live;
+    if (live) return live;
+  }
+  const snap =
     String(o?.customerName || "").trim() ||
-    String(o?.companyName || "").trim() ||
-    "Харилцагч"
-  );
+    String(o?.companyName || "").trim();
+  return snap || "Харилцагч";
 }
 function syncOrdersCustomerName(customer) {
   if (!customer?.id) return 0;
-  const name =
-    String(customer.name || "").trim() ||
-    String(customer.companyName || "").trim();
-  if (!name) return 0;
-  const customerId = String(customer.id);
+  const name = customerDisplayName(customer);
+  if (!name || name === "Дэлгүүр") return 0;
+  const map = customerLookupMap();
+  // Also match orders that point at this customer via id aliases.
+  const aliases = new Set([String(customer.id)]);
+  const bare = String(customer.id).replace(/^c-/i, "");
+  if (bare) {
+    aliases.add(bare);
+    aliases.add(`c-${bare}`);
+  }
   let changed = 0;
   for (const o of state.orders || []) {
-    if (String(o.customerId || "") !== customerId) continue;
+    const oid = String(o.customerId || "").trim();
+    if (!aliases.has(oid) && findCustomerForOrder(o, map) !== customer) {
+      continue;
+    }
+    if (String(o.customerName || "").trim() === name) continue;
+    o.customerName = name;
+    if (!oid) o.customerId = customer.id;
+    changed += 1;
+  }
+  return changed;
+}
+let orderCustomerNameHealQueued = false;
+/** Backfill blank order.customerName from the live customer record. */
+function healOrderCustomerNames() {
+  const map = customerLookupMap();
+  let changed = 0;
+  for (const o of state.orders || []) {
+    const c = findCustomerForOrder(o, map);
+    if (!c) continue;
+    const name = customerDisplayName(c);
+    if (!name || name === "Дэлгүүр") continue;
     if (String(o.customerName || "").trim() === name) continue;
     o.customerName = name;
     changed += 1;
+  }
+  if (changed && !orderCustomerNameHealQueued) {
+    orderCustomerNameHealQueued = true;
+    queueMicrotask(() => {
+      orderCustomerNameHealQueued = false;
+      persistOrderSnapshot();
+      scheduleBackendSave();
+    });
   }
   return changed;
 }
@@ -18162,6 +18218,7 @@ function workerSelectedRow(p) {
   return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb worker-selected-row__thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
 }
 function workerOrders(orders) {
+  healOrderCustomerNames();
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
     orderCount = orders.length,
     day = state.filters.workerDate || "",
@@ -22062,7 +22119,7 @@ function confirmDeleteReceipt(id) {
   }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
-  const label = `${formatReceiptNumber(o)} · ${o.customerName || "Захиалга"}`;
+  const label = `${formatReceiptNumber(o)} · ${orderCustomerName(o)}`;
   confirmModal(
     "Баримт устгах уу?",
     `<p><b>${esc(label)}</b> баримтыг устгах гэж байна.</p><p class="text-sm text-muted-foreground mt-2">Баримт устгавал холбоотой захиалга мөн устана. Цуцлагдаагүй бол барааны үлдэгдэл буцааж нэмэгдэнэ.</p>`,
