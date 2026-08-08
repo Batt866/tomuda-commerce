@@ -11830,9 +11830,16 @@ function exportStockInExcelFallback(receipt) {
     ? `Орлогын баримт №: ${h(receipt.receiptNumber)}`
     : "Орлогын баримт";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-@page { size: A4 portrait; margin: 18mm 14mm 16mm 18mm; }
+@page { size: A4 portrait; margin: 20mm 14mm 16mm 20mm; }
 body { font-family: Arial, sans-serif; color: #000; margin: 0; }
-table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.stock-in col.c-no { width: 5%; }
+.stock-in col.c-name { width: 28%; }
+.stock-in col.c-code { width: 14%; }
+.stock-in col.c-unit { width: 11%; }
+.stock-in col.c-qty { width: 11%; }
+.stock-in col.c-price { width: 14%; }
+.stock-in col.c-total { width: 17%; }
 .stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
 .form-code td { border: none; font-size: 11px; }
 .title { text-align: center; font-size: 15px; font-weight: 800; border: none; }
@@ -11845,6 +11852,7 @@ table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; fo
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 14px; }
 </style></head><body><table class="stock-in">
+<colgroup><col class="c-no"><col class="c-name"><col class="c-name"><col class="c-code"><col class="c-unit"><col class="c-qty"><col class="c-price"><col class="c-total"></colgroup>
 <tr class="form-code"><td colspan="5">НХМаяг БМ-1</td><td colspan="3" style="text-align:right;white-space:pre-line">Сангийн сайдын 2017 оны 347 дугаар
 тушаалын хавсралт</td></tr>
 <tr><td colspan="8" class="title">БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ</td></tr>
@@ -13174,6 +13182,42 @@ const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
 const STOCK_IN_COMPANY_NAME = "ТОМУДА ГРУПП ХХК";
 const STOCK_IN_COMPANY_REG = "5397987";
 const STOCK_IN_WAREHOUSE_DEFAULT = "Төв агуулах";
+/** BM-1 column widths sized for A4 with extra top/left margin (no heavy fit-shrink). */
+const STOCK_IN_COL_WIDTHS = [5, 26, 12, 14, 11, 11, 12, 14];
+/** receiptXlsxStylesXml indices used by BM-1 stock-in sheet. */
+const STOCK_IN_STYLES = {
+  blank: 0,
+  formCode: 15, // bold 9 left
+  formNote: 5, // 9 left wrap
+  title: 13, // 18pt bold center
+  receiptNo: 14, // 14pt bold center
+  metaLabel: 15, // bold 9 left
+  metaValue: 51, // 9 left
+  header: 7, // bold 9 gray fill + border center wrap
+  text: 8, // left border wrap
+  center: 9, // center border
+  num: 10, // right #,##0 border
+  barcode: 34, // text/@ center border
+  zebraText: 25, // left gray fill border
+  zebraCenter: 26,
+  zebraNum: 27,
+  sumLabel: 25, // left gray fill border
+  sumNum: 27, // right #,##0 gray fill border
+  vatLabel: 8,
+  vatNum: 10,
+  totalLabel: 25,
+  totalNum: 27,
+  signLabel: 15,
+  signLine: 51,
+};
+function stockInColsXml(widths = STOCK_IN_COL_WIDTHS) {
+  return widths
+    .map(
+      (width, index) =>
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+    )
+    .join("");
+}
 /** Official BM-1 style stock-in receipt (A4). */
 function buildStockInSheetXml(receipt, {
   titleText = null,
@@ -13181,6 +13225,7 @@ function buildStockInSheetXml(receipt, {
 } = {}) {
   void receivedLabel;
   receipt = normalizeStockInReceiptTotals(receipt);
+  const S = STOCK_IN_STYLES;
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -13213,53 +13258,55 @@ function buildStockInSheetXml(receipt, {
     rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
     rowNum += 1;
   };
-  const emptyCells = (row, from = "A", to = STOCK_IN_LAST_COL, style = 1) => {
+  const emptyCells = (row, from = "A", to = STOCK_IN_LAST_COL, style = S.blank) => {
     const cols = COLS.slice(COLS.indexOf(from), COLS.indexOf(to) + 1);
     return cols
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
+  // Sample layout: A label | B:C value | D label | E:F value (not stretched to H).
   const metaPair = (l1, v1, l2, v2) => {
     const r = rowNum;
-    pushRow(16.5, [
-      xlsxCellXml(`A${r}`, 5, si(l1), "s"),
-      xlsxCellXml(`B${r}`, 4, si(v1 || "-"), "s"),
-      xlsxCellXml(`C${r}`, 4, null, "empty"),
-      xlsxCellXml(`D${r}`, 5, si(l2), "s"),
-      xlsxCellXml(`E${r}`, 4, si(v2 || "-"), "s"),
-      ...emptyCells(r, "F", "H", 1),
+    pushRow(18, [
+      xlsxCellXml(`A${r}`, S.metaLabel, si(l1), "s"),
+      xlsxCellXml(`B${r}`, S.metaValue, si(v1 || "-"), "s"),
+      xlsxCellXml(`C${r}`, S.metaValue, null, "empty"),
+      xlsxCellXml(`D${r}`, S.metaLabel, si(l2), "s"),
+      xlsxCellXml(`E${r}`, S.metaValue, si(v2 || "-"), "s"),
+      xlsxCellXml(`F${r}`, S.metaValue, null, "empty"),
+      ...emptyCells(r, "G", "H", S.blank),
     ]);
-    merges.push(`B${r}:C${r}`, `E${r}:H${r}`);
+    merges.push(`B${r}:C${r}`, `E${r}:F${r}`);
   };
 
   // R1 form header — matches НХМаяг БМ-1 sample
-  pushRow(18, [
-    xlsxCellXml("A1", 5, si("НХМаяг БМ-1"), "s"),
-    ...emptyCells(1, "B", "E", 1),
+  pushRow(28, [
+    xlsxCellXml("A1", S.formCode, si("НХМаяг БМ-1"), "s"),
+    ...emptyCells(1, "B", "E", S.blank),
     xlsxCellXml(
       "F1",
-      2,
+      S.formNote,
       si("Сангийн сайдын 2017 оны 347 дугаар\nтушаалын хавсралт"),
       "s",
     ),
-    ...emptyCells(1, "G", "H", 2),
+    ...emptyCells(1, "G", "H", S.formNote),
   ]);
-  merges.push("F1:H1");
-  pushRow(8, emptyCells(rowNum));
+  merges.push("A1:B1", "F1:H1");
+  pushRow(6, emptyCells(rowNum));
 
   const title =
     titleText || "БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ";
-  pushRow(22, [
-    xlsxCellXml(`A${rowNum}`, 13, si(title), "s"),
-    ...emptyCells(rowNum, "B", "H", 13),
+  pushRow(28, [
+    xlsxCellXml(`A${rowNum}`, S.title, si(title), "s"),
+    ...emptyCells(rowNum, "B", "H", S.title),
   ]);
   merges.push(`A${rowNum - 1}:H${rowNum - 1}`);
   const receiptNo = receipt.receiptNumber
     ? `Орлогын баримт №: ${receipt.receiptNumber}`
     : "Орлогын баримт";
-  pushRow(16, [
-    xlsxCellXml(`A${rowNum}`, 6, si(receiptNo), "s"),
-    ...emptyCells(rowNum, "B", "H", 6),
+  pushRow(20, [
+    xlsxCellXml(`A${rowNum}`, S.receiptNo, si(receiptNo), "s"),
+    ...emptyCells(rowNum, "B", "H", S.receiptNo),
   ]);
   merges.push(`A${rowNum - 1}:H${rowNum - 1}`);
   pushRow(8, emptyCells(rowNum));
@@ -13288,19 +13335,19 @@ function buildStockInSheetXml(receipt, {
     "Хүлээн авсан ажилтан:",
     receipt.employeeName || "-",
   );
-  pushRow(10, emptyCells(rowNum));
+  pushRow(8, emptyCells(rowNum));
 
   const headerRow = rowNum;
   merges.push(`B${headerRow}:C${headerRow}`);
   pushRow(28, [
-    xlsxCellXml(`A${headerRow}`, 7, si("№"), "s"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Бараа, материалын нэр, зэрэг"), "s"),
-    xlsxCellXml(`C${headerRow}`, 7, null, "empty"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Баркод / Код"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Тоо хэмжээ"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, si("Нэгж үнэ (₮)"), "s"),
-    xlsxCellXml(`H${headerRow}`, 7, si("Нийт дүн (₮)"), "s"),
+    xlsxCellXml(`A${headerRow}`, S.header, si("№"), "s"),
+    xlsxCellXml(`B${headerRow}`, S.header, si("Бараа, материалын нэр, зэрэг"), "s"),
+    xlsxCellXml(`C${headerRow}`, S.header, null, "empty"),
+    xlsxCellXml(`D${headerRow}`, S.header, si("Баркод / Код"), "s"),
+    xlsxCellXml(`E${headerRow}`, S.header, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`F${headerRow}`, S.header, si("Тоо хэмжээ"), "s"),
+    xlsxCellXml(`G${headerRow}`, S.header, si("Нэгж үнэ (₮)"), "s"),
+    xlsxCellXml(`H${headerRow}`, S.header, si("Нийт дүн (₮)"), "s"),
   ]);
 
   let itemIndex = 0;
@@ -13314,15 +13361,15 @@ function buildStockInSheetXml(receipt, {
       state.products.find((x) => String(x.id) === String(line.productId)) || {};
     const unitText = String(line.unit || p.unit || "ширхэг").trim() || "ширхэг";
     const zebra = itemIndex % 2 === 0;
-    const centerStyle = zebra ? 9 : 8;
-    const nameStyle = zebra ? 14 : 8;
-    const numStyle = 10;
+    const textStyle = zebra ? S.zebraText : S.text;
+    const centerStyle = zebra ? S.zebraCenter : S.center;
+    const numStyle = zebra ? S.zebraNum : S.num;
     merges.push(`B${r}:C${r}`);
-    pushRow(18, [
+    pushRow(20, [
       xlsxCellXml(`A${r}`, centerStyle, itemIndex, "n"),
-      xlsxCellXml(`B${r}`, nameStyle, si(line.productName || "-"), "s"),
-      xlsxCellXml(`C${r}`, nameStyle, null, "empty"),
-      xlsxBarcodeCell(`D${r}`, centerStyle, line.barcode, si),
+      xlsxCellXml(`B${r}`, textStyle, si(line.productName || "-"), "s"),
+      xlsxCellXml(`C${r}`, textStyle, null, "empty"),
+      xlsxBarcodeCell(`D${r}`, S.barcode, line.barcode, si),
       xlsxCellXml(`E${r}`, centerStyle, si(unitText), "s"),
       xlsxCellXml(`F${r}`, numStyle, qty, "n"),
       xlsxCellXml(`G${r}`, numStyle, unitPrice, "n"),
@@ -13330,50 +13377,49 @@ function buildStockInSheetXml(receipt, {
     ]);
   }
 
-  pushRow(8, emptyCells(rowNum));
   const sumRow = rowNum;
   // Sample: label A:E, qty sum F, amount H (ex-VAT for ДҮН)
   merges.push(`A${sumRow}:E${sumRow}`);
-  pushRow(18, [
+  pushRow(20, [
     xlsxCellXml(
       `A${sumRow}`,
-      19,
+      S.sumLabel,
       si("ДҮН (Нийт орлогод авсан барааны дүн)"),
       "s",
     ),
-    ...emptyCells(sumRow, "B", "E", 19),
-    xlsxCellXml(`F${sumRow}`, 20, qtyTotal, "n"),
-    xlsxCellXml(`G${sumRow}`, 19, null, "empty"),
-    xlsxCellXml(`H${sumRow}`, 20, netExVat, "n"),
+    ...emptyCells(sumRow, "B", "E", S.sumLabel),
+    xlsxCellXml(`F${sumRow}`, S.sumNum, qtyTotal, "n"),
+    xlsxCellXml(`G${sumRow}`, S.sumLabel, null, "empty"),
+    xlsxCellXml(`H${sumRow}`, S.sumNum, netExVat, "n"),
   ]);
   const vatRow = rowNum;
   merges.push(`A${vatRow}:G${vatRow}`);
-  pushRow(16.5, [
-    xlsxCellXml(`A${vatRow}`, 5, si("НӨАТ (10%):"), "s"),
-    ...emptyCells(vatRow, "B", "G", 5),
-    xlsxCellXml(`H${vatRow}`, 10, vatAmount, "n"),
+  pushRow(20, [
+    xlsxCellXml(`A${vatRow}`, S.vatLabel, si("НӨАТ (10%):"), "s"),
+    ...emptyCells(vatRow, "B", "G", S.vatLabel),
+    xlsxCellXml(`H${vatRow}`, S.vatNum, vatAmount, "n"),
   ]);
   const totalRow = rowNum;
   merges.push(`A${totalRow}:G${totalRow}`);
-  pushRow(18, [
-    xlsxCellXml(`A${totalRow}`, 19, si("НИЙТ ДҮН (НӨАТ-тай):"), "s"),
-    ...emptyCells(totalRow, "B", "G", 19),
-    xlsxCellXml(`H${totalRow}`, 20, grossInclusive, "n"),
+  pushRow(20, [
+    xlsxCellXml(`A${totalRow}`, S.totalLabel, si("НИЙТ ДҮН (НӨАТ-тай):"), "s"),
+    ...emptyCells(totalRow, "B", "G", S.totalLabel),
+    xlsxCellXml(`H${totalRow}`, S.totalNum, grossInclusive, "n"),
   ]);
 
-  pushRow(14, emptyCells(rowNum));
+  pushRow(12, emptyCells(rowNum));
   const signLine =
     ".................................... /                              /";
   const pushSign = (label) => {
     const r = rowNum;
-    merges.push(`F${r}:H${r}`);
-    pushRow(18, [
-      xlsxCellXml(`A${r}`, 5, si(label), "s"),
-      ...emptyCells(r, "B", "E", 1),
-      xlsxCellXml(`F${r}`, 4, si(signLine), "s"),
-      ...emptyCells(r, "G", "H", 4),
+    merges.push(`A${r}:E${r}`, `F${r}:H${r}`);
+    pushRow(20, [
+      xlsxCellXml(`A${r}`, S.signLabel, si(label), "s"),
+      ...emptyCells(r, "B", "E", S.signLabel),
+      xlsxCellXml(`F${r}`, S.signLine, si(signLine), "s"),
+      ...emptyCells(r, "G", "H", S.signLine),
     ]);
-    pushRow(10, emptyCells(rowNum));
+    pushRow(8, emptyCells(rowNum));
   };
   pushSign("Хүлээлгэн өгсөн (Бэлтгэн нийлүүлэгч/Төлөөлөгч):");
   pushSign("Хүлээн авсан эд хариуцагч (Нярав):");
@@ -13381,8 +13427,8 @@ function buildStockInSheetXml(receipt, {
 
   const lastRow = Math.max(1, rowNum - 1);
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  // A4 portrait; slightly more top/left margin than the BM-1 sample for print.
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="6" customWidth="1"/><col min="2" max="2" width="22" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="4" width="18" customWidth="1"/><col min="5" max="5" width="14" customWidth="1"/><col min="6" max="6" width="14" customWidth="1"/><col min="7" max="7" width="16" customWidth="1"/><col min="8" max="8" width="18" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="0" verticalCentered="0"/><pageMargins left="0.95" right="0.7" top="1.2" bottom="0.85" header="0.4" footer="0.4"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0" scale="100"/></worksheet>`;
+  // A4 portrait; a bit more top/left than sample. Cols sized so fit-to-width ≈ 100%.
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr baseColWidth="8" defaultRowHeight="15"/><cols>${stockInColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="0" verticalCentered="0"/><pageMargins left="0.9" right="0.65" top="1.15" bottom="0.85" header="0.4" footer="0.4"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportStockInExcelXlsx(receipt) {
