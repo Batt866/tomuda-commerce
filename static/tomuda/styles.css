@@ -605,8 +605,9 @@ textarea.text-sm,
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     "head actions"
+    "contact actions"
     "addr actions";
-  gap: 8px 4px;
+  gap: 6px 10px;
   align-items: center;
   padding: 10px 4px 10px 0;
   border-radius: 0;
@@ -1047,17 +1048,19 @@ textarea.text-sm,
 
 .customer-card__title-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }
 
 .customer-card__name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  max-width: 55%;
   min-width: 0;
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.25;
   color: var(--hex-foreground);
@@ -1069,12 +1072,12 @@ textarea.text-sm,
 .customer-card__phones {
   flex: 0 1 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px 10px;
+  justify-content: flex-start;
+  gap: 8px;
   min-width: 0;
-  max-width: 58%;
+  max-width: none;
 }
 
 .customer-card__phone-link {
@@ -1109,13 +1112,21 @@ textarea.text-sm,
 }
 
 .customer-card__sub {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.3;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
   color: var(--hex-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.customer-card__contact {
+  grid-area: contact;
+  min-width: 0;
 }
 
 .customer-card__phone,
@@ -1174,11 +1185,11 @@ a.customer-card__line .customer-card__icon {
 .customer-card__actions {
   grid-area: actions;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex-wrap: nowrap;
-  align-items: stretch;
-  justify-content: center;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   flex-shrink: 0;
   padding: 0;
   margin: 0;
@@ -1486,20 +1497,23 @@ img.worker-pick-card__avatar {
 
 .list-panel--customers .customer-card__avatar,
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 56px;
-  height: 56px;
-  min-width: 56px;
-  border-radius: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--hex-border);
+  background: #fff;
+  overflow: hidden;
 }
 
 .list-panel--customers .customer-card__avatar {
-  font-size: 20px;
+  font-size: 15px;
 }
 
 .list-panel--customers .customer-card__avatar-img {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  background: transparent;
+  background: #fff;
 }
 
 .list-action-toolbar {
@@ -3031,13 +3045,13 @@ img[data-product-img],
 
   .customer-list__head {
     display: grid;
-    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(
+    grid-template-columns: minmax(220px, 1.15fr) minmax(110px, 0.45fr) minmax(
         200px,
-        auto
-      );
-    gap: 16px;
+        1.25fr
+      ) auto;
+    gap: 12px 16px;
     align-items: center;
-    padding: 10px 16px;
+    padding: 8px 16px;
     background: var(--hex-secondary);
     color: var(--hex-muted-foreground);
     font-size: 12px;
@@ -3045,7 +3059,7 @@ img[data-product-img],
     letter-spacing: 0.02em;
     text-transform: none;
     border-bottom: 1px solid var(--hex-border);
-    min-height: calc(108px + 20px);
+    min-height: 0;
   }
 
   .customer-list__head-actions {
@@ -3054,11 +3068,14 @@ img[data-product-img],
 
   .customer-card {
     display: grid;
-    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) auto;
-    grid-template-areas: "head addr actions";
+    grid-template-columns: minmax(220px, 1.15fr) minmax(110px, 0.45fr) minmax(
+        200px,
+        1.25fr
+      ) auto;
+    grid-template-areas: "head contact addr actions";
     gap: 12px 16px;
     align-items: center;
-    min-height: calc(108px + 20px);
+    min-height: 0;
     padding: 10px 16px;
     border-radius: 0;
     border: none;
@@ -3068,42 +3085,52 @@ img[data-product-img],
 
   .list-panel--customers .customer-card__avatar,
   .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-    width: 108px;
-    height: 108px;
-    min-width: 108px;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 10px;
     border: 1px solid var(--hex-border);
     background: #fff;
   }
 
   .list-panel--customers .customer-card__avatar {
-    font-size: 28px;
+    font-size: 15px;
   }
 
   .customer-card__head {
     grid-area: head;
-    gap: 14px;
+    gap: 12px;
   }
 
   .customer-card__name {
+    max-width: none;
+    flex: 0 1 auto;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.25;
   }
 
   .customer-card__sub {
-    margin: 2px 0 0;
+    flex: 1 1 auto;
+    margin: 0;
     font-size: 12px;
-    line-height: 1.3;
+    line-height: 1.25;
+  }
+
+  .customer-card__contact {
+    grid-area: contact;
   }
 
   .customer-card__phones {
-    font-size: 12px;
+    font-size: 13px;
+    max-width: none;
+    justify-content: flex-start;
   }
 
   .customer-card__line {
-    font-size: 12px;
-    line-height: 1.35;
+    font-size: 13px;
+    line-height: 1.3;
+    align-items: center;
   }
 
   .customer-card__addr {
@@ -3113,10 +3140,11 @@ img[data-product-img],
 
   .customer-card__actions {
     grid-area: actions;
-    flex-direction: column;
-    justify-content: center;
+    flex-direction: row;
+    justify-content: flex-end;
     justify-self: end;
     flex-wrap: nowrap;
+    gap: 6px;
     padding: 0;
     margin: 0;
     border-top: none;
@@ -9662,6 +9690,10 @@ textarea::placeholder {
   gap: 8px;
 }
 
+.barcode-input-row--scan {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
 .barcode-scanner {
   overflow: hidden;
   border-radius: 8px;
@@ -10449,6 +10481,10 @@ textarea::placeholder {
   .barcode-input-row {
     grid-template-columns: minmax(0, 1fr) 74px;
     gap: 7px;
+  }
+
+  .barcode-input-row--scan {
+    grid-template-columns: minmax(0, 1fr) 64px 64px;
   }
 
   .barcode-input-row button {
@@ -12452,10 +12488,12 @@ textarea::placeholder {
 }
 
 @media print {
-  /* Page size/fonts for ЗАРЛАГЫН БАРИМТ come from RECEIPT_EXCEL_STYLES (Letter).
+  /* Page size/fonts for ЗАРЛАГЫН БАРИМТ come from RECEIPT_EXCEL_STYLES (A4).
      Keep only print-root chrome here — do not override .receipt-page / logo / title. */
   @page {
-    margin: 8mm;
+    size: A4 portrait;
+    /* top | right | bottom | left — left > right */
+    margin: 14mm 8mm 12mm 18mm;
   }
   body > *:not(#print-root) {
     display: none !important;
@@ -14942,6 +14980,9 @@ body.image-lightbox-open {
 .stock-in-scan__input {
   flex: 1;
   min-width: 0;
+  pointer-events: auto;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .stock-in-scan__btn {

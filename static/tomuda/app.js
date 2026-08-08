@@ -7959,7 +7959,7 @@ function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 10mm; }
+@page { size: A4 portrait; margin: 14mm 8mm 12mm 18mm; }
 body {
   margin: 0;
   padding: 0;
@@ -7974,11 +7974,11 @@ td, th { border: none; }
 .receipt-excel-sheet { display: block; background: #fff; color: ${RECEIPT_TEXT}; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page {
-  width: 190mm;
-  max-width: 190mm;
-  margin: 0 auto;
-  /* A4 page; ҮНДСЭН density — base 9pt Arial. */
-  padding: 4mm 4mm 3mm 4mm;
+  width: 184mm;
+  max-width: 184mm;
+  margin: 0;
+  /* A4: left/top margin via @page; right smaller than left. */
+  padding: 2mm 0 2mm 0;
   box-sizing: border-box;
   font-size: 9px;
   line-height: 1.15;
@@ -8769,11 +8769,11 @@ td, th { border: none; }
     padding: 0 !important;
   }
   .receipt-page {
-    width: 190mm;
-    max-width: 190mm;
+    width: 184mm;
+    max-width: 184mm;
     min-height: auto;
-    padding: 2mm 0;
-    margin: 0 auto;
+    padding: 0;
+    margin: 0;
     box-shadow: none !important;
     overflow: visible;
     font-size: 9px;
@@ -10107,10 +10107,11 @@ function ensureReceiptScreenStyles() {
 }
 .wh-receipt-preview__doc.receipt-page {
   min-height: 0;
-  width: 215.9mm;
-  max-width: 215.9mm;
+  width: 210mm;
+  max-width: 210mm;
   margin: 0 auto;
-  padding: 4mm 12mm 6mm;
+  /* Match A4 print: top/left larger, right smaller than left */
+  padding: 14mm 8mm 12mm 18mm;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
 }
@@ -10124,7 +10125,7 @@ function ensureReceiptScreenStyles() {
   }
   .wh-receipt-preview__doc.receipt-page {
     min-width: 210mm;
-    padding: 4mm 12mm 6mm;
+    padding: 14mm 8mm 12mm 18mm;
   }
 }
 `;
@@ -10134,10 +10135,11 @@ function orderRow(o) {
 }
 function customerAvatarHtml(c, className = "customer-card__avatar") {
   const src = entityImageSrc(c?.image);
+  const initial = esc(deliveryInitial(customerDisplayName(c)));
   if (src) {
-    return `<img src="${esc(src)}" alt="" class="${className} customer-card__avatar-img" loading="lazy" decoding="async">`;
+    return `<img src="${esc(src)}" alt="" class="${className} customer-card__avatar-img" loading="lazy" decoding="async" onerror="this.outerHTML='<span class=\\'${className}\\' aria-hidden=\\'true\\'>${initial}</span>'">`;
   }
-  return `<span class="${className}" aria-hidden="true">${esc(deliveryInitial(customerDisplayName(c)))}</span>`;
+  return `<span class="${className}" aria-hidden="true">${initial}</span>`;
 }
 function customerImageField(c) {
   const preview = c.image || customerStoreImage(c);
@@ -10606,12 +10608,12 @@ function customerCardPhonesHtml(c) {
     .join("")}</div>`;
 }
 function customerListHead() {
-  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
+  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Утас</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${sub ? `<span class="customer-card__sub">${esc(sub)}</span>` : ""}</div></div></header><div class="customer-card__contact">${customerCardPhonesHtml(c)}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName) {
   if (!customerId) return;
@@ -11528,8 +11530,10 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
     list = state.products.filter(
       (p) =>
         (cat === "all" || p.category === cat) &&
-        (p.name.toLowerCase().includes(q.toLowerCase()) ||
-          p.barcode.includes(q)),
+        (String(p.name || "")
+          .toLowerCase()
+          .includes(q.toLowerCase()) ||
+          String(p.barcode || "").includes(q)),
     );
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
 }
@@ -12276,24 +12280,59 @@ function barcodeScannerPanelHtml() {
   return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
 }
 function stockInScanToolbarHtml() {
-  return `<div class="stock-in-scan"><label class="stock-in-scan__field"><span class="stock-in-scan__label">Баркод</span><div class="barcode-input-row"><input id="stockInBarcodeInput" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="field-input app-input stock-in-scan__input" placeholder="Баркод оруулах..." onkeydown="stockInBarcodeKeydown(event)" aria-label="Баркод"><button type="button" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Scan</button></div></label>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
+  const q = esc(state.stockInScanQuery || "");
+  return `<div class="stock-in-scan"><label class="stock-in-scan__field"><span class="stock-in-scan__label">Баркод / нэр</span><div class="barcode-input-row barcode-input-row--scan"><input id="stockInBarcodeInput" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" spellcheck="false" class="field-input app-input stock-in-scan__input" placeholder="Баркод эсвэл барааны нэр..." value="${q}" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Баркод эсвэл барааны нэр"><button type="button" onclick="stockInScanSubmit()" class="btn btn--secondary btn--sm stock-in-scan__btn">Хайх</button><button type="button" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Scan</button></div></label>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Баркод эсвэл нэрээр хайна. Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
+}
+function stockInScanDraft(el) {
+  state.stockInScanQuery = String(el?.value || "");
+}
+function findProductsByQuery(code) {
+  const value = String(code || "").trim();
+  if (!value) return [];
+  const exactBarcode = state.products.filter(
+    (p) => String(p.barcode || "").trim() === value,
+  );
+  if (exactBarcode.length) return exactBarcode;
+  const partialBarcode = state.products.filter((p) =>
+    String(p.barcode || "").includes(value),
+  );
+  if (partialBarcode.length === 1) return partialBarcode;
+  const q = value.toLowerCase();
+  const exactName = state.products.filter(
+    (p) => String(p.name || "").trim().toLowerCase() === q,
+  );
+  if (exactName.length) return exactName;
+  const nameHits = state.products.filter((p) =>
+    String(p.name || "")
+      .toLowerCase()
+      .includes(q),
+  );
+  if (nameHits.length) return nameHits;
+  return partialBarcode;
 }
 function findProductByBarcode(code) {
-  const value = String(code || "").trim();
-  if (!value) return null;
-  return (
-    state.products.find((p) => String(p.barcode || "").trim() === value) ||
-    state.products.find((p) => String(p.barcode || "").includes(value)) ||
-    null
-  );
+  const matches = findProductsByQuery(code);
+  return matches.length === 1 ? matches[0] : matches[0] || null;
 }
 function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
   ensureStockInSession();
-  const product = findProductByBarcode(code);
-  if (!product) {
+  const query = String(code || "").trim();
+  const matches = findProductsByQuery(query);
+  if (!matches.length) {
     alert("Бараа олдсонгүй");
     return false;
   }
+  if (matches.length > 1) {
+    const sample = matches
+      .slice(0, 5)
+      .map((p) => p.name)
+      .join(", ");
+    alert(
+      `Олон бараа олдлоо (${matches.length}): ${sample}${matches.length > 5 ? "…" : ""}.\nНэрийг илүү тодорхой бичнэ үү.`,
+    );
+    return false;
+  }
+  const product = matches[0];
   const entry = stockInDraftEntry(product.id);
   const packSize = productPackSize(product);
   if (packSize) {
@@ -12311,6 +12350,7 @@ function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
   state.stockInDone = false;
   state.stockInReceipt = null;
   state.stockInHighlightId = product.id;
+  state.stockInScanQuery = "";
   const input = document.getElementById("stockInBarcodeInput");
   if (input) input.value = "";
   render();
@@ -12319,6 +12359,7 @@ function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
     document
       .querySelector(`[data-stock-in-id="${product.id}"]`)
       ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    document.getElementById("stockInBarcodeInput")?.focus();
   });
   setTimeout(() => {
     if (state.stockInHighlightId === product.id) {
@@ -12330,16 +12371,22 @@ function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
           state.filters.warehouseTab === "in")
       ) {
         render();
+        requestAnimationFrame(() =>
+          document.getElementById("stockInBarcodeInput")?.focus(),
+        );
       }
     }
   }, 1600);
   return true;
 }
+function stockInScanSubmit() {
+  const input = document.getElementById("stockInBarcodeInput");
+  applyStockInBarcode(input?.value || state.stockInScanQuery || "");
+}
 function stockInBarcodeKeydown(e) {
   if (e.key !== "Enter") return;
   e.preventDefault();
-  const input = document.getElementById("stockInBarcodeInput");
-  applyStockInBarcode(input?.value || "");
+  stockInScanSubmit();
 }
 function stockInEntryRow(p) {
   const qty = stockInLineQty(p);
@@ -20862,8 +20909,8 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: A4 portrait; margin: 10mm; }
-  .receipt-page { width: 190mm; max-width: 190mm; margin: 0 auto; padding: 2mm 0; }
+  @page { size: A4 portrait; margin: 14mm 8mm 12mm 18mm; }
+  .receipt-page { width: 184mm; max-width: 184mm; margin: 0; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
     const cleanup = () => {
@@ -22650,6 +22697,8 @@ Object.assign(window, {
   applyPickerBarcode,
   applyStockInBarcode,
   stockInBarcodeKeydown,
+  stockInScanDraft,
+  stockInScanSubmit,
   clearPickerFilter,
   startBarcodeScan,
   stopBarcodeScan,
