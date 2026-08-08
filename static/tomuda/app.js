@@ -11902,21 +11902,20 @@ table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; fo
 .sign td { border: none; padding-top: 14px; }
 </style></head><body><table class="stock-in">
 <colgroup><col class="c-no"><col class="c-name"><col class="c-name"><col class="c-code"><col class="c-unit"><col class="c-qty"><col class="c-price"><col class="c-total"></colgroup>
-<tr class="form-code"><td colspan="5">НХМаяг БМ-1</td><td colspan="3" style="text-align:right;white-space:pre-line">Сангийн сайдын 2017 оны 347 дугаар
-тушаалын хавсралт</td></tr>
+<tr class="form-code"><td colspan="8">НХМаяг БМ-1</td></tr>
 <tr><td colspan="8" class="title">БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ</td></tr>
 <tr><td colspan="8" class="sub">${receiptNo}</td></tr>
-<tr class="meta"><td colspan="2">Байгууллагын нэр:</td><td colspan="2">${h(STOCK_IN_COMPANY_NAME)}</td><td colspan="2">Огноо:</td><td colspan="2">${h(dateValue)}</td></tr>
-<tr class="meta"><td colspan="2">Регистрийн дугаар:</td><td colspan="2">${h(STOCK_IN_COMPANY_REG)}</td><td colspan="2">Агуулах / Байршил:</td><td colspan="2">${h(STOCK_IN_WAREHOUSE_DEFAULT)}</td></tr>
-<tr class="meta"><td colspan="2">Бэлтгэн нийлүүлэгч:</td><td colspan="2">-</td><td colspan="2">Дагалдах баримт №:</td><td colspan="2">${h(receipt.receiptNumber || "-")}</td></tr>
-<tr class="meta"><td colspan="2">Харилцах утас:</td><td colspan="2">${h(RECEIPT_COMPANY_PHONE)}</td><td colspan="2">Хүлээн авсан ажилтан:</td><td colspan="2">${h(receipt.employeeName || "-")}</td></tr>
+<tr class="meta"><td colspan="2">Байгууллагын нэр:</td><td>${h(STOCK_IN_COMPANY_NAME)}</td><td colspan="2">Огноо:</td><td colspan="3">${h(dateValue)}</td></tr>
+<tr class="meta"><td colspan="2">Регистрийн дугаар:</td><td>${h(STOCK_IN_COMPANY_REG)}</td><td colspan="2">Агуулах / Байршил:</td><td colspan="3">${h(STOCK_IN_WAREHOUSE_DEFAULT)}</td></tr>
+<tr class="meta"><td colspan="2">Бэлтгэн нийлүүлэгч:</td><td>-</td><td colspan="2">Дагалдах баримт №:</td><td colspan="3">${h(receipt.receiptNumber || "-")}</td></tr>
+<tr class="meta"><td colspan="2">Харилцах утас:</td><td>${h(RECEIPT_COMPANY_PHONE)}</td><td colspan="2">Хүлээн авсан ажилтан:</td><td colspan="3">${h(receipt.employeeName || "-")}</td></tr>
 <tr class="head"><th>№</th><th colspan="2">Бараа, материалын нэр, зэрэг</th><th>Баркод / Код</th><th>Хэмжих нэгж</th><th>Тоо хэмжээ</th><th>Нэгж үнэ (₮)</th><th>Нийт дүн (₮)</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="5">ДҮН (Нийт орлогод авсан барааны дүн)</td><td class="num">${qtyTotal}</td><td></td><td class="num">${fmtExcelMoney(netExVat)}</td></tr>
 <tr><td colspan="7">НӨАТ (10%):</td><td class="num">${fmtExcelMoney(vatAmount)}</td></tr>
 <tr class="total"><td colspan="7">НИЙТ ДҮН (НӨАТ-тай):</td><td class="num">${fmtExcelMoney(grossInclusive)}</td></tr>
-<tr class="sign"><td colspan="5">Хүлээлгэн өгсөн (Бэлтгэн нийлүүлэгч/Төлөөлөгч):</td><td colspan="3">.................................... /                              /</td></tr>
-<tr class="sign"><td colspan="5">Хүлээн авсан эд хариуцагч (Нярав):</td><td colspan="3">.................................... /                              /</td></tr>
+<tr class="sign"><td colspan="5">Хүлээлгэн өгсөн:</td><td colspan="3">.................................... /                              /</td></tr>
+<tr class="sign"><td colspan="5">Хүлээн авсан эд хариуцагч:</td><td colspan="3">.................................... /                              /</td></tr>
 <tr class="sign"><td colspan="5">Шалгасан нягтлан бодогч:</td><td colspan="3">.................................... /                              /</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
@@ -13231,13 +13230,12 @@ const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
 const STOCK_IN_COMPANY_NAME = "ТОМУДА ГРУПП ХХК";
 const STOCK_IN_COMPANY_REG = "5397987";
 const STOCK_IN_WAREHOUSE_DEFAULT = "Төв агуулах";
-/** BM-1 column widths sized for A4 with extra top/left margin (no heavy fit-shrink). */
-const STOCK_IN_COL_WIDTHS = [5, 26, 12, 14, 11, 11, 12, 14];
+/** BM-1 column widths sized for A4; A+B wide enough for meta labels. */
+const STOCK_IN_COL_WIDTHS = [6, 14, 16, 14, 11, 10, 11, 13];
 /** receiptXlsxStylesXml indices used by BM-1 stock-in sheet. */
 const STOCK_IN_STYLES = {
   blank: 0,
   formCode: 15, // bold 9 left
-  formNote: 5, // 9 left wrap
   title: 13, // 18pt bold center
   receiptNo: 14, // 14pt bold center
   metaLabel: 15, // bold 9 left
@@ -13313,34 +13311,27 @@ function buildStockInSheetXml(receipt, {
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
-  // Sample layout: A label | B:C value | D label | E:F value (not stretched to H).
+  // A:B left label (full text visible) | C left value | D:E right label | F:H right value
   const metaPair = (l1, v1, l2, v2) => {
     const r = rowNum;
     pushRow(18, [
       xlsxCellXml(`A${r}`, S.metaLabel, si(l1), "s"),
-      xlsxCellXml(`B${r}`, S.metaValue, si(v1 || "-"), "s"),
-      xlsxCellXml(`C${r}`, S.metaValue, null, "empty"),
+      xlsxCellXml(`B${r}`, S.metaLabel, null, "empty"),
+      xlsxCellXml(`C${r}`, S.metaValue, si(v1 || "-"), "s"),
       xlsxCellXml(`D${r}`, S.metaLabel, si(l2), "s"),
-      xlsxCellXml(`E${r}`, S.metaValue, si(v2 || "-"), "s"),
-      xlsxCellXml(`F${r}`, S.metaValue, null, "empty"),
-      ...emptyCells(r, "G", "H", S.blank),
+      xlsxCellXml(`E${r}`, S.metaLabel, null, "empty"),
+      xlsxCellXml(`F${r}`, S.metaValue, si(v2 || "-"), "s"),
+      ...emptyCells(r, "G", "H", S.metaValue),
     ]);
-    merges.push(`B${r}:C${r}`, `E${r}:F${r}`);
+    merges.push(`A${r}:B${r}`, `D${r}:E${r}`, `F${r}:H${r}`);
   };
 
-  // R1 form header — matches НХМаяг БМ-1 sample
-  pushRow(28, [
+  // R1 form code only
+  pushRow(18, [
     xlsxCellXml("A1", S.formCode, si("НХМаяг БМ-1"), "s"),
-    ...emptyCells(1, "B", "E", S.blank),
-    xlsxCellXml(
-      "F1",
-      S.formNote,
-      si("Сангийн сайдын 2017 оны 347 дугаар\nтушаалын хавсралт"),
-      "s",
-    ),
-    ...emptyCells(1, "G", "H", S.formNote),
+    ...emptyCells(1, "B", "H", S.blank),
   ]);
-  merges.push("A1:B1", "F1:H1");
+  merges.push("A1:B1");
   pushRow(6, emptyCells(rowNum));
 
   const title =
@@ -13470,8 +13461,8 @@ function buildStockInSheetXml(receipt, {
     ]);
     pushRow(8, emptyCells(rowNum));
   };
-  pushSign("Хүлээлгэн өгсөн (Бэлтгэн нийлүүлэгч/Төлөөлөгч):");
-  pushSign("Хүлээн авсан эд хариуцагч (Нярав):");
+  pushSign("Хүлээлгэн өгсөн:");
+  pushSign("Хүлээн авсан эд хариуцагч:");
   pushSign("Шалгасан нягтлан бодогч:");
 
   const lastRow = Math.max(1, rowNum - 1);
