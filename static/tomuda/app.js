@@ -4866,6 +4866,50 @@ function entityStateDirty() {
     return localStateDirty();
   }
 }
+const ENTITY_ID_KEYS = [
+  "customers",
+  "products",
+  "employees",
+  "orders",
+  "inventoryLogs",
+  "stockInReceipts",
+  "stockOutReceipts",
+];
+/** Local rows that are not on the server snapshot yet (never POSTed / upserted). */
+function localOnlyEntityIds(serverState = {}, localState = persistentState()) {
+  const missing = [];
+  for (const key of ENTITY_ID_KEYS) {
+    const remoteIds = new Set(
+      (serverState[key] || [])
+        .map((item) => String(item?.id ?? ""))
+        .filter(Boolean),
+    );
+    for (const item of localState[key] || []) {
+      const id = String(item?.id ?? "");
+      if (id && !remoteIds.has(id)) missing.push(`${key}:${id}`);
+    }
+  }
+  return missing;
+}
+function hasLocalOnlyEntities(serverState = {}) {
+  return localOnlyEntityIds(serverState).length > 0;
+}
+/**
+ * After a peer pull or single-entity upsert, baseline against the SERVER
+ * snapshot so unsaved local-only rows stay dirty and get POSTed next.
+ * Never mark the full local memory as clean unless it matches the server.
+ */
+function reconcileBackendMarkerFromServer(serverState, updatedAt = "") {
+  if (updatedAt) serverUpdatedAt = updatedAt;
+  if (!serverState || typeof serverState !== "object") return false;
+  syncBackendSaveMarker(serverState);
+  const stillDirty =
+    JSON.stringify(entityStateSlice(persistentState())) !==
+    JSON.stringify(entityStateSlice(serverState));
+  if (!stillDirty) return false;
+  if (canAutoSaveBackendState()) scheduleBackendSave();
+  return true;
+}
 function shouldDeferBackendSync() {
   if (isLoginFormActive()) return true;
   if (isEditingCountQty()) return true;
@@ -5269,23 +5313,13 @@ function applyRemoteState(payload, opts = {}) {
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
-  // Only push back when shared business data still differs — not session UI keys.
-  if (entityStateDirty() && canAutoSaveBackendState()) {
-    // Re-check against server entities after stock/receipt merge.
-    const serverEntities = entityStateSlice(payload.state);
-    const localEntities = entityStateSlice(persistentState());
-    if (JSON.stringify(localEntities) !== JSON.stringify(serverEntities)) {
-      scheduleBackendSave();
-    } else {
-      syncBackendSaveMarker();
-    }
-  } else {
-    syncBackendSaveMarker();
-  }
-  if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+  // Baseline against SERVER state. Marking local as clean here used to drop
+  // never-POSTed products/customers so peers never saw them.
+  reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
   if (
     !backendSaving &&
     !backendSaveFailedMessage &&
+    !hasLocalOnlyEntities(payload.state) &&
     serverSnapshotLooksFresherThanLocal(
       payload.state,
       payload.updatedAt || "",
@@ -5326,8 +5360,15 @@ async function pullBackendStateNow(opts = {}) {
   }
 }
 async function pollBackendState() {
-  // Do not skip on backendSaveTimer — pending autosave must not starve peer pulls.
-  if (!backendReady || backendSaving || importLoading || stockInSaveLock || stockOutSaveLock)
+  // Skip poll while a dirty entity save is queued/running so we don't race the POST.
+  if (
+    !backendReady ||
+    backendSaving ||
+    importLoading ||
+    stockInSaveLock ||
+    stockOutSaveLock ||
+    (backendSaveTimer && entityStateDirty())
+  )
     return;
   try {
     const payload = await fetchBackendPayload();
@@ -6813,135 +6854,144 @@ async function saveBackendState(retry = 0) {
     scheduleBackendSave();
     return;
   }
-  const protectedData = protectAccidentalDeletions(persistentState());
-  if (protectedData.orders) {
-    protectedData.orders = retainedOrders(protectedData.orders);
-  }
-  if (JSON.stringify(protectedData) !== JSON.stringify(persistentState())) {
-    const session = captureSessionSnapshot();
-    applyPersistentState(protectedData);
-    restoreSessionSnapshot(session);
-    if (!shouldDeferBackendSync()) safeRender();
-  }
-  const mergedOk = await mergeServerStateBeforeSave();
-  if (!mergedOk) {
-    persistOrderSnapshot();
-    markBackendSaveFailed(
-      "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
-    );
-    if (retry < 2) {
-      await sleep(900 * (retry + 1));
-      return saveBackendState(retry + 1);
+  // Block peer polls for the whole pre-save merge + POST window.
+  backendSaving = true;
+  let handoffRetry = false;
+  try {
+    const protectedData = protectAccidentalDeletions(persistentState());
+    if (protectedData.orders) {
+      protectedData.orders = retainedOrders(protectedData.orders);
     }
-    return;
-  }
-  let payloadState = stateForBackendSave();
-  let unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
-  if (unsafeDeletes.length) {
-    const remerged = await mergeServerStateBeforeSave();
-    if (!remerged) {
+    if (JSON.stringify(protectedData) !== JSON.stringify(persistentState())) {
+      const session = captureSessionSnapshot();
+      applyPersistentState(protectedData);
+      restoreSessionSnapshot(session);
+      if (!shouldDeferBackendSync()) safeRender();
+    }
+    const mergedOk = await mergeServerStateBeforeSave();
+    if (!mergedOk) {
       persistOrderSnapshot();
       markBackendSaveFailed(
         "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
       );
+      if (retry < 2) {
+        handoffRetry = true;
+        backendSaving = false;
+        await sleep(900 * (retry + 1));
+        return saveBackendState(retry + 1);
+      }
       return;
     }
-    payloadState = stateForBackendSave();
-    unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
-  }
-  if (unsafeDeletes.length) {
-    persistOrderSnapshot();
-    markBackendSaveFailed(
-      "Захиалга сервертэй sync хийгдээгүй байна. Дахин хадгална уу.",
-    );
-    return;
-  }
-  const snapshot = backendStateSnapshot(payloadState);
-  if (snapshot === backendLastSaved) {
-    clearOrderPersistenceCache();
-    return;
-  }
-  if (importLoading) {
-    scheduleBackendSave();
-    return;
-  }
-  const body = JSON.stringify({
-    state: payloadState,
-    actor: state.currentEmployee
-      ? {
-          id: state.currentEmployee.id,
-          email: state.currentEmployee.email,
-        }
-      : null,
-  });
-  backendSaving = true;
-  try {
-    const res = await fetch(`${API_BASE}/state`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body,
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const payload = await res.json();
-      let appliedServerState = false;
-      if (payload?.state) {
-        const beforeSnapshot = backendStateSnapshot();
-        const session = captureSessionSnapshot();
-        const merged = mergePersistentStates(payload.state, persistentState());
-        applyPersistentState(merged);
-        restoreSessionSnapshot(session);
-        appliedServerState = backendStateSnapshot() !== beforeSnapshot;
+    let payloadState = stateForBackendSave();
+    let unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
+    if (unsafeDeletes.length) {
+      const remerged = await mergeServerStateBeforeSave();
+      if (!remerged) {
+        persistOrderSnapshot();
+        markBackendSaveFailed(
+          "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
+        );
+        return;
       }
-      syncBackendSaveMarker();
+      payloadState = stateForBackendSave();
+      unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
+    }
+    if (unsafeDeletes.length) {
+      persistOrderSnapshot();
+      markBackendSaveFailed(
+        "Захиалга сервертэй sync хийгдээгүй байна. Дахин хадгална уу.",
+      );
+      return;
+    }
+    const snapshot = backendStateSnapshot(payloadState);
+    if (snapshot === backendLastSaved) {
       clearOrderPersistenceCache();
-      clearBackendSaveFailed();
-      if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
-      if (appliedServerState && !shouldDeferBackendSync()) safeRender();
-    } else if (res.status === 403) {
-      let msg = "Эрх хүрэлцэхгүй";
-      try {
-        const err = await res.json();
-        if (err?.detail) msg = String(err.detail);
-      } catch {
-        /* ignore */
+      return;
+    }
+    if (importLoading) {
+      scheduleBackendSave();
+      return;
+    }
+    const body = JSON.stringify({
+      state: payloadState,
+      actor: state.currentEmployee
+        ? {
+            id: state.currentEmployee.id,
+            email: state.currentEmployee.email,
+          }
+        : null,
+    });
+    try {
+      const res = await fetch(`${API_BASE}/state`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body,
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        let appliedServerState = false;
+        if (payload?.state) {
+          const beforeSnapshot = backendStateSnapshot();
+          const session = captureSessionSnapshot();
+          const merged = mergePersistentStates(payload.state, persistentState());
+          applyPersistentState(merged);
+          restoreSessionSnapshot(session);
+          appliedServerState = backendStateSnapshot() !== beforeSnapshot;
+        }
+        // Full-state POST succeeded — mark current memory clean.
+        syncBackendSaveMarker();
+        clearOrderPersistenceCache();
+        clearBackendSaveFailed();
+        if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
+        if (appliedServerState && !shouldDeferBackendSync()) safeRender();
+      } else if (res.status === 403) {
+        let msg = "Эрх хүрэлцэхгүй";
+        try {
+          const err = await res.json();
+          if (err?.detail) msg = String(err.detail);
+        } catch {
+          /* ignore */
+        }
+        persistOrderSnapshot();
+        markBackendSaveFailed(msg);
+        if (!shouldDeferBackendSync()) safeRender();
+      } else {
+        persistOrderSnapshot();
+        markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
+        if (retry >= 2) {
+          alertModal(
+            "Хадгалах амжилтгүй",
+            "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+          );
+        } else {
+          handoffRetry = true;
+          backendSaving = false;
+          await sleep(900 * (retry + 1));
+          return saveBackendState(retry + 1);
+        }
       }
+    } catch (error) {
+      console.warn("Backend state save failed", error);
       persistOrderSnapshot();
-      markBackendSaveFailed(msg);
-      if (!shouldDeferBackendSync()) safeRender();
-    } else {
-      persistOrderSnapshot();
-      markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
+      markBackendSaveFailed("Интернет холболт эсвэл серверийн алдаа");
       if (retry >= 2) {
         alertModal(
           "Хадгалах амжилтгүй",
-          "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+          "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу.",
         );
       } else {
+        handoffRetry = true;
         backendSaving = false;
         await sleep(900 * (retry + 1));
         return saveBackendState(retry + 1);
       }
     }
-  } catch (error) {
-    console.warn("Backend state save failed", error);
-    persistOrderSnapshot();
-    markBackendSaveFailed("Интернет холболт эсвэл серверийн алдаа");
-    if (retry >= 2) {
-      alertModal(
-        "Хадгалах амжилтгүй",
-        "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу.",
-      );
-    } else {
-      backendSaving = false;
-      await sleep(900 * (retry + 1));
-      return saveBackendState(retry + 1);
-    }
   } finally {
-    backendSaving = false;
+    if (!handoffRetry) backendSaving = false;
   }
 }
 function initPageUnloadPersist() {
@@ -18859,10 +18909,16 @@ async function applyCustomerSave(data, id) {
     }
     if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
     saveLocalBackendCache({
-      state: stateForBackendSave(),
+      state: payload?.state || stateForBackendSave(),
       updatedAt: payload?.updatedAt || "",
     });
-    syncBackendSaveMarker(stateForBackendSave());
+    // Baseline against server (or keep dirty). Never mark all local rows clean
+    // after a single-customer upsert — other unsaved products would never POST.
+    if (payload?.state) {
+      reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
+    } else if (localStateDirty()) {
+      scheduleBackendSave();
+    }
     clearOrderPersistenceCache();
     clearBackendSaveFailed();
   } catch (error) {
@@ -18878,8 +18934,7 @@ async function applyCustomerSave(data, id) {
   }
   closeModal();
   focusSavedCustomer(customerId, customerName);
-  // Customer is already on the server; sync leftover dirty data in background.
-  if (localStateDirty()) scheduleBackendSave();
+  if (localStateDirty() || entityStateDirty()) scheduleBackendSave();
   showAppToast(`${customerName} хадгалагдлаа`, "success");
   return true;
 }
@@ -19279,7 +19334,7 @@ async function applyProductSave(data, id) {
       existing.image = prevImage;
     }
   } else {
-    productId = String(Date.now());
+    productId = newEntityId("p");
     state.products.push({
       ...data,
       id: productId,
@@ -19292,17 +19347,26 @@ async function applyProductSave(data, id) {
   if (product) {
     await persistProductImageToMedia(product);
   }
+  const saved = await flushBackendSave().catch((error) => {
+    console.warn("Product backend save failed", error);
+    return false;
+  });
   closeModal();
   render();
+  if (!saved) {
+    markBackendSaveFailed(
+      "Бараа түр хадгалагдлаа. Интернетээ шалгаад дахин оролдоно уу.",
+    );
+    showAppToast("Бараа серверт хадгалагдаагүй — дахин оролдоно уу", "error");
+    return false;
+  }
   showAppToast(
     id
       ? `${product?.name || "Бараа"} хадгалагдлаа`
       : `${product?.name || "Бараа"} нэмэгдлээ`,
     "success",
   );
-  await flushBackendSave().catch((error) =>
-    console.warn("Product backend save failed", error),
-  );
+  return true;
 }
 async function saveProduct(e, id) {
   if (
@@ -20830,12 +20894,11 @@ function applyOrderUpsertPayload(payload) {
   restoreSessionSnapshot(session);
   if (payload.updatedAt) serverUpdatedAt = payload.updatedAt;
   saveLocalBackendCache({
-    state: stateForBackendSave(),
+    state: payload.state,
     updatedAt: payload.updatedAt || "",
   });
-  // Upsert already wrote order+stock on the server — mark clean so we do not
-  // immediately block the UI on a second full-state GET+POST.
-  syncBackendSaveMarker(stateForBackendSave());
+  // Baseline against server so other local-only rows (products, etc.) still POST.
+  reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
   clearOrderPersistenceCache();
   clearBackendSaveFailed();
 }
