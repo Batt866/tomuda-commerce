@@ -268,6 +268,7 @@
     customers: "customers.view",
     employees: "employees.view",
     employeePermissions: "permissions.view",
+    stockReports: "warehouse.view",
     reports: "reports.view",
     promotions: "promotions.view",
     warehouseReceipts: "receipts.view",
@@ -333,6 +334,15 @@
         hasPermission("receipts.view", emp) ||
         hasPermission("warehouse.view", emp) ||
         hasPermission("warehouse.edit", emp)
+      );
+    }
+    if (viewId === "stockReports") {
+      return (
+        hasPermission("warehouse.view", emp) ||
+        hasPermission("warehouse.edit", emp) ||
+        hasPermission("stockIn.view", emp) ||
+        hasPermission("stockOut.view", emp) ||
+        hasPermission("receipts.view", emp)
       );
     }
     if (viewId === "promotions") {

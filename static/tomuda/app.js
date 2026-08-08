@@ -26,6 +26,8 @@ const state = {
     workerDate: "",
     warehouseDate: "",
     reportDate: "",
+    stockReportKind: "",
+    stockReportDate: "",
     promotionTab: "price",
     promotionDetail: "",
   },
@@ -2723,10 +2725,21 @@ function defaultViewForRole(r) {
   if (r === "warehouse") return "warehouse";
   return "worker";
 }
+function canViewStockReports() {
+  return (
+    isAdmin() ||
+    hasPermission("warehouse.view") ||
+    hasPermission("warehouse.edit") ||
+    hasPermission("stockIn.view") ||
+    hasPermission("stockOut.view") ||
+    hasPermission("receipts.view")
+  );
+}
 function canAccessView(viewId) {
   if (viewId === "employeePermissions" && canManageEmployeePermissions()) {
     return true;
   }
+  if (viewId === "stockReports") return canViewStockReports();
   if (permApi()) {
     if (
       (viewId === "warehouse" || viewId === "inventory") &&
@@ -3219,6 +3232,7 @@ function canPageBack() {
     "inventory",
     "warehouse",
     "reports",
+    "stockReports",
     "promotions",
     "warehouseReceipts",
     "count",
@@ -3350,6 +3364,7 @@ function mobileNavActive(viewId, navId) {
       viewId === "employees" ||
       viewId === "employeePermissions" ||
       viewId === "reports" ||
+      viewId === "stockReports" ||
       viewId === "promotions")
   ) {
     return true;
@@ -3395,12 +3410,16 @@ function currentPageTitle(nav) {
   if (state.currentView === "promotions" && state.filters.promotionDetail) {
     return promotionTypeLabel(state.filters.promotionDetail);
   }
+  if (state.currentView === "stockReports" && state.filters.stockReportKind) {
+    return stockReportKindLabel(state.filters.stockReportKind);
+  }
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрхийн тохиргоо",
     inventory: "Агуулах",
     warehouse: "Нярав",
     reports: "Борлуулалтын мэдээ",
+    stockReports: "Тайлан",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
     count: "Тооллого",
@@ -5651,12 +5670,16 @@ function canAppBack() {
   if (state.currentView === "promotions" && state.filters.promotionDetail) {
     return true;
   }
+  if (state.currentView === "stockReports" && state.filters.stockReportKind) {
+    return true;
+  }
   const subAdminViews = [
     "employees",
     "employeePermissions",
     "inventory",
     "warehouse",
     "reports",
+    "stockReports",
     "promotions",
     "warehouseReceipts",
     "count",
@@ -5783,12 +5806,19 @@ function handleAppBack() {
     return true;
   }
 
+  if (state.currentView === "stockReports" && state.filters.stockReportKind) {
+    state.filters.stockReportKind = "";
+    render();
+    return true;
+  }
+
   const subAdminViews = [
     "employees",
     "employeePermissions",
     "inventory",
     "warehouse",
     "reports",
+    "stockReports",
     "promotions",
     "warehouseReceipts",
     "count",
@@ -7240,6 +7270,7 @@ function go(view, opts = {}) {
   state.mobileOpen = false;
   if (changed && view !== "promotions") state.filters.promotionDetail = "";
   if (changed && view === "promotions") state.filters.promotionDetail = "";
+  if (changed && view !== "stockReports") state.filters.stockReportKind = "";
   if (changed && view === "warehouseReceipts") {
     state.filters.warehouseTab = "orders";
     state.filters.warehouseDate = todayIso();
@@ -7428,6 +7459,7 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["warehouse", "Нярав", "warehouse", "warehouse.view"],
+    ["stockReports", "Тайлан", "reports", "__stock_reports__"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
@@ -7436,6 +7468,7 @@ function adminHubHtml() {
     ["employeePermissions", "Эрхийн тохиргоо", "employees", "__permissions__"],
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
+    if (id === "stockReports") return canViewStockReports();
     if (id === "promotions") return canManagePromotions();
     if (id === "warehouseReceipts") return canManageReceipts();
     if (id === "count") return canManageCount();
@@ -7468,7 +7501,7 @@ function adminHubHtml() {
   if (!main.length && !settingsHtml) {
     return `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`;
   }
-  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => adminHubCard(id, label, icon)).join("")}</div>` : ""}${settingsHtml}</section>`;
+  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => (id === "stockReports" ? adminHubActionCard("openStockReportsHub()", label, icon) : adminHubCard(id, label, icon))).join("")}</div>` : ""}${settingsHtml}</section>`;
 }
 function adminView() {
   ensureSettings();
@@ -14759,6 +14792,189 @@ function setReportDate(day) {
     state.filters.reportDate = day || "";
   });
 }
+function stockReportKindLabel(kind) {
+  if (kind === "in") return "Орлогын тайлан";
+  if (kind === "out") return "Зарлагын тайлан";
+  return "Тайлан";
+}
+function ensureStockReportDateDefault() {
+  if (!normalizeIsoDateInput(state.filters.stockReportDate)) {
+    state.filters.stockReportDate = todayIso();
+  }
+}
+function openStockReportsHub() {
+  if (!canViewStockReports()) {
+    return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
+  }
+  state.filters.stockReportKind = "";
+  if (state.currentView !== "stockReports") {
+    go("stockReports");
+    return;
+  }
+  render();
+  scrollAppMainToTop();
+}
+function openStockReport(kind) {
+  if (!canViewStockReports()) {
+    return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
+  }
+  if (kind !== "in" && kind !== "out") return;
+  state.filters.stockReportKind = kind;
+  ensureStockReportDateDefault();
+  if (state.currentView !== "stockReports") {
+    go("stockReports");
+    return;
+  }
+  render();
+  scrollAppMainToTop();
+}
+function setStockReportDate(day) {
+  commitDatePickerChange(() => {
+    state.filters.stockReportDate =
+      normalizeIsoDateInput(day) || todayIso();
+  });
+}
+function selectStockReportToday() {
+  commitDatePickerChange(() => {
+    state.filters.stockReportDate = todayIso();
+  });
+}
+function stockReportDateFiltersHtml() {
+  ensureStockReportDateDefault();
+  const today = todayIso(),
+    day = normalizeIsoDateInput(state.filters.stockReportDate) || today,
+    isToday = day === today,
+    display = warehouseDateDisplayText(day);
+  return `<div class="wh-date-filters"><button type="button" onclick="selectStockReportToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setStockReportDate(this.value)" oninput="setStockReportDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдрийн тайлан" : "Сонгосон өдрийн тайлан"}</span></div>`;
+}
+function stockReportReceiptsForDay(kind, day) {
+  const list =
+    kind === "out"
+      ? Array.isArray(state.stockOutReceipts)
+        ? state.stockOutReceipts
+        : []
+      : Array.isArray(state.stockInReceipts)
+        ? state.stockInReceipts
+        : [];
+  const target = normalizeIsoDateInput(day) || todayIso();
+  return list
+    .filter((r) => isoDay(r?.createdAt) === target)
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b?.createdAt || 0).getTime() -
+        new Date(a?.createdAt || 0).getTime(),
+    );
+}
+function stockReportLineAmount(kind, line) {
+  if (kind === "out") {
+    const total = Number(line?.totalPrice);
+    if (Number.isFinite(total)) return total;
+    return (Number(line?.quantity) || 0) * (Number(line?.unitPrice) || 0);
+  }
+  return stockInReceiptLineTotal(line);
+}
+function stockReportReceiptTotal(kind, receipt) {
+  const total = Number(receipt?.totalAmount);
+  if (Number.isFinite(total) && total > 0) return total;
+  return (receipt?.lines || []).reduce(
+    (sum, line) => sum + stockReportLineAmount(kind, line),
+    0,
+  );
+}
+function stockReportAggregateLines(kind, receipts) {
+  const map = new Map();
+  for (const receipt of receipts) {
+    for (const line of receipt.lines || []) {
+      const qty = Number(line.quantity) || 0;
+      if (qty <= 0) continue;
+      const key = String(
+        line.productId || line.barcode || line.productName || "",
+      );
+      if (!key) continue;
+      const prev = map.get(key) || {
+        productId: line.productId || "",
+        productName: line.productName || "-",
+        barcode: line.barcode || "",
+        quantity: 0,
+        amount: 0,
+      };
+      prev.quantity += qty;
+      prev.amount += stockReportLineAmount(kind, line);
+      if (!prev.barcode && line.barcode) prev.barcode = line.barcode;
+      if ((!prev.productName || prev.productName === "-") && line.productName) {
+        prev.productName = line.productName;
+      }
+      map.set(key, prev);
+    }
+  }
+  return [...map.values()].sort((a, b) =>
+    String(a.productName || "").localeCompare(String(b.productName || ""), "mn"),
+  );
+}
+function openStockReportReceipt(kind, id) {
+  const list =
+    kind === "out" ? state.stockOutReceipts || [] : state.stockInReceipts || [];
+  const receipt = list.find((r) => r.id === id);
+  if (!receipt) return;
+  const title =
+    kind === "out"
+      ? stockOutReceiptTitle(receipt)
+      : receipt.receiptNumber
+        ? `Орлого № ${receipt.receiptNumber}`
+        : "Орлогын баримт";
+  const body =
+    kind === "out"
+      ? stockOutReceiptPanel(receipt)
+      : stockInReceiptPanel(receipt);
+  box(title, `<div class="p-3">${body}</div>`, "max-w-3xl");
+}
+function stockReportReceiptRow(kind, receipt) {
+  const lines = receipt.lines || [];
+  const total = stockReportReceiptTotal(kind, receipt);
+  const no = receipt.receiptNumber
+    ? `#${esc(receipt.receiptNumber)}`
+    : "Дугааргүй";
+  return `<button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="line-list__row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${esc(receipt.employeeName || "-")} · ${lines.length} бараа · ${dteAt(receipt.createdAt)}</p></div><b class="line-list__amount">${fmt(total)}</b></button>`;
+}
+function stockReportAggregateRow(row, index) {
+  return `<div class="line-list__row line-list__row--static"><span>${index + 1}. ${esc(row.productName)}${row.barcode ? ` <span class="text-muted-foreground">· ${esc(row.barcode)}</span>` : ""}</span><span class="text-sm text-muted-foreground">${row.quantity} ш</span><b>${fmt(row.amount)}</b></div>`;
+}
+function stockReportsMenuHtml() {
+  const items = [
+    ["in", "Орлогын тайлан", "stock"],
+    ["out", "Зарлагын тайлан", "inventory"],
+  ];
+  return `<div class="admin-hub__settings">${items
+    .map(
+      ([kind, label, icon]) =>
+        adminHubActionCard(`openStockReport('${kind}')`, label, icon),
+    )
+    .join("")}</div>`;
+}
+function stockReportDetailView(kind) {
+  ensureStockReportDateDefault();
+  const day = normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
+  const receipts = stockReportReceiptsForDay(kind, day);
+  const products = stockReportAggregateLines(kind, receipts);
+  const total = receipts.reduce(
+    (sum, r) => sum + stockReportReceiptTotal(kind, r),
+    0,
+  );
+  const emptyDay =
+    day === todayIso()
+      ? "Өнөөдөр баримт байхгүй"
+      : "Сонгосон өдөр баримт байхгүй";
+  return `<div class="space-y-4">${pageHead(stockReportKindLabel(kind))}${pageToolbarHtml({ filters: stockReportDateFiltersHtml() })}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}${card("Бараа", products.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(kind, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
+}
+function stockReportsView() {
+  if (!canViewStockReports()) {
+    return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
+  }
+  const kind = state.filters.stockReportKind;
+  if (kind === "in" || kind === "out") return stockReportDetailView(kind);
+  return `<div class="space-y-4">${pageHead("Тайлан")}<section class="admin-hub"><h3 class="admin-hub__heading">Орлого / Зарлага</h3>${stockReportsMenuHtml()}</section></div>`;
+}
 function reportsView() {
   const orders = reportOrdersFiltered(),
     q = String(state.searches.reports || "").trim(),
@@ -17850,6 +18066,7 @@ function render() {
     employees: employeesView,
     employeePermissions: employeePermissionsView,
     reports: reportsView,
+    stockReports: stockReportsView,
     promotions: promotionsView,
     worker: workerView,
     warehouse: warehouseView,
@@ -22133,6 +22350,11 @@ Object.assign(window, {
   setReportDate,
   clearReportDate,
   reportOrdersFiltered,
+  openStockReportsHub,
+  openStockReport,
+  setStockReportDate,
+  selectStockReportToday,
+  openStockReportReceipt,
   setPaymentTerm,
   csv,
   finishCount,
