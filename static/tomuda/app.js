@@ -3250,11 +3250,11 @@ const MOBILE_NAV_SHORT = {
   worker: "Захиалга",
   customers: "Харилцагч",
   products: "Бараа",
-  warehouse: "Нярав",
+  warehouse: "Агуулах",
   delivery: "Хүргэлт",
   count: "Тооллого",
   employees: "Ажилтан",
-  inventory: "Агуулах",
+  inventory: "Үлдэгдэл",
   reports: "Борлуулалтын мэдээ",
   promotions: "Урамшуулал",
   admin: "Админ",
@@ -3294,7 +3294,7 @@ function sidebarNavForRole(role) {
       ["worker", "+ Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["inventory", "Агуулах"],
+      ["warehouse", "Агуулах"],
       ["employees", "Ажилтан"],
       ["reports", "Борлуулалтын мэдээ"],
       ["promotions", "Урамшуулал"],
@@ -3305,19 +3305,40 @@ function sidebarNavForRole(role) {
       ["worker", "+ Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["inventory", "Агуулах"],
-      ["warehouse", "Нярав"],
+      ["warehouse", "Агуулах"],
+      ["inventory", "Үлдэгдэл"],
       ["admin", "Админ"],
-    ].filter(([id]) => allowedNavIds().includes(id) || id === "inventory");
+    ].filter(
+      ([id]) =>
+        allowedNavIds().includes(id) ||
+        id === "warehouse" ||
+        id === "inventory",
+    );
   }
-  // Нярав is under Админ hub — hide from primary nav when Admin is available.
-  // Агуулах stays on bottom/sidebar nav as its own stock register.
+  // Menu "Агуулах" = бараа бэлдэх (calendar + авсан захиалга).
+  // Stock register is "Үлдэгдэл" and lives under Admin for admin users.
+  nav = nav.map(([id, label]) => {
+    if (id === "warehouse") return ["warehouse", "Агуулах"];
+    if (id === "inventory") return ["inventory", "Үлдэгдэл"];
+    return [id, label];
+  });
   if (nav.some(([id]) => id === "admin")) {
-    nav = nav.filter(([id]) => id !== "warehouse");
+    nav = nav.filter(([id]) => id !== "inventory");
+    if (
+      canAccessView("warehouse") &&
+      !nav.some(([id]) => id === "warehouse")
+    ) {
+      const adminIdx = nav.findIndex(([id]) => id === "admin");
+      const item = ["warehouse", "Агуулах"];
+      if (adminIdx >= 0) nav.splice(adminIdx, 0, item);
+      else nav.push(item);
+    }
   }
   return nav;
 }
 function bottomNavForRole(role) {
+  const canWh =
+    canAccessView("warehouse") || hasPermission("warehouse.view");
   const canInv =
     canAccessView("inventory") || hasPermission("warehouse.view");
   const specs = {
@@ -3325,23 +3346,24 @@ function bottomNavForRole(role) {
       ["worker", "Захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["inventory", "Агуулах"],
+      ["warehouse", "Агуулах"],
       ["admin", "Админ"],
     ],
     sales: [
       ["worker", "Захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["inventory", "Агуулах"],
+      ["inventory", "Үлдэгдэл"],
     ],
     warehouse: [
-      ["warehouse", "Нярав"],
-      ["inventory", "Агуулах"],
+      ["warehouse", "Агуулах"],
+      ["inventory", "Үлдэгдэл"],
     ],
     delivery: [["delivery", "Хүргэлт"]],
   };
   const items = specs[role] || specs.sales;
   return items.filter(([id]) => {
+    if (id === "warehouse") return canWh;
     if (id === "inventory") return canInv;
     if (id === "admin") return canAccessView("admin");
     return canAccessView(id);
@@ -3357,14 +3379,14 @@ function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
   if (
     navId === "admin" &&
-    (viewId === "warehouse" ||
-      viewId === "warehouseReceipts" ||
+    (viewId === "warehouseReceipts" ||
       viewId === "count" ||
       viewId === "delivery" ||
       viewId === "employees" ||
       viewId === "employeePermissions" ||
       viewId === "reports" ||
       viewId === "stockReports" ||
+      viewId === "inventory" ||
       viewId === "promotions")
   ) {
     return true;
@@ -3416,8 +3438,8 @@ function currentPageTitle(nav) {
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрхийн тохиргоо",
-    inventory: "Агуулах",
-    warehouse: "Нярав",
+    inventory: "Үлдэгдэл",
+    warehouse: "Агуулах",
     reports: "Борлуулалтын мэдээ",
     stockReports: "Тайлан",
     promotions: "Урамшуулал",
@@ -6969,11 +6991,18 @@ function warehouseDateFilterActive() {
   );
 }
 function warehouseLiveFilterBannerHtml() {
-  if (!warehouseDateFilterActive()) return "";
-  const total = (state.orders || []).length;
-  const visible = filterWarehouseOrders(state.orders || []).length;
+  ensureWarehouseDateDefault();
+  const day = normalizeIsoDateInput(state.filters.warehouseDate) || todayIso();
+  const today = todayIso();
+  const total = (state.orders || []).filter((o) => o.status !== "cancelled")
+    .length;
+  const visible = filterWarehouseOrders(
+    (state.orders || []).filter((o) => o.status !== "cancelled"),
+  ).length;
   const hidden = Math.max(0, total - visible);
-  return `<div class="wh-date-banner" role="status"><strong>Зөвхөн өнөөдөр авсан захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Баримт дээрх хүргэлтийн огноо ихэвчлэн маргааш байдаг.</span></div>`;
+  const dayLabel =
+    day === today ? "Өнөөдөр авсан" : `${warehouseDateDisplayText(day)} өдөр авсан`;
+  return `<div class="wh-date-banner" role="status"><strong>${dayLabel} захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Календараас өдөр сонгоод бараа бэлдэнэ.</span></div>`;
 }
 async function mergeServerStateBeforeSave() {
   try {
@@ -7283,12 +7312,17 @@ function go(view, opts = {}) {
     state.selectedWarehouseOrderId = "";
   }
   if (changed && view === "warehouse") {
-    state.filters.warehouseDate = todayIso();
     state.selectedWarehouseOrderId = "";
-    // Keep Орлого/Зарлага when setWarehouseTab() called go("warehouse").
-    if (
+    if (!normalizeIsoDateInput(state.filters.warehouseDate)) {
+      state.filters.warehouseDate = todayIso();
+    }
+    // Menu "Агуулах" opens бараа бэлдэх. Tab switches keep Орлого/Зарлага.
+    if (!opts.keepWarehouseTab) {
+      state.filters.warehouseTab = "orders";
+    } else if (
       state.filters.warehouseTab !== "in" &&
-      state.filters.warehouseTab !== "out"
+      state.filters.warehouseTab !== "out" &&
+      state.filters.warehouseTab !== "orders"
     ) {
       state.filters.warehouseTab = "orders";
     }
@@ -7465,6 +7499,7 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["warehouse", "Бараа бэлдэх", "warehouse", "warehouse.view"],
+    ["inventory", "Үлдэгдэл", "inventory", "warehouse.view"],
     ["stockReports", "Тайлан", "reports", "__stock_reports__"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
@@ -7475,6 +7510,12 @@ function adminHubHtml() {
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
     if (id === "stockReports") return canViewStockReports();
+    if (id === "inventory")
+      return (
+        canAccessView("inventory") ||
+        hasPermission("warehouse.view") ||
+        hasPermission("warehouse.edit")
+      );
     if (id === "promotions") return canManagePromotions();
     if (id === "warehouseReceipts") return canManageReceipts();
     if (id === "count") return canManageCount();
@@ -10862,7 +10903,9 @@ function warehouseOrdersForSelectedWorkers() {
   if (!scopeIds.length) return [];
   const idSet = new Set(scopeIds);
   const orders = filterWarehouseOrders(
-    state.orders.filter((o) => idSet.has(o.employeeId)),
+    state.orders.filter(
+      (o) => idSet.has(o.employeeId) && o.status !== "cancelled",
+    ),
   );
   return sortOrdersBySelectedPeople(orders, scopeIds);
 }
@@ -11319,9 +11362,9 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
 }
 function inventoryView() {
-  // Агуулах = зөвхөн үлдэгдлийн бүртгэл. Орлого/Зарлага нь Нярав дотор.
+  // Агуулах цэс = бараа бэлдэх. Энэ view = зөвхөн үлдэгдлийн бүртгэл.
   state.filters.inventory = "stock";
-  return `<div class="space-y-4">${pageHead("Агуулах")}${inventoryRegisterBody("stock")}</div>`;
+  return `<div class="space-y-4">${pageHead("Үлдэгдэл")}${inventoryRegisterBody("stock")}</div>`;
 }
 function setWarehouseTab(tab) {
   const next =
@@ -11337,7 +11380,7 @@ function setWarehouseTab(tab) {
     ensureStockOutSession();
   }
   if (state.currentView !== "warehouse") {
-    go("warehouse");
+    go("warehouse", { keepWarehouseTab: true });
     return;
   }
   render();
@@ -17215,7 +17258,8 @@ function warehouseView() {
       ? `<div class="grid grid-cols-1 gap-3">${workerChooser(warehouseOrdersForSelectedWorkers())}</div>`
       : inventoryRegisterBody(tab);
   const tabClass = tabs.length > 2 ? "seg-tabs seg-tabs--3" : "seg-tabs";
-  return `<div class="space-y-3">${pageHead("Нярав")}${
+  const title = tab === "orders" ? "Агуулах" : "Нярав";
+  return `<div class="space-y-3">${pageHead(title)}${
     tabs.length > 1
       ? `<div class="${tabClass}">${tabs
           .map(
