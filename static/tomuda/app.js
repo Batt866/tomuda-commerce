@@ -3250,11 +3250,11 @@ const MOBILE_NAV_SHORT = {
   worker: "Захиалга",
   customers: "Харилцагч",
   products: "Бараа",
-  warehouse: "Агуулах",
+  warehouse: "Нярав",
   delivery: "Хүргэлт",
   count: "Тооллого",
   employees: "Ажилтан",
-  inventory: "Үлдэгдэл",
+  inventory: "Агуулах",
   reports: "Борлуулалтын мэдээ",
   promotions: "Урамшуулал",
   admin: "Админ",
@@ -3294,7 +3294,7 @@ function sidebarNavForRole(role) {
       ["worker", "+ Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
+      ["inventory", "Агуулах"],
       ["employees", "Ажилтан"],
       ["reports", "Борлуулалтын мэдээ"],
       ["promotions", "Урамшуулал"],
@@ -3305,40 +3305,24 @@ function sidebarNavForRole(role) {
       ["worker", "+ Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
-      ["inventory", "Үлдэгдэл"],
+      ["inventory", "Агуулах"],
+      ["warehouse", "Нярав"],
       ["admin", "Админ"],
-    ].filter(
-      ([id]) =>
-        allowedNavIds().includes(id) ||
-        id === "warehouse" ||
-        id === "inventory",
-    );
+    ].filter(([id]) => allowedNavIds().includes(id) || id === "inventory");
   }
-  // Menu "Агуулах" = бараа бэлдэх (calendar + авсан захиалга).
-  // Stock register is "Үлдэгдэл" and lives under Admin for admin users.
+  // Агуулах = үлдэгдэл (inventory). Нярав = авсан захиалга / бараа бэлдэх.
   nav = nav.map(([id, label]) => {
-    if (id === "warehouse") return ["warehouse", "Агуулах"];
-    if (id === "inventory") return ["inventory", "Үлдэгдэл"];
+    if (id === "inventory") return ["inventory", "Агуулах"];
+    if (id === "warehouse") return ["warehouse", "Нярав"];
     return [id, label];
   });
+  // Admin: Нярав (захиалга бэлдэх) is under Админ hub — keep Агуулах on menu.
   if (nav.some(([id]) => id === "admin")) {
-    nav = nav.filter(([id]) => id !== "inventory");
-    if (
-      canAccessView("warehouse") &&
-      !nav.some(([id]) => id === "warehouse")
-    ) {
-      const adminIdx = nav.findIndex(([id]) => id === "admin");
-      const item = ["warehouse", "Агуулах"];
-      if (adminIdx >= 0) nav.splice(adminIdx, 0, item);
-      else nav.push(item);
-    }
+    nav = nav.filter(([id]) => id !== "warehouse");
   }
   return nav;
 }
 function bottomNavForRole(role) {
-  const canWh =
-    canAccessView("warehouse") || hasPermission("warehouse.view");
   const canInv =
     canAccessView("inventory") || hasPermission("warehouse.view");
   const specs = {
@@ -3346,24 +3330,23 @@ function bottomNavForRole(role) {
       ["worker", "Захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
+      ["inventory", "Агуулах"],
       ["admin", "Админ"],
     ],
     sales: [
       ["worker", "Захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["inventory", "Үлдэгдэл"],
+      ["inventory", "Агуулах"],
     ],
     warehouse: [
-      ["warehouse", "Агуулах"],
-      ["inventory", "Үлдэгдэл"],
+      ["warehouse", "Нярав"],
+      ["inventory", "Агуулах"],
     ],
     delivery: [["delivery", "Хүргэлт"]],
   };
   const items = specs[role] || specs.sales;
   return items.filter(([id]) => {
-    if (id === "warehouse") return canWh;
     if (id === "inventory") return canInv;
     if (id === "admin") return canAccessView("admin");
     return canAccessView(id);
@@ -3379,14 +3362,14 @@ function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
   if (
     navId === "admin" &&
-    (viewId === "warehouseReceipts" ||
+    (viewId === "warehouse" ||
+      viewId === "warehouseReceipts" ||
       viewId === "count" ||
       viewId === "delivery" ||
       viewId === "employees" ||
       viewId === "employeePermissions" ||
       viewId === "reports" ||
       viewId === "stockReports" ||
-      viewId === "inventory" ||
       viewId === "promotions")
   ) {
     return true;
@@ -3438,8 +3421,8 @@ function currentPageTitle(nav) {
   const extra = {
     employees: "Ажилтан",
     employeePermissions: "Эрхийн тохиргоо",
-    inventory: "Үлдэгдэл",
-    warehouse: "Агуулах",
+    inventory: "Агуулах",
+    warehouse: "Нярав",
     reports: "Борлуулалтын мэдээ",
     stockReports: "Тайлан",
     promotions: "Урамшуулал",
@@ -7316,7 +7299,7 @@ function go(view, opts = {}) {
     if (!normalizeIsoDateInput(state.filters.warehouseDate)) {
       state.filters.warehouseDate = todayIso();
     }
-    // Menu "Агуулах" opens бараа бэлдэх. Tab switches keep Орлого/Зарлага.
+    // Нярав opens Бараа бэлдэх by default. Tab switches keep Орлого/Зарлага.
     if (!opts.keepWarehouseTab) {
       state.filters.warehouseTab = "orders";
     } else if (
@@ -7498,8 +7481,8 @@ function adminHubActionCard(action, label, iconKey) {
 function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
-    ["warehouse", "Бараа бэлдэх", "warehouse", "warehouse.view"],
-    ["inventory", "Үлдэгдэл", "inventory", "warehouse.view"],
+    ["warehouse", "Нярав", "warehouse", "warehouse.view"],
+    ["inventory", "Агуулах", "inventory", "warehouse.view"],
     ["stockReports", "Тайлан", "reports", "__stock_reports__"],
     ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
@@ -11104,7 +11087,7 @@ function openWarehousePrepare() {
   }
   state.filters.warehouseTab = "orders";
   if (state.currentView !== "warehouse") {
-    go("warehouse");
+    go("warehouse", { keepWarehouseTab: true });
     return;
   }
   render();
@@ -11362,9 +11345,9 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
 }
 function inventoryView() {
-  // Агуулах цэс = бараа бэлдэх. Энэ view = зөвхөн үлдэгдлийн бүртгэл.
+  // Үлдэгдлийн бүртгэл. Орлого/Зарлага болон бараа бэлдэх нь Нярав дотор.
   state.filters.inventory = "stock";
-  return `<div class="space-y-4">${pageHead("Үлдэгдэл")}${inventoryRegisterBody("stock")}</div>`;
+  return `<div class="space-y-4">${pageHead("Агуулах")}${inventoryRegisterBody("stock")}</div>`;
 }
 function setWarehouseTab(tab) {
   const next =
@@ -17258,8 +17241,7 @@ function warehouseView() {
       ? `<div class="grid grid-cols-1 gap-3">${workerChooser(warehouseOrdersForSelectedWorkers())}</div>`
       : inventoryRegisterBody(tab);
   const tabClass = tabs.length > 2 ? "seg-tabs seg-tabs--3" : "seg-tabs";
-  const title = tab === "orders" ? "Агуулах" : "Нярав";
-  return `<div class="space-y-3">${pageHead(title)}${
+  return `<div class="space-y-3">${pageHead("Нярав")}${
     tabs.length > 1
       ? `<div class="${tabClass}">${tabs
           .map(
