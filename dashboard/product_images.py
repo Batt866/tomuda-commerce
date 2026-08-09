@@ -70,7 +70,7 @@ def decode_data_url(data_url: str) -> tuple[bytes, str]:
 
 
 def make_product_thumb_bytes(raw: bytes) -> bytes | None:
-    """Build a small JPEG thumb for list UIs. Returns None if decode fails."""
+    """Build a small square JPEG thumb (full product, letterboxed). Returns None if decode fails."""
     if not raw or len(raw) < 32:
         return None
     try:
@@ -81,8 +81,12 @@ def make_product_thumb_bytes(raw: bytes) -> bytes | None:
         with Image.open(io.BytesIO(raw)) as img:
             img = img.convert("RGB")
             img.thumbnail((THUMB_MAX_EDGE, THUMB_MAX_EDGE), Image.Resampling.LANCZOS)
+            canvas = Image.new("RGB", (THUMB_MAX_EDGE, THUMB_MAX_EDGE), (255, 255, 255))
+            ox = max(0, (THUMB_MAX_EDGE - img.width) // 2)
+            oy = max(0, (THUMB_MAX_EDGE - img.height) // 2)
+            canvas.paste(img, (ox, oy))
             out = io.BytesIO()
-            img.save(
+            canvas.save(
                 out,
                 format="JPEG",
                 quality=THUMB_JPEG_QUALITY,
