@@ -12877,7 +12877,7 @@ function stockOutReceiptFileName(receipt) {
 }
 function stockOutReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `Зарлага гаргах баримт №${no}` : "Зарлага гаргах баримт";
+  return no ? `Зарлагын баримт №${no}` : "Зарлагын баримт";
 }
 function buildStockOutReceiptSnapshot(productIds = null) {
   let products = stockOutEntryProducts(state.products);
