@@ -9457,7 +9457,7 @@ function warehousePrepareStylesXml() {
 }
 function receiptDrawingXml() {
   // Fixed ~14mm logo via oneCellAnchor (size does not depend on narrow column A).
-  // Brand/address in B stay indented so they clear the logo spill.
+  // Brand/address in B share the same left edge (parallel).
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
   const pad = Math.round((0.15 / 25.4) * 914400);
   const logoEmu = Math.round((14 / 25.4) * 914400);
@@ -9590,12 +9590,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
   const deliveryDateText = receiptDeliveryDateDisplay(o);
-  // Two lines under brand; clear of logo that extends into B
+  // Two lines under brand — same left edge as brand (no font-scaled nbsp pad).
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  // Leading spaces clear the fixed 14mm logo that spills into B.
-  const logoTextPad = "\u00A0".repeat(12);
 
-  // Header: fixed-size logo from A; brand/address indented in B; title full B
+  // Header: logo in A; brand + address left-aligned in B (parallel start).
   // Date: label J:K row1; value K row2
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
@@ -9609,7 +9607,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   );
   pushRow(18, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
-    xlsxCellXml(`B${hr1}`, 39, si(`${logoTextPad}ТОМУДА ГРУПП`), "s"),
+    xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
     ...emptyCells(hr1, "C", "F", 39),
     ...emptyCells(hr1, "I", "I", 3),
@@ -9633,12 +9631,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       max: 44,
     }),
   );
-  const paddedAddr = companyAddr
-    .split("\n")
-    .map((line) => `${logoTextPad}${line}`)
-    .join("\n");
   pushRow(companyAddrH, [
-    xlsxCellXml(`B${hr2}`, 5, si(paddedAddr), "s"),
+    xlsxCellXml(`B${hr2}`, 5, si(companyAddr), "s"),
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "C", "I", 5),
   ]);
