@@ -9341,7 +9341,7 @@ td, th { border: none; }
   overflow: visible;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid__spacer--sign-gap td { height: 6px; padding: 0; }
+.receipt-grid__spacer--sign-gap td { height: 15px; padding: 0; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 @media print {
   html, body {
@@ -10214,7 +10214,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
   {
     const gapR = rowNum;
-    pushRow(8, [
+    pushRow(14.25, [
       xlsxCellXml(`A${gapR}`, 1, si("\u00A0"), "s"),
       ...emptyCells(gapR, "B", RECEIPT_XLSX_LAST_COL, 1),
     ]);
@@ -16030,7 +16030,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .spacer td { height: 18px; border: none !important; }
 .sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
-.sign-gap td { height: 6px; border: none !important; }
+.sign-gap td { height: 15px; border: none !important; }
 </style></head><body><table class="prepare">
 <colgroup><col class="c-name"><col class="c-unit"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-stock"></colgroup>
 <tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
