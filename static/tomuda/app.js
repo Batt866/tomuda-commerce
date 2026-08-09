@@ -12337,9 +12337,10 @@ function stockInTakeRowHtml({
   placeholder = "0",
   ariaLabel = "",
 }) {
+  const idAttr = `stock-in-${name}`;
   const inputAttrs = readonly
-    ? `readonly tabindex="-1" data-stock-in-${name}`
-    : `name="${name}" oninput="${oninput}"`;
+    ? `id="${idAttr}" name="${name}" readonly tabindex="-1" data-stock-in-${name}`
+    : `id="${idAttr}" name="${name}" oninput="${oninput}"`;
   const inputClass = `stock-in-take__input${accent ? " stock-in-take__input--accent" : ""}${soft ? " stock-in-take__input--soft" : ""}`;
   return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><span class="stock-in-take__label">${label}</span><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label></div>`;
 }
@@ -19712,16 +19713,20 @@ function initProductImageFallback() {
       if (img?.tagName !== "IMG" || !img.dataset.productImg) return;
       const failed = productImageUrlKey(img.currentSrc || img.src);
       if (failed) brokenProductImageUrls.add(failed);
+      // bindProductImages already owns retries once marked ready.
       if (img.dataset.imgFallbackReady === "1") return;
-      const candidates = productImageFallbackList(findProductForImage(img));
+      const thumb = img.dataset.productImgThumb === "1";
+      const candidates = productImageFallbackList(findProductForImage(img), {
+        thumb,
+      });
       const next = Number(img.dataset.imgFallbackIdx || "0") + 1;
       if (next < candidates.length) {
         img.dataset.imgFallbackIdx = String(next);
         img.src = candidates[next];
-      } else if (candidates.length) {
-        img.dataset.imgFallbackIdx = "0";
-        img.src = candidates[0];
+        return;
       }
+      // Exhausted — never wrap to 0 (that spam-loops 404s / freezes the UI).
+      img.dataset.imgFallbackReady = "1";
     },
     true,
   );
