@@ -2875,11 +2875,18 @@ function canViewStockReports() {
     hasPermission("receipts.view")
   );
 }
+function canViewSalesReport() {
+  return isAdmin() || hasPermission("reports.view");
+}
+function canViewReportsHub() {
+  return canViewStockReports() || canViewSalesReport();
+}
 function canAccessView(viewId) {
   if (viewId === "employeePermissions" && canManageEmployeePermissions()) {
     return true;
   }
-  if (viewId === "stockReports") return canViewStockReports();
+  if (viewId === "stockReports") return canViewReportsHub();
+  if (viewId === "reports") return canViewSalesReport();
   if (permApi()) {
     if (
       (viewId === "warehouse" || viewId === "inventory") &&
@@ -3396,6 +3403,7 @@ const MOBILE_NAV_SHORT = {
   employees: "Ажилтан",
   inventory: "Нярав",
   reports: "Борлуулалтын мэдээ",
+  stockReports: "Тайлан",
   promotions: "Урамшуулал",
   admin: "Админ",
 };
@@ -3415,6 +3423,8 @@ const MOBILE_NAV_SVG = {
   inventory:
     '<path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3"/><path d="M3 8h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/><path d="M12 12v6"/>',
   reports:
+    '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 17V9"/><path d="M12 17V7"/><path d="M16 17v-4"/>',
+  stockReports:
     '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 17V9"/><path d="M12 17V7"/><path d="M16 17v-4"/>',
   promotions:
     '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
@@ -3436,7 +3446,7 @@ function sidebarNavForRole(role) {
       ["products", "Бараа"],
       ["warehouse", "Агуулах"],
       ["employees", "Ажилтан"],
-      ["reports", "Борлуулалтын мэдээ"],
+      ["stockReports", "Тайлан"],
       ["promotions", "Урамшуулал"],
       ["admin", "Админ"],
     ];
@@ -7850,6 +7860,19 @@ function initPageUnloadPersist() {
 }
 
 function go(view, opts = {}) {
+  if (view === "reports") {
+    if (!canViewSalesReport()) {
+      if (!opts.silent) {
+        alertModal(
+          "Эрхгүй",
+          "Энэ хэсгийг харах эрх байхгүй байна. Админаас эрхээ шалгуулна уу.",
+        );
+      }
+      return;
+    }
+    state.filters.stockReportKind = "sales";
+    view = "stockReports";
+  }
   if (!canAccessView(view)) {
     if (!opts.silent) {
       alertModal(
@@ -8110,7 +8133,6 @@ function adminHubHtml() {
     ["warehouse", "Агуулах", "warehouse", "warehouse.view"],
     ["inventory", "Нярав", "inventory", "warehouse.view"],
     ["stockReports", "Тайлан", "reports", "__stock_reports__"],
-    ["reports", "Борлуулалтын мэдээ", "reports", "reports.view"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
     ["warehouseReceipts", "Баримтууд", "stock", "receipts.view"],
     ["count", "Тооллого", "count", "count.view"],
@@ -8118,7 +8140,7 @@ function adminHubHtml() {
     ["employeePermissions", "Эрхийн тохиргоо", "employees", "__permissions__"],
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
-    if (id === "stockReports") return canViewStockReports();
+    if (id === "stockReports") return canViewReportsHub();
     if (id === "inventory")
       return (
         canAccessView("inventory") ||
@@ -16198,6 +16220,7 @@ function setReportDate(day) {
   });
 }
 function stockReportKindLabel(kind) {
+  if (kind === "sales") return "Борлуулалтын мэдээ";
   if (kind === "in") return "Орлогын тайлан";
   if (kind === "out") return "Зарлагын тайлан";
   return "Тайлан";
@@ -16208,7 +16231,7 @@ function ensureStockReportDateDefault() {
   }
 }
 function openStockReportsHub() {
-  if (!canViewStockReports()) {
+  if (!canViewReportsHub()) {
     return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
   }
   state.filters.stockReportKind = "";
@@ -16220,12 +16243,19 @@ function openStockReportsHub() {
   scrollAppMainToTop();
 }
 function openStockReport(kind) {
-  if (!canViewStockReports()) {
-    return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
+  if (kind === "sales") {
+    if (!canViewSalesReport()) {
+      return alertModal("Эрхгүй", "Борлуулалтын мэдээ харах эрхгүй.");
+    }
+  } else if (kind === "in" || kind === "out") {
+    if (!canViewStockReports()) {
+      return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
+    }
+  } else {
+    return;
   }
-  if (kind !== "in" && kind !== "out") return;
   state.filters.stockReportKind = kind;
-  ensureStockReportDateDefault();
+  if (kind === "in" || kind === "out") ensureStockReportDateDefault();
   if (state.currentView !== "stockReports") {
     go("stockReports");
     return;
@@ -16346,16 +16376,27 @@ function stockReportAggregateRow(row, index) {
   return `<div class="line-list__row line-list__row--static"><span>${index + 1}. ${esc(row.productName)}${row.barcode ? ` <span class="text-muted-foreground">· ${esc(row.barcode)}</span>` : ""}</span><span class="text-sm text-muted-foreground">${row.quantity} ш</span><b>${fmt(row.amount)}</b></div>`;
 }
 function stockReportsMenuHtml() {
-  const items = [
-    ["in", "Орлогын тайлан", "stock"],
-    ["out", "Зарлагын тайлан", "inventory"],
-  ];
-  return `<div class="admin-hub__settings">${items
-    .map(
-      ([kind, label, icon]) =>
-        adminHubActionCard(`openStockReport('${kind}')`, label, icon),
-    )
-    .join("")}</div>`;
+  const sections = [];
+  if (canViewSalesReport()) {
+    sections.push(
+      `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${adminHubActionCard("openStockReport('sales')", "Борлуулалтын мэдээ", "reports")}</div>`,
+    );
+  }
+  if (canViewStockReports()) {
+    const items = [
+      ["in", "Орлогын тайлан", "stock"],
+      ["out", "Зарлагын тайлан", "inventory"],
+    ];
+    sections.push(
+      `<h3 class="admin-hub__heading">Орлого / Зарлага</h3><div class="admin-hub__settings">${items
+        .map(
+          ([kind, label, icon]) =>
+            adminHubActionCard(`openStockReport('${kind}')`, label, icon),
+        )
+        .join("")}</div>`,
+    );
+  }
+  return sections.join("") || `<p class="text-sm text-muted-foreground">Харах эрхтэй тайлан байхгүй.</p>`;
 }
 function stockReportDetailView(kind) {
   ensureStockReportDateDefault();
@@ -16372,15 +16413,7 @@ function stockReportDetailView(kind) {
       : "Сонгосон өдөр баримт байхгүй";
   return `<div class="space-y-4">${pageHead(stockReportKindLabel(kind))}${pageToolbarHtml({ filters: stockReportDateFiltersHtml() })}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}${card("Бараа", products.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(kind, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
 }
-function stockReportsView() {
-  if (!canViewStockReports()) {
-    return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
-  }
-  const kind = state.filters.stockReportKind;
-  if (kind === "in" || kind === "out") return stockReportDetailView(kind);
-  return `<div class="space-y-4">${pageHead("Тайлан")}<section class="admin-hub"><h3 class="admin-hub__heading">Орлого / Зарлага</h3>${stockReportsMenuHtml()}</section></div>`;
-}
-function reportsView() {
+function salesReportDetailView() {
   const orders = reportOrdersFiltered(),
     q = String(state.searches.reports || "").trim(),
     paymentOrders = orders.filter((o) => orderReceiptMatchesQuery(o, q)),
@@ -16399,6 +16432,31 @@ function reportsView() {
       };
     });
   return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+}
+function stockReportsView() {
+  if (!canViewReportsHub()) {
+    return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
+  }
+  const kind = state.filters.stockReportKind;
+  if (kind === "sales") {
+    if (!canViewSalesReport()) {
+      return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын мэдээ харах эрхгүй.</p></div>`;
+    }
+    return salesReportDetailView();
+  }
+  if (kind === "in" || kind === "out") {
+    if (!canViewStockReports()) {
+      return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
+    }
+    return stockReportDetailView(kind);
+  }
+  return `<div class="space-y-4">${pageHead("Тайлан")}<section class="admin-hub">${stockReportsMenuHtml()}</section></div>`;
+}
+function reportsView() {
+  if (!canViewSalesReport()) {
+    return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
+  }
+  return salesReportDetailView();
 }
 function paymentRow(o) {
   const paid = orderIsPaid(o),
@@ -22324,7 +22382,7 @@ function pickerProductsInView() {
 }
 function pickerSearchToolsHtml() {
   const q = state.searches.workerProduct || "";
-  return `<div class="picker-search-tools"><input data-picker-search type="search" inputmode="search" value="${esc(q)}" oninput="pickerSearch(this.value)" placeholder="Бараа, баркодоор хайх..." class="picker-search-input app-input" autocomplete="off" aria-label="Бараа хайх"><button type="button" data-picker-clear-search class="btn btn--secondary btn--sm picker-search-clear"${q ? "" : " hidden"}>Цэвэрлэх</button></div>`;
+  return `<div class="picker-search-tools"><input data-picker-search type="search" inputmode="search" value="${esc(q)}" oninput="pickerSearch(this.value)" placeholder="утгаар хайх" class="picker-search-input app-input" autocomplete="off" aria-label="утгаар хайх"><button type="button" data-picker-clear-search class="btn btn--secondary btn--sm picker-search-clear"${q ? "" : " hidden"}>Цэвэрлэх</button></div>`;
 }
 function pickerSearch(value) {
   state.searches.workerProduct = String(value || "");

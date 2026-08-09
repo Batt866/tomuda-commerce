@@ -283,7 +283,7 @@
     ["inventory", "Нярав", "warehouse.view"],
     ["warehouse", "Агуулах", "warehouse.view"],
     ["employees", "Ажилтан", "employees.view"],
-    ["reports", "Борлуулалтын мэдээ", "reports.view"],
+    ["stockReports", "Тайлан", "reports.view"],
     ["promotions", "Урамшуулал", "promotions.view"],
     ["admin", "Админ", "dashboard.view"],
   ];
@@ -342,7 +342,8 @@
         hasPermission("warehouse.edit", emp) ||
         hasPermission("stockIn.view", emp) ||
         hasPermission("stockOut.view", emp) ||
-        hasPermission("receipts.view", emp)
+        hasPermission("receipts.view", emp) ||
+        hasPermission("reports.view", emp)
       );
     }
     if (viewId === "promotions") {
