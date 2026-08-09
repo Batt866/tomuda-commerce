@@ -15730,7 +15730,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D Том/х · E Жижиг/х · F Тоо/ш · G Үлдэгдэл — sample proportions. */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [29, 10, 12, 8.5, 10.5, 8.5, 11.5];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [28, 9, 12, 8.5, 10.5, 8.5, 11.5];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -15740,6 +15740,8 @@ const WAREHOUSE_PREPARE_SMALL_HEAD_STYLE = 22;
 const WAREHOUSE_PREPARE_SMALL_CELL_STYLE = 23;
 const WAREHOUSE_PREPARE_PIECE_HEAD_STYLE = 24;
 const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
+/** Wrapped header for «Хэмжих\nнэгж». */
+const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 26;
 const WAREHOUSE_PREPARE_GRAY_LARGE = "FFE4E7EB";
 const WAREHOUSE_PREPARE_GRAY_SMALL = "FFC5CAD0";
 const WAREHOUSE_PREPARE_GRAY_PIECE = "FFA3AAB3";
@@ -15819,12 +15821,15 @@ function warehousePreparePatchStylesXml(stylesXml) {
     WAREHOUSE_PREPARE_GRAY_PIECE,
   );
 
-  // Table headers (style 7): wrap so «Хэмжих нэгж» fits on two lines.
+  // Table headers (style 7): center + wrap for multi-line labels.
   const headerXfNoWrap =
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" /></xf>';
   const headerXfWrap =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>';
   if (out.includes(headerXfNoWrap)) out = out.replace(headerXfNoWrap, headerXfWrap);
+
+  // Dedicated unit-header xf (appended after qty styles) — always wrap.
+  // (actual xf string is appended below with shrinkToFit marker)
 
   // Qty numbers: center (sample).
   const numStyleLeft =
@@ -15866,6 +15871,12 @@ function warehousePreparePatchStylesXml(stylesXml) {
     const cell = qtyCellXf(fillId);
     if (!out.includes(head)) appendXfs.push(head);
     if (!out.includes(cell)) appendXfs.push(cell);
+  }
+  // Unique xf for unit header (wrap + marker) — style id 26 after qty pair append.
+  if (!out.includes('applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" shrinkToFit="0"/>')) {
+    appendXfs.push(
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" shrinkToFit="0"/></xf>',
+    );
   }
   if (appendXfs.length) {
     out = out.replace(
@@ -16012,9 +16023,15 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
-  pushRow(40, [
+  // Two-line unit header: explicit break so print/fitToWidth cannot clip «Хэмжих нэгж».
+  pushRow(46, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(
+      `B${headerRow}`,
+      WAREHOUSE_PREPARE_UNIT_HEAD_STYLE,
+      si("Хэмжих\nнэгж"),
+      "s",
+    ),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
     xlsxCellXml(
       `D${headerRow}`,
@@ -16196,7 +16213,8 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 42px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: normal; line-height: 1.15; background: #f3f3f3; overflow: visible; }
+.head th { height: 48px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: normal; line-height: 1.15; background: #f3f3f3; overflow: visible; }
+.head th.unit-head { white-space: normal; line-height: 1.2; padding-top: 4px; padding-bottom: 4px; }
 .head th.qty-large,
 .head th.qty-small,
 .head th.qty-piece { white-space: nowrap; }
@@ -16224,7 +16242,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value" colspan="2">${h(warehouseEmp)}</td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td colspan="7"></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих<br>нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
 <tr><td class="sign-label">Хүлээн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
@@ -19829,7 +19847,7 @@ function workerNewOrderStep(cart) {
       : "";
   const headAction = editing
     ? cancelOrderBtn
-    : `<button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button>`;
+    : `<button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Харилцагч өөрчлөх</button>`;
   const headExtra = editing
     ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")}</p>`
     : "";
