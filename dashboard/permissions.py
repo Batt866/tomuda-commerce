@@ -386,11 +386,29 @@ def _order_retention_days(state: dict[str, Any] | None = None) -> int:
     return max(7, min(days, 365))
 
 
+def _order_is_paid(order: dict[str, Any]) -> bool:
+    term = str(order.get("paymentTerm") or "").strip()
+    if term == "cash":
+        return True
+    if term == "credit":
+        return bool(order.get("isPaid"))
+    return bool(order.get("isPaid"))
+
+
+def _order_has_open_receivable(order: dict[str, Any]) -> bool:
+    if str(order.get("status") or "") == "cancelled":
+        return False
+    return not _order_is_paid(order)
+
+
 def _order_within_retention(
     order: dict[str, Any],
     now: datetime | None = None,
     retention_days: int | None = None,
 ) -> bool:
+    # Авлага (төлөөгүй) баримт хугацаа дууссан ч устгахгүй.
+    if _order_has_open_receivable(order):
+        return True
     day = _iso_day(order.get("takenDay") or order.get("createdAt") or "")
     if not day:
         return True

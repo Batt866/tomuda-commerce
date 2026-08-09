@@ -238,17 +238,46 @@ class OrderRetentionTests(TestCase):
                 "id": "old",
                 "createdAt": (today - timedelta(days=31)).isoformat(),
                 "status": "delivered",
+                "paymentTerm": "cash",
+                "isPaid": True,
             },
             {
                 "id": "recent",
                 "createdAt": (today - timedelta(days=10)).isoformat(),
                 "status": "delivered",
+                "paymentTerm": "cash",
+                "isPaid": True,
             },
         ]
 
         cleaned = _retained_orders_state(state)
 
         self.assertEqual([o["id"] for o in cleaned["orders"]], ["recent"])
+
+    def test_retained_orders_keeps_unpaid_receivable_past_retention(self):
+        today = date.today()
+        state = default_state()
+        state["settings"]["orderRetentionDays"] = 30
+        state["orders"] = [
+            {
+                "id": "old-unpaid",
+                "createdAt": (today - timedelta(days=90)).isoformat(),
+                "status": "delivered",
+                "paymentTerm": "credit",
+                "isPaid": False,
+            },
+            {
+                "id": "old-paid",
+                "createdAt": (today - timedelta(days=90)).isoformat(),
+                "status": "delivered",
+                "paymentTerm": "credit",
+                "isPaid": True,
+            },
+        ]
+
+        cleaned = _retained_orders_state(state)
+
+        self.assertEqual([o["id"] for o in cleaned["orders"]], ["old-unpaid"])
 
     def test_get_state_purges_expired_orders_from_database(self):
         today = date.today()
@@ -259,11 +288,15 @@ class OrderRetentionTests(TestCase):
                 "id": "old",
                 "createdAt": (today - timedelta(days=40)).isoformat(),
                 "status": "delivered",
+                "paymentTerm": "cash",
+                "isPaid": True,
             },
             {
                 "id": "recent",
                 "createdAt": (today - timedelta(days=5)).isoformat(),
                 "status": "delivered",
+                "paymentTerm": "cash",
+                "isPaid": True,
             },
         ]
         AppState.objects.create(key="main", data=state)
@@ -287,6 +320,8 @@ class OrderRetentionTests(TestCase):
                 "id": "old",
                 "createdAt": (today - timedelta(days=45)).isoformat(),
                 "status": "delivered",
+                "paymentTerm": "cash",
+                "isPaid": True,
             }
         ]
         AppState.objects.create(key="main", data=state)
