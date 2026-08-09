@@ -2356,8 +2356,8 @@ img[data-product-img],
   }
 
   .product-card {
-    --pc-thumb: 56px;
-    --pc-gap: 12px;
+    --pc-thumb: 72px;
+    --pc-gap: 10px;
     --pc-pad-y: 10px;
     --pc-pad-x: 0;
     --pc-title: 15px;
@@ -2367,7 +2367,7 @@ img[data-product-img],
     grid-template-areas:
       "img copy actions"
       "img fields actions";
-    gap: 4px 12px;
+    gap: 2px 10px;
     padding: 10px 4px 10px 0;
     border: none;
     border-radius: 0;
@@ -2476,10 +2476,10 @@ img[data-product-img],
   .product-card__fields {
     grid-area: fields;
     display: flex;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: flex-start;
-    gap: 4px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
     width: 100%;
     min-width: 0;
     padding-top: 0;
@@ -2490,12 +2490,7 @@ img[data-product-img],
   }
 
   .product-card__facts {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 10px;
-    width: 100%;
-    min-width: 0;
+    display: contents;
   }
 
   .product-card__pack,
@@ -2503,12 +2498,12 @@ img[data-product-img],
   .product-card__cost,
   .product-card__stock,
   .product-card__barcode {
-    display: block;
+    display: inline;
     margin: 0;
     min-height: 0;
     border: none;
     text-align: left;
-    line-height: 1.25;
+    line-height: 1.3;
   }
 
   .product-card__pack::before,
@@ -2530,6 +2525,7 @@ img[data-product-img],
     font-variant-numeric: tabular-nums;
     color: var(--hex-primary);
     letter-spacing: -0.02em;
+    white-space: nowrap;
   }
 
   .product-card__stock {
@@ -2546,6 +2542,7 @@ img[data-product-img],
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--hex-muted-foreground);
+    white-space: nowrap;
   }
 
   .product-card__stock.is-low {
@@ -2556,7 +2553,8 @@ img[data-product-img],
 
   .product-card__pack {
     order: 3;
-    flex: 1 1 100%;
+    flex: 0 1 auto;
+    max-width: 100%;
     padding: 0;
     border-radius: 0;
     background: transparent;
@@ -2564,6 +2562,9 @@ img[data-product-img],
     font-size: 12px;
     font-weight: 700;
     color: var(--hex-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .product-card__pack--empty {
@@ -2575,9 +2576,9 @@ img[data-product-img],
   }
 
   .product-list--show-cost .product-card__cost {
-    display: block;
+    display: inline;
     order: 4;
-    flex: 1 1 100%;
+    flex: 0 1 auto;
     padding: 0;
     border-radius: 0;
     background: transparent;
@@ -2586,6 +2587,7 @@ img[data-product-img],
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--hex-muted-foreground);
+    white-space: nowrap;
   }
 
   .product-list--show-cost .product-card__cost::before {
@@ -2597,7 +2599,8 @@ img[data-product-img],
 
   .product-card__barcode {
     order: 5;
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    min-width: 0;
     margin-top: 0;
     padding: 0;
     border-top: none;
@@ -2622,11 +2625,11 @@ img[data-product-img],
   }
 
   .product-card {
-    --pc-thumb: 56px;
+    --pc-thumb: 72px;
     --pc-pad-y: 10px;
     --pc-pad-x: 0;
     --pc-title: 14.5px;
-    --pc-gap: 12px;
+    --pc-gap: 10px;
     border-radius: 0;
   }
 
@@ -8983,7 +8986,37 @@ textarea::placeholder {
 }
 
 .delivery-view__search {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
+  min-height: var(--field-h);
+  padding: 10px 14px;
+  border: 1.5px solid var(--hex-border);
+  border-radius: var(--btn-radius, 10px);
+  background: var(--hex-card);
+  color: var(--hex-foreground);
+  font-size: 16px;
+  line-height: 1.25;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none !important;
+}
+
+.delivery-view__search::-webkit-search-decoration,
+.delivery-view__search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.delivery-view__search::placeholder {
+  color: var(--hex-muted-foreground);
+  opacity: 1;
+}
+
+.delivery-view__search:focus {
+  border-color: var(--hex-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(22, 137, 154, 0.14) !important;
 }
 
 .delivery-view__empty {
