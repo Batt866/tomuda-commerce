@@ -26,6 +26,9 @@ const state = {
     workerDate: "",
     warehouseDate: "",
     reportDate: "",
+    reportEmployeeId: "",
+    reportYear: "",
+    reportMonth: "",
     stockReportKind: "",
     stockReportDate: "",
     promotionTab: "price",
@@ -3402,7 +3405,7 @@ const MOBILE_NAV_SHORT = {
   count: "Тооллого",
   employees: "Ажилтан",
   inventory: "Нярав",
-  reports: "Борлуулалтын мэдээ",
+  reports: "Борлуулалтын тайлан",
   stockReports: "Тайлан",
   promotions: "Урамшуулал",
   admin: "Админ",
@@ -3590,7 +3593,7 @@ function currentPageTitle(nav) {
     employeePermissions: "Эрхийн тохиргоо",
     inventory: "Нярав",
     warehouse: "Агуулах",
-    reports: "Борлуулалтын мэдээ",
+    reports: "Борлуулалтын тайлан",
     stockReports: "Тайлан",
     promotions: "Урамшуулал",
     warehouseReceipts: "Баримтууд",
@@ -6217,6 +6220,27 @@ function exclusiveOrderQtyParts(parts, largeCount = 0) {
   }
   return p;
 }
+/**
+ * Carry loose → жижиг → том so warehouse sheets / editors show large boxes.
+ * Old orders often stored only small packs (e.g. 125 жижиг) with largePacks=0.
+ */
+function rollUpQtyParts(parts, packSize = 0, largeCount = 0) {
+  let { largePacks: lp, packs: pk, pieces: loose } = exclusiveOrderQtyParts(
+    parts,
+    largeCount,
+  );
+  const small = Math.max(0, Math.floor(Number(packSize) || 0));
+  const lc = Math.max(0, Math.floor(Number(largeCount) || 0));
+  if (small > 1 && loose >= small) {
+    pk += Math.floor(loose / small);
+    loose = loose % small;
+  }
+  if (lc > 1 && pk >= lc) {
+    lp += Math.floor(pk / lc);
+    pk = pk % lc;
+  }
+  return { largePacks: lp, packs: pk, pieces: loose };
+}
 function formatOrderQtyParts(
   parts,
   { unit = "ш", empty = "", largeCount = 0, product = null } = {},
@@ -6304,11 +6328,11 @@ function workerQtyPartsForProduct(p, qty) {
       qty: parts.pieces,
     });
     if (rebuilt === total) {
-      const excl = exclusiveOrderQtyParts(parts, largeCount);
+      const rolled = rollUpQtyParts(parts, packSize, largeCount);
       return {
-        largePacks: excl.largePacks,
-        packs: excl.packs,
-        loosePieces: excl.pieces,
+        largePacks: rolled.largePacks,
+        packs: rolled.packs,
+        loosePieces: rolled.pieces,
       };
     }
   }
@@ -6345,16 +6369,20 @@ function resolveWarehousePrepareParts(
       largePacks !== "" &&
       Number(largePacks) > 0);
   if (hasExplicit) {
-    let lp = Math.max(0, Math.floor(Number(largePacks) || 0));
-    let pk = Math.max(0, Math.floor(Number(packs) || 0));
-    let loose = Math.max(0, Math.floor(Number(loosePieces) || 0));
-    if (small > 1 && loose >= small) {
-      pk += Math.floor(loose / small);
-      loose = loose % small;
-    }
-    if (large > 1 && small > 1 && pk * small >= large) {
-      // keep as entered if totals match
-    }
+    const largeCount =
+      large > 1 && small > 1 ? Math.floor(large / small) : 0;
+    const rolled = rollUpQtyParts(
+      {
+        largePacks,
+        packs,
+        pieces: loosePieces,
+      },
+      small,
+      largeCount,
+    );
+    let lp = rolled.largePacks;
+    let pk = rolled.packs;
+    let loose = rolled.pieces;
     const rebuilt =
       (large > 1 ? lp * large : 0) + (small > 1 ? pk * small : 0) + loose;
     if (rebuilt === total) {
@@ -11719,14 +11747,50 @@ function confirmInventoryExport() {
 function confirmReportExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   confirmDataExport("Мэдээлэл татах", () => {
-    const orders = reportOrdersFiltered(),
-      total = orders.reduce((s, o) => s + orderAmount(o), 0),
-      paid = orders
-        .filter((o) => orderIsPaid(o))
-        .reduce((s, o) => s + orderAmount(o), 0);
-    excel("report.xlsx", [
-      ["Нийт", "Төлсөн"],
-      [total, paid],
+    const orders = reportOrdersFiltered();
+    const customers = salesReportCustomerRows(orders);
+    const total = orders.reduce((s, o) => s + orderAmount(o), 0);
+    const receivable = orders
+      .filter((o) => !orderIsPaid(o))
+      .reduce((s, o) => s + orderAmount(o), 0);
+    const emp =
+      salesOrderAgents().find(
+        (e) => e.id === state.filters.reportEmployeeId,
+      )?.name || "Бүгд";
+    excel("borluulaltiin-tailan.xlsx", [
+      ["Борлуулалтын тайлан"],
+      ["Ажилтан", emp],
+      ["Хугацаа", reportPeriodHint()],
+      ["Нийт борлуулалт", total],
+      ["Авлага", receivable],
+      ["Захиалга", orders.length],
+      [],
+      ["Харилцагч", "Захиалга", "Борлуулалт", "Авлага"],
+      ...customers.map((c) => [
+        c.customerName,
+        c.orderCount,
+        c.sales,
+        c.receivable,
+      ]),
+      [],
+      [
+        "Баримт №",
+        "Огноо",
+        "Ажилтан",
+        "Харилцагч",
+        "Төлбөр",
+        "Дүн",
+        "Төлөв",
+      ],
+      ...orders.map((o) => [
+        formatReceiptNumber(o) || o.receiptNumber || "",
+        orderCreatedDay(o) || orderTakenDay(o) || "",
+        o.employeeName || "",
+        orderCustomerName(o),
+        paymentTermLabel(o.paymentTerm),
+        orderAmount(o),
+        orderIsPaid(o) ? "Төлсөн" : "Авлага",
+      ]),
     ]);
   });
 }
@@ -15576,7 +15640,14 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
     .map((row) => {
       const p = warehousePrepareProduct(row);
       const packSize = warehousePreparePackSize(row, p);
-      const largeSize = warehousePrepareLargeSize(row, p);
+      const largeCount =
+        Number(row.largeBoxQuantity) > 1
+          ? Math.floor(Number(row.largeBoxQuantity))
+          : productLargeBoxCount(p);
+      const largeSize =
+        packSize > 1 && largeCount > 1
+          ? packSize * largeCount
+          : productLargeBoxPieceCount(p);
       const normalized = resolveWarehousePrepareParts(
         row.qty,
         row.packs,
@@ -15592,7 +15663,8 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
         packs: normalized.packs,
         loosePieces: normalized.loosePieces,
         boxQuantity: packSize,
-        largeBoxQuantity: largeSize,
+        // Count of small boxes per large — never store piece-size here.
+        largeBoxQuantity: largeCount > 1 ? largeCount : 0,
       };
     })
     .sort(
@@ -15639,6 +15711,19 @@ function xlsxOptionalNum(ref, styleId, value) {
     return xlsxCellXml(ref, styleId, null, "empty");
   }
   return xlsxCellXml(ref, styleId, n, "n");
+}
+/** Qty cols on бараа бэлдэх sheet: show "—" when empty (not a blank cell). */
+function xlsxPrepareQtyCell(ref, styleId, value, si) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) {
+    return xlsxCellXml(ref, styleId, si("—"), "s");
+  }
+  return xlsxCellXml(ref, styleId, n, "n");
+}
+function prepareQtyDisplay(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return "—";
+  return String(n);
 }
 const XLSX_BARCODE_CELL_STYLE = 34; // numFmtId 49 (@) — full digits, no scientific notation
 function xlsxBarcodeCell(ref, styleId, barcode, si) {
@@ -15695,7 +15780,7 @@ function warehousePreparePatchStylesXml(stylesXml) {
     ? stylesXml.replace(numStyle, numStyleRight)
     : stylesXml;
 
-  // Header cells (style 7): wrap so Том · Жижиг · Ширхэг stay fully visible in narrow A4 cols.
+  // Header cells (style 7): wrap so Том/х · Жижиг/х · Тоо/ш stay fully visible in narrow A4 cols.
   const headerXf =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
   const headerXfWrap =
@@ -15742,7 +15827,7 @@ function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const cols = warehousePrepareColsXml(
     colWidths || WAREHOUSE_PREPARE_COL_WIDTHS,
   );
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.25" right="0.25" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.55" right="0.2" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildWarehousePrepareSheetXml(orders, workerIds) {
   const strings = [];
@@ -15870,9 +15955,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих\nнэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Том"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Ширхэг"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Том/х"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/х"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Тоо/ш"), "s"),
     xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл"), "s"),
   ]);
   const pushPrepareGroups = (groups) => {
@@ -15898,9 +15983,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
-        xlsxOptionalNum(`D${r}`, 10, parts.largePacks),
-        xlsxOptionalNum(`E${r}`, 10, parts.packs),
-        xlsxOptionalNum(`F${r}`, 10, parts.loosePieces),
+        xlsxPrepareQtyCell(`D${r}`, 10, parts.largePacks, si),
+        xlsxPrepareQtyCell(`E${r}`, 10, parts.packs, si),
+        xlsxPrepareQtyCell(`F${r}`, 10, parts.loosePieces, si),
         xlsxCellXml(`G${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
@@ -15997,15 +16082,15 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
-        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${parts.largePacks || ""}</td><td class="num">${parts.packs || ""}</td><td class="num">${parts.loosePieces || ""}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
+        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num">${h(prepareQtyDisplay(parts.packs))}</td><td class="num">${h(prepareQtyDisplay(parts.loosePieces))}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
       })
       .join("");
   const promoRows = sections.promo.length
     ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-body { font-family: Arial, sans-serif; color: #000; }
-table.prepare { width: 980px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 8px 12px 8px 28px; }
+table.prepare { width: 980px; max-width: 100%; margin-left: auto; margin-right: 0; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
 .prepare col:nth-child(1) { width: 340px; }
 .prepare col:nth-child(2) { width: 100px; }
 .prepare col:nth-child(3) { width: 120px; }
@@ -16021,7 +16106,7 @@ table.prepare { width: 980px; border-collapse: collapse; table-layout: fixed; fo
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .blank td { height: 30px; }
-.head th { height: 52px; text-align: center; font-size: 15px; font-weight: 800; border: 2px solid #000; white-space: normal; line-height: 1.15; word-break: keep-all; }
+.head th { height: 52px; text-align: center; font-size: 14px; font-weight: 800; border: 2px solid #000; white-space: normal; line-height: 1.15; word-break: keep-all; }
 .cat { text-align: center; font-weight: 800; height: 36px; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; }
@@ -16032,13 +16117,14 @@ table.prepare { width: 980px; border-collapse: collapse; table-layout: fixed; fo
 .sign-hint { text-align: left; font-size: 14px; border-top: none !important; }
 .sign-gap td { height: 10px; border: none !important; }
 .sign-block-gap td { height: 22px; border: none !important; }
+@media print { body { padding-left: 36px; padding-right: 8px; } table.prepare { margin-left: auto; } }
 </style></head><body><table class="prepare">
 <colgroup><col><col><col><col><col><col><col></colgroup>
 <tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих<br>нэгж</th><th>Баркод</th><th>Том</th><th>Жижиг</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих<br>нэгж</th><th>Баркод</th><th>Том/х</th><th>Жижиг/х</th><th>Тоо/ш</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
@@ -16191,37 +16277,206 @@ function setInventoryCategory(cat) {
   scrollAppMainToTop();
 }
 function reportOrdersFiltered() {
-  const day = state.filters.reportDate || "";
   let list = retainedOrders(state.orders).filter(
     (o) => o.status !== "cancelled",
   );
-  if (day) list = list.filter((o) => orderCreatedDay(o) === day);
+  const empId = String(state.filters.reportEmployeeId || "").trim();
+  if (empId) {
+    list = list.filter((o) => String(o.employeeId || "") === empId);
+  }
+  const year = String(state.filters.reportYear || "").trim();
+  const monthRaw = String(state.filters.reportMonth || "").trim();
+  const month = monthRaw ? monthRaw.padStart(2, "0") : "";
+  if (year || month) {
+    list = list.filter((o) => {
+      const day = orderCreatedDay(o) || orderTakenDay(o) || "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+      if (year && day.slice(0, 4) !== year) return false;
+      if (month && day.slice(5, 7) !== month) return false;
+      return true;
+    });
+  }
   return list;
 }
+function reportFilterYears() {
+  const years = new Set();
+  const nowY = new Date().getFullYear();
+  years.add(nowY);
+  years.add(nowY - 1);
+  for (const o of retainedOrders(state.orders || [])) {
+    const day = orderCreatedDay(o) || orderTakenDay(o) || "";
+    if (/^\d{4}/.test(day)) years.add(Number(day.slice(0, 4)));
+  }
+  return [...years]
+    .filter((y) => Number.isFinite(y) && y > 2000)
+    .sort((a, b) => b - a);
+}
+function reportPeriodHint() {
+  const year = String(state.filters.reportYear || "").trim();
+  const month = String(state.filters.reportMonth || "").trim();
+  if (!year && !month) return "Нийт хугацааны борлуулалт";
+  if (year && !month) return `${year} оны бүх сар`;
+  if (!year && month) return `${Number(month)}-р сар (бүх жил)`;
+  return `${year} оны ${Number(month)}-р сар`;
+}
 function reportDateFiltersHtml() {
-  const day = state.filters.reportDate || "",
-    live = !day,
-    pickerDay = day || todayIso(),
-    display = warehouseDateDisplayText(day),
-    q = state.searches.reports || "";
-  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Нэр, баримт №-ээр хайх..." })}<div class="wh-date-filters wh-date-filters--reports"><button type="button" onclick="clearReportDate()" class="wh-date-filters__live${live ? " is-active" : ""}">Бүгд</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(pickerDay)}" onchange="setReportDate(this.value)" oninput="setReportDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Огноо сонгох"></label><span class="wh-date-filters__hint">${live ? "Бүх захиалга" : "Сонгосон өдрийн захиалга"}</span></div>`;
+  const empId = String(state.filters.reportEmployeeId || "").trim();
+  const year = String(state.filters.reportYear || "").trim();
+  const month = String(state.filters.reportMonth || "").trim();
+  const q = state.searches.reports || "";
+  const agents = salesOrderAgents();
+  const years = reportFilterYears();
+  const empOpts = [
+    `<option value="" ${!empId ? "selected" : ""}>Бүгд</option>`,
+    ...agents.map(
+      (e) =>
+        `<option value="${esc(e.id)}" ${empId === e.id ? "selected" : ""}>${esc(e.name || "-")}</option>`,
+    ),
+  ].join("");
+  const yearOpts = [
+    `<option value="" ${!year ? "selected" : ""}>Бүгд</option>`,
+    ...years.map(
+      (y) =>
+        `<option value="${y}" ${year === String(y) ? "selected" : ""}>${y}</option>`,
+    ),
+  ].join("");
+  const monthOpts = [
+    `<option value="" ${!month ? "selected" : ""}>Бүгд</option>`,
+    ...Array.from({ length: 12 }, (_, i) => {
+      const m = String(i + 1);
+      return `<option value="${m}" ${month === m ? "selected" : ""}>${m}-р сар</option>`;
+    }),
+  ].join("");
+  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Харилцагч, баримт №-ээр хайх..." })}<div class="sales-report-filters"><label class="sales-report-filters__field"><span class="sales-report-filters__label">Ажилтан</span><select onchange="setReportEmployee(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Ажилтан">${empOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Жил</span><select onchange="setReportYear(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Жил">${yearOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Сар</span><select onchange="setReportMonth(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Сар">${monthOpts}</select></label><span class="page-toolbar__hint">${esc(reportPeriodHint())}</span></div>`;
   return pageToolbarHtml({
     filters,
     actions: excelDownloadBtn("confirmReportExport()"),
   });
 }
+function setReportEmployee(id) {
+  state.filters.reportEmployeeId = String(id || "").trim();
+  render();
+}
+function setReportYear(year) {
+  state.filters.reportYear = String(year || "").trim();
+  render();
+}
+function setReportMonth(month) {
+  const raw = String(month || "").trim();
+  state.filters.reportMonth = raw ? String(Math.max(1, Math.min(12, Number(raw) || 0))) : "";
+  render();
+}
 function clearReportDate() {
-  commitDatePickerChange(() => {
-    state.filters.reportDate = "";
-  });
+  state.filters.reportDate = "";
+  state.filters.reportYear = "";
+  state.filters.reportMonth = "";
+  state.filters.reportEmployeeId = "";
+  render();
 }
 function setReportDate(day) {
   commitDatePickerChange(() => {
     state.filters.reportDate = day || "";
   });
 }
+function salesReportCustomerRows(orders) {
+  const map = new Map();
+  for (const o of orders) {
+    const key = String(o.customerId || orderCustomerName(o) || "unknown");
+    let row = map.get(key);
+    if (!row) {
+      row = {
+        key,
+        customerId: o.customerId || "",
+        customerName: orderCustomerName(o) || "-",
+        orderCount: 0,
+        sales: 0,
+        receivable: 0,
+        employeeNames: new Set(),
+      };
+      map.set(key, row);
+    }
+    const amt = orderAmount(o);
+    row.orderCount += 1;
+    row.sales += amt;
+    if (!orderIsPaid(o)) row.receivable += amt;
+    if (o.employeeName) row.employeeNames.add(String(o.employeeName));
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      b.sales - a.sales ||
+      String(a.customerName).localeCompare(String(b.customerName), "mn"),
+  );
+}
+function salesReportEmployeeRows(orders) {
+  const map = new Map();
+  for (const o of orders) {
+    const id = String(o.employeeId || "_none");
+    let row = map.get(id);
+    if (!row) {
+      const emp = state.employees.find((e) => String(e.id) === id);
+      row = {
+        employeeId: id === "_none" ? "" : id,
+        name: emp?.name || o.employeeName || "-",
+        orderCount: 0,
+        sales: 0,
+        receivable: 0,
+        customers: new Map(),
+      };
+      map.set(id, row);
+    }
+    const amt = orderAmount(o);
+    row.orderCount += 1;
+    row.sales += amt;
+    if (!orderIsPaid(o)) row.receivable += amt;
+    const cKey = String(o.customerId || orderCustomerName(o) || "unknown");
+    let cust = row.customers.get(cKey);
+    if (!cust) {
+      cust = {
+        customerName: orderCustomerName(o) || "-",
+        orderCount: 0,
+        sales: 0,
+        receivable: 0,
+      };
+      row.customers.set(cKey, cust);
+    }
+    cust.orderCount += 1;
+    cust.sales += amt;
+    if (!orderIsPaid(o)) cust.receivable += amt;
+  }
+  return [...map.values()]
+    .map((row) => ({
+      ...row,
+      customers: [...row.customers.values()].sort(
+        (a, b) =>
+          b.sales - a.sales ||
+          String(a.customerName).localeCompare(String(b.customerName), "mn"),
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        b.sales - a.sales ||
+        String(a.name).localeCompare(String(b.name), "mn"),
+    );
+}
+function salesReportCustomerRowHtml(row, { showEmployee = false } = {}) {
+  const empBit =
+    showEmployee && row.employeeNames?.size
+      ? ` · ${esc([...row.employeeNames].join(", "))}`
+      : "";
+  return `<div class="line-list__row line-list__row--static sales-report-customer"><div class="sales-report-customer__main"><p class="payment-row__customer">${esc(row.customerName)}</p><p class="line-list__meta">${row.orderCount} захиалга${empBit}${row.receivable > 0 ? ` · <span class="text-tone-danger">Авлага ${fmt(row.receivable)}</span>` : ""}</p></div><div class="sales-report-customer__amounts"><b class="line-list__amount">${fmt(row.sales)}</b>${row.receivable > 0 ? `<span class="sales-report-customer__debt text-tone-danger">${fmt(row.receivable)}</span>` : `<span class="sales-report-customer__debt text-tone-success">Авлагагүй</span>`}</div></div>`;
+}
+function salesReportEmployeeBlockHtml(row) {
+  const customers = row.customers.length
+    ? row.customers
+        .map((c) =>
+          salesReportCustomerRowHtml(c, { showEmployee: false }),
+        )
+        .join("")
+    : `<p class="line-panel__empty">Харилцагч байхгүй</p>`;
+  return `<div class="sales-report-emp"><div class="sales-report-emp__head"><div><p class="sales-report-emp__name">${esc(row.name)}</p><p class="line-list__meta">${row.orderCount} захиалга · ${row.customers.length} харилцагч</p></div><div class="sales-report-emp__totals"><b>${fmt(row.sales)}</b><span class="${row.receivable > 0 ? "text-tone-danger" : "text-muted-foreground"}">Авлага ${fmt(row.receivable)}</span></div></div><div class="line-list">${customers}</div></div>`;
+}
 function stockReportKindLabel(kind) {
-  if (kind === "sales") return "Борлуулалтын мэдээ";
+  if (kind === "sales") return "Борлуулалтын тайлан";
   if (kind === "in") return "Орлогын тайлан";
   if (kind === "out") return "Зарлагын тайлан";
   return "Тайлан";
@@ -16246,7 +16501,7 @@ function openStockReportsHub() {
 function openStockReport(kind) {
   if (kind === "sales") {
     if (!canViewSalesReport()) {
-      return alertModal("Эрхгүй", "Борлуулалтын мэдээ харах эрхгүй.");
+      return alertModal("Эрхгүй", "Борлуулалтын тайлан харах эрхгүй.");
     }
   } else if (kind === "in" || kind === "out") {
     if (!canViewStockReports()) {
@@ -16380,7 +16635,7 @@ function stockReportsMenuHtml() {
   const sections = [];
   if (canViewSalesReport()) {
     sections.push(
-      `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${adminHubActionCard("openStockReport('sales')", "Борлуулалтын мэдээ", "reports")}</div>`,
+      `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${adminHubActionCard("openStockReport('sales')", "Борлуулалтын тайлан", "reports")}</div>`,
     );
   }
   if (canViewStockReports()) {
@@ -16415,24 +16670,36 @@ function stockReportDetailView(kind) {
   return `<div class="space-y-4">${pageHead(stockReportKindLabel(kind))}${pageToolbarHtml({ filters: stockReportDateFiltersHtml() })}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}${card("Бараа", products.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(kind, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
 }
 function salesReportDetailView() {
-  const orders = reportOrdersFiltered(),
-    q = String(state.searches.reports || "").trim(),
-    paymentOrders = orders.filter((o) => orderReceiptMatchesQuery(o, q)),
-    orderCount = orders.length,
-    total = orders.reduce((s, o) => s + orderAmount(o), 0);
-  const sales = state.employees
-    .filter((e) => e.role === "sales")
-    .map((e) => {
-      const empOrders = orders.filter((o) => o.employeeId === e.id);
-      const sum = empOrders.reduce((s, o) => s + orderAmount(o), 0);
-      return {
-        ...e,
-        count: empOrders.length,
-        sum,
-        commission: (sum * e.commissionRate) / 100,
-      };
-    });
-  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Төлбөр${q ? ` · ${paymentOrders.length}` : ""}</div><div class="line-list">${reportPaymentListHtml(paymentOrders, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div><div class="line-panel"><div class="line-panel__section-title">Тооцооны үлдэгдэл</div><div class="line-list">${sales.map((e, i) => `<div class="line-list__row line-list__row--static"><span>${i + 1}. ${e.name}</span><b>${fmt(e.sum)}</b></div>`).join("")}</div></div>`;
+  const orders = reportOrdersFiltered();
+  const q = String(state.searches.reports || "").trim().toLowerCase();
+  const filtered = q
+    ? orders.filter((o) => {
+        const hay = `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
+        return hay.includes(q);
+      })
+    : orders;
+  const orderCount = filtered.length;
+  const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
+  const receivable = filtered
+    .filter((o) => !orderIsPaid(o))
+    .reduce((s, o) => s + orderAmount(o), 0);
+  const empId = String(state.filters.reportEmployeeId || "").trim();
+  const customers = salesReportCustomerRows(filtered);
+  const body = empId
+    ? `<div class="line-panel"><div class="line-panel__section-title">Харилцагчид · ${customers.length}</div><div class="line-list">${
+        customers.length
+          ? customers.map((row) => salesReportCustomerRowHtml(row)).join("")
+          : `<p class="line-panel__empty">${q ? "Олдсонгүй" : "Борлуулалт байхгүй"}</p>`
+      }</div></div>`
+    : (() => {
+        const empRows = salesReportEmployeeRows(filtered);
+        return `<div class="space-y-3"><div class="line-panel__section-title">Ажилтнаар · ${empRows.length}</div>${
+          empRows.length
+            ? empRows.map(salesReportEmployeeBlockHtml).join("")
+            : `<div class="line-panel"><p class="line-panel__empty">${q ? "Олдсонгүй" : "Борлуулалт байхгүй"}</p></div>`
+        }</div>`;
+      })();
+  return `<div class="space-y-4">${pageHead("Борлуулалтын тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}${card("Харилцагч", customers.length)}`, 4)}${body}<div class="line-panel"><div class="line-panel__section-title">Захиалгууд · ${orderCount}</div><div class="line-list">${reportPaymentListHtml(filtered, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div></div>`;
 }
 function stockReportsView() {
   if (!canViewReportsHub()) {
@@ -16441,7 +16708,7 @@ function stockReportsView() {
   const kind = state.filters.stockReportKind;
   if (kind === "sales") {
     if (!canViewSalesReport()) {
-      return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын мэдээ харах эрхгүй.</p></div>`;
+      return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын тайлан харах эрхгүй.</p></div>`;
     }
     return salesReportDetailView();
   }
@@ -16455,7 +16722,7 @@ function stockReportsView() {
 }
 function reportsView() {
   if (!canViewSalesReport()) {
-    return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
+    return `<div class="space-y-4">${pageHead("Борлуулалтын тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
   }
   return salesReportDetailView();
 }
@@ -19368,7 +19635,16 @@ function seedWorkerCartFromOrder(order) {
         packs: stored.packs,
         qty: stored.pieces,
       });
-      if (rebuilt === qty[id]) return;
+      if (rebuilt === qty[id]) {
+        // Old lines often only have жижиг — roll into том for the editor.
+        const rolled = rollUpQtyParts(
+          stored,
+          productPackSize(p),
+          productLargeBoxCount(p),
+        );
+        syncWorkerQtyParts(id, rolled);
+        return;
+      }
     }
     const split = pickerQtyToParts(qty[id], p);
     syncWorkerQtyParts(id, split);
@@ -24176,6 +24452,9 @@ Object.assign(window, {
   confirmSetPaid,
   setReportDate,
   clearReportDate,
+  setReportEmployee,
+  setReportYear,
+  setReportMonth,
   reportOrdersFiltered,
   openStockReportsHub,
   openStockReport,

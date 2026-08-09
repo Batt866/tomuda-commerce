@@ -14542,6 +14542,101 @@ textarea::placeholder {
   color: var(--hex-muted-foreground);
 }
 
+.sales-report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.sales-report-filters__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sales-report-filters__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--hex-muted-foreground);
+}
+
+.sales-report-filters .page-toolbar__select {
+  min-width: 7.5rem;
+}
+
+.sales-report-customer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sales-report-customer__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.sales-report-customer__amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.sales-report-customer__debt {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sales-report-emp {
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  background: var(--hex-card, #fff);
+  overflow: hidden;
+}
+
+.sales-report-emp__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hex-border);
+  background: color-mix(in srgb, var(--hex-secondary) 55%, transparent);
+}
+
+.sales-report-emp__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sales-report-emp__totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sales-report-emp__totals b {
+  font-size: 15px;
+}
+
+.sales-report-emp .line-list {
+  padding: 0 14px;
+}
+
+.sales-report-emp .line-list__row {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .line-list {
   display: flex;
   flex-direction: column;
