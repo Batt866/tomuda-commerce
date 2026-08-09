@@ -9248,6 +9248,10 @@ textarea::placeholder {
   align-items: center;
 }
 
+.delivery-store-detail__maps-row--top {
+  padding: 0 2px;
+}
+
 .delivery-store-detail__maps--apple {
   color: var(--hex-muted-foreground);
   font-weight: 500;
