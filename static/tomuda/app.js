@@ -15738,7 +15738,11 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D Том/х · E Жижиг/х · F Тоо/ш · G Үлдэгдэл — sample proportions. */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [36, 9.5, 13, 7, 7.5, 7, 9.5];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [34, 9, 12.5, 7.5, 10, 7.5, 9.5];
+/** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
+const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
+const WAREHOUSE_PREPARE_QTY_HEADER_STYLE = 20;
+const WAREHOUSE_PREPARE_QTY_CELL_STYLE = 21;
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -15752,7 +15756,7 @@ function warehousePrepareMaxBarcodeLen(sections) {
   scan(sections?.promo);
   return maxLen;
 }
-/** Column widths tuned for A4 fitToWidth; qty headers wrap so text stays full. */
+/** Column widths tuned for A4; Жижиг/х stays on one line. */
 function warehousePrepareColWidthsFor(sections) {
   const barcodeChars = warehousePrepareMaxBarcodeLen(sections);
   const barcodeW = Math.min(
@@ -15770,26 +15774,31 @@ function warehousePrepareColWidthsFor(sections) {
   ];
 }
 function warehousePreparePatchStylesXml(stylesXml) {
-  // Qty / stock numbers: center to match the print sample (Том/х · Жижиг/х · Тоо/ш).
+  let out = String(stylesXml || "");
+
+  // Solid light-gray fill for Том/х · Жижиг/х · Тоо/ш columns (sample highlight).
+  const grayFill =
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill>';
+  if (!out.includes('rgb="FFE8EBEE"')) {
+    out = out.replace(
+      /(<fills count=")(\d+)(">)([\s\S]*?)(<\/fills>)/,
+      (_, a, count, c, body, end) =>
+        `${a}${Number(count) + 1}${c}${body}${grayFill}${end}`,
+    );
+  }
+  const fillsMatch = out.match(/<fills count="(\d+)">/);
+  const grayFillId = fillsMatch ? Number(fillsMatch[1]) - 1 : 2;
+
+  // Qty numbers: center (sample).
   const numStyleLeft =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
   const numStyleRight =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top" /></xf>';
   const numStyleCenter =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
-  let out = stylesXml;
   if (out.includes(numStyleLeft)) out = out.replace(numStyleLeft, numStyleCenter);
   else if (out.includes(numStyleRight))
     out = out.replace(numStyleRight, numStyleCenter);
-
-  // Header cells (style 7): wrap so Том/х · Жижиг/х · Тоо/ш · Үлдэгдэл (ш) stay visible.
-  const headerXf =
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
-  const headerXfWrap =
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" /></xf>';
-  if (out.includes(headerXf)) {
-    out = out.replace(headerXf, headerXfWrap);
-  }
 
   // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
@@ -15805,19 +15814,32 @@ function warehousePreparePatchStylesXml(stylesXml) {
         `${a}${Number(count) + 1}${c}${body}${signBorderHair}${end}`,
     );
   }
+
   const signXf =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
-  if (!out.includes(signXf)) {
+  // Qty header: gray + center + no wrap (Жижиг/х stays one line).
+  const qtyHeaderXf = `<xf numFmtId="0" fontId="2" fillId="${grayFillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
+  // Qty cells: gray + bold center numbers.
+  const qtyCellXf = `<xf numFmtId="1" fontId="2" fillId="${grayFillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
+
+  const appendXfs = [];
+  if (!out.includes(signXf)) appendXfs.push(signXf);
+  if (!out.includes(`fillId="${grayFillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/>`)) {
+    appendXfs.push(qtyHeaderXf);
+  }
+  if (!out.includes(`numFmtId="1" fontId="2" fillId="${grayFillId}"`)) {
+    appendXfs.push(qtyCellXf);
+  }
+  if (appendXfs.length) {
     out = out.replace(
       /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
       (_, a, count, c, body, end) =>
-        `${a}${Number(count) + 1}${c}${body}${signXf}${end}`,
+        `${a}${Number(count) + appendXfs.length}${c}${body}${appendXfs.join("")}${end}`,
     );
   }
   return out;
 }
 /** cellXfs index after warehousePreparePatchStylesXml appends the sign-line xf. */
-const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 function warehousePrepareColsXml(widths = WAREHOUSE_PREPARE_COL_WIDTHS) {
   return widths.map(
     (width, index) =>
@@ -15953,13 +15975,15 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
-  pushRow(36, [
+  const qtyHead = WAREHOUSE_PREPARE_QTY_HEADER_STYLE;
+  const qtyCell = WAREHOUSE_PREPARE_QTY_CELL_STYLE;
+  pushRow(28, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Том/х"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/х"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`D${headerRow}`, qtyHead, si("Том/х"), "s"),
+    xlsxCellXml(`E${headerRow}`, qtyHead, si("Жижиг/х"), "s"),
+    xlsxCellXml(`F${headerRow}`, qtyHead, si("Тоо/ш"), "s"),
     xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл (ш)"), "s"),
   ]);
   const pushPrepareGroups = (groups) => {
@@ -15985,9 +16009,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
-        xlsxPrepareQtyCell(`D${r}`, 10, parts.largePacks),
-        xlsxPrepareQtyCell(`E${r}`, 10, parts.packs),
-        xlsxPrepareQtyCell(`F${r}`, 10, parts.loosePieces),
+        xlsxPrepareQtyCell(`D${r}`, qtyCell, parts.largePacks),
+        xlsxPrepareQtyCell(`E${r}`, qtyCell, parts.packs),
+        xlsxPrepareQtyCell(`F${r}`, qtyCell, parts.loosePieces),
         xlsxCellXml(`G${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
@@ -16092,13 +16116,13 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
 @page { size: A4 portrait; margin: 10mm 8mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
 table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
-.prepare col.c-name { width: 38%; }
+.prepare col.c-name { width: 36%; }
 .prepare col.c-unit { width: 10%; }
-.prepare col.c-barcode { width: 14%; }
-.prepare col.c-large { width: 8%; }
-.prepare col.c-small { width: 9%; }
-.prepare col.c-piece { width: 8%; }
-.prepare col.c-stock { width: 13%; }
+.prepare col.c-barcode { width: 13%; }
+.prepare col.c-large { width: 9%; }
+.prepare col.c-small { width: 11%; }
+.prepare col.c-piece { width: 9%; }
+.prepare col.c-stock { width: 12%; }
 .prepare td, .prepare th { border: 1px solid #444; padding: 3px 4px; vertical-align: middle; }
 .prepare td.name { overflow-wrap: anywhere; text-align: left; }
 .prepare td.unit { text-align: center; }
@@ -16108,13 +16132,14 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 38px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: normal; line-height: 1.15; word-break: keep-all; background: #f3f3f3; }
-.cat { text-align: center; font-weight: 800; height: 28px; }
+.head th { height: 34px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; }
+.head th.qty { background: #e8ebee; white-space: nowrap; }
+.cat { text-align: center; font-weight: 800; height: 28px; background: #e8ebee; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; }
-.num { text-align: center; font-weight: 700; }
-.num:empty { background: #f5f5f5; font-weight: 400; }
-.stock { font-weight: 600; }
+.num { text-align: center; font-weight: 700; background: #e8ebee; }
+.num:empty { background: #e8ebee; font-weight: 400; }
+.stock { font-weight: 600; background: #fff; }
 .spacer td { height: 36px; border: none !important; }
 .sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
@@ -16125,7 +16150,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value" colspan="2">${h(warehouseEmp)}</td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td colspan="7"></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Том/х</th><th>Жижиг/х</th><th>Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th class="qty">Том/х</th><th class="qty">Жижиг/х</th><th class="qty">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
 <tr><td class="sign-label">Хүлээн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
