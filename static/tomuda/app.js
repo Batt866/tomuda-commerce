@@ -13350,21 +13350,53 @@ function stockReceiptPackCell(line) {
   if (packs) parts.push(`${packs} жижиг`);
   return parts.length ? parts.join(" · ") : "-";
 }
+function stockReceiptPackHtml(line) {
+  const p =
+    state.products.find((x) => String(x.id) === String(line?.productId)) ||
+    null;
+  const largeCount =
+    Number(line?.largeBoxQuantity) > 1
+      ? Math.floor(Number(line.largeBoxQuantity))
+      : productLargeBoxCount(p);
+  const excl = exclusiveOrderQtyParts(
+    {
+      largePacks: line?.largePacks,
+      packs: line?.packs,
+      pieces: 0,
+    },
+    largeCount,
+  );
+  const bits = [];
+  if (excl.largePacks) {
+    bits.push(`<span class="stock-in-pack-chip">${excl.largePacks} том</span>`);
+  }
+  if (excl.packs) {
+    bits.push(`<span class="stock-in-pack-chip">${excl.packs} жижиг</span>`);
+  }
+  if (!bits.length) {
+    return `<span class="stock-in-pack-chip stock-in-pack-chip--empty">—</span>`;
+  }
+  return `<span class="stock-in-pack">${bits.join("")}</span>`;
+}
 function stockInReceiptRow(line) {
   const costPrice = stockInReceiptLineCostPrice(line);
   const salesPrice = stockInReceiptLineSalesPrice(line);
   const totalPrice = stockInReceiptLineTotal(line);
+  const showCost = canViewProductCost();
   const note = String(line?.note || "").trim();
   const noteHtml = note
     ? `<span class="stock-in-table__note">${esc(note)}</span>`
     : "";
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}${noteHtml}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${esc(stockReceiptPackCell(line))}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(costPrice)}</span><span class="stock-in-table__money">${fmt(salesPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(totalPrice)}</span></div>`;
+  const costCell = showCost
+    ? `<span class="stock-in-receipt-line__price"><span class="stock-in-receipt-line__price-label">Өртөг</span><span class="stock-in-receipt-line__price-value">${fmt(costPrice)}</span></span>`
+    : "";
+  return `<article class="stock-in-receipt-line"><div class="stock-in-receipt-line__main"><p class="stock-in-receipt-line__name">${esc(line.productName)}</p>${noteHtml}<div class="stock-in-receipt-line__meta"><span class="stock-in-receipt-line__barcode">${esc(line.barcode || "—")}</span>${stockReceiptPackHtml(line)}<span class="stock-in-receipt-line__qty">${line.quantity} ш</span></div></div><div class="stock-in-receipt-line__prices">${costCell}<span class="stock-in-receipt-line__price"><span class="stock-in-receipt-line__price-label">Үнэ</span><span class="stock-in-receipt-line__price-value">${fmt(salesPrice)}</span></span><span class="stock-in-receipt-line__price stock-in-receipt-line__price--total"><span class="stock-in-receipt-line__price-label">Нийт</span><span class="stock-in-receipt-line__price-value">${fmt(totalPrice)}</span></span></div></article>`;
 }
 function stockInTableHead(mode = "entry") {
   if (mode === "entry") {
     return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Хайрцаг</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
   }
-  return `<div class="stock-in-table__head"><span>Барааны нэр</span><span>Barcode</span><span>Хайрцаг</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span><span>Нэгж үнэ</span><span>Нийт үнэ</span></div>`;
+  return "";
 }
 function stockInEntryList(list) {
   const filled = list.filter((p) => stockInLineQty(p) > 0);
@@ -13405,7 +13437,7 @@ function stockInReceiptGroupedLines(lines) {
     });
 }
 function stockInCategoryTotalRow(name, amount) {
-  return `<div class="stock-in-table__foot stock-in-table__foot--cat"><span class="stock-in-table__foot-label">${esc(name)} нийт</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(amount)}</span></div>`;
+  return `<div class="stock-in-receipt-subtotal"><span class="stock-in-receipt-subtotal__label">${esc(name)} нийт</span><span class="stock-in-receipt-subtotal__value">${fmt(amount)}</span></div>`;
 }
 function stockInReceiptPanel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
@@ -13413,7 +13445,7 @@ function stockInReceiptPanel(receipt) {
   const rows = groups
     .map((item) => {
       if (item.type === "cat") {
-        return `<div class="stock-in-table__cat">${esc(item.name)}</div>`;
+        return `<div class="stock-in-receipt-cat">${esc(item.name)}</div>`;
       }
       if (item.type === "catTotal") {
         return stockInCategoryTotalRow(item.name, item.amount);
@@ -13422,7 +13454,7 @@ function stockInReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -13494,13 +13526,13 @@ function exportStockInExcelFallback(receipt) {
 @page { size: A4 portrait; margin: 20mm 14mm 16mm 20mm; }
 body { font-family: Arial, sans-serif; color: #000; margin: 0; }
 table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
-.stock-in col.c-no { width: 5%; }
-.stock-in col.c-name { width: 28%; }
+.stock-in col.c-no { width: 4%; }
+.stock-in col.c-name { width: 30%; }
 .stock-in col.c-code { width: 14%; }
 .stock-in col.c-unit { width: 11%; }
 .stock-in col.c-qty { width: 11%; }
 .stock-in col.c-price { width: 14%; }
-.stock-in col.c-total { width: 17%; }
+.stock-in col.c-total { width: 12%; }
 .stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
 .form-code td { border: none; font-size: 11px; }
 .title { text-align: center; font-size: 15px; font-weight: 800; border: none; }
@@ -13569,18 +13601,20 @@ function stockOutEntryList(list) {
   return `<div class="space-y-3">${section("Зарлага гаргах бараанууд", filled, "Зарлага сонгоогүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
 }
 function stockOutReceiptRow(line) {
+  const salesPrice = Number(line.unitPrice) || 0;
+  const totalPrice = Number(line.totalPrice) || 0;
   const note = String(line?.note || "").trim();
   const noteHtml = note
     ? `<span class="stock-in-table__note">${esc(note)}</span>`
     : "";
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}${noteHtml}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${esc(stockReceiptPackCell(line))}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money">${fmt(line.unitPrice || 0)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(line.totalPrice || 0)}</span></div>`;
+  return `<article class="stock-in-receipt-line"><div class="stock-in-receipt-line__main"><p class="stock-in-receipt-line__name">${esc(line.productName)}</p>${noteHtml}<div class="stock-in-receipt-line__meta"><span class="stock-in-receipt-line__barcode">${esc(line.barcode || "—")}</span>${stockReceiptPackHtml(line)}<span class="stock-in-receipt-line__qty">${line.quantity} ш</span></div></div><div class="stock-in-receipt-line__prices"><span class="stock-in-receipt-line__price"><span class="stock-in-receipt-line__price-label">Үнэ</span><span class="stock-in-receipt-line__price-value">${fmt(salesPrice)}</span></span><span class="stock-in-receipt-line__price stock-in-receipt-line__price--total"><span class="stock-in-receipt-line__price-label">Нийт</span><span class="stock-in-receipt-line__price-value">${fmt(totalPrice)}</span></span></div></article>`;
 }
 function stockOutReceiptPanel(receipt) {
   const groups = stockInReceiptGroupedLines(receipt.lines || []);
   const rows = groups
     .map((item) => {
       if (item.type === "cat") {
-        return `<div class="stock-in-table__cat">${esc(item.name)}</div>`;
+        return `<div class="stock-in-receipt-cat">${esc(item.name)}</div>`;
       }
       if (item.type === "catTotal") {
         return stockInCategoryTotalRow(item.name, item.amount);
@@ -13589,7 +13623,7 @@ function stockOutReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-table stock-in-table--receipt"><div class="stock-in-table__scroll">${stockInTableHead("receipt")}<div class="stock-in-table__body">${rows}</div><div class="stock-in-table__foot"><span class="stock-in-table__foot-label">Нийт дүн</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(receipt.totalAmount || 0)}</span></div></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн:</span><span class="stock-in-sign__line">_____________________</span></div><div class="stock-in-sign"><span>Хүлээн авсан:</span><span class="stock-in-sign__line">______________________</span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо:</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockOutExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockOutExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockOutModal(id) {
   ensureStockOutSession();
@@ -14862,8 +14896,8 @@ const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
 const STOCK_IN_COMPANY_NAME = "ТОМУДА ГРУПП ХХК";
 const STOCK_IN_COMPANY_REG = "5397987";
 const STOCK_IN_WAREHOUSE_DEFAULT = "Төв агуулах";
-/** BM-1 column widths sized for A4; A+B wide enough for meta labels. */
-const STOCK_IN_COL_WIDTHS = [6, 14, 16, 14, 11, 10, 11, 13];
+/** BM-1 column widths sized for A4; A (№) and H (нийт) kept narrow. */
+const STOCK_IN_COL_WIDTHS = [3.5, 15, 17, 14, 11, 10, 11, 10];
 /** receiptXlsxStylesXml indices used by BM-1 stock-in sheet. */
 const STOCK_IN_STYLES = {
   blank: 0,

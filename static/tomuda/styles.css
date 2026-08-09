@@ -15344,7 +15344,7 @@ body.image-lightbox-open {
 }
 
 .stock-in-receipt-panel__head {
-  padding: 16px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--hex-border);
   background: linear-gradient(
     180deg,
@@ -15355,7 +15355,7 @@ body.image-lightbox-open {
 
 .stock-in-receipt-panel__title {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   line-height: 1.25;
   color: var(--hex-foreground);
@@ -15368,10 +15368,176 @@ body.image-lightbox-open {
   color: var(--hex-muted-foreground);
 }
 
-.stock-in-receipt-panel__signatures {
+.stock-in-receipt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.stock-in-receipt-cat {
+  padding: 8px 18px;
+  background: color-mix(in srgb, var(--hex-secondary) 55%, var(--hex-card));
+  border-bottom: 1px solid var(--hex-border);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--hex-foreground);
+}
+
+.stock-in-receipt-line {
   display: grid;
   gap: 10px;
-  padding: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.stock-in-receipt-line__name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--hex-foreground);
+}
+
+.stock-in-receipt-line__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+
+.stock-in-receipt-line__barcode {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-muted-foreground);
+  letter-spacing: 0.01em;
+}
+
+.stock-in-pack {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.stock-in-pack-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hex-secondary) 80%, var(--hex-card));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+}
+
+.stock-in-pack-chip--empty {
+  background: transparent;
+  color: var(--hex-muted-foreground);
+  font-weight: 500;
+  padding-inline: 0;
+}
+
+.stock-in-receipt-line__qty {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hex-primary) 12%, var(--hex-card));
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-primary);
+  white-space: nowrap;
+}
+
+.stock-in-receipt-line__prices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.stock-in-receipt-line__price {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-secondary) 40%, var(--hex-card));
+}
+
+.stock-in-receipt-line__price--total {
+  background: color-mix(in srgb, var(--hex-primary) 10%, var(--hex-card));
+}
+
+.stock-in-receipt-line__price-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-receipt-line__price-value {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+}
+
+.stock-in-receipt-line__price--total .stock-in-receipt-line__price-value {
+  color: var(--hex-primary);
+}
+
+.stock-in-receipt-subtotal,
+.stock-in-receipt-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+}
+
+.stock-in-receipt-subtotal {
+  border-bottom: 1px solid var(--hex-border);
+  background: color-mix(in srgb, var(--hex-secondary) 28%, var(--hex-card));
+}
+
+.stock-in-receipt-total {
+  border-top: 1px solid var(--hex-border);
+  background: color-mix(in srgb, var(--hex-primary) 6%, var(--hex-card));
+  padding-block: 14px;
+}
+
+.stock-in-receipt-subtotal__label,
+.stock-in-receipt-total__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-receipt-subtotal__value,
+.stock-in-receipt-total__value {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+}
+
+.stock-in-receipt-total__value {
+  font-size: 17px;
+  color: var(--hex-primary);
+}
+
+.stock-in-receipt-panel__signatures {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
   border-top: 1px solid var(--hex-border);
   font-size: 13px;
   line-height: 1.45;
@@ -15383,21 +15549,26 @@ body.image-lightbox-open {
 }
 
 .stock-in-sign {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr;
+  align-items: end;
+  gap: 10px;
+  color: var(--hex-muted-foreground);
 }
 
 .stock-in-sign__line {
-  flex: 1;
-  min-width: 180px;
-  color: var(--hex-muted-foreground);
+  min-height: 1.1em;
+  border-bottom: 1px solid color-mix(in srgb, var(--hex-border) 80%, #94a3b8);
+}
+
+.stock-in-sign--date {
+  color: var(--hex-foreground);
 }
 
 .stock-in-sign--date span:last-child {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  justify-self: start;
 }
 
 .stock-in-table {
@@ -15428,27 +15599,15 @@ body.image-lightbox-open {
     minmax(88px, 0.9fr);
 }
 
-.stock-in-table--receipt .stock-in-table__head,
-.stock-in-table--receipt .stock-in-table__row,
-.stock-in-table--receipt .stock-in-table__foot {
-  grid-template-columns:
-    minmax(140px, 1.4fr)
-    minmax(88px, 1fr)
-    minmax(56px, 0.6fr)
-    minmax(72px, 0.7fr)
-    repeat(3, minmax(80px, 0.85fr));
-}
-
 @media (min-width: 640px) {
   .stock-in-table__head--entry,
   .stock-in-table__row--entry {
     min-width: 560px;
   }
 
-  .stock-in-table--receipt .stock-in-table__head,
-  .stock-in-table--receipt .stock-in-table__row,
-  .stock-in-table--receipt .stock-in-table__foot {
-    min-width: 760px;
+  .stock-in-receipt-line {
+    grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.9fr);
+    align-items: center;
   }
 }
 
@@ -15466,10 +15625,6 @@ body.image-lightbox-open {
 
 .stock-in-table__head span:nth-child(n + 3) {
   text-align: center;
-}
-
-.stock-in-table--receipt .stock-in-table__head span:nth-child(n + 5) {
-  text-align: right;
 }
 
 .stock-in-table__body {
