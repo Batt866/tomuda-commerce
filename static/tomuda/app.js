@@ -15712,17 +15712,17 @@ function xlsxOptionalNum(ref, styleId, value) {
   }
   return xlsxCellXml(ref, styleId, n, "n");
 }
-/** Qty cols on бараа бэлдэх sheet: show "—" when empty (not a blank cell). */
-function xlsxPrepareQtyCell(ref, styleId, value, si) {
+/** Qty cols on бараа бэлдэх sheet: blank when empty (match print sample). */
+function xlsxPrepareQtyCell(ref, styleId, value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n === 0) {
-    return xlsxCellXml(ref, styleId, si("—"), "s");
+    return xlsxCellXml(ref, styleId, null, "empty");
   }
   return xlsxCellXml(ref, styleId, n, "n");
 }
 function prepareQtyDisplay(value) {
   const n = Number(value);
-  if (!Number.isFinite(n) || n === 0) return "—";
+  if (!Number.isFinite(n) || n === 0) return "";
   return String(n);
 }
 const XLSX_BARCODE_CELL_STYLE = 34; // numFmtId 49 (@) — full digits, no scientific notation
@@ -15737,8 +15737,8 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
   return xlsxCellXml(ref, 9, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
-/** A name · B unit · C barcode · D том · E жижиг · F ширхэг · G stock — A4 portrait. */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [29, 10, 11, 7, 8, 7, 9];
+/** A name · B unit · C barcode · D Том/х · E Жижиг/х · F Тоо/ш · G Үлдэгдэл — sample proportions. */
+const WAREHOUSE_PREPARE_COL_WIDTHS = [36, 9.5, 13, 7, 7.5, 7, 9.5];
 function warehousePrepareMaxBarcodeLen(sections) {
   let maxLen = String("Баркод").length;
   const scan = (groups) => {
@@ -15756,8 +15756,8 @@ function warehousePrepareMaxBarcodeLen(sections) {
 function warehousePrepareColWidthsFor(sections) {
   const barcodeChars = warehousePrepareMaxBarcodeLen(sections);
   const barcodeW = Math.min(
-    13,
-    Math.max(9, Math.round(barcodeChars * 1.05) + 1),
+    14,
+    Math.max(11, Math.round(barcodeChars * 1.02) + 0.5),
   );
   return [
     WAREHOUSE_PREPARE_COL_WIDTHS[0],
@@ -15770,17 +15770,19 @@ function warehousePrepareColWidthsFor(sections) {
   ];
 }
 function warehousePreparePatchStylesXml(stylesXml) {
-  const numStyle =
+  // Qty / stock numbers: center to match the print sample (Том/х · Жижиг/х · Тоо/ш).
+  const numStyleLeft =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
-  const numStyleRight = numStyle.replace(
-    'horizontal="left"',
-    'horizontal="right"',
-  );
-  let out = stylesXml.includes(numStyle)
-    ? stylesXml.replace(numStyle, numStyleRight)
-    : stylesXml;
+  const numStyleRight =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top" /></xf>';
+  const numStyleCenter =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+  let out = stylesXml;
+  if (out.includes(numStyleLeft)) out = out.replace(numStyleLeft, numStyleCenter);
+  else if (out.includes(numStyleRight))
+    out = out.replace(numStyleRight, numStyleCenter);
 
-  // Header cells (style 7): wrap so Том/х · Жижиг/х · Тоо/ш stay fully visible in narrow A4 cols.
+  // Header cells (style 7): wrap so Том/х · Жижиг/х · Тоо/ш · Үлдэгдэл (ш) stay visible.
   const headerXf =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
   const headerXfWrap =
@@ -15789,7 +15791,7 @@ function warehousePreparePatchStylesXml(stylesXml) {
     out = out.replace(headerXf, headerXfWrap);
   }
 
-  // Signature underline (B→E): thinnest hairline bottom border.
+  // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
     '<border><left /><right /><top /><bottom style="hair"><color theme="1" /></bottom><diagonal /></border>';
   const signBorderMedium =
@@ -15827,7 +15829,7 @@ function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const cols = warehousePrepareColsXml(
     colWidths || WAREHOUSE_PREPARE_COL_WIDTHS,
   );
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.55" right="0.2" top="0.75" bottom="0.75" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.4" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildWarehousePrepareSheetXml(orders, workerIds) {
   const strings = [];
@@ -15953,12 +15955,12 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   const headerRow = rowNum;
   pushRow(36, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих\nнэгж"), "s"),
+    xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
     xlsxCellXml(`D${headerRow}`, 7, si("Том/х"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/х"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Тоо/ш"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл (ш)"), "s"),
   ]);
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
@@ -15983,9 +15985,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
         xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
-        xlsxPrepareQtyCell(`D${r}`, 10, parts.largePacks, si),
-        xlsxPrepareQtyCell(`E${r}`, 10, parts.packs, si),
-        xlsxPrepareQtyCell(`F${r}`, 10, parts.loosePieces, si),
+        xlsxPrepareQtyCell(`D${r}`, 10, parts.largePacks),
+        xlsxPrepareQtyCell(`E${r}`, 10, parts.packs),
+        xlsxPrepareQtyCell(`F${r}`, 10, parts.loosePieces),
         xlsxCellXml(`G${r}`, 10, Number(p.stock) || 0, "n"),
       ]);
     }
@@ -16015,9 +16017,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       xlsxCellXml(`G${r}`, 1, null, "empty"),
     ]);
   };
-  pushWarehousePrepareSignatureBlock("Хүлээлгэн өгсөн ажилтан:");
-  pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-  pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
+  pushWarehousePrepareSignatureBlock("Хүлээн өгсөн ажилтан:");
   const lastRow = rowNum;
   const sheetXml = warehousePrepareWorksheetXml(
     rows,
@@ -16070,10 +16070,10 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? workerNames
         .map(
           (name, idx) =>
-            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value">${h(name)}</td>${idx === 0 ? `<td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td>` : "<td></td><td></td><td></td><td></td><td></td>"}</tr>`,
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value" colspan="2">${h(name)}</td>${idx === 0 ? `<td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td>` : `<td colspan="4" style="border:none"></td>`}</tr>`,
         )
         .join("")
-    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value">-</td><td></td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td></tr>`;
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value" colspan="2">-</td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td></tr>`;
   const renderGroupRows = (groups) =>
     groups
       .map((item) => {
@@ -16082,54 +16082,53 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
-        return `<tr><td>${h(p.name || "")}</td><td>${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num">${h(prepareQtyDisplay(parts.packs))}</td><td class="num">${h(prepareQtyDisplay(parts.loosePieces))}</td><td class="num">${Number(p.stock) || 0}</td></tr>`;
+        return `<tr><td class="name">${h(p.name || "")}</td><td class="unit">${h(p.unit || "ширхэг")}</td><td class="barcode">${h(p.barcode || "")}</td><td class="num">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num">${h(prepareQtyDisplay(parts.packs))}</td><td class="num">${h(prepareQtyDisplay(parts.loosePieces))}</td><td class="num stock">${Number(p.stock) || 0}</td></tr>`;
       })
       .join("");
   const promoRows = sections.promo.length
     ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 8px 12px 8px 28px; }
-table.prepare { width: 980px; max-width: 100%; margin-left: auto; margin-right: 0; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
-.prepare col:nth-child(1) { width: 340px; }
-.prepare col:nth-child(2) { width: 100px; }
-.prepare col:nth-child(3) { width: 120px; }
-.prepare col:nth-child(4) { width: 72px; }
-.prepare col:nth-child(5) { width: 84px; }
-.prepare col:nth-child(6) { width: 72px; }
-.prepare col:nth-child(7) { width: 92px; }
-.prepare td, .prepare th { border: 1px solid #555; padding: 2px 3px; vertical-align: middle; }
-.prepare td:first-child { overflow-wrap: anywhere; }
-.title { height: 72px; text-align: center; font-size: 28px; font-weight: 800; }
-.meta-label { text-align: right; font-weight: 700; white-space: nowrap; }
-.meta-value { font-weight: 400; white-space: nowrap; }
-.date-label { text-align: right; font-weight: 700; white-space: nowrap; }
-.date-value { text-align: left; white-space: nowrap; }
-.blank td { height: 30px; }
-.head th { height: 52px; text-align: center; font-size: 14px; font-weight: 800; border: 2px solid #000; white-space: normal; line-height: 1.15; word-break: keep-all; }
-.cat { text-align: center; font-weight: 800; height: 36px; }
+@page { size: A4 portrait; margin: 10mm 8mm; }
+body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
+table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
+.prepare col.c-name { width: 38%; }
+.prepare col.c-unit { width: 10%; }
+.prepare col.c-barcode { width: 14%; }
+.prepare col.c-large { width: 8%; }
+.prepare col.c-small { width: 9%; }
+.prepare col.c-piece { width: 8%; }
+.prepare col.c-stock { width: 13%; }
+.prepare td, .prepare th { border: 1px solid #444; padding: 3px 4px; vertical-align: middle; }
+.prepare td.name { overflow-wrap: anywhere; text-align: left; }
+.prepare td.unit { text-align: center; }
+.title { height: 48px; text-align: center; font-size: 22px; font-weight: 800; border: none !important; }
+.meta-label { text-align: left; font-weight: 700; white-space: nowrap; border: none !important; }
+.meta-value { font-weight: 400; white-space: nowrap; border: none !important; }
+.date-label { text-align: right; font-weight: 700; white-space: nowrap; border: none !important; }
+.date-value { text-align: left; white-space: nowrap; border: none !important; }
+.blank td { height: 14px; border: none !important; }
+.head th { height: 38px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: normal; line-height: 1.15; word-break: keep-all; background: #f3f3f3; }
+.cat { text-align: center; font-weight: 800; height: 28px; }
 .promo-head { border-top: 2px solid #000 !important; }
-.barcode { mso-number-format:"\\@"; text-align: left; }
-.num { text-align: right; }
-.spacer td { height: 88px; }
-.sign-label { text-align: right; font-weight: 700; }
-.sign-line { border-bottom: 0.5pt solid #000 !important; }
-.sign-hint { text-align: left; font-size: 14px; border-top: none !important; }
-.sign-gap td { height: 10px; border: none !important; }
-.sign-block-gap td { height: 22px; border: none !important; }
-@media print { body { padding-left: 36px; padding-right: 8px; } table.prepare { margin-left: auto; } }
+.barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; }
+.num { text-align: center; font-weight: 700; }
+.num:empty { background: #f5f5f5; font-weight: 400; }
+.stock { font-weight: 600; }
+.spacer td { height: 36px; border: none !important; }
+.sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
+.sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
+.sign-gap td { height: 8px; border: none !important; }
 </style></head><body><table class="prepare">
-<colgroup><col><col><col><col><col><col><col></colgroup>
+<colgroup><col class="c-name"><col class="c-unit"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-stock"></colgroup>
 <tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value" colspan="2">${h(warehouseEmp)}</td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
-<tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих<br>нэгж</th><th>Баркод</th><th>Том/х</th><th>Жижиг/х</th><th>Тоо/ш</th><th>Үлдэгдэл</th></tr>
+<tr class="blank"><td colspan="7"></td></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих нэгж</th><th>Баркод</th><th>Том/х</th><th>Жижиг/х</th><th>Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
-<tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
-<tr class="sign-block-gap"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
+<tr class="spacer"><td colspan="7"></td></tr>
+<tr><td class="sign-label">Хүлээн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
