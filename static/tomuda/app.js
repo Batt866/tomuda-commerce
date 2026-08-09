@@ -16055,12 +16055,12 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     pushPrepareGroups(sections.promo);
   }
   pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-  pushRow(16.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
+  pushRow(10.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
     merges.push(`B${r}:F${r}`);
     const line = WAREHOUSE_PREPARE_SIGN_LINE_STYLE;
-    pushRow(22, [
+    pushRow(20, [
       xlsxCellXml(`A${r}`, 3, si(role), "s"),
       xlsxCellXml(`B${r}`, line, null, "empty"),
       ...emptyCells(r, "C", "F", line),
@@ -16068,6 +16068,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ]);
   };
   pushWarehousePrepareSignatureBlock("Хүлээн өгсөн ажилтан:");
+  pushRow(6, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
+  pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
   const lastRow = rowNum;
   const sheetXml = warehousePrepareWorksheetXml(
     rows,
@@ -16173,10 +16175,10 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .num.qty-small:empty,
 .num.qty-piece:empty { font-weight: 400; }
 .stock { font-weight: 600; background: #fff; }
-.spacer td { height: 36px; border: none !important; }
+.spacer td { height: 18px; border: none !important; }
 .sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
-.sign-gap td { height: 8px; border: none !important; }
+.sign-gap td { height: 6px; border: none !important; }
 </style></head><body><table class="prepare">
 <colgroup><col class="c-name"><col class="c-unit"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-stock"></colgroup>
 <tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
@@ -16187,6 +16189,8 @@ ${workerRows}
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
 <tr><td class="sign-label">Хүлээн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
+<tr class="sign-gap"><td colspan="7"></td></tr>
+<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
 }
