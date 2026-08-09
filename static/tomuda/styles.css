@@ -948,6 +948,210 @@ textarea.text-sm,
   padding-top: 4px;
 }
 
+.customer-detail-scroll {
+  max-height: min(75vh, 720px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.customer-detail-modal .modal-panel__head {
+  flex-shrink: 0;
+}
+
+.customer-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--hex-border);
+  border-radius: 14px;
+  background: var(--hex-card);
+}
+
+.customer-history__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.customer-history__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--hex-foreground);
+}
+
+.customer-history__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--hex-muted-foreground);
+}
+
+.customer-history__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.customer-history__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.customer-history__chip {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hex-border);
+  border-radius: 999px;
+  background: var(--hex-secondary);
+  color: var(--hex-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.customer-history__chip.is-active {
+  border-color: var(--hex-primary);
+  background: color-mix(in srgb, var(--hex-primary) 14%, var(--hex-card));
+  color: var(--hex-primary);
+}
+
+.customer-history__range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.customer-history__date {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hex-muted-foreground);
+}
+
+.customer-history__date-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--hex-border);
+  border-radius: 10px;
+  background: var(--hex-secondary);
+  color: var(--hex-foreground);
+  font-size: 14px;
+}
+
+.customer-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.customer-history__order {
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  background: var(--hex-secondary);
+  overflow: hidden;
+}
+
+.customer-history__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.customer-history__summary::-webkit-details-marker {
+  display: none;
+}
+
+.customer-history__summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.customer-history__day {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+}
+
+.customer-history__amount {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--hex-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.customer-history__body {
+  padding: 0 12px 12px;
+  border-top: 1px dashed var(--hex-border);
+}
+
+.customer-history__meta {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--hex-muted-foreground);
+}
+
+.customer-history__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customer-history__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.customer-history__item-name {
+  min-width: 0;
+  font-weight: 600;
+  color: var(--hex-foreground);
+}
+
+.customer-history__item-qty {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--hex-muted-foreground);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.customer-history__empty,
+.customer-history__empty-items {
+  margin: 0;
+  padding: 14px 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--hex-muted-foreground);
+}
+
+.customer-history__empty-items {
+  padding: 4px 0 0;
+  text-align: left;
+}
+
 .customer-card__avatar {
   flex-shrink: 0;
   width: var(--avatar-lg);

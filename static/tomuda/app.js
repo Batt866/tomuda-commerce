@@ -38,6 +38,9 @@ const state = {
   editingOrderOriginalItems: null,
   deliveryStoreId: "",
   deliveryStoreReady: false,
+  customerHistoryId: "",
+  customerHistoryFrom: "",
+  customerHistoryTo: "",
   orderEmployee: "emp-hasan",
   deliveryDate: "",
   paymentTerm: "cash",
@@ -1660,6 +1663,129 @@ function customerUnpaidOrders(customerId) {
   return retainedOrders(state.orders || [])
     .filter((o) => o.customerId === customerId && !orderIsPaid(o))
     .sort(compareOrdersNewestFirst);
+}
+function canViewCustomerOrderHistory() {
+  return (
+    isAdmin() ||
+    hasPermission("orders.view") ||
+    hasPermission("orderHistory.view")
+  );
+}
+function customerAllOrders(customerId) {
+  if (!customerId) return [];
+  return retainedOrders(state.orders || [])
+    .filter(
+      (o) => o.customerId === customerId && o.status !== "cancelled",
+    )
+    .sort(compareOrdersNewestFirst);
+}
+function customerHistoryFromDay() {
+  return normalizeIsoDateInput(state.customerHistoryFrom) || "";
+}
+function customerHistoryToDay() {
+  return normalizeIsoDateInput(state.customerHistoryTo) || "";
+}
+function customerOrdersInHistoryRange(customerId) {
+  const from = customerHistoryFromDay();
+  const to = customerHistoryToDay();
+  return customerAllOrders(customerId).filter((o) => {
+    const day = orderTakenDay(o) || orderCreatedDay(o);
+    if (!day) return !from && !to;
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    return true;
+  });
+}
+function refreshCustomerDetailModal() {
+  const id = state.customerHistoryId;
+  if (!id) return;
+  const c = state.customers.find((x) => x.id === id);
+  if (!c) return;
+  box(
+    customerDisplayName(c),
+    `<div class="modal-scroll customer-detail-scroll">${customerDetailHtml(c)}</div>`,
+    "max-w-xl",
+    { panelClass: "customer-detail-modal" },
+  );
+}
+function clearCustomerHistoryRange() {
+  state.customerHistoryFrom = "";
+  state.customerHistoryTo = "";
+  refreshCustomerDetailModal();
+}
+function setCustomerHistoryFrom(day) {
+  const next = normalizeIsoDateInput(day) || "";
+  state.customerHistoryFrom = next;
+  const to = customerHistoryToDay();
+  if (next && to && to < next) state.customerHistoryTo = next;
+  refreshCustomerDetailModal();
+}
+function setCustomerHistoryTo(day) {
+  const next = normalizeIsoDateInput(day) || "";
+  state.customerHistoryTo = next;
+  const from = customerHistoryFromDay();
+  if (next && from && next < from) state.customerHistoryFrom = next;
+  refreshCustomerDetailModal();
+}
+function setCustomerHistoryPreset(days) {
+  const n = Math.max(1, Math.floor(Number(days) || 0));
+  const to = todayIso();
+  const dt = new Date();
+  dt.setDate(dt.getDate() - (n - 1));
+  state.customerHistoryFrom = isoDayFromDate(dt);
+  state.customerHistoryTo = to;
+  refreshCustomerDetailModal();
+}
+function customerHistoryItemLine(item) {
+  const p =
+    state.products.find((x) => x.id === item?.productId) || null;
+  const name =
+    String(item?.productName || p?.name || "Бараа").trim() || "Бараа";
+  const qty = orderLineQtyLabel(item, p);
+  const unit = esc(p?.unit || item?.unit || "ш");
+  const qtyText = /\d/.test(String(qty)) ? qty : `${qty} ${unit}`;
+  return `<li class="customer-history__item"><span class="customer-history__item-name">${esc(name)}</span><span class="customer-history__item-qty">${esc(qtyText)}</span></li>`;
+}
+function customerHistoryOrderRow(o, open = false) {
+  const items = (o.items || []).filter((it) => !it?.isPromoFree);
+  const itemList = items.length
+    ? `<ul class="customer-history__items">${items.map(customerHistoryItemLine).join("")}</ul>`
+    : `<p class="customer-history__empty-items">Бараа алга</p>`;
+  const paid = orderIsPaid(o);
+  const payCls = o.paymentTerm === "credit" && !paid
+    ? "text-tone-danger"
+    : "text-tone-success";
+  const payLabel =
+    o.paymentTerm === "credit"
+      ? paid
+        ? "Зээл · төлсөн"
+        : "Зээл · төлөөгүй"
+      : paymentTermLabel(o.paymentTerm);
+  return `<details class="customer-history__order"${open ? " open" : ""}><summary class="customer-history__summary"><span class="customer-history__summary-main">${receiptNo(o, "xs")}<span class="customer-history__day">Захиалга ${dte(orderTakenDay(o))}</span></span><b class="customer-history__amount">${fmt(orderAmount(o))}</b></summary><div class="customer-history__body"><p class="customer-history__meta">Хүргэлт ${dte(orderDeliveryDay(o))} · ${items.length} бараа · <span class="${payCls}">${payLabel}</span> · ${esc(orderStatusText(o))}</p>${itemList}</div></details>`;
+}
+function customerHistorySectionHtml(customerId) {
+  if (!canViewCustomerOrderHistory()) return "";
+  const from = customerHistoryFromDay();
+  const to = customerHistoryToDay();
+  const live = !from && !to;
+  const orders = customerOrdersInHistoryRange(customerId);
+  const retention = orderRetentionDays();
+  const presetDays = (() => {
+    if (live || !from || !to || to !== todayIso()) return 0;
+    const a = new Date(`${from}T12:00:00`);
+    const b = new Date(`${to}T12:00:00`);
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
+    return Math.round((b - a) / 86400000) + 1;
+  })();
+  const rangeHint = live
+    ? `Сүүлийн ${retention} хоногийн түүх`
+    : `${from ? dte(from) : "…"} – ${to ? dte(to) : "…"}`;
+  const list = orders.length
+    ? orders
+        .map((o, i) => customerHistoryOrderRow(o, i === 0))
+        .join("")
+    : `<p class="customer-history__empty">Энэ хугацаанд захиалга олдсонгүй</p>`;
+  return `<section class="customer-history" aria-label="Захиалгын түүх"><div class="customer-history__head"><h4 class="customer-history__title">Захиалгын түүх</h4><p class="customer-history__hint">${esc(rangeHint)} · ${orders.length} баримт</p></div><div class="customer-history__filters"><div class="customer-history__presets"><button type="button" class="customer-history__chip${live ? " is-active" : ""}" onclick="clearCustomerHistoryRange()">Бүгд</button><button type="button" class="customer-history__chip${presetDays === 7 ? " is-active" : ""}" onclick="setCustomerHistoryPreset(7)">7 хоног</button><button type="button" class="customer-history__chip${presetDays === 30 ? " is-active" : ""}" onclick="setCustomerHistoryPreset(30)">30 хоног</button><button type="button" class="customer-history__chip${presetDays === 90 ? " is-active" : ""}" onclick="setCustomerHistoryPreset(90)">90 хоног</button></div><div class="customer-history__range"><label class="customer-history__date">Эхлэх<input type="date" class="customer-history__date-input app-input" value="${esc(from)}" onchange="setCustomerHistoryFrom(this.value)" aria-label="Эхлэх огноо"></label><label class="customer-history__date">Дуусах<input type="date" class="customer-history__date-input app-input" value="${esc(to)}" onchange="setCustomerHistoryTo(this.value)" aria-label="Дуусах огноо"></label></div></div><div class="customer-history__list">${list}</div></section>`;
 }
 function customerReceivableTotal(customerId) {
   return customerUnpaidOrders(customerId).reduce(
@@ -10809,7 +10935,7 @@ function customerDetailHtml(c) {
     ),
     customerDetailRow("Байршил", mapsHtml, customerCardPinIcon()),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name">${esc(displayName)}</p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div></div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name">${esc(displayName)}</p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div>${customerHistorySectionHtml(c.id)}</div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -19574,6 +19700,7 @@ function closeModal() {
   state.filters.workerCategory = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
+  state.customerHistoryId = "";
   clearReceiptEdit();
   const syncWorkerSelect = !!document.querySelector(
     "[data-worker-select-modal]",
@@ -20824,7 +20951,13 @@ async function saveCustomer(e, id) {
 function customerDetail(id) {
   const c = state.customers.find((x) => x.id === id);
   if (!c) return;
-  box(customerDisplayName(c), customerDetailHtml(c), "max-w-xl");
+  state.customerHistoryId = id;
+  box(
+    customerDisplayName(c),
+    `<div class="modal-scroll customer-detail-scroll">${customerDetailHtml(c)}</div>`,
+    "max-w-xl",
+    { panelClass: "customer-detail-modal" },
+  );
 }
 function productModal(id) {
   if (
@@ -23796,6 +23929,10 @@ Object.assign(window, {
   openDeviceLocationSettings,
   saveCustomer,
   customerDetail,
+  clearCustomerHistoryRange,
+  setCustomerHistoryFrom,
+  setCustomerHistoryTo,
+  setCustomerHistoryPreset,
   productDetail,
   productModal,
   handleProductImage,
