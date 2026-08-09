@@ -5,6 +5,7 @@ from typing import Any
 
 from django.db import transaction
 from django.http import HttpResponse
+from django.utils.http import content_disposition_header
 from ninja import Body, File, Form, NinjaAPI
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
@@ -568,7 +569,9 @@ def customer_import_template(request):
         content,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = 'attachment; filename="hariltsagch-format.xlsx"'
+    response["Content-Disposition"] = content_disposition_header(
+        as_attachment=True, filename="Харилцагч-формат.xlsx"
+    )
     return response
 
 
@@ -579,7 +582,9 @@ def product_import_template(request):
         content,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = 'attachment; filename="baraa-format.xlsx"'
+    response["Content-Disposition"] = content_disposition_header(
+        as_attachment=True, filename="Бараа-формат.xlsx"
+    )
     return response
 
 

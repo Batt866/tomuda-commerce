@@ -641,7 +641,7 @@ function receiptInfoRows(o) {
   }
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА», «Регистрийн».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label receipt-grid__iban-b">Дансны дугаар:</td><td class="receipt-grid__iban-c"><b>IBAN:</b></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_IBAN_SHORT}</b></td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td></td><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_ACCOUNT}</b></td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__label">Дансны дугаар:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>IBAN:</b> ${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums"><b>${RECEIPT_BANK_ACCOUNT}</b></td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -2103,7 +2103,7 @@ function importUploadFilename(file, kind) {
   if (/\.(xlsx|xls)$/i.test(raw)) return raw;
   const base =
     raw.replace(/\.[^.]+$/, "") ||
-    (kind === "customers" ? "hariltsagch" : "baraa");
+    (kind === "customers" ? "Харилцагч" : "Бараа");
   return `${base}.xlsx`;
 }
 async function importFileLooksLikeExcel(file) {
@@ -2180,7 +2180,7 @@ function importTemplatePath(kind) {
     : "/import/products/template";
 }
 function importTemplateFilename(kind) {
-  return kind === "customers" ? "hariltsagch-format.xlsx" : "baraa-format.xlsx";
+  return kind === "customers" ? "Харилцагч-формат.xlsx" : "Бараа-формат.xlsx";
 }
 function importApiPath(kind) {
   return kind === "customers" ? "/import/customers" : "/import/products";
@@ -9051,8 +9051,8 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: transparent !important;
   color: ${RECEIPT_TEXT} !important;
-  height: 13px;
-  padding: 0 3px;
+  height: 16px;
+  padding: 0 6px;
   font-weight: 700;
   font-size: 9px;
 }
@@ -9229,7 +9229,7 @@ td, th { border: none; }
   background: transparent !important;
 }
 .receipt-grid__iban-c {
-  text-align: right !important;
+  text-align: left !important;
   font-weight: 700;
   font-size: 9px;
   white-space: nowrap;
@@ -9328,7 +9328,7 @@ td, th { border: none; }
 .receipt-grid__warn-line { margin: 0 0 1px; font-size: 8px; line-height: 1.2; color: ${RECEIPT_TEXT}; font-weight: 400; }
 .receipt-grid__warn-line:last-child,
 .receipt-grid__warn-line--last { margin-bottom: 0; }
-.receipt-grid__warn-line--bold { font-weight: 700; font-style: italic; }
+.receipt-grid__warn-line--bold { font-weight: 700; }
 .receipt-grid__warn-em { font-weight: 700; font-size: 8.5px; }
 .receipt-grid__sign-label {
   font-size: 11px;
@@ -9341,7 +9341,7 @@ td, th { border: none; }
   overflow: visible;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid__spacer--sign-gap td { height: 6px; padding: 0; }
+.receipt-grid__spacer--sign-gap td { height: 16px; padding: 0; }
 .receipt-page--continued { page-break-before: always; break-before: page; }
 @media print {
   html, body {
@@ -9468,12 +9468,12 @@ function receiptExcelFileName(orders) {
   const stamp = new Date().toISOString().slice(0, 10);
   if (orders.length === 1) {
     const no = String(formatReceiptNumber(orders[0]) || "1").replace(
-      /[^\w.-]+/g,
+      /[^\w.-]+/gu,
       "-",
     );
-    return `zarlagyn-barimt-${no}.xlsx`;
+    return `Зарлагын-баримт-${no}.xlsx`;
   }
-  return `zarlagyn-barimt-${stamp}.xlsx`;
+  return `Зарлагын-баримт-${stamp}.xlsx`;
 }
 function receiptHtmlFileName(orders) {
   return receiptExcelFileName(orders).replace(/\.xlsx$/i, ".html");
@@ -9486,7 +9486,7 @@ function legacyExcelFileName(name) {
 }
 async function downloadReceiptExcelBlob(name, html) {
   // Same print HTML + CSS as on-screen preview so download matches what you see.
-  const fileName = String(name || "zarlagyn-barimt.html").replace(
+  const fileName = String(name || "Зарлагын-баримт.html").replace(
     /\.(xlsx|xls|zip)$/i,
     ".html",
   );
@@ -9510,7 +9510,7 @@ function exportOrderReceiptsExcelCsv(orders) {
     if (idx > 0) sheetRows.push([], ["--------------------"], []);
     sheetRows.push(...buildOrderReceiptExcelRows(o));
   });
-  excel(`zahialgiin-barimt-${stamp}.xlsx`, sheetRows);
+  excel(`Захиалгын-баримт-${stamp}.xlsx`, sheetRows);
 }
 const RECEIPT_XLSX_LAST_COL = "K";
 /** Canonical ҮНДСЭН layout (BIFF). Runtime Excel mirrors this sample. */
@@ -9630,7 +9630,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="59"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="59"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -9888,7 +9888,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // Same row: C = IBAN:, D:E = short number; next row D:E = full account
+    // Same as other bank labels: B:C = Дансны дугаар:; D:E = IBAN + short; next = account
+    `B${bankR4}:C${bankR4}`,
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
@@ -9916,9 +9917,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR3, "E", "E", 5),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(`B${bankR4}`, 15, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`C${bankR4}`, 4, si("IBAN:"), "s"),
-    xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
+    xlsxCellXml(`B${bankR4}`, 5, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(
+      `D${bankR4}`,
+      4,
+      si(`IBAN: ${RECEIPT_BANK_IBAN_SHORT}`),
+      "s",
+    ),
+    ...emptyCells(bankR4, "C", "C", 5),
     ...emptyCells(bankR4, "E", "E", 4),
   ]);
   pushRow(perBankH, [
@@ -10018,7 +10024,14 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
 
-  pushRow(14.25, emptyCells(rowNum));
+  // Gap before totals — keep normal height; empty rows can collapse in Excel/Numbers.
+  {
+    const spacerR = rowNum;
+    pushRow(18, [
+      xlsxCellXml(`A${spacerR}`, 1, si("\u00A0"), "s"),
+      ...emptyCells(spacerR, "B", RECEIPT_XLSX_LAST_COL, 1),
+    ]);
+  }
 
   // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн Шууд төлөх
   if (receiptShouldShowGross(o)) {
@@ -10077,9 +10090,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   });
 
-  // One blank row before summary when promo exists (no promo → keep the single prior spacer only)
+  // Extra gap after promo so summary doesn't sit on the promo border
   if (promoLines.length) {
-    pushRow(10, emptyCells(rowNum, "A", RECEIPT_XLSX_LAST_COL, 1));
+    const spacerR = rowNum;
+    pushRow(18, [
+      xlsxCellXml(`A${spacerR}`, 1, si("\u00A0"), "s"),
+      ...emptyCells(spacerR, "B", RECEIPT_XLSX_LAST_COL, 1),
+    ]);
   }
 
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
@@ -10111,7 +10128,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         cells.push(xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"));
         cells.push(...emptyCells(r, "F", "K", valueStyle));
       }
-      pushRow(12, cells);
+      pushRow(14.25, cells);
       return;
     }
     cells.push(...emptyCells(r, "C", "D", labelStyle));
@@ -10200,7 +10217,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   };
   pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
-  pushRow(10, emptyCells(rowNum));
+  {
+    const gapR = rowNum;
+    pushRow(22, [
+      xlsxCellXml(`A${gapR}`, 1, si("\u00A0"), "s"),
+      ...emptyCells(gapR, "B", RECEIPT_XLSX_LAST_COL, 1),
+    ]);
+  }
   pushSignRow("Хүлээн авсан ажилтны гарын үсэг:");
   pushRow(14.25, emptyCells(rowNum));
   return rowNum;
@@ -10347,7 +10370,7 @@ function prefersExcelFileShare() {
 }
 async function forceDownloadXlsxFile(blob, filename) {
   // Always deliver a real .xlsx Excel workbook.
-  const name = xlsxFileName(filename || "zarlagyn-barimt.xlsx");
+  const name = xlsxFileName(filename || "Зарлагын-баримт.xlsx");
   const buffer = await blob.arrayBuffer();
   const excelBlob = new Blob([buffer], { type: XLSX_MIME });
   const downloadBlob = new Blob([buffer], {
@@ -11713,7 +11736,7 @@ function exportProductsExcelFallback() {
   const products = productsExportList();
   if (!products.length) return alert("Бараа байхгүй");
   const stamp = new Date().toISOString().slice(0, 10);
-  excel(`baraa-${stamp}.xlsx`, [
+  excel(`Бараа-${stamp}.xlsx`, [
     ["Барааны жагсаалт"],
     [`${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
     [],
@@ -11725,7 +11748,7 @@ function confirmInventoryExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   confirmDataExport("Мэдээлэл татах", () => {
     excel(
-      "inventory.xlsx",
+      "Агуулахын-лог.xlsx",
       state.inventoryLogs.map((l) => [
         dte(l.date),
         l.productName,
@@ -11749,7 +11772,7 @@ function confirmReportExport() {
       salesOrderAgents().find(
         (e) => e.id === state.filters.reportEmployeeId,
       )?.name || "Бүгд";
-    excel("borluulaltiin-tailan.xlsx", [
+    excel("Борлуулалтын-тайлан.xlsx", [
       ["Борлуулалтын тайлан"],
       ["Ажилтан", emp],
       ["Хугацаа", reportPeriodHint()],
@@ -11869,7 +11892,7 @@ function customerExcel() {
     12,
     12,
   ];
-  excel("hariltsagch.xlsx", rows, {
+  excel("Харилцагч.xlsx", rows, {
     sheetName: "Харилцагч",
     colMins,
     maxColWidth: 56,
@@ -12873,7 +12896,7 @@ function finalizeStockOutReceipt(receipt) {
 }
 function stockOutReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `zarlaga-${no}.xlsx` : `zarlaga-${todayIso()}.xlsx`;
+  return no ? `Зарлагын-баримт-${no}.xlsx` : `Зарлагын-баримт-${todayIso()}.xlsx`;
 }
 function stockOutReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -13128,11 +13151,11 @@ function finalizeStockInReceipt(receipt) {
 }
 function stockInReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `orlogo-avah-${no}.xlsx` : `orlogo-avah-${todayIso()}.xlsx`;
+  return no ? `Орлогын-баримт-${no}.xlsx` : `Орлогын-баримт-${todayIso()}.xlsx`;
 }
 function stockInReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `Орлого авах баримт №${no}` : "Орлого авах баримт";
+  return no ? `Орлогын баримт №${no}` : "Орлогын баримт";
 }
 function buildStockInReceiptSnapshot(productIds = null) {
   let products = stockInEntryProducts(state.products);
@@ -13679,7 +13702,7 @@ function stockInReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">Орлого авах баримт</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -13720,69 +13743,50 @@ function confirmStockOutExcel() {
 }
 function exportStockInExcelFallback(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
-  const dateValue = warehouseSheetDateValue(
+  const receivedDateValue = warehouseSheetDateValue(
     receipt.createdAt
       ? isoDay(receipt.createdAt) || todayIso()
       : todayIso(),
-  ).trim();
+  );
+  const printedDateValue = warehouseSheetDateValue(todayIso());
   const h = (value) => xlsxXmlEsc(value ?? "");
-  const lines = (receipt.lines || []).filter(
-    (line) => (Number(line.quantity) || 0) > 0,
-  );
-  const grossInclusive = Number(receipt.totalAmount) || 0;
-  const qtyTotal = lines.reduce(
-    (sum, line) => sum + (Number(line.quantity) || 0),
-    0,
-  );
-  const bodyRows = lines
-    .map((line, idx) => {
-      const p =
-        state.products.find((x) => String(x.id) === String(line.productId)) ||
-        {};
-      const unitText =
-        String(line.unit || p.unit || "ширхэг").trim() || "ширхэг";
-      return `<tr><td class="num">${idx + 1}</td><td colspan="2">${h(line.productName || "-")}</td><td class="barcode">${h(line.barcode || "")}</td><td class="center">${h(unitText)}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(stockInReceiptLineUnitPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
+  const bodyRows = stockInReceiptGroupedLines(receipt.lines || [])
+    .map((item) => {
+      if (item.type === "cat") {
+        return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
+      }
+      if (item.type === "catTotal") {
+        return `<tr class="cat-total"><td colspan="6" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
+      }
+      const line = item.line;
+      const pack = stockReceiptPackCell(line);
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${h(pack === "-" ? "" : pack)}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(stockInReceiptLineCostPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
-  const receiptNo = receipt.receiptNumber
-    ? `Орлогын баримт №: ${h(receipt.receiptNumber)}`
-    : "Орлогын баримт";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-@page { size: A4 portrait; margin: 20mm 14mm 16mm 20mm; }
-body { font-family: Arial, sans-serif; color: #000; margin: 0; }
-table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
-.stock-in col.c-no { width: 4%; }
-.stock-in col.c-name { width: 30%; }
-.stock-in col.c-code { width: 14%; }
-.stock-in col.c-unit { width: 11%; }
-.stock-in col.c-qty { width: 11%; }
-.stock-in col.c-price { width: 14%; }
-.stock-in col.c-total { width: 12%; }
-.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
-.form-code td { border: none; font-size: 11px; }
-.title { text-align: center; font-size: 15px; font-weight: 800; border: none; }
-.sub { text-align: center; font-weight: 700; border: none; }
-.meta td { border: none; padding: 3px 0; }
+body { font-family: Arial, sans-serif; color: #000; }
+table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
+.title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
+.meta td { border: none; padding: 4px 0; }
+.date-label { text-align: right; white-space: nowrap; }
+.date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; }
+.cat { text-align: center; font-weight: 800; background: #f7f7f7; }
+.cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
-.center { text-align: center; }
 .num { text-align: right; }
 .total td { font-weight: 800; }
-.sign td { border: none; padding-top: 14px; }
+.sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
-<colgroup><col class="c-no"><col class="c-name"><col class="c-name"><col class="c-code"><col class="c-unit"><col class="c-qty"><col class="c-price"><col class="c-total"></colgroup>
-<tr><td colspan="8" class="title">БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ</td></tr>
-<tr><td colspan="8" class="sub">${receiptNo}</td></tr>
-<tr class="meta"><td colspan="2">Байгууллагын нэр:</td><td>${h(STOCK_IN_COMPANY_NAME)}</td><td colspan="2">Огноо:</td><td colspan="3">${h(dateValue)}</td></tr>
-<tr class="meta"><td colspan="2">Регистрийн дугаар:</td><td>${h(STOCK_IN_COMPANY_REG)}</td><td colspan="2">Агуулах / Байршил:</td><td colspan="3">${h(STOCK_IN_WAREHOUSE_DEFAULT)}</td></tr>
-<tr class="meta"><td colspan="2">Бэлтгэн нийлүүлэгч:</td><td>-</td><td colspan="2">Дагалдах баримт №:</td><td colspan="3">${h(receipt.receiptNumber || "-")}</td></tr>
-<tr class="meta"><td colspan="2">Харилцах утас:</td><td>${h(RECEIPT_COMPANY_PHONE)}</td><td colspan="2">Хүлээн авсан ажилтан:</td><td colspan="3">${h(receipt.employeeName || "-")}</td></tr>
-<tr class="head"><th>№</th><th colspan="2">Бараа, материалын нэр, зэрэг</th><th>Баркод / Код</th><th>Хэмжих нэгж</th><th>Тоо хэмжээ</th><th>Нэгж үнэ (₮)</th><th>Нийт дүн (₮)</th></tr>
+<tr><td colspan="7" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
+<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Хайрцаг</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="5">ДҮН (Нийт орлогод авсан барааны дүн)</td><td class="num">${qtyTotal}</td><td></td><td class="num">${fmtExcelMoney(grossInclusive)}</td></tr>
-<tr class="sign"><td colspan="5">Хүлээлгэн өгсөн:</td><td colspan="3">.................................... /                              /</td></tr>
-<tr class="sign"><td colspan="5">Хүлээн авсан эд хариуцагч:</td><td colspan="3">.................................... /                              /</td></tr>
-<tr class="sign"><td colspan="5">Шалгасан нягтлан бодогч:</td><td colspan="3">.................................... /                              /</td></tr>
+<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
+<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -14918,7 +14922,7 @@ async function exportProductsExcelXlsx() {
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
   const blob = await zipToExcelBlob(zip);
-  await downloadBlobFile(blob, `baraa-${stamp}.xlsx`);
+  await downloadBlobFile(blob, `Бараа-${stamp}.xlsx`);
 }
 function buildCountSheetXml() {
   const strings = [];
@@ -15111,225 +15115,21 @@ async function exportCountExcelXlsx() {
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
   const blob = await zipToExcelBlob(zip);
-  await downloadBlobFile(blob, `toollogo-${stamp}.xlsx`);
+  await downloadBlobFile(blob, `Тооллого-${stamp}.xlsx`);
 }
 const WAREHOUSE_PREPARE_LAST_COL = "G";
 const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
-const STOCK_IN_LAST_COL = "H";
 const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
-const STOCK_IN_COMPANY_NAME = "ТОМУДА ГРУПП ХХК";
-const STOCK_IN_COMPANY_REG = "5397987";
-const STOCK_IN_WAREHOUSE_DEFAULT = "Төв агуулах";
-/** BM-1 column widths sized for A4; A (№) and H (нийт) kept narrow. */
-const STOCK_IN_COL_WIDTHS = [3.5, 15, 17, 14, 11, 10, 11, 10];
-/** receiptXlsxStylesXml indices used by BM-1 stock-in sheet. */
-const STOCK_IN_STYLES = {
-  blank: 0,
-  title: 13, // 18pt bold center
-  receiptNo: 14, // 14pt bold center
-  metaLabel: 15, // bold 9 left
-  metaValue: 51, // 9 left
-  header: 7, // bold 9 gray fill + border center wrap
-  text: 8, // left border wrap
-  center: 9, // center border
-  num: 10, // right #,##0 border
-  barcode: 34, // text/@ center border
-  zebraText: 25, // left gray fill border
-  zebraCenter: 26,
-  zebraNum: 27,
-  sumLabel: 25, // left gray fill border
-  sumNum: 27, // right #,##0 gray fill border
-  signLabel: 15,
-  signLine: 51,
-};
-function stockInColsXml(widths = STOCK_IN_COL_WIDTHS) {
-  return widths
-    .map(
-      (width, index) =>
-        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
-    )
-    .join("");
-}
-/** Official BM-1 style stock-in receipt (A4). */
+/** Stock-in Excel uses the same sheet layout/fonts as stock-out. */
 function buildStockInSheetXml(receipt, {
   titleText = null,
   receivedLabel = "Орлого авсан огноо:",
 } = {}) {
-  void receivedLabel;
-  receipt = normalizeStockInReceiptTotals(receipt);
-  const S = STOCK_IN_STYLES;
-  const strings = [];
-  const strIndex = new Map();
-  const si = (text) => {
-    const key = String(text ?? "");
-    if (strIndex.has(key)) return strIndex.get(key);
-    const idx = strings.length;
-    strings.push(key);
-    strIndex.set(key, idx);
-    return idx;
-  };
-  const dateValue = warehouseSheetDateValue(
-    receipt.createdAt ? isoDay(receipt.createdAt) || todayIso() : todayIso(),
-  );
-  const lines = (receipt.lines || []).filter(
-    (line) => (Number(line.quantity) || 0) > 0,
-  );
-  const grossInclusive = xlsxSafeNumber(Number(receipt.totalAmount) || 0);
-  const qtyTotal = lines.reduce(
-    (sum, line) => sum + (Number(line.quantity) || 0),
-    0,
-  );
-  const rows = [];
-  const merges = [];
-  let rowNum = 1;
-  const COLS = "ABCDEFGH";
-  const pushRow = (height, cells) => {
-    rows.push(xlsxRowXml(rowNum, height, cells, STOCK_IN_LAST_COL));
-    rowNum += 1;
-  };
-  const emptyCells = (row, from = "A", to = STOCK_IN_LAST_COL, style = S.blank) => {
-    const cols = COLS.slice(COLS.indexOf(from), COLS.indexOf(to) + 1);
-    return cols
-      .split("")
-      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
-  };
-  // A:B left label (full text visible) | C left value | D:E right label | F:H right value
-  const metaPair = (l1, v1, l2, v2) => {
-    const r = rowNum;
-    pushRow(18, [
-      xlsxCellXml(`A${r}`, S.metaLabel, si(l1), "s"),
-      xlsxCellXml(`B${r}`, S.metaLabel, null, "empty"),
-      xlsxCellXml(`C${r}`, S.metaValue, si(v1 || "-"), "s"),
-      xlsxCellXml(`D${r}`, S.metaLabel, si(l2), "s"),
-      xlsxCellXml(`E${r}`, S.metaLabel, null, "empty"),
-      xlsxCellXml(`F${r}`, S.metaValue, si(v2 || "-"), "s"),
-      ...emptyCells(r, "G", "H", S.metaValue),
-    ]);
-    merges.push(`A${r}:B${r}`, `D${r}:E${r}`, `F${r}:H${r}`);
-  };
-
-  const title =
-    titleText || "БАРАА, МАТЕРИАЛ ХҮЛЭЭН АВСАН ОРЛОГЫН БАРИМТ";
-  pushRow(28, [
-    xlsxCellXml(`A${rowNum}`, S.title, si(title), "s"),
-    ...emptyCells(rowNum, "B", "H", S.title),
-  ]);
-  merges.push(`A${rowNum - 1}:H${rowNum - 1}`);
-  const receiptNo = receipt.receiptNumber
-    ? `Орлогын баримт №: ${receipt.receiptNumber}`
-    : "Орлогын баримт";
-  pushRow(20, [
-    xlsxCellXml(`A${rowNum}`, S.receiptNo, si(receiptNo), "s"),
-    ...emptyCells(rowNum, "B", "H", S.receiptNo),
-  ]);
-  merges.push(`A${rowNum - 1}:H${rowNum - 1}`);
-  pushRow(8, emptyCells(rowNum));
-
-  metaPair(
-    "Байгууллагын нэр:",
-    STOCK_IN_COMPANY_NAME,
-    "Огноо:",
-    dateValue.trim(),
-  );
-  metaPair(
-    "Регистрийн дугаар:",
-    STOCK_IN_COMPANY_REG,
-    "Агуулах / Байршил:",
-    STOCK_IN_WAREHOUSE_DEFAULT,
-  );
-  metaPair(
-    "Бэлтгэн нийлүүлэгч:",
-    "-",
-    "Дагалдах баримт №:",
-    receipt.receiptNumber || "-",
-  );
-  metaPair(
-    "Харилцах утас:",
-    RECEIPT_COMPANY_PHONE,
-    "Хүлээн авсан ажилтан:",
-    receipt.employeeName || "-",
-  );
-  pushRow(8, emptyCells(rowNum));
-
-  const headerRow = rowNum;
-  merges.push(`B${headerRow}:C${headerRow}`);
-  pushRow(28, [
-    xlsxCellXml(`A${headerRow}`, S.header, si("№"), "s"),
-    xlsxCellXml(`B${headerRow}`, S.header, si("Бараа, материалын нэр, зэрэг"), "s"),
-    xlsxCellXml(`C${headerRow}`, S.header, null, "empty"),
-    xlsxCellXml(`D${headerRow}`, S.header, si("Баркод / Код"), "s"),
-    xlsxCellXml(`E${headerRow}`, S.header, si("Хэмжих нэгж"), "s"),
-    xlsxCellXml(`F${headerRow}`, S.header, si("Тоо хэмжээ"), "s"),
-    xlsxCellXml(`G${headerRow}`, S.header, si("Нэгж үнэ (₮)"), "s"),
-    xlsxCellXml(`H${headerRow}`, S.header, si("Нийт дүн (₮)"), "s"),
-  ]);
-
-  let itemIndex = 0;
-  for (const line of lines) {
-    itemIndex += 1;
-    const r = rowNum;
-    const qty = Number(line.quantity) || 0;
-    const unitPrice = xlsxSafeNumber(stockInReceiptLineUnitPrice(line));
-    const lineTotal = xlsxSafeNumber(stockInReceiptLineTotal(line));
-    const p =
-      state.products.find((x) => String(x.id) === String(line.productId)) || {};
-    const unitText = String(line.unit || p.unit || "ширхэг").trim() || "ширхэг";
-    const zebra = itemIndex % 2 === 0;
-    const textStyle = zebra ? S.zebraText : S.text;
-    const centerStyle = zebra ? S.zebraCenter : S.center;
-    const numStyle = zebra ? S.zebraNum : S.num;
-    merges.push(`B${r}:C${r}`);
-    pushRow(20, [
-      xlsxCellXml(`A${r}`, centerStyle, itemIndex, "n"),
-      xlsxCellXml(`B${r}`, textStyle, si(line.productName || "-"), "s"),
-      xlsxCellXml(`C${r}`, textStyle, null, "empty"),
-      xlsxBarcodeCell(`D${r}`, S.barcode, line.barcode, si),
-      xlsxCellXml(`E${r}`, centerStyle, si(unitText), "s"),
-      xlsxCellXml(`F${r}`, numStyle, qty, "n"),
-      xlsxCellXml(`G${r}`, numStyle, unitPrice, "n"),
-      xlsxCellXml(`H${r}`, numStyle, lineTotal, "n"),
-    ]);
-  }
-
-  const sumRow = rowNum;
-  merges.push(`A${sumRow}:E${sumRow}`);
-  pushRow(20, [
-    xlsxCellXml(
-      `A${sumRow}`,
-      S.sumLabel,
-      si("ДҮН (Нийт орлогод авсан барааны дүн)"),
-      "s",
-    ),
-    ...emptyCells(sumRow, "B", "E", S.sumLabel),
-    xlsxCellXml(`F${sumRow}`, S.sumNum, qtyTotal, "n"),
-    xlsxCellXml(`G${sumRow}`, S.sumLabel, null, "empty"),
-    xlsxCellXml(`H${sumRow}`, S.sumNum, grossInclusive, "n"),
-  ]);
-
-  pushRow(12, emptyCells(rowNum));
-  const signLine =
-    ".................................... /                              /";
-  const pushSign = (label) => {
-    const r = rowNum;
-    merges.push(`A${r}:E${r}`, `F${r}:H${r}`);
-    pushRow(20, [
-      xlsxCellXml(`A${r}`, S.signLabel, si(label), "s"),
-      ...emptyCells(r, "B", "E", S.signLabel),
-      xlsxCellXml(`F${r}`, S.signLine, si(signLine), "s"),
-      ...emptyCells(r, "G", "H", S.signLine),
-    ]);
-    pushRow(8, emptyCells(rowNum));
-  };
-  pushSign("Хүлээлгэн өгсөн:");
-  pushSign("Хүлээн авсан эд хариуцагч:");
-  pushSign("Шалгасан нягтлан бодогч:");
-
-  const lastRow = Math.max(1, rowNum - 1);
-  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  // A4 portrait; a bit more top/left than sample. Cols sized so fit-to-width ≈ 100%.
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr baseColWidth="8" defaultRowHeight="15"/><cols>${stockInColsXml()}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="0" verticalCentered="0"/><pageMargins left="0.9" right="0.65" top="1.15" bottom="0.85" header="0.4" footer="0.4"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
-  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+  return buildStockOutSheetXmlLegacy(receipt, {
+    titleText: titleText || stockInReceiptTitle(receipt),
+    receivedLabel,
+  });
 }
 async function exportStockInExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
@@ -16157,7 +15957,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   zip.remove("xl/printerSettings/printerSettings1.bin");
   zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
   const blob = await zipToExcelBlob(zip);
-  await downloadBlobFile(blob, `aguulah-beldeh-${stamp}.xlsx`);
+  await downloadBlobFile(blob, `Агуулах-бэлдэх-${stamp}.xlsx`);
 }
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const stamp = new Date().toISOString().slice(0, 10);
@@ -16249,7 +16049,7 @@ ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="sign-gap"><td colspan="7"></td></tr>
 <tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
 </table></body></html>`;
-  downloadReceiptExcelBlob(`aguulah-beldeh-${stamp}.xls`, html);
+  downloadReceiptExcelBlob(`Агуулах-бэлдэх-${stamp}.xls`, html);
 }
 function exportWarehousePrepareExcel(orders, workerIds) {
   return exportWarehousePrepareExcelXlsx(orders, workerIds)
@@ -16273,7 +16073,7 @@ function exportCountExcelFallback() {
   const products = countExportProducts();
   const totals = countMetricsTotals(products);
   const mismatchCount = countMismatchesForList(products).length;
-  excel(`toollogo-${stamp}.xlsx`, [
+  excel(`Тооллого-${stamp}.xlsx`, [
     ["Тооллогын тайлан"],
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
