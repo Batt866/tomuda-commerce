@@ -15738,7 +15738,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D Том/х · E Жижиг/х · F Тоо/ш · G Үлдэгдэл — sample proportions. */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [34, 9, 12.5, 7.5, 10, 7.5, 9.5];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [30, 8.5, 12, 8.5, 10.5, 8.5, 12];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 const WAREHOUSE_PREPARE_QTY_HEADER_STYLE = 20;
@@ -15776,10 +15776,10 @@ function warehousePrepareColWidthsFor(sections) {
 function warehousePreparePatchStylesXml(stylesXml) {
   let out = String(stylesXml || "");
 
-  // Solid light-gray fill for Том/х · Жижиг/х · Тоо/ш columns (sample highlight).
+  // Solid gray fill for Том/х · Жижиг/х · Тоо/ш (sample highlight — not too pale).
   const grayFill =
-    '<fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill>';
-  if (!out.includes('rgb="FFE8EBEE"')) {
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill>';
+  if (!out.includes('rgb="FFC5CAD0"')) {
     out = out.replace(
       /(<fills count=")(\d+)(">)([\s\S]*?)(<\/fills>)/,
       (_, a, count, c, body, end) =>
@@ -15851,7 +15851,7 @@ function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const cols = warehousePrepareColsXml(
     colWidths || WAREHOUSE_PREPARE_COL_WIDTHS,
   );
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.4" right="0.35" top="0.55" bottom="0.55" header="0.25" footer="0.25"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.28" right="0.28" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildWarehousePrepareSheetXml(orders, workerIds) {
   const strings = [];
@@ -16113,17 +16113,17 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-@page { size: A4 portrait; margin: 10mm 8mm; }
+@page { size: A4 portrait; margin: 8mm 6mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
 table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
-.prepare col.c-name { width: 36%; }
-.prepare col.c-unit { width: 10%; }
+.prepare col.c-name { width: 32%; }
+.prepare col.c-unit { width: 9%; }
 .prepare col.c-barcode { width: 13%; }
-.prepare col.c-large { width: 9%; }
-.prepare col.c-small { width: 11%; }
-.prepare col.c-piece { width: 9%; }
-.prepare col.c-stock { width: 12%; }
-.prepare td, .prepare th { border: 1px solid #444; padding: 3px 4px; vertical-align: middle; }
+.prepare col.c-large { width: 10%; }
+.prepare col.c-small { width: 12%; }
+.prepare col.c-piece { width: 10%; }
+.prepare col.c-stock { width: 14%; }
+.prepare td, .prepare th { border: 1px solid #444; padding: 3px 5px; vertical-align: middle; }
 .prepare td.name { overflow-wrap: anywhere; text-align: left; }
 .prepare td.unit { text-align: center; }
 .title { height: 48px; text-align: center; font-size: 22px; font-weight: 800; border: none !important; }
@@ -16132,13 +16132,13 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 34px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; }
-.head th.qty { background: #e8ebee; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 28px; background: #e8ebee; }
+.head th { height: 34px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
+.head th.qty { background: #c5cad0; white-space: nowrap; }
+.cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; }
-.num { text-align: center; font-weight: 700; background: #e8ebee; }
-.num:empty { background: #e8ebee; font-weight: 400; }
+.num { text-align: center; font-weight: 700; background: #c5cad0; }
+.num:empty { background: #c5cad0; font-weight: 400; }
 .stock { font-weight: 600; background: #fff; }
 .spacer td { height: 36px; border: none !important; }
 .sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
