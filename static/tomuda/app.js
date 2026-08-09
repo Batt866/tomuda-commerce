@@ -1157,7 +1157,9 @@ function ensureEmployeePercentDiscount() {
   });
 }
 function stockAlertLevel(p) {
-  return Math.max(0, Number(p?.minStock ?? 0));
+  const perProduct = Math.max(0, Math.floor(Number(p?.minStock) || 0));
+  if (perProduct > 0) return perProduct;
+  return Math.max(0, Math.floor(Number(state.settings?.stockAlertMin) || 0));
 }
 function isLowStock(p) {
   if (state.settings?.stockAlertEnabled === false) return false;
@@ -4036,6 +4038,14 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
       ) {
         merged.stock = Number(prev.stock) || 0;
         if (prev.costPrice != null) merged.costPrice = prev.costPrice;
+      }
+      // Үлдэгдэл сануулах thresholds: do not let pre-save peer pull wipe local minStock.
+      if (
+        opts.pullFromServer &&
+        item.minStock != null &&
+        businessEntityDirty()
+      ) {
+        merged.minStock = Math.max(0, Number(item.minStock) || 0);
       }
     }
     // Never let a stale device republish older role/permissions after a pull.
@@ -8314,6 +8324,10 @@ function stockAlertModal() {
   ensureSettings();
   const q = (state.searches.stockAlert || "").toLowerCase().trim();
   const alertOn = state.settings.stockAlertEnabled !== false;
+  const defaultMin = Math.max(
+    0,
+    Math.floor(Number(state.settings.stockAlertMin) || 0),
+  );
   const products = state.products
     .filter(
       (p) =>
@@ -8328,20 +8342,21 @@ function stockAlertModal() {
     ? products
         .map((p) => {
           const limit = stockAlertLevel(p);
+          const custom = Math.max(0, Math.floor(Number(p.minStock) || 0));
           const lowNow = isLowStock(p);
-          const limitAttr = limit > 0 ? `value="${limit}" ` : "";
-          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="0" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
+          const limitAttr = custom > 0 ? `value="${custom}" ` : "";
+          return `<div class="stock-alert-row ${lowNow ? "stock-alert-row--low" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-alert-thumb" width="56" height="56" loading="lazy" decoding="async"><div class="stock-alert-row__info min-w-0"><p class="stock-alert-row__name">${esc(p.name)}</p><p class="stock-alert-row__sub">Үлд <b class="${lowNow ? "text-tone-warning" : ""}">${p.stock ?? 0}</b>${limit > 0 ? ` · доод ${limit}` : ""}</p></div><label class="stock-alert-row__limit shrink-0"><span class="stock-alert-row__limit-label">Доод</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="minStock_${esc(p.id)}" min="0" step="1" ${limitAttr}placeholder="${defaultMin || 0}" class="stock-alert-row__input app-input" aria-label="${esc(p.name)} доод үлдэгдэл"></label></div>`;
         })
         .join("")
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
     "Үлдэгдэл сануулах",
-    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 flex items-center justify-between gap-3 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label>${low.length ? `<span class="text-sm font-semibold text-tone-warning">Татан авалт: ${low.length}</span>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 space-y-2 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label><label class="flex items-center justify-between gap-3 text-sm"><span>Ерөнхий доод үлдэгдэл</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="stockAlertMin" min="0" step="1" value="${defaultMin}" class="stock-alert-row__input app-input w-20" aria-label="Ерөнхий доод үлдэгдэл"></label>${low.length ? `<p class="text-sm font-semibold text-tone-warning m-0">Татан авалт: ${low.length}</p>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-xl",
   );
 }
 function saveStockAlertSettings(e) {
-  if (!isAdmin()) return;
+  if (!canManageStockAlert()) return;
   e.preventDefault();
   ensureSettings();
   const data = new FormData(e.target);
@@ -8364,11 +8379,21 @@ function stockAlertChangeSummary(data) {
       `<p>Сануулга: <b>${alertEnabled ? "идэвхтэй" : "унтраах"}</b></p>`,
     );
   }
+  const nextDefault = Math.max(0, Number(data.get("stockAlertMin")) || 0);
+  const prevDefault = Math.max(
+    0,
+    Math.floor(Number(state.settings.stockAlertMin) || 0),
+  );
+  if (nextDefault !== prevDefault) {
+    lines.push(
+      `<p>Ерөнхий доод: <b>${prevDefault} → ${nextDefault}</b></p>`,
+    );
+  }
   state.products.forEach((p) => {
     const raw = data.get(`minStock_${p.id}`);
     if (raw == null) return;
     const next = Math.max(0, Number(raw) || 0);
-    const prev = stockAlertLevel(p);
+    const prev = Math.max(0, Math.floor(Number(p.minStock) || 0));
     if (next !== prev) {
       lines.push(
         `<p><b>${esc(p.name)}</b> — доод үлдэгдэл: ${prev} → ${next}</p>`,
@@ -8383,9 +8408,13 @@ function stockAlertChangeSummary(data) {
   };
 }
 function applyStockAlertSettings(data) {
-  if (!isAdmin()) return;
+  if (!canManageStockAlert()) return;
   ensureSettings();
   state.settings.stockAlertEnabled = data.get("stockAlertEnabled") === "on";
+  state.settings.stockAlertMin = Math.max(
+    0,
+    Number(data.get("stockAlertMin")) || 0,
+  );
   state.products.forEach((p) => {
     const raw = data.get(`minStock_${p.id}`);
     if (raw == null) return;
@@ -15701,7 +15730,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** A name · B unit · C barcode · D Том/х · E Жижиг/х · F Тоо/ш · G Үлдэгдэл — sample proportions. */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [30, 8.5, 12, 8.5, 10.5, 8.5, 12];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [29, 10, 12, 8.5, 10.5, 8.5, 11.5];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -15789,6 +15818,13 @@ function warehousePreparePatchStylesXml(stylesXml) {
     out,
     WAREHOUSE_PREPARE_GRAY_PIECE,
   );
+
+  // Table headers (style 7): wrap so «Хэмжих нэгж» fits on two lines.
+  const headerXfNoWrap =
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" /></xf>';
+  const headerXfWrap =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>';
+  if (out.includes(headerXfNoWrap)) out = out.replace(headerXfNoWrap, headerXfWrap);
 
   // Qty numbers: center (sample).
   const numStyleLeft =
@@ -15976,7 +16012,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
-  pushRow(28, [
+  pushRow(40, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
@@ -16144,13 +16180,13 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
 @page { size: A4 portrait; margin: 8mm 6mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
 table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
-.prepare col.c-name { width: 32%; }
-.prepare col.c-unit { width: 9%; }
+.prepare col.c-name { width: 31%; }
+.prepare col.c-unit { width: 11%; }
 .prepare col.c-barcode { width: 13%; }
 .prepare col.c-large { width: 10%; }
 .prepare col.c-small { width: 12%; }
 .prepare col.c-piece { width: 10%; }
-.prepare col.c-stock { width: 14%; }
+.prepare col.c-stock { width: 13%; }
 .prepare td, .prepare th { border: 1px solid #444; padding: 3px 5px; vertical-align: middle; }
 .prepare td.name { overflow-wrap: anywhere; text-align: left; }
 .prepare td.unit { text-align: center; }
@@ -16160,7 +16196,10 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 700; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 34px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
+.head th { height: 42px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: normal; line-height: 1.15; background: #f3f3f3; overflow: visible; }
+.head th.qty-large,
+.head th.qty-small,
+.head th.qty-piece { white-space: nowrap; }
 .head th.qty-large { background: #e4e7eb; white-space: nowrap; }
 .head th.qty-small { background: #c5cad0; white-space: nowrap; }
 .head th.qty-piece { background: #a3aab3; white-space: nowrap; }
