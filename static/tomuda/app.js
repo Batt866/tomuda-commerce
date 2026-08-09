@@ -6043,18 +6043,15 @@ function productBoxQtyTotal(
   const largeCount = productLargeBoxCount(p);
   const largePieces = productLargeBoxPieceCount(p);
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
-  const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  let pk = Math.max(0, Math.floor(Number(packs) || 0));
   const pc = Math.max(0, Math.floor(Number(qty) || 0));
-  let total = pc;
-  if (small) {
-    const fromLarge = largeCount ? lp * largeCount : 0;
-    // packs = нийт жижиг (том-оос автоматаар орсон тоо орно); хоосон бол зөвхөн томоос
-    if (pk > 0) total += pk * small;
-    else if (fromLarge > 0) total += fromLarge * small;
-    else if (largePieces && lp > 0) total += lp * largePieces;
-  } else if (largePieces) {
-    total += lp * largePieces;
+  // Back-compat: хуучин nested packs (жижиг = том×n + нэмэлт) → exclusive
+  if (largeCount > 1 && lp > 0 && pk >= lp * largeCount) {
+    pk -= lp * largeCount;
   }
+  let total = pc;
+  if (largePieces) total += lp * largePieces;
+  if (small) total += pk * small;
   return total;
 }
 function ensureWorkerQtyParts() {
@@ -6168,14 +6165,15 @@ function workerQtyPartsForProduct(p, qty) {
       qty: parts.pieces,
     });
     if (rebuilt === total) {
+      const excl = exclusiveOrderQtyParts(parts, largeCount);
       return {
-        largePacks: parts.largePacks,
-        packs: parts.packs,
-        loosePieces: parts.pieces,
+        largePacks: excl.largePacks,
+        packs: excl.packs,
+        loosePieces: excl.pieces,
       };
     }
   }
-  const split = pickerQtyToParts(total, p);
+  const split = pickerQtyToParts(total, p, { preferStored: false });
   return {
     largePacks: split.largePacks,
     packs: split.packs,
@@ -6397,7 +6395,7 @@ function pickerQtyToParts(q, p, { preferStored = true } = {}) {
         packs: parts.packs,
         qty: parts.pieces,
       });
-      if (rebuilt === total) return parts;
+      if (rebuilt === total) return exclusiveOrderQtyParts(parts, largeCount);
     }
   }
   if (!packSize && !largePieces) {
@@ -6414,32 +6412,37 @@ function pickerQtyToParts(q, p, { preferStored = true } = {}) {
     packs = Math.floor(rem / packSize);
     rem = rem % packSize;
   }
-  // Nested display: жижиг includes том contents (matches орлого take UI)
-  if (largeCount > 1 && largePacks > 0) {
-    packs += largePacks * largeCount;
-  }
   return { largePacks, packs, pieces: rem };
 }
-function pickerPackMax(p, pieces, largePacks = 0) {
+function pickerPackMax(p, pieces = 0, largePacks = 0) {
   const packSize = productPackSize(p);
   if (!packSize) return 0;
+  const largePieces = productLargeBoxPieceCount(p);
+  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
+  const used = (largePieces ? lp * largePieces : 0) + pc;
   const maxTotal = maxWorkerPaidQty(p.id);
-  return Math.floor(Math.max(0, maxTotal - pc) / packSize);
+  return Math.floor(Math.max(0, maxTotal - used) / packSize);
 }
-function pickerLargeMax(p, pieces) {
+function pickerLargeMax(p, pieces = 0, packs = 0) {
   const largePieces = productLargeBoxPieceCount(p);
   if (!largePieces) return 0;
-  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
-  const maxTotal = maxWorkerPaidQty(p.id);
-  return Math.floor(Math.max(0, maxTotal - pc) / largePieces);
-}
-function pickerPieceMax(p, packs) {
   const packSize = productPackSize(p);
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
+  const used = (packSize ? pk * packSize : 0) + pc;
   const maxTotal = maxWorkerPaidQty(p.id);
-  if (!packSize) return maxTotal;
-  return Math.max(0, maxTotal - pk * packSize);
+  return Math.floor(Math.max(0, maxTotal - used) / largePieces);
+}
+function pickerPieceMax(p, packs = 0, largePacks = 0) {
+  const packSize = productPackSize(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+  const maxTotal = maxWorkerPaidQty(p.id);
+  const used =
+    (largePieces ? lp * largePieces : 0) + (packSize ? pk * packSize : 0);
+  return Math.max(0, maxTotal - used);
 }
 function readPickerQtyParts(id) {
   const p = state.products.find((x) => x.id === id);
@@ -6537,14 +6540,13 @@ function pickerPartStepperApply(btn, kind) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   let { largePacks, packs, pieces } = readPickerQtyParts(id);
-  const largeCount = productLargeBoxCount(p);
   const currentTotal = pickerQtyFromParts(
     { largePacks, packs, pieces },
     p,
   );
   if (kind === "large") {
     if (action === "inc") {
-      const max = pickerLargeMax(p, pieces);
+      const max = pickerLargeMax(p, pieces, packs);
       if (largePacks >= max) {
         showStockLimitToast();
         return;
@@ -6552,10 +6554,9 @@ function pickerPartStepperApply(btn, kind) {
       largePacks = Math.min(max, largePacks + 1);
     } else if (action === "dec") largePacks = Math.max(0, largePacks - 1);
     else return;
-    if (largeCount > 1) packs = largePacks * largeCount;
   } else if (kind === "pack") {
     if (action === "inc") {
-      const max = pickerPackMax(p, pieces);
+      const max = pickerPackMax(p, pieces, largePacks);
       if (packs >= max) {
         showStockLimitToast();
         return;
@@ -6564,7 +6565,7 @@ function pickerPartStepperApply(btn, kind) {
     } else if (action === "dec") packs = Math.max(0, packs - 1);
     else return;
   } else if (action === "inc") {
-    const max = pickerPieceMax(p, packs);
+    const max = pickerPieceMax(p, packs, largePacks);
     if (pieces >= max) {
       showStockLimitToast();
       return;
@@ -6588,19 +6589,17 @@ function pickerPartDraft(el, kind) {
   const digits = String(el.value || "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
   let { largePacks, packs, pieces } = readPickerQtyParts(id);
-  const largeCount = productLargeBoxCount(p);
   const n = digits ? Number(digits) : 0;
   if (kind === "large") {
-    const max = pickerLargeMax(p, pieces);
+    const max = pickerLargeMax(p, pieces, packs);
     if (n > max) showStockLimitToast();
     largePacks = Math.min(max, n);
-    if (largeCount > 1) packs = largePacks * largeCount;
   } else if (kind === "pack") {
-    const max = pickerPackMax(p, pieces);
+    const max = pickerPackMax(p, pieces, largePacks);
     if (n > max) showStockLimitToast();
     packs = Math.min(max, n);
   } else {
-    const max = pickerPieceMax(p, packs);
+    const max = pickerPieceMax(p, packs, largePacks);
     if (n > max) showStockLimitToast();
     pieces = Math.min(max, n);
   }
@@ -6619,20 +6618,18 @@ function pickerPartCommit(el, kind) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   let { largePacks, packs, pieces } = readPickerQtyParts(id);
-  const largeCount = productLargeBoxCount(p);
   const digits = String(el.value || "").replace(/\D/g, "");
   const n = digits ? Number(digits) : 0;
   if (kind === "large") {
-    const max = pickerLargeMax(p, pieces);
+    const max = pickerLargeMax(p, pieces, packs);
     if (n > max) showStockLimitToast();
     largePacks = Math.min(max, n);
-    if (largeCount > 1) packs = largePacks * largeCount;
   } else if (kind === "pack") {
-    const max = pickerPackMax(p, pieces);
+    const max = pickerPackMax(p, pieces, largePacks);
     if (n > max) showStockLimitToast();
     packs = Math.min(max, n);
   } else {
-    const max = pickerPieceMax(p, packs);
+    const max = pickerPieceMax(p, packs, largePacks);
     if (n > max) showStockLimitToast();
     pieces = Math.min(max, n);
   }
@@ -6728,16 +6725,16 @@ function workerPackQtyEditHtml(p, q) {
   const rows = [];
   if (largePieces) {
     rows.push(
-      `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Том</span>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces) })}</div>`,
+      `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Том</span>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces, packs) })}</div>`,
     );
   }
   if (packSize) {
     rows.push(
-      `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Жижиг</span>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces) })}</div>`,
+      `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Жижиг</span>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces, largePacks) })}</div>`,
     );
   }
   rows.push(
-    `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Задгай</span>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs) })}</div>`,
+    `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Задгай</span>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs, largePacks) })}</div>`,
   );
   const partsLabel = prepareQtyColsHtml(
     { largePacks, packs, pieces },
@@ -9450,7 +9447,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="59"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="14"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><i/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="59"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -9590,10 +9587,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
   const deliveryDateText = receiptDeliveryDateDisplay(o);
-  // Two lines under brand — same left edge as brand (no font-scaled nbsp pad).
+  // Two lines under brand — same Excel indent as brand (clears logo spill; A stays narrow).
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header: logo in A; brand + address left-aligned in B (parallel start).
+  // Header: logo in A; brand + address in B with matching left indent.
   // Date: label J:K row1; value K row2
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
@@ -9632,9 +9629,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     }),
   );
   pushRow(companyAddrH, [
-    xlsxCellXml(`B${hr2}`, 5, si(companyAddr), "s"),
+    xlsxCellXml(`B${hr2}`, 41, si(companyAddr), "s"),
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
-    ...emptyCells(hr2, "C", "I", 5),
+    ...emptyCells(hr2, "C", "I", 41),
   ]);
   pushRow(31.5, [
     xlsxCellXml(`B${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
@@ -12129,11 +12126,7 @@ function stockInDraftEntry(id) {
 }
 function stockInLineQty(p) {
   const d = state.stockInDraft[p.id] || {};
-  return productBoxQtyTotal(p, {
-    largePacks: d.largePacks,
-    packs: d.packs,
-    qty: d.qty,
-  });
+  return stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
 }
 function stockInLineCost(p) {
   const d = state.stockInDraft[p.id] || {};
@@ -12613,11 +12606,7 @@ function stockOutDraftEntry(id) {
 }
 function stockOutLineQty(p) {
   const d = state.stockOutDraft[p.id] || {};
-  return productBoxQtyTotal(p, {
-    largePacks: d.largePacks,
-    packs: d.packs,
-    qty: d.qty,
-  });
+  return stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
 }
 function stockOutHasEntries() {
   return state.products.some((p) => stockOutLineQty(p) > 0);
@@ -13295,7 +13284,22 @@ function stockInPackDerivedPieces(packs, packSize) {
   return pk * size;
 }
 function stockInEntryTotalQty(largePacks, packs, pieces, p) {
-  return productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
+  // Орлого: жижиг nested (том-оос автоматаар орсон тоо packs-д орно)
+  const small = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+  const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
+  let total = pc;
+  if (small) {
+    if (pk > 0) total += pk * small;
+    else if (largeCount && lp > 0) total += lp * largeCount * small;
+    else if (largePieces && lp > 0) total += lp * largePieces;
+  } else if (largePieces) {
+    total += lp * largePieces;
+  }
+  return total;
 }
 function applyStockInEntryModal(e, id) {
   e.preventDefault();
@@ -13312,7 +13316,7 @@ function applyStockInEntryModal(e, id) {
   );
   const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
   const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
-  const qty = productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
+  const qty = stockInEntryTotalQty(largePacks, packs, pieces, p);
   if (qty <= 0) {
     delete state.stockInDraft[id];
     state.stockInDone = false;
@@ -13675,7 +13679,7 @@ function applyStockOutModal(e, id) {
   );
   const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
   const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
-  const qty = productBoxQtyTotal(p, { largePacks, packs, qty: pieces });
+  const qty = stockInEntryTotalQty(largePacks, packs, pieces, p);
   if (qty <= 0) {
     delete state.stockOutDraft[id];
     state.stockOutDone = false;
@@ -22272,9 +22276,9 @@ function updatePickerQtySteppers(id) {
     return;
   }
   const { largePacks, packs, pieces } = pickerQtyToParts(q, p);
-  const packMax = pickerPackMax(p, pieces);
-  const pieceMax = pickerPieceMax(p, packs);
-  const largeMax = pickerLargeMax(p, pieces);
+  const packMax = pickerPackMax(p, pieces, largePacks);
+  const pieceMax = pickerPieceMax(p, packs, largePacks);
+  const largeMax = pickerLargeMax(p, pieces, packs);
   const largeInput = root.querySelector(
     `[data-picker-large-input][data-product-id="${id}"]`,
   );
@@ -22757,16 +22761,16 @@ function pickerQtySheetHtml(productId) {
     const rows = [];
     if (largePieces) {
       rows.push(
-        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Том хайрцаг</span></div>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces), sheet: true })}</div>`,
+        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Том хайрцаг</span></div>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces, packs), sheet: true })}</div>`,
       );
     }
     if (packSize) {
       rows.push(
-        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Жижиг хайрцаг</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div>`,
+        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Жижиг хайрцаг</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces, largePacks), sheet: true })}</div>`,
       );
     }
     rows.push(
-      `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Задгай ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div>`,
+      `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Задгай ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs, largePacks), sheet: true })}</div>`,
     );
     const partsLabel = prepareQtyColsHtml(
       { largePacks, packs, pieces },
