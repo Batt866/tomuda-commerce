@@ -8999,14 +8999,12 @@ textarea::placeholder {
 
 .delivery-store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .delivery-store-card-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: contents;
 }
 
 .delivery-store-card-wrap.is-active .delivery-store-card {
@@ -9018,13 +9016,15 @@ textarea::placeholder {
   justify-content: center;
   white-space: normal;
   line-height: 1.3;
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 10px;
 }
 
 .delivery-store-card__mark-note {
   display: block;
-  padding: 0 4px 2px;
+  padding: 8px 4px 2px;
   font-size: 12px;
   font-weight: 600;
   color: var(--hex-muted-foreground);
@@ -9032,7 +9032,7 @@ textarea::placeholder {
 }
 
 .delivery-store-grid--compact {
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -9046,12 +9046,10 @@ textarea::placeholder {
   overflow: hidden;
   background: var(--hex-card);
   text-align: left;
-  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    box-shadow 0.15s ease;
 }
 
 .delivery-store-card.is-active {
@@ -9059,90 +9057,83 @@ textarea::placeholder {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--hex-primary) 25%, transparent);
 }
 
-.delivery-store-card__media {
-  position: relative;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  background: var(--hex-secondary);
-}
-
-.delivery-store-card__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.delivery-store-card__pin {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.92);
-  color: var(--hex-primary);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
-}
-
-.delivery-store-card__pin .ui-icon {
-  width: 18px;
-  height: 18px;
-  fill: currentColor;
-  stroke: none;
-}
-
-.delivery-store-card__badge {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgb(22 137 154 / 0.92);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.delivery-store-card__body {
+.delivery-store-card__main {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 4px;
-  padding: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 14px 14px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.delivery-store-card__main:focus-visible {
+  outline: 2px solid var(--hex-primary);
+  outline-offset: -2px;
+}
+
+.delivery-store-card__media,
+.delivery-store-card__img,
+.delivery-store-card__pin,
+.delivery-store-card__badge,
+.delivery-store-card__body,
+.delivery-store-card__meta {
+  display: none !important;
 }
 
 .delivery-store-card__name {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--hex-foreground);
 }
 
 .delivery-store-card__company {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--hex-muted-foreground);
 }
 
-.delivery-store-card__meta {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--hex-muted-foreground);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.delivery-store-card__total {
-  margin: 4px 0 0;
+.delivery-store-card__phone {
+  margin: 2px 0 0;
   font-size: 14px;
   font-weight: 700;
   color: var(--hex-primary);
+}
+
+.delivery-store-card__addr,
+.delivery-store-card__note {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--hex-muted-foreground);
+}
+
+.delivery-store-card__count {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hex-muted-foreground);
+}
+
+.delivery-store-card__total {
+  margin: 6px 0 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--hex-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.delivery-store-card__footer {
+  padding: 0 12px 12px;
 }
 
 .delivery-map {
@@ -9346,8 +9337,8 @@ textarea::placeholder {
   margin-top: 4px;
 }
 
-.delivery-store-card:active:not(:disabled) {
-  filter: brightness(0.96);
+.delivery-store-card__main:active {
+  filter: brightness(0.97);
 }
 
 .worker-store-list {

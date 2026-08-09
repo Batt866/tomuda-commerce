@@ -18565,15 +18565,23 @@ function deliveryStoreCard(entry, active = false) {
     id = esc(c.id),
     displayName = customerDisplayName(c),
     addr = customerAddress(c),
-    meta = [customerPhonesList(c)[0] || "", addr !== "-" ? addr : ""]
-      .filter(Boolean)
-      .join(" · "),
+    phone = customerPhonesList(c)[0] || "",
     markAction = deliveryStoreCardMarkAction(c.id);
   const companyLine =
     c.companyName && String(c.companyName).trim() !== displayName
       ? `<p class="delivery-store-card__company">${esc(c.companyName)}</p>`
       : "";
-  return `<div class="delivery-store-card-wrap${active ? " is-active" : ""}"><button type="button" class="delivery-store-card${active ? " is-active" : ""}" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><div class="delivery-store-card__media"><img src="${customerStoreImage(c)}" alt="" class="delivery-store-card__img" loading="lazy" decoding="async"><span class="delivery-store-card__pin" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>${entry.orderCount ? `<span class="delivery-store-card__badge">${entry.orderCount} захиалга</span>` : ""}</div><div class="delivery-store-card__body"><p class="delivery-store-card__name">${esc(displayName)}</p>${companyLine}<p class="delivery-store-card__meta">${esc(meta || "—")}</p><p class="delivery-store-card__total">${fmt(entry.total)}</p></div></button>${markAction}</div>`;
+  const phoneLine = phone
+    ? `<p class="delivery-store-card__phone">${esc(phone)}</p>`
+    : "";
+  const addrLine = `<p class="delivery-store-card__addr">${esc(addr && addr !== "-" ? addr : "Хаяг байхгүй")}</p>`;
+  const noteLine = c.locationText
+    ? `<p class="delivery-store-card__note">${esc(c.locationText)}</p>`
+    : "";
+  const countLine = entry.orderCount
+    ? `<p class="delivery-store-card__count">${entry.orderCount} захиалга</p>`
+    : "";
+  return `<article class="delivery-store-card${active ? " is-active" : ""}"><button type="button" class="delivery-store-card__main" onclick="pickDeliveryStore('${id}')" aria-pressed="${active ? "true" : "false"}"><p class="delivery-store-card__name">${esc(displayName)}</p>${companyLine}${phoneLine}${addrLine}${noteLine}${countLine}<p class="delivery-store-card__total">${fmt(entry.total)}</p></button>${markAction ? `<div class="delivery-store-card__footer">${markAction}</div>` : ""}</article>`;
 }
 function deliveryStorePickStep() {
   const q = state.searches.deliveryStore || "",
@@ -18622,9 +18630,9 @@ function deliveryStoreMapStep() {
     .map((entry) => deliveryStoreCard(entry, false))
     .join("");
   const mapsLinks = maps
-    ? `<div class="delivery-store-detail__maps-row"><a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps · ${esc(displayName)}</a>${apple ? `<a href="${apple}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps delivery-store-detail__maps--apple">Apple Maps</a>` : ""}</div>`
+    ? `<div class="delivery-store-detail__maps-row"><a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps нээх</a>${apple ? `<a href="${apple}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps delivery-store-detail__maps--apple">Apple Maps</a>` : ""}</div>`
     : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`;
-  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(displayName)}</h2></div>${banner}<div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}${mapsLinks}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
+  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(displayName)}</h2></div>${banner}<article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}${mapsLinks}</div></article><div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
 }
 function deliveryView() {
   if (!state.deliveryStoreReady || !state.deliveryStoreId) {
