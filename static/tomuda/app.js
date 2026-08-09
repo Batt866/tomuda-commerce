@@ -12625,7 +12625,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const submitClass = isOut
     ? "stock-in-take__submit stock-in-take__submit--danger"
     : "stock-in-take__submit";
-  const submitLabel = isOut ? "Хасах" : "Хадгалах";
+  const submitLabel = isOut ? "Баталгаажуулах" : "Хадгалах";
   const onsubmit = isOut
     ? `applyStockOutModal(event,'${esc(p.id)}')`
     : `applyStockInEntryModal(event,'${esc(p.id)}')`;
@@ -13933,7 +13933,7 @@ function inventoryStockModal(id, tab) {
   if (!p) return;
   const isIn = tab === "in",
     title = isIn ? "Орлого авах" : "Зарлага гаргах",
-    actionLabel = isIn ? "Нэмэх" : "Хасах",
+    actionLabel = isIn ? "Нэмэх" : "Баталгаажуулах",
     btnClass = isIn ? "btn--primary" : "btn--danger",
     hint = isIn
       ? ""
