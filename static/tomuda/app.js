@@ -690,13 +690,13 @@ function receiptHasPromoSection(o) {
 }
 function receiptItemsHeadRow() {
   // Sample R14: empty A, name B:D, unit E, barcode F:G, qty H:I, price J, total K — no gray № header.
-  return `<tr class="receipt-items__head"><td class="receipt-items__num"></td><td colspan="3" class="receipt-items__name">Барааны нэр</td><td class="receipt-items__unit">Хэмжих нэгж</td><td colspan="2" class="receipt-items__barcode">Баркод</td><td colspan="2" class="receipt-items__qty">Тоо/ш</td><td class="receipt-items__price">Нэгж үнэ</td><td class="receipt-items__total">Нийт үнэ</td></tr>`;
+  return `<tr class="receipt-items__head"><td class="receipt-items__num"></td><td colspan="3" class="receipt-items__name">Барааны нэр</td><td class="receipt-items__unit">Хэмжих нэгж</td><td colspan="2" class="receipt-items__barcode">Баркод</td><td colspan="2" class="receipt-items__qty">Тоо</td><td class="receipt-items__price">Нэгж үнэ</td><td class="receipt-items__total">Нийт үнэ</td></tr>`;
 }
 function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
   return (items || [])
     .map((i, n) => {
       const p = productForReceiptLine(i);
-      return `<tr class="receipt-items__row"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${i.quantity}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__row"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
 }
@@ -6060,8 +6060,8 @@ function productBoxQtyTotal(
 function productPackLabel(p) {
   const small = productPackSize(p);
   const large = productLargeBoxCount(p);
-  if (small && large) return `Том ${large}×жижиг · ${small}ш`;
-  if (small) return `${small}ш/жижиг хайрцаг`;
+  if (small && large) return `1 том = ${large} жижиг · 1 жижиг = ${small}ш`;
+  if (small) return `1 жижиг = ${small}ш`;
   return "";
 }
 function ensureWorkerQtyParts() {
@@ -6069,32 +6069,113 @@ function ensureWorkerQtyParts() {
     state.workerQtyParts = {};
   }
 }
-function syncWorkerQtyParts(id, packs, pieces) {
+function normalizeQtyParts(parts = {}) {
+  return {
+    largePacks: Math.max(0, Math.floor(Number(parts.largePacks) || 0)),
+    packs: Math.max(0, Math.floor(Number(parts.packs) || 0)),
+    pieces: Math.max(0, Math.floor(Number(parts.pieces) || 0)),
+  };
+}
+/** Nested packs (том-оос автоматаар орсон жижиг) → зөвхөн нэмэлт жижиг. */
+function exclusiveOrderQtyParts(parts, largeCount = 0) {
+  const p = normalizeQtyParts(parts);
+  const lc = Math.max(0, Math.floor(Number(largeCount) || 0));
+  if (lc > 1 && p.largePacks > 0 && p.packs >= p.largePacks * lc) {
+    return {
+      ...p,
+      packs: p.packs - p.largePacks * lc,
+    };
+  }
+  return p;
+}
+function formatOrderQtyParts(
+  parts,
+  { unit = "ш", empty = "", largeCount = 0, product = null } = {},
+) {
+  const lc = product ? productLargeBoxCount(product) : largeCount;
+  const p = exclusiveOrderQtyParts(parts, lc);
+  const bits = [];
+  if (p.largePacks) bits.push(`${p.largePacks} том`);
+  if (p.packs) bits.push(`${p.packs} жижиг`);
+  if (p.pieces) bits.push(`${p.pieces} ${unit}`);
+  if (!bits.length) return empty || `0 ${unit}`;
+  return bits.join(" · ");
+}
+function orderLineQtyLabel(item, product) {
+  const p =
+    product ||
+    state.products.find((x) => x.id === item?.productId) ||
+    {};
+  const unit = p.unit || item?.unit || "ш";
+  const parts = orderItemPrepareParts(item || {}, p);
+  return formatOrderQtyParts(
+    {
+      largePacks: parts.largePacks,
+      packs: parts.packs,
+      pieces: parts.loosePieces,
+    },
+    {
+      unit,
+      product: p,
+      largeCount:
+        Number(item?.largeBoxQuantity) > 1
+          ? Math.floor(Number(item.largeBoxQuantity))
+          : productLargeBoxCount(p),
+    },
+  );
+}
+function syncWorkerQtyParts(id, packsOrParts, piecesMaybe) {
   const p = state.products.find((x) => x.id === id);
-  if (!p || !productPackSize(p)) {
+  if (!p || (!productPackSize(p) && !productLargeBoxPieceCount(p))) {
     if (state.workerQtyParts) delete state.workerQtyParts[id];
     return;
   }
   ensureWorkerQtyParts();
-  state.workerQtyParts[id] = {
-    packs: Math.max(0, Math.floor(Number(packs) || 0)),
-    pieces: Math.max(0, Math.floor(Number(pieces) || 0)),
-  };
+  let parts;
+  if (packsOrParts && typeof packsOrParts === "object") {
+    parts = normalizeQtyParts(packsOrParts);
+  } else {
+    parts = normalizeQtyParts({
+      packs: packsOrParts,
+      pieces: piecesMaybe,
+      largePacks: state.workerQtyParts?.[id]?.largePacks,
+    });
+  }
+  if (!parts.largePacks && !parts.packs && !parts.pieces) {
+    delete state.workerQtyParts[id];
+    return;
+  }
+  state.workerQtyParts[id] = parts;
 }
 function workerQtyPartsForProduct(p, qty) {
   const total = Math.max(0, Math.floor(Number(qty) || 0));
   const packSize = productPackSize(p);
-  if (!packSize) return { packs: 0, loosePieces: total };
+  const largeCount = productLargeBoxCount(p);
+  if (!packSize && !productLargeBoxPieceCount(p)) {
+    return { largePacks: 0, packs: 0, loosePieces: total };
+  }
   const stored = state.workerQtyParts?.[p.id];
   if (stored) {
-    const packs = Math.max(0, Math.floor(Number(stored.packs) || 0));
-    const loosePieces = Math.max(0, Math.floor(Number(stored.pieces) || 0));
-    if (packs * packSize + loosePieces === total) {
-      return { packs, loosePieces };
+    const parts = normalizeQtyParts(stored);
+    const rebuilt = productBoxQtyTotal(p, {
+      largePacks: parts.largePacks,
+      packs: parts.packs,
+      qty: parts.pieces,
+    });
+    if (rebuilt === total) {
+      return {
+        largePacks: parts.largePacks,
+        packs: parts.packs,
+        loosePieces: parts.pieces,
+      };
     }
   }
   const split = pickerQtyToParts(total, p);
-  return { packs: split.packs, loosePieces: split.pieces };
+  return {
+    largePacks: split.largePacks,
+    packs: split.packs,
+    loosePieces: split.pieces,
+  };
 }
 /** Split qty into том / жижиг / ширхэг for warehouse prepare sheets. */
 function resolveWarehousePrepareParts(
@@ -6208,25 +6289,35 @@ function orderItemPrepareParts(item, product) {
               largePacks * (largeSize || 0) -
               packs * (packSize || 0),
           );
+    const excl = exclusiveOrderQtyParts(
+      { largePacks, packs, pieces: loosePieces },
+      largeCount,
+    );
     return resolveWarehousePrepareParts(
       totalQty,
-      packs,
-      loosePieces,
+      excl.packs,
+      excl.pieces,
       packSize,
-      largePacks,
+      excl.largePacks,
       largeSize,
     );
   }
-  const split = pickerQtyToParts(totalQty, {
-    ...product,
-    boxQuantity: packSize,
-  });
+  const split = pickerQtyToParts(
+    totalQty,
+    {
+      ...product,
+      boxQuantity: packSize,
+      largeBoxQuantity: largeCount,
+    },
+    { preferStored: false },
+  );
+  const excl = exclusiveOrderQtyParts(split, largeCount);
   return resolveWarehousePrepareParts(
     totalQty,
-    split.packs,
-    split.pieces,
+    excl.packs,
+    excl.pieces,
     packSize,
-    0,
+    excl.largePacks,
     largeSize,
   );
 }
@@ -6257,25 +6348,86 @@ function warehousePreparePrintParts(item, product) {
     largeSize,
   );
 }
-function pickerQtyFromParts(packs, pieces, p) {
-  const packSize = productPackSize(p);
-  const pk = Math.max(0, Math.floor(Number(packs) || 0));
-  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
-  const total = packSize ? pk * packSize + pc : pc;
-  return Math.min(maxWorkerPaidQty(p.id), total);
+function productPackLabel(p) {
+  const small = productPackSize(p);
+  const large = productLargeBoxCount(p);
+  if (small && large) return `1 том = ${large} жижиг · 1 жижиг = ${small}ш`;
+  if (small) return `1 жижиг = ${small}ш`;
+  return "";
 }
-function pickerQtyToParts(q, p) {
+function pickerQtyFromParts(packsOrParts, piecesOrProduct, maybeProduct) {
+  let parts;
+  let p;
+  if (packsOrParts && typeof packsOrParts === "object" && "packs" in packsOrParts) {
+    parts = normalizeQtyParts(packsOrParts);
+    p = piecesOrProduct;
+  } else {
+    parts = normalizeQtyParts({
+      packs: packsOrParts,
+      pieces: piecesOrProduct,
+    });
+    p = maybeProduct;
+  }
+  if (!p?.id) return parts.pieces;
+  return Math.min(
+    maxWorkerPaidQty(p.id),
+    productBoxQtyTotal(p, {
+      largePacks: parts.largePacks,
+      packs: parts.packs,
+      qty: parts.pieces,
+    }),
+  );
+}
+function pickerQtyToParts(q, p, { preferStored = true } = {}) {
   const packSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
   const total = Math.max(0, Math.floor(Number(q) || 0));
-  if (!packSize) return { packs: 0, pieces: total };
-  return { packs: Math.floor(total / packSize), pieces: total % packSize };
+  if (preferStored) {
+    const stored = state.workerQtyParts?.[p?.id];
+    if (stored) {
+      const parts = normalizeQtyParts(stored);
+      const rebuilt = productBoxQtyTotal(p, {
+        largePacks: parts.largePacks,
+        packs: parts.packs,
+        qty: parts.pieces,
+      });
+      if (rebuilt === total) return parts;
+    }
+  }
+  if (!packSize && !largePieces) {
+    return { largePacks: 0, packs: 0, pieces: total };
+  }
+  let rem = total;
+  let largePacks = 0;
+  let packs = 0;
+  if (largePieces > 1) {
+    largePacks = Math.floor(rem / largePieces);
+    rem = rem % largePieces;
+  }
+  if (packSize > 1) {
+    packs = Math.floor(rem / packSize);
+    rem = rem % packSize;
+  }
+  // Nested display: жижиг includes том contents (matches орлого take UI)
+  if (largeCount > 1 && largePacks > 0) {
+    packs += largePacks * largeCount;
+  }
+  return { largePacks, packs, pieces: rem };
 }
-function pickerPackMax(p, pieces) {
+function pickerPackMax(p, pieces, largePacks = 0) {
   const packSize = productPackSize(p);
   if (!packSize) return 0;
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
   const maxTotal = maxWorkerPaidQty(p.id);
   return Math.floor(Math.max(0, maxTotal - pc) / packSize);
+}
+function pickerLargeMax(p, pieces) {
+  const largePieces = productLargeBoxPieceCount(p);
+  if (!largePieces) return 0;
+  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
+  const maxTotal = maxWorkerPaidQty(p.id);
+  return Math.floor(Math.max(0, maxTotal - pc) / largePieces);
 }
 function pickerPieceMax(p, packs) {
   const packSize = productPackSize(p);
@@ -6286,20 +6438,25 @@ function pickerPieceMax(p, packs) {
 }
 function readPickerQtyParts(id) {
   const p = state.products.find((x) => x.id === id);
-  if (!p) return { packs: 0, pieces: 0 };
+  if (!p) return { largePacks: 0, packs: 0, pieces: 0 };
   const packSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
   const fallback = pickerQtyToParts(getWorkerQty(id), p);
-  if (!packSize) {
+  if (!packSize && !productLargeBoxPieceCount(p)) {
     const input = document.querySelector(
       `[data-picker-qty-input][data-product-id="${id}"]`,
     );
     return {
+      largePacks: 0,
       packs: 0,
       pieces: input
         ? Number(String(input.value).replace(/\D/g, "")) || 0
         : fallback.pieces,
     };
   }
+  const largeInput = document.querySelector(
+    `[data-picker-large-input][data-product-id="${id}"]`,
+  );
   const packInput = document.querySelector(
     `[data-picker-pack-input][data-product-id="${id}"]`,
   );
@@ -6307,6 +6464,9 @@ function readPickerQtyParts(id) {
     `[data-picker-piece-input][data-product-id="${id}"]`,
   );
   return {
+    largePacks: largeInput
+      ? Number(String(largeInput.value).replace(/\D/g, "")) || 0
+      : fallback.largePacks,
     packs: packInput
       ? Number(String(packInput.value).replace(/\D/g, "")) || 0
       : fallback.packs,
@@ -6325,28 +6485,70 @@ function pickerPartStepperHtml(
   const decDisabled = v <= min;
   const incDisabled = v >= max;
   const actionAttr =
-    kind === "pack" ? "data-picker-pack-action" : "data-picker-piece-action";
+    kind === "large"
+      ? "data-picker-large-action"
+      : kind === "pack"
+        ? "data-picker-pack-action"
+        : "data-picker-piece-action";
   const inputAttr =
-    kind === "pack" ? "data-picker-pack-input" : "data-picker-piece-input";
-  const draftFn = kind === "pack" ? "pickerPackDraft" : "pickerPieceDraft";
-  const commitFn = kind === "pack" ? "pickerPackCommit" : "pickerPieceCommit";
-  const label = kind === "pack" ? "Багц" : "Тоо ширхэг";
+    kind === "large"
+      ? "data-picker-large-input"
+      : kind === "pack"
+        ? "data-picker-pack-input"
+        : "data-picker-piece-input";
+  const draftFn =
+    kind === "large"
+      ? "pickerLargeDraft"
+      : kind === "pack"
+        ? "pickerPackDraft"
+        : "pickerPieceDraft";
+  const commitFn =
+    kind === "large"
+      ? "pickerLargeCommit"
+      : kind === "pack"
+        ? "pickerPackCommit"
+        : "pickerPieceCommit";
+  const label =
+    kind === "large"
+      ? "Том хайрцаг"
+      : kind === "pack"
+        ? "Жижиг хайрцаг"
+        : "Тоо ширхэг";
   const stepperCls = sheet
     ? "picker-qty-stepper--sheet"
     : "picker-qty-stepper--compact";
   return `<div class="qty-stepper picker-qty-stepper ${stepperCls}" data-qty-min="${min}"><button type="button" class="qty-stepper__btn qty-stepper__btn--dec" ${actionAttr}="dec" data-product-id="${idAttr}" ${decDisabled ? "disabled" : ""} aria-label="${label} багасгах">−</button><input ${inputAttr} data-product-id="${idAttr}" oninput="${draftFn}(this)" onblur="${commitFn}(this)" value="${v}" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="app-input qty-stepper__input" aria-label="${label}"><button type="button" class="qty-stepper__btn qty-stepper__btn--inc" ${actionAttr}="inc" data-product-id="${idAttr}" ${incDisabled ? "disabled" : ""} aria-label="${label} нэмэх">+</button></div>`;
 }
 function pickerPartStepperApply(btn, kind) {
-  const action = btn.getAttribute(
-    kind === "pack" ? "data-picker-pack-action" : "data-picker-piece-action",
-  );
+  const actionAttr =
+    kind === "large"
+      ? "data-picker-large-action"
+      : kind === "pack"
+        ? "data-picker-pack-action"
+        : "data-picker-piece-action";
+  const action = btn.getAttribute(actionAttr);
   const id = btn.getAttribute("data-product-id");
   if (!action || !id) return;
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  let { packs, pieces } = readPickerQtyParts(id);
-  const currentTotal = pickerQtyFromParts(packs, pieces, p);
-  if (kind === "pack") {
+  let { largePacks, packs, pieces } = readPickerQtyParts(id);
+  const largeCount = productLargeBoxCount(p);
+  const currentTotal = pickerQtyFromParts(
+    { largePacks, packs, pieces },
+    p,
+  );
+  if (kind === "large") {
+    if (action === "inc") {
+      const max = pickerLargeMax(p, pieces);
+      if (largePacks >= max) {
+        showStockLimitToast();
+        return;
+      }
+      largePacks = Math.min(max, largePacks + 1);
+    } else if (action === "dec") largePacks = Math.max(0, largePacks - 1);
+    else return;
+    if (largeCount > 1) packs = largePacks * largeCount;
+  } else if (kind === "pack") {
     if (action === "inc") {
       const max = pickerPackMax(p, pieces);
       if (packs >= max) {
@@ -6365,12 +6567,13 @@ function pickerPartStepperApply(btn, kind) {
     pieces = Math.min(max, pieces + 1);
   } else if (action === "dec") pieces = Math.max(0, pieces - 1);
   else return;
-  const nextTotal = pickerQtyFromParts(packs, pieces, p);
+  const parts = { largePacks, packs, pieces };
+  const nextTotal = pickerQtyFromParts(parts, p);
   if (nextTotal <= currentTotal && action === "inc") {
     showStockLimitToast();
     return;
   }
-  syncWorkerQtyParts(id, packs, pieces);
+  syncWorkerQtyParts(id, parts);
   pickerQtyChange(id, nextTotal);
 }
 function pickerPartDraft(el, kind) {
@@ -6379,9 +6582,15 @@ function pickerPartDraft(el, kind) {
   if (!p) return;
   const digits = String(el.value || "").replace(/\D/g, "");
   if (digits !== el.value) el.value = digits;
-  let { packs, pieces } = readPickerQtyParts(id);
+  let { largePacks, packs, pieces } = readPickerQtyParts(id);
+  const largeCount = productLargeBoxCount(p);
   const n = digits ? Number(digits) : 0;
-  if (kind === "pack") {
+  if (kind === "large") {
+    const max = pickerLargeMax(p, pieces);
+    if (n > max) showStockLimitToast();
+    largePacks = Math.min(max, n);
+    if (largeCount > 1) packs = largePacks * largeCount;
+  } else if (kind === "pack") {
     const max = pickerPackMax(p, pieces);
     if (n > max) showStockLimitToast();
     packs = Math.min(max, n);
@@ -6390,21 +6599,30 @@ function pickerPartDraft(el, kind) {
     if (n > max) showStockLimitToast();
     pieces = Math.min(max, n);
   }
-  const total = pickerQtyFromParts(packs, pieces, p);
-  syncWorkerQtyParts(id, packs, pieces);
+  const parts = { largePacks, packs, pieces };
+  const total = pickerQtyFromParts(parts, p);
+  syncWorkerQtyParts(id, parts);
   if (total > 0) state.workerQty[id] = total;
   else delete state.workerQty[id];
-  el.value = String(kind === "pack" ? packs : pieces);
+  el.value = String(
+    kind === "large" ? largePacks : kind === "pack" ? packs : pieces,
+  );
   syncPickerQtySheetUi(id);
 }
 function pickerPartCommit(el, kind) {
   const id = el.getAttribute("data-product-id") || "";
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  let { packs, pieces } = readPickerQtyParts(id);
+  let { largePacks, packs, pieces } = readPickerQtyParts(id);
+  const largeCount = productLargeBoxCount(p);
   const digits = String(el.value || "").replace(/\D/g, "");
   const n = digits ? Number(digits) : 0;
-  if (kind === "pack") {
+  if (kind === "large") {
+    const max = pickerLargeMax(p, pieces);
+    if (n > max) showStockLimitToast();
+    largePacks = Math.min(max, n);
+    if (largeCount > 1) packs = largePacks * largeCount;
+  } else if (kind === "pack") {
     const max = pickerPackMax(p, pieces);
     if (n > max) showStockLimitToast();
     packs = Math.min(max, n);
@@ -6413,8 +6631,15 @@ function pickerPartCommit(el, kind) {
     if (n > max) showStockLimitToast();
     pieces = Math.min(max, n);
   }
-  syncWorkerQtyParts(id, packs, pieces);
-  pickerQtyChange(id, pickerQtyFromParts(packs, pieces, p));
+  const parts = { largePacks, packs, pieces };
+  syncWorkerQtyParts(id, parts);
+  pickerQtyChange(id, pickerQtyFromParts(parts, p));
+}
+function pickerLargeDraft(el) {
+  pickerPartDraft(el, "large");
+}
+function pickerLargeCommit(el) {
+  pickerPartCommit(el, "large");
 }
 function pickerPackDraft(el) {
   pickerPartDraft(el, "pack");
@@ -6429,8 +6654,18 @@ function pickerPieceCommit(el) {
   pickerPartCommit(el, "piece");
 }
 function syncPickerQtySheetUi(id) {
+  const q = getWorkerQty(id);
+  const p = state.products.find((x) => x.id === id);
   const totalEl = document.querySelector("[data-picker-qty-total]");
-  if (totalEl) totalEl.textContent = `${getWorkerQty(id)} ш`;
+  if (totalEl) totalEl.textContent = `${q} ш`;
+  const partsEl = document.querySelector("[data-picker-qty-parts]");
+  if (partsEl && p) {
+    const parts = pickerQtyToParts(q, p);
+    partsEl.textContent = formatOrderQtyParts(parts, {
+      unit: p.unit || "ш",
+      product: p,
+    });
+  }
   updatePickerQtySteppers(id);
   if (pickerOpen()) {
     refreshPickerList({ singleProductId: id });
@@ -6462,9 +6697,9 @@ function finishPickerEditFor(id) {
   if (!id) return;
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
-  if (productPackSize(p)) {
-    const { packs, pieces } = readPickerQtyParts(id);
-    setWorkerQty(id, pickerQtyFromParts(packs, pieces, p));
+  if (productPackSize(p) || productLargeBoxPieceCount(p)) {
+    const parts = readPickerQtyParts(id);
+    setWorkerQty(id, pickerQtyFromParts(parts, p));
   } else {
     const input = document.querySelector(
       `[data-picker-qty-input][data-product-id="${id}"]`,
@@ -6514,7 +6749,16 @@ function workerOrderQtyHtml(p, q) {
   const removeBtn = state.editingOrderId
     ? `<button type="button" class="worker-row-remove" onclick="removeWorkerCartProduct('${id}')" aria-label="Хасах">×</button>`
     : "";
-  return `<div class="worker-row-qty-wrap"><button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${q}</span><span class="worker-row-qty__unit">ш</span></button>${removeBtn}</div>`;
+  const parts = workerQtyPartsForProduct(p, q);
+  const label = formatOrderQtyParts(
+    {
+      largePacks: parts.largePacks,
+      packs: parts.packs,
+      pieces: parts.loosePieces,
+    },
+    { unit: p.unit || "ш", product: p },
+  );
+  return `<div class="worker-row-qty-wrap"><button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${esc(label)}</span></button>${removeBtn}</div>`;
 }
 function removeWorkerCartProduct(id) {
   setWorkerQty(id, 0);
@@ -6594,6 +6838,20 @@ function initPickerModalActions() {
   modal.addEventListener(
     "pointerdown",
     (e) => {
+      const largeBtn = e.target.closest("[data-picker-large-action]");
+      if (largeBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (
+          largeBtn.disabled &&
+          largeBtn.getAttribute("data-picker-large-action") === "inc"
+        ) {
+          showStockLimitToast();
+        } else if (!largeBtn.disabled) {
+          pickerPartStepperApply(largeBtn, "large");
+        }
+        return;
+      }
       const packBtn = e.target.closest("[data-picker-pack-action]");
       if (packBtn) {
         e.preventDefault();
@@ -8027,7 +8285,7 @@ function buildOrderReceiptExcelRows(o) {
       ["Төлбөр", paid ? "Шууд төлөх" : "Дансаар"],
       ["Төлөв", status(o.status)],
       [],
-      ["№", "Барааны нэр", "Нэгж", "Баркод", "Тоо/ш", "Нэгж үнэ", "Нийт үнэ"],
+      ["№", "Барааны нэр", "Нэгж", "Баркод", "Тоо", "Нэгж үнэ", "Нийт үнэ"],
     ];
   (o.items || [])
     .filter((i) => !i.isPromoFree)
@@ -8038,7 +8296,7 @@ function buildOrderReceiptExcelRows(o) {
         i.productName,
         p.unit || "ш",
         p.barcode || "-",
-        i.quantity,
+        orderLineQtyLabel(i, p),
         resolveOrderItemUnitPrice(i),
         resolveOrderItemLineTotal(i),
       ]);
@@ -9490,7 +9748,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Тоо"), "s"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
     ...emptyCells(headerRow, "C", "D", 7),
@@ -9514,6 +9772,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const unitPrice = resolveOrderItemUnitPrice(item);
     const lineTotal = resolveOrderItemLineTotal(item);
     const qty = Number(item.quantity) || 0;
+    const qtyLabel = orderLineQtyLabel(item, p);
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
     const nameText = String(item.productName || "").trim() || "-";
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
@@ -9528,6 +9787,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
             max: 28,
           })
         : 14.25,
+      receiptXlsxWrappedRowHeight(qtyLabel, 12, {
+        min: 14.25,
+        linePt: 11,
+        pad: 2,
+        max: 36,
+      }),
     );
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(rowH, [
@@ -9537,7 +9802,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       barcodeText !== "-"
         ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
         : xlsxCellXml(`F${r}`, 34, null, "empty"),
-      xlsxCellXml(`H${r}`, 11, qty, "n"),
+      xlsxCellXml(
+        `H${r}`,
+        11,
+        qtyLabel === String(qty) ? qty : si(qtyLabel),
+        qtyLabel === String(qty) ? "n" : "s",
+      ),
       xlsxCellXml(`J${r}`, 10, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`K${r}`, 10, Number(lineTotal) || 0, "n"),
       ...emptyCells(r, "C", "D", 8),
@@ -12222,25 +12492,52 @@ function stockInEntryModal(id) {
     }
   });
 }
+function stockInReceiptLineCostPrice(line) {
+  const cost = Number(line?.costPrice);
+  if (Number.isFinite(cost) && cost > 0) return Math.floor(cost);
+  return 0;
+}
+function stockInReceiptLineSalesPrice(line) {
+  const storedSales = Number(line?.unitPrice);
+  const cost = stockInReceiptLineCostPrice(line);
+  const p =
+    state.products.find((x) => String(x.id) === String(line?.productId)) ||
+    null;
+  const productSales = productSalesPrice(p);
+  // Хуучин баримт: unitPrice = cost гэж хадгалсан бол барааны борлуулах үнийг авна
+  if (Number.isFinite(storedSales) && storedSales > 0) {
+    if (cost > 0 && storedSales === cost && productSales > 0) {
+      return Math.floor(productSales);
+    }
+    return Math.floor(storedSales);
+  }
+  if (productSales > 0) return Math.floor(productSales);
+  return cost;
+}
 function stockInReceiptLineUnitPrice(line) {
-  const unitPrice = Number(line?.unitPrice ?? line?.costPrice);
-  return Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 0;
+  return stockInReceiptLineSalesPrice(line);
 }
 function stockInReceiptLineTotal(line) {
   const quantity = Number(line?.quantity) || 0;
-  const unitPrice = stockInReceiptLineUnitPrice(line);
+  const unitPrice = stockInReceiptLineSalesPrice(line);
   if (quantity > 0 && unitPrice > 0) return quantity * unitPrice;
   const storedTotal = Number(line?.totalPrice);
   return Number.isFinite(storedTotal) ? storedTotal : 0;
 }
+function stockInReceiptLineCostTotal(line) {
+  const quantity = Number(line?.quantity) || 0;
+  const cost = stockInReceiptLineCostPrice(line);
+  return quantity > 0 && cost > 0 ? quantity * cost : 0;
+}
 function normalizeStockInReceiptTotals(receipt) {
   const lines = (receipt?.lines || []).map((line) => {
-    const unitPrice = stockInReceiptLineUnitPrice(line);
+    const costPrice = stockInReceiptLineCostPrice(line);
+    const unitPrice = stockInReceiptLineSalesPrice(line);
     const totalPrice = stockInReceiptLineTotal(line);
     return {
       ...line,
-      costPrice: unitPrice || Number(line.costPrice) || 0,
-      unitPrice: unitPrice || Number(line.unitPrice) || 0,
+      costPrice,
+      unitPrice,
       totalPrice,
     };
   });
@@ -12249,6 +12546,10 @@ function normalizeStockInReceiptTotals(receipt) {
     lines,
     totalAmount: lines.reduce(
       (sum, line) => sum + stockInReceiptLineTotal(line),
+      0,
+    ),
+    totalCostAmount: lines.reduce(
+      (sum, line) => sum + stockInReceiptLineCostTotal(line),
       0,
     ),
   };
@@ -12635,6 +12936,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
     const largePacks = Math.max(0, Math.floor(Number(d.largePacks) || 0));
     const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
     const cost = stockInLineCost(p);
+    const sales = productSalesPrice(p) || 0;
     return {
       productId: p.id,
       productName: p.name,
@@ -12644,8 +12946,8 @@ function buildStockInReceiptSnapshot(productIds = null) {
       packs,
       quantity: qty,
       costPrice: cost,
-      unitPrice: cost,
-      totalPrice: qty * cost,
+      unitPrice: sales,
+      totalPrice: qty * sales,
       note: String(d.note || "").trim(),
     };
   });
@@ -13049,13 +13351,14 @@ function stockReceiptPackCell(line) {
   return parts.length ? parts.join(" · ") : "-";
 }
 function stockInReceiptRow(line) {
-  const unitPrice = stockInReceiptLineUnitPrice(line);
+  const costPrice = stockInReceiptLineCostPrice(line);
+  const salesPrice = stockInReceiptLineSalesPrice(line);
   const totalPrice = stockInReceiptLineTotal(line);
   const note = String(line?.note || "").trim();
   const noteHtml = note
     ? `<span class="stock-in-table__note">${esc(note)}</span>`
     : "";
-  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}${noteHtml}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${esc(stockReceiptPackCell(line))}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money">${fmt(unitPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(totalPrice)}</span></div>`;
+  return `<div class="stock-in-table__row"><span class="stock-in-table__name">${esc(line.productName)}${noteHtml}</span><span class="stock-in-table__barcode">${esc(line.barcode || "-")}</span><span class="stock-in-table__pack">${esc(stockReceiptPackCell(line))}</span><span class="stock-in-table__qty">${line.quantity}</span><span class="stock-in-table__money">${fmt(costPrice)}</span><span class="stock-in-table__money">${fmt(salesPrice)}</span><span class="stock-in-table__money stock-in-table__money--total">${fmt(totalPrice)}</span></div>`;
 }
 function stockInTableHead(mode = "entry") {
   if (mode === "entry") {
@@ -14903,7 +15206,8 @@ function buildStockOutSheetXmlLegacy(receipt, {
     }
     const line = item.line;
     const r = rowNum;
-    const unitPrice = stockInReceiptLineUnitPrice(line);
+    const costPrice = stockInReceiptLineCostPrice(line);
+    const salesPrice = stockInReceiptLineSalesPrice(line);
     const packCell = stockReceiptPackCell(line);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
@@ -14912,8 +15216,8 @@ function buildStockOutSheetXmlLegacy(receipt, {
         ? xlsxCellXml(`C${r}`, 10, null, "empty")
         : xlsxCellXml(`C${r}`, 8, si(packCell), "s"),
       xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
-      xlsxCellXml(`E${r}`, 10, unitPrice, "n"),
-      xlsxCellXml(`F${r}`, 10, unitPrice, "n"),
+      xlsxCellXml(`E${r}`, 10, costPrice, "n"),
+      xlsxCellXml(`F${r}`, 10, salesPrice, "n"),
       xlsxCellXml(`G${r}`, 10, stockInReceiptLineTotal(line), "n"),
     ]);
   }
@@ -15188,7 +15492,7 @@ function warehousePreparePatchStylesXml(stylesXml) {
     ? stylesXml.replace(numStyle, numStyleRight)
     : stylesXml;
 
-  // Header cells (style 7): wrap so Том/х · Жижиг/х · Тоо/ш stay fully visible in narrow A4 cols.
+  // Header cells (style 7): wrap so Том · Жижиг · Ширхэг stay fully visible in narrow A4 cols.
   const headerXf =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
   const headerXfWrap =
@@ -15363,9 +15667,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Хэмжих\nнэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Том/\nх"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг/\nх"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Тоо/\nш"), "s"),
+    xlsxCellXml(`D${headerRow}`, 7, si("Том"), "s"),
+    xlsxCellXml(`E${headerRow}`, 7, si("Жижиг"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Ширхэг"), "s"),
     xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл"), "s"),
   ]);
   const pushPrepareGroups = (groups) => {
@@ -15531,7 +15835,7 @@ table.prepare { width: 980px; border-collapse: collapse; table-layout: fixed; fo
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value">${h(warehouseEmp)}</td><td></td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих<br>нэгж</th><th>Баркод</th><th>Том/<br>х</th><th>Жижиг/<br>х</th><th>Тоо/<br>ш</th><th>Үлдэгдэл</th></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th>Хэмжих<br>нэгж</th><th>Баркод</th><th>Том</th><th>Жижиг</th><th>Ширхэг</th><th>Үлдэгдэл</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
 <tr><td class="sign-label">Хүлээлгэн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td></td></tr>
@@ -17405,14 +17709,17 @@ function workerPaidLines() {
       const q = getWorkerQty(p.id);
       if (!q) return null;
       const packSize = productPackSize(p);
+      const largeCount = productLargeBoxCount(p);
       const raw = workerQtyPartsForProduct(p, q);
       return {
         productId: p.id,
         productName: p.name,
         quantity: q,
+        largePacks: raw.largePacks || 0,
         packs: raw.packs,
         loosePieces: raw.loosePieces,
         boxQuantity: packSize || 0,
+        largeBoxQuantity: largeCount || 0,
         price: p.price,
         total: p.price * q,
       };
@@ -17809,11 +18116,14 @@ function cleanSessionQtyParts(raw, qtyMap) {
     const qty = Math.floor(Number(qtyMap?.[id]) || 0);
     if (qty < 1) return;
     const product = state.products.find((p) => p.id === id);
-    if (!product || !productPackSize(product)) return;
-    const packs = Math.max(0, Math.floor(Number(value?.packs) || 0));
-    const pieces = Math.max(0, Math.floor(Number(value?.pieces) || 0));
-    if (pickerQtyFromParts(packs, pieces, product) === qty) {
-      result[id] = { packs, pieces };
+    if (
+      !product ||
+      (!productPackSize(product) && !productLargeBoxPieceCount(product))
+    )
+      return;
+    const parts = normalizeQtyParts(value);
+    if (pickerQtyFromParts(parts, product) === qty) {
+      result[id] = parts;
     }
   });
   return result;
@@ -17823,9 +18133,12 @@ function restoreWorkerQtyPartsFromTotals() {
   Object.entries(state.workerQty || {}).forEach(([id, qty]) => {
     if (state.workerQtyParts[id]) return;
     const product = state.products.find((p) => p.id === id);
-    if (!product || !productPackSize(product)) return;
-    const split = pickerQtyToParts(qty, product);
-    state.workerQtyParts[id] = { packs: split.packs, pieces: split.pieces };
+    if (
+      !product ||
+      (!productPackSize(product) && !productLargeBoxPieceCount(product))
+    )
+      return;
+    state.workerQtyParts[id] = pickerQtyToParts(qty, product);
   });
 }
 function authSessionPayload() {
@@ -18555,21 +18868,56 @@ function qtyDetail(orders) {
           productId: i.productId,
           productName: i.productName,
           qty: 0,
+          largePacks: 0,
+          packs: 0,
+          loosePieces: 0,
         };
       }
       map[key].qty += Math.max(0, Math.floor(Number(i.quantity) || 0));
+      const prod = state.products.find((x) => x.id === i.productId) || {
+        name: i.productName,
+        id: i.productId,
+      };
+      const parts = orderItemPrepareParts(i, prod);
+      map[key].largePacks += parts.largePacks || 0;
+      map[key].packs += parts.packs || 0;
+      map[key].loosePieces += parts.loosePieces || 0;
+      if (Number(i.boxQuantity) > 1) {
+        map[key].boxQuantity = Math.floor(Number(i.boxQuantity));
+      }
+      if (Number(i.largeBoxQuantity) > 1) {
+        map[key].largeBoxQuantity = Math.floor(Number(i.largeBoxQuantity));
+      }
     }),
   );
   return Object.values(map)
     .map((row) => ({
       product: warehousePrepareProduct(row),
       qty: row.qty,
+      largePacks: row.largePacks,
+      packs: row.packs,
+      loosePieces: row.loosePieces,
+      boxQuantity: row.boxQuantity,
+      largeBoxQuantity: row.largeBoxQuantity,
     }))
     .sort((a, b) => b.qty - a.qty);
 }
 function detailRow(x) {
   const p = x.product;
-  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${x.qty} ш</b></div>`;
+  const label = formatOrderQtyParts(
+    {
+      largePacks: x.largePacks,
+      packs: x.packs,
+      pieces: x.loosePieces,
+    },
+    {
+      unit: p.unit || "ш",
+      product: p,
+      largeCount: x.largeBoxQuantity || productLargeBoxCount(p),
+      empty: `${x.qty} ${p.unit || "ш"}`,
+    },
+  );
+  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${esc(label)}</b></div>`;
 }
 function customerDistrictKhoroo(c) {
   return [c?.district, c?.khoroo].filter(Boolean).join(" · ");
@@ -18744,17 +19092,51 @@ function workerOrderListRow(o) {
 function seedWorkerCartFromOrder(order) {
   resetWorkerCart();
   const qty = {};
+  ensureWorkerQtyParts();
   (order.items || []).forEach((item) => {
     if (!item?.productId || item.isPromoFree) return;
     const id = String(item.productId);
-    qty[id] = (qty[id] || 0) + Math.max(0, Math.floor(Number(item.quantity) || 0));
+    const add = Math.max(0, Math.floor(Number(item.quantity) || 0));
+    qty[id] = (qty[id] || 0) + add;
+    const p = state.products.find((x) => x.id === id);
+    if (!p) return;
+    const hasPacks =
+      (item.packs != null && item.packs !== "") ||
+      (item.largePacks != null && Number(item.largePacks) > 0) ||
+      (item.loosePieces != null && item.loosePieces !== "");
+    if (hasPacks) {
+      const parts = normalizeQtyParts({
+        largePacks: item.largePacks,
+        packs: item.packs,
+        pieces: item.loosePieces,
+      });
+      const existing = state.workerQtyParts[id];
+      if (existing) {
+        state.workerQtyParts[id] = normalizeQtyParts({
+          largePacks: existing.largePacks + parts.largePacks,
+          packs: existing.packs + parts.packs,
+          pieces: existing.pieces + parts.pieces,
+        });
+      } else {
+        state.workerQtyParts[id] = parts;
+      }
+    }
   });
   state.workerQty = qty;
   Object.keys(qty).forEach((id) => {
     const p = state.products.find((x) => x.id === id);
-    if (!p || !productPackSize(p)) return;
+    if (!p || (!productPackSize(p) && !productLargeBoxPieceCount(p))) return;
+    const stored = state.workerQtyParts?.[id];
+    if (stored) {
+      const rebuilt = productBoxQtyTotal(p, {
+        largePacks: stored.largePacks,
+        packs: stored.packs,
+        qty: stored.pieces,
+      });
+      if (rebuilt === qty[id]) return;
+    }
     const split = pickerQtyToParts(qty[id], p);
-    syncWorkerQtyParts(id, split.packs, split.pieces);
+    syncWorkerQtyParts(id, split);
   });
 }
 function openWorkerOrderEdit(id) {
@@ -21828,7 +22210,8 @@ function updatePickerQtySteppers(id) {
   const q = getWorkerQty(id);
   const maxOk = maxWorkerPaidQty(id);
   const packSize = productPackSize(p);
-  if (!packSize) {
+  const largePieces = productLargeBoxPieceCount(p);
+  if (!packSize && !largePieces) {
     modal
       .querySelectorAll(`[data-picker-qty-input][data-product-id="${id}"]`)
       .forEach((input) => {
@@ -21846,17 +22229,29 @@ function updatePickerQtySteppers(id) {
       });
     return;
   }
-  const { packs, pieces } = pickerQtyToParts(q, p);
+  const { largePacks, packs, pieces } = pickerQtyToParts(q, p);
   const packMax = pickerPackMax(p, pieces);
   const pieceMax = pickerPieceMax(p, packs);
+  const largeMax = pickerLargeMax(p, pieces);
+  const largeInput = modal.querySelector(
+    `[data-picker-large-input][data-product-id="${id}"]`,
+  );
   const packInput = modal.querySelector(
     `[data-picker-pack-input][data-product-id="${id}"]`,
   );
   const pieceInput = modal.querySelector(
     `[data-picker-piece-input][data-product-id="${id}"]`,
   );
+  if (largeInput) largeInput.value = String(largePacks);
   if (packInput) packInput.value = String(packs);
   if (pieceInput) pieceInput.value = String(pieces);
+  modal
+    .querySelectorAll(`[data-picker-large-action][data-product-id="${id}"]`)
+    .forEach((btn) => {
+      const action = btn.getAttribute("data-picker-large-action");
+      if (action === "dec") btn.disabled = largePacks <= 0;
+      if (action === "inc") btn.disabled = largePacks >= largeMax;
+    });
   modal
     .querySelectorAll(`[data-picker-pack-action][data-product-id="${id}"]`)
     .forEach((btn) => {
@@ -22021,23 +22416,25 @@ function setWorkerQty(id, qty) {
     if (state.workerQtyParts) delete state.workerQtyParts[id];
     if (state.workerOrderActiveId === id) state.workerOrderActiveId = "";
   }
-  if (q > 0 && productPackSize(p)) {
-    const packSize = productPackSize(p);
+  if (q > 0 && (productPackSize(p) || productLargeBoxPieceCount(p))) {
     if (state.pickerQtyProductId === id) {
-      const { packs, pieces } = readPickerQtyParts(id);
-      syncWorkerQtyParts(id, packs, pieces);
+      syncWorkerQtyParts(id, readPickerQtyParts(id));
     } else {
       const stored = state.workerQtyParts?.[id];
-      const storedPacks = Math.max(0, Math.floor(Number(stored?.packs) || 0));
-      const storedPieces = Math.max(
-        0,
-        Math.floor(Number(stored?.pieces) || 0),
-      );
-      if (stored && storedPacks * packSize + storedPieces === q) {
-        syncWorkerQtyParts(id, storedPacks, storedPieces);
+      if (stored) {
+        const parts = normalizeQtyParts(stored);
+        const rebuilt = productBoxQtyTotal(p, {
+          largePacks: parts.largePacks,
+          packs: parts.packs,
+          qty: parts.pieces,
+        });
+        if (rebuilt === q) {
+          syncWorkerQtyParts(id, parts);
+        } else {
+          syncWorkerQtyParts(id, pickerQtyToParts(q, p));
+        }
       } else {
-        const split = pickerQtyToParts(q, p);
-        syncWorkerQtyParts(id, split.packs, split.pieces);
+        syncWorkerQtyParts(id, pickerQtyToParts(q, p));
       }
     }
   } else if (state.workerQtyParts) {
@@ -22311,14 +22708,37 @@ function pickerQtySheetHtml(productId) {
   const id = esc(p.id);
   const q = getWorkerQty(p.id);
   const packSize = productPackSize(p);
-  const { packs, pieces } = pickerQtyToParts(q, p);
-  const qtyBody = packSize
-    ? `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Багц</span><span class="picker-qty-sheet__row-hint">Багц = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`
-    : `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const { largePacks, packs, pieces } = pickerQtyToParts(q, p);
+  let qtyBody;
+  if (packSize || largePieces) {
+    const rows = [];
+    if (largePieces) {
+      rows.push(
+        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Том хайрцаг</span><span class="picker-qty-sheet__row-hint">1 том = ${largeCount} жижиг (${largePieces}ш)</span></div>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces), sheet: true })}</div>`,
+      );
+    }
+    if (packSize) {
+      rows.push(
+        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Жижиг хайрцаг</span><span class="picker-qty-sheet__row-hint">1 жижиг = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div>`,
+      );
+    }
+    rows.push(
+      `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Задгай ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div>`,
+    );
+    const partsLabel = formatOrderQtyParts(
+      { largePacks, packs, pieces },
+      { unit: p.unit || "ш", product: p },
+    );
+    qtyBody = `<div class="picker-qty-sheet__qty">${rows.join("")}<p class="picker-qty-sheet__total">Захиалга: <b data-picker-qty-parts>${esc(partsLabel)}</b> · Нийт <b data-picker-qty-total>${q} ш</b></p></div>`;
+  } else {
+    qtyBody = `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
+  }
   const promoHtml = "";
   const stockHave = productStockWithEditCredit(p.id);
-  const packMeta = packSize
-    ? `<span class="picker-qty-sheet__meta-sep">·</span><span>1 багц = ${packSize}ш</span>`
+  const packMeta = productPackLabel(p)
+    ? `<span class="picker-qty-sheet__meta-sep">·</span><span>${esc(productPackLabel(p))}</span>`
     : "";
   return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${stockHave} ${esc(p.unit || "ш")}${packMeta}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
@@ -22331,8 +22751,14 @@ function pickerRow(p) {
     packMeta = packLabel
       ? `<span class="picker-row__meta-sep">·</span><span class="picker-row__value--pack">${esc(packLabel)}</span>`
       : "",
+    qtyLabel = inCart
+      ? formatOrderQtyParts(pickerQtyToParts(q, p), {
+          unit: p.unit || "ш",
+          product: p,
+        })
+      : "",
     qtyBadge = inCart
-      ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
+      ? `<span class="picker-row__qty" aria-label="Сонгосон ${esc(qtyLabel)}">${esc(qtyLabel)}</span>`
       : "";
   return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="picker-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${packMeta}${promoHint}</span></div>${qtyBadge}</button>`;
 }
@@ -23388,6 +23814,8 @@ Object.assign(window, {
   pickerPackCommit,
   pickerPieceDraft,
   pickerPieceCommit,
+  pickerLargeDraft,
+  pickerLargeCommit,
   qtyDraft,
   qtyCommit,
   openPickerModal,

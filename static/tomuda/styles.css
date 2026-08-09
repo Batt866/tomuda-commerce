@@ -8620,10 +8620,11 @@ textarea::placeholder {
 
 .picker-row__qty {
   flex-shrink: 0;
+  max-width: 42%;
   font-size: var(--picker-row-qty);
   font-weight: 700;
   line-height: 1.2;
-  white-space: nowrap;
+  white-space: normal;
   color: var(--hex-primary);
   background: none;
   padding: 0;
