@@ -7099,14 +7099,41 @@ textarea::placeholder {
 
 .worker-receivable__item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   min-width: 0;
 }
 
 .worker-receivable__item:has(.worker-receivable__action) {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.worker-receivable__open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 2px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.worker-receivable__open:active {
+  filter: brightness(0.97);
+}
+
+.worker-receivable__open:focus-visible {
+  outline: 2px solid var(--hex-primary);
+  outline-offset: 2px;
 }
 
 .worker-receivable__no .receipt-no--xs {

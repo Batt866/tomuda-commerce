@@ -1809,7 +1809,8 @@ function refreshCustomerEditReceivable(customerId) {
 }
 function workerReceivableItemHtml(o, opts = {}) {
   const { actions = "" } = opts;
-  return `<div class="worker-receivable__item"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span>${actions}</div>`;
+  const id = esc(o.id);
+  return `<div class="worker-receivable__item"><button type="button" class="worker-receivable__open" onclick="event.stopPropagation();orderReceiptModal('${id}')" aria-label="Баримт ${esc(formatReceiptNumber(o))} харах"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span></button>${actions}</div>`;
 }
 function workerReceivableHtml(customerId, opts = {}) {
   const orders = customerUnpaidOrders(customerId);
