@@ -6666,11 +6666,25 @@ function syncPickerQtySheetUi(id) {
       product: p,
     });
   }
+  const workerSum = document.querySelector(
+    `[data-worker-pack-edit="${CSS.escape(id)}"] .worker-pack-edit__sum`,
+  );
+  if (workerSum && p) {
+    const parts = pickerQtyToParts(q, p);
+    const label = formatOrderQtyParts(parts, {
+      unit: p.unit || "ш",
+      product: p,
+    });
+    workerSum.textContent = `${label} · ${q} ш`;
+  }
   updatePickerQtySteppers(id);
   if (pickerOpen()) {
     refreshPickerList({ singleProductId: id });
     updatePickerClearBtn();
     updatePickerCartSummary();
+  } else if (state.workerOrderActiveId === id) {
+    // keep inline pack editors in sync without collapsing the row
+    updatePickerQtySteppers(id);
   }
 }
 function pickerQtyStepperHtml(p, q, { min = 0, sheet = false } = {}) {
@@ -6708,6 +6722,31 @@ function finishPickerEditFor(id) {
   }
   if (state.pickerActiveId === id) state.pickerActiveId = "";
 }
+function workerPackQtyEditHtml(p, q) {
+  const packSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces = productLargeBoxPieceCount(p);
+  const { largePacks, packs, pieces } = pickerQtyToParts(q, p);
+  const rows = [];
+  if (largePieces) {
+    rows.push(
+      `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Том</span>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces) })}</div>`,
+    );
+  }
+  if (packSize) {
+    rows.push(
+      `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Жижиг</span>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces) })}</div>`,
+    );
+  }
+  rows.push(
+    `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Задгай</span>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs) })}</div>`,
+  );
+  const partsLabel = formatOrderQtyParts(
+    { largePacks, packs, pieces },
+    { unit: p.unit || "ш", product: p },
+  );
+  return `<div class="worker-pack-edit" data-worker-pack-edit="${esc(p.id)}">${rows.join("")}<p class="worker-pack-edit__sum">${esc(partsLabel)} · ${q} ш</p><button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
+}
 function workerQtyStepperHtml(p, q) {
   const idAttr = esc(p.id);
   const maxOk = maxWorkerPaidQty(p.id);
@@ -6724,13 +6763,18 @@ function setWorkerOrderActive(id) {
 function finishWorkerOrderEdit() {
   const id = state.workerOrderActiveId;
   if (id) {
-    const input = document.querySelector(
-      `.worker-order-qty-stepper input[data-product-id="${id}"]`,
-    );
-    if (input) qtyCommit(input);
-    else if (!getWorkerQty(id) && !state.editingOrderId) {
-      const p = state.products.find((x) => x.id === id);
-      if (p) state.workerQty[id] = 1;
+    const p = state.products.find((x) => x.id === id);
+    if (p && (productPackSize(p) || productLargeBoxPieceCount(p))) {
+      const parts = readPickerQtyParts(id);
+      setWorkerQty(id, pickerQtyFromParts(parts, p));
+    } else {
+      const input = document.querySelector(
+        `.worker-order-qty-stepper input[data-product-id="${id}"]`,
+      );
+      if (input) qtyCommit(input);
+      else if (!getWorkerQty(id) && !state.editingOrderId) {
+        if (p) state.workerQty[id] = 1;
+      }
     }
   }
   state.workerOrderActiveId = "";
@@ -6744,8 +6788,12 @@ function finishPickerEdit() {
 }
 function workerOrderQtyHtml(p, q) {
   const id = esc(p.id);
-  if (state.workerOrderActiveId === p.id)
+  if (state.workerOrderActiveId === p.id) {
+    if (productPackSize(p) || productLargeBoxPieceCount(p)) {
+      return workerPackQtyEditHtml(p, q);
+    }
     return `<div class="worker-row-edit">${workerQtyStepperHtml(p, q)}<button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
+  }
   const removeBtn = state.editingOrderId
     ? `<button type="button" class="worker-row-remove" onclick="removeWorkerCartProduct('${id}')" aria-label="Хасах">×</button>`
     : "";
@@ -6805,6 +6853,23 @@ function initQtyStepperButtons() {
   document.addEventListener(
     "pointerdown",
     (e) => {
+      const packKinds = [
+        ["data-picker-large-action", "large"],
+        ["data-picker-pack-action", "pack"],
+        ["data-picker-piece-action", "piece"],
+      ];
+      for (const [attr, kind] of packKinds) {
+        const packBtn = e.target.closest?.(`[${attr}]`);
+        if (!packBtn) continue;
+        e.preventDefault();
+        e.stopPropagation();
+        if (packBtn.disabled && packBtn.getAttribute(attr) === "inc") {
+          showStockLimitToast();
+        } else if (!packBtn.disabled) {
+          pickerPartStepperApply(packBtn, kind);
+        }
+        return;
+      }
       const btn = e.target.closest?.(".qty-stepper__btn[data-qty-action]");
       if (!btn) return;
       if (btn.disabled) {
@@ -6835,53 +6900,6 @@ function initEmployeeModalActions() {
 function initPickerModalActions() {
   if (modal.dataset.pickerBound) return;
   modal.dataset.pickerBound = "1";
-  modal.addEventListener(
-    "pointerdown",
-    (e) => {
-      const largeBtn = e.target.closest("[data-picker-large-action]");
-      if (largeBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (
-          largeBtn.disabled &&
-          largeBtn.getAttribute("data-picker-large-action") === "inc"
-        ) {
-          showStockLimitToast();
-        } else if (!largeBtn.disabled) {
-          pickerPartStepperApply(largeBtn, "large");
-        }
-        return;
-      }
-      const packBtn = e.target.closest("[data-picker-pack-action]");
-      if (packBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (
-          packBtn.disabled &&
-          packBtn.getAttribute("data-picker-pack-action") === "inc"
-        ) {
-          showStockLimitToast();
-        } else if (!packBtn.disabled) {
-          pickerPartStepperApply(packBtn, "pack");
-        }
-        return;
-      }
-      const pieceBtn = e.target.closest("[data-picker-piece-action]");
-      if (pieceBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (
-          pieceBtn.disabled &&
-          pieceBtn.getAttribute("data-picker-piece-action") === "inc"
-        ) {
-          showStockLimitToast();
-        } else if (!pieceBtn.disabled) {
-          pickerPartStepperApply(pieceBtn, "piece");
-        }
-      }
-    },
-    true,
-  );
   modal.addEventListener("click", (e) => {
     const catBtn = e.target.closest("[data-picker-cat]");
     if (catBtn) {
@@ -11406,7 +11424,7 @@ function warehouseDateFiltersHtml() {
     day = normalizeIsoDateInput(state.filters.warehouseDate) || today,
     isToday = day === today,
     display = warehouseDateDisplayText(day);
-  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" oninput="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Авсан огноо сонгох"></label><span class="wh-date-filters__hint">${isToday ? "Өнөөдөр авсан" : "Сонгосон өдөр авсан"}</span></div>`;
+  return `<div class="wh-date-filters"><button type="button" onclick="selectWarehouseToday()" class="wh-date-filters__live${isToday ? " is-active" : ""}">Өнөөдөр</button><label class="wh-date-filters__date app-input"><span class="wh-date-filters__date-value">${esc(display)}</span><svg class="wh-date-filters__date-icon ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v2M17 3v2M4 8h16"/><rect x="4" y="5" width="16" height="16" rx="2"/></svg><input type="date" class="wh-date-filters__native app-input" value="${esc(day)}" onchange="setWarehouseDate(this.value)" oninput="setWarehouseDate(this.value)" onfocus="warehouseDateFocus()" onblur="warehouseDateBlur()" aria-label="Авсан огноо сонгох"></label></div>`;
 }
 function selectWarehouseToday() {
   commitDatePickerChange(() => {
@@ -22240,19 +22258,22 @@ function mountPickerQtySheet(productId) {
 }
 function updatePickerQtySteppers(id) {
   const p = state.products.find((x) => x.id === id);
-  if (!p || !pickerOpen()) return;
+  if (!p) return;
+  const onWorkerEdit = state.workerOrderActiveId === id;
+  if (!pickerOpen() && !onWorkerEdit) return;
   const q = getWorkerQty(id);
   const maxOk = maxWorkerPaidQty(id);
   const packSize = productPackSize(p);
   const largePieces = productLargeBoxPieceCount(p);
+  const root = pickerOpen() ? modal : document;
   if (!packSize && !largePieces) {
-    modal
+    root
       .querySelectorAll(`[data-picker-qty-input][data-product-id="${id}"]`)
       .forEach((input) => {
         input.value = String(q);
         input.setAttribute("aria-valuenow", String(q));
       });
-    modal
+    root
       .querySelectorAll(
         `.qty-stepper__btn[data-qty-action][data-product-id="${id}"]`,
       )
@@ -22267,33 +22288,33 @@ function updatePickerQtySteppers(id) {
   const packMax = pickerPackMax(p, pieces);
   const pieceMax = pickerPieceMax(p, packs);
   const largeMax = pickerLargeMax(p, pieces);
-  const largeInput = modal.querySelector(
+  const largeInput = root.querySelector(
     `[data-picker-large-input][data-product-id="${id}"]`,
   );
-  const packInput = modal.querySelector(
+  const packInput = root.querySelector(
     `[data-picker-pack-input][data-product-id="${id}"]`,
   );
-  const pieceInput = modal.querySelector(
+  const pieceInput = root.querySelector(
     `[data-picker-piece-input][data-product-id="${id}"]`,
   );
   if (largeInput) largeInput.value = String(largePacks);
   if (packInput) packInput.value = String(packs);
   if (pieceInput) pieceInput.value = String(pieces);
-  modal
+  root
     .querySelectorAll(`[data-picker-large-action][data-product-id="${id}"]`)
     .forEach((btn) => {
       const action = btn.getAttribute("data-picker-large-action");
       if (action === "dec") btn.disabled = largePacks <= 0;
       if (action === "inc") btn.disabled = largePacks >= largeMax;
     });
-  modal
+  root
     .querySelectorAll(`[data-picker-pack-action][data-product-id="${id}"]`)
     .forEach((btn) => {
       const action = btn.getAttribute("data-picker-pack-action");
       if (action === "dec") btn.disabled = packs <= 0;
       if (action === "inc") btn.disabled = packs >= packMax;
     });
-  modal
+  root
     .querySelectorAll(`[data-picker-piece-action][data-product-id="${id}"]`)
     .forEach((btn) => {
       const action = btn.getAttribute("data-picker-piece-action");
