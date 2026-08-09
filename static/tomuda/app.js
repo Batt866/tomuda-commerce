@@ -19117,11 +19117,7 @@ function confirmCancelWorkerOrder(id) {
   );
 }
 function workerOrderListRow(o) {
-  const canCancel = canCancelWorkerOrder(o);
-  const cancelBtn = canCancel
-    ? `<button type="button" class="worker-order-row__cancel" onclick="event.stopPropagation();confirmCancelWorkerOrder('${esc(o.id)}')" aria-label="Захиалга цуцлах">Захиалга цуцлах</button>`
-    : "";
-  return `<div class="line-list__row worker-order-row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" role="button" tabindex="0" onclick="workerOrderDetail('${esc(o.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();workerOrderDetail('${esc(o.id)}')}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(orderCustomerName(o))}</span><span class="worker-order-row__amount-wrap">${cancelBtn}<b class="line-list__amount">${fmt(orderAmount(o))}</b></span></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></div>`;
+  return `<div class="line-list__row worker-order-row${state.workerHighlightOrderId === o.id ? " line-list__row--new" : ""}" data-order-id="${esc(o.id)}" data-order-day="${orderCreatedDay(o)}" role="button" tabindex="0" onclick="workerOrderDetail('${esc(o.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();workerOrderDetail('${esc(o.id)}')}"><div class="line-list__main"><div class="line-list__title-row">${receiptNo(o, "xs")}<span class="line-list__title">${esc(orderCustomerName(o))}</span><b class="line-list__amount">${fmt(orderAmount(o))}</b></div><p class="line-list__meta">Захиалга ${dte(orderTakenDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))} · ${o.items.length} бараа · <span class="${o.paymentTerm === "credit" ? "text-tone-danger" : "text-tone-success"}">${paymentTermLabel(o.paymentTerm)}</span></p></div></div>`;
 }
 function seedWorkerCartFromOrder(order) {
   resetWorkerCart();
@@ -19258,11 +19254,15 @@ function workerNewOrderStep(cart) {
     : editing
       ? "Өөрчлөлт хадгалах"
       : "Хадгалах";
+  const cancelOrderBtn =
+    editing && canCancelWorkerOrder(editingOrder)
+      ? `<button type="button" onclick="confirmCancelWorkerOrder('${esc(editingOrder.id)}')" class="worker-order-cancel-btn"${saving ? " disabled" : ""}>Захиалга цуцлах</button>`
+      : "";
   const addBtn = `<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${editing ? "Бараа нэмэх" : "Бараа сонгох"}</span></button></div>`;
   const lines = `<div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div>`;
   // Edit: show lines first so existing items aren't hidden under controls.
   const bodyMain = editing ? `${lines}${addBtn}` : `${addBtn}${lines}`;
-  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
+  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button>${cancelOrderBtn}</footer></section>`;
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};

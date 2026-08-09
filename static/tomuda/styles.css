@@ -14315,38 +14315,46 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
-.worker-order-row__amount-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.worker-order-row .line-list__title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.worker-order-row .line-list__amount {
   margin-left: auto;
   flex-shrink: 0;
-  max-width: 100%;
 }
 
-.worker-order-row__cancel {
-  flex-shrink: 0;
-  padding: 5px 8px;
-  border: 0;
-  border-radius: 7px;
-  background: color-mix(in srgb, #dc2626 12%, var(--hex-card));
+.worker-order-cancel-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px dashed color-mix(in srgb, #dc2626 35%, var(--hex-border));
+  border-radius: 12px;
+  background: transparent;
   color: #b91c1c;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.3;
   cursor: pointer;
 }
 
-.worker-order-row__cancel:hover,
-.worker-order-row__cancel:focus-visible {
-  background: color-mix(in srgb, #dc2626 22%, var(--hex-card));
+.worker-order-cancel-btn:hover,
+.worker-order-cancel-btn:focus-visible {
+  background: color-mix(in srgb, #dc2626 8%, var(--hex-card));
+  outline: none;
 }
 
-.worker-order-row__cancel:active {
+.worker-order-cancel-btn:active {
+  background: color-mix(in srgb, #dc2626 14%, var(--hex-card));
+}
+
+.worker-order-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .worker-orders-filters {
