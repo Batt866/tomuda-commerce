@@ -18621,7 +18621,7 @@ function deliveryStoreMapStep() {
     deliveryStoresWithOrders().find((r) => r.customer.id === selected.id);
   const orderList = orders.length
     ? orders.map((o) => deliveryOrderRowHtml(o)).join("")
-    : `<p class="delivery-view__empty">Захиалга алга</p>`;
+    : `<p class="delivery-view__empty">Нэмэлт захиалга байхгүй</p>`;
   const banner = deliveryUndeliveredBanner(
     currentRole() === "delivery" ? "delivery" : "all",
   );
