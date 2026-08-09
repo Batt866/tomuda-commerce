@@ -2315,13 +2315,14 @@ img[data-product-img],
 
 .product-card__media {
   grid-area: img;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: var(--pc-thumb);
   height: var(--pc-thumb);
   min-width: var(--pc-thumb);
   border-radius: 0;
-  background: transparent;
+  background: #fff;
   border: none;
   box-shadow: none;
   overflow: hidden;
@@ -2330,14 +2331,17 @@ img[data-product-img],
 
 .product-card__img {
   grid-area: unset;
-  width: 100%;
-  height: 100%;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 0;
-  object-fit: contain;
-  object-position: center;
+  object-fit: contain !important;
+  object-position: center center !important;
   padding: 0;
   border: none;
-  background: transparent;
+  background: #fff;
   box-shadow: none;
 }
 
@@ -2603,12 +2607,19 @@ img[data-product-img],
     border-radius: 0;
     border: none;
     box-shadow: none;
-    background: transparent;
+    background: #fff;
   }
 
   .product-card__img {
     padding: 0;
     border-radius: 0;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain !important;
+    object-position: center center !important;
+    background: #fff;
   }
 
   .product-card__copy {
@@ -3044,7 +3055,7 @@ img[data-product-img],
     height: var(--product-thumb);
     border-radius: 0;
     border: none;
-    background: transparent;
+    background: #fff;
     box-shadow: none;
   }
 
@@ -3052,14 +3063,17 @@ img[data-product-img],
     grid-area: unset;
     grid-column: auto;
     grid-row: auto;
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
     border-radius: 0;
     border: none;
-    background: transparent;
+    background: #fff;
     padding: 0;
     box-shadow: none;
-    object-fit: contain;
+    object-fit: contain !important;
+    object-position: center center !important;
     align-self: center;
     justify-self: start;
   }
