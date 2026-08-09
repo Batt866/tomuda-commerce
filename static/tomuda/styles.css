@@ -14329,27 +14329,29 @@ textarea::placeholder {
 }
 
 .worker-order-cancel-btn {
-  width: 100%;
-  margin-top: 10px;
-  padding: 12px 14px;
-  border: 1px dashed color-mix(in srgb, #dc2626 35%, var(--hex-border));
-  border-radius: 12px;
-  background: transparent;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, #dc2626 28%, var(--hex-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, #dc2626 8%, var(--hex-card));
   color: #b91c1c;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .worker-order-cancel-btn:hover,
 .worker-order-cancel-btn:focus-visible {
-  background: color-mix(in srgb, #dc2626 8%, var(--hex-card));
+  background: color-mix(in srgb, #dc2626 16%, var(--hex-card));
   outline: none;
 }
 
 .worker-order-cancel-btn:active {
-  background: color-mix(in srgb, #dc2626 14%, var(--hex-card));
+  background: color-mix(in srgb, #dc2626 22%, var(--hex-card));
 }
 
 .worker-order-cancel-btn:disabled {

@@ -19242,8 +19242,12 @@ function workerNewOrderStep(cart) {
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
       : "";
   const saving = orderSubmitLock;
+  const cancelOrderBtn =
+    editing && canCancelWorkerOrder(editingOrder)
+      ? `<button type="button" onclick="confirmCancelWorkerOrder('${esc(editingOrder.id)}')" class="worker-order-cancel-btn"${saving ? " disabled" : ""}>Захиалга цуцлах</button>`
+      : "";
   const headAction = editing
-    ? ""
+    ? cancelOrderBtn
     : `<button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Солих</button>`;
   const headExtra = editing
     ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")}</p>`
@@ -19254,15 +19258,11 @@ function workerNewOrderStep(cart) {
     : editing
       ? "Өөрчлөлт хадгалах"
       : "Хадгалах";
-  const cancelOrderBtn =
-    editing && canCancelWorkerOrder(editingOrder)
-      ? `<button type="button" onclick="confirmCancelWorkerOrder('${esc(editingOrder.id)}')" class="worker-order-cancel-btn"${saving ? " disabled" : ""}>Захиалга цуцлах</button>`
-      : "";
   const addBtn = `<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${editing ? "Бараа нэмэх" : "Бараа сонгох"}</span></button></div>`;
   const lines = `<div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div>`;
   // Edit: show lines first so existing items aren't hidden under controls.
   const bodyMain = editing ? `${lines}${addBtn}` : `${addBtn}${lines}`;
-  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button>${cancelOrderBtn}</footer></section>`;
+  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
 }
 function workerPromoRow(line) {
   const p = state.products.find((x) => x.id === line.productId) || {};
