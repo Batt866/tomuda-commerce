@@ -285,6 +285,25 @@ textarea.text-sm,
   margin: 0;
 }
 
+.page-head__count {
+  margin-left: 0.35em;
+  font-weight: 700;
+  color: var(--hex-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-head__count::before {
+  content: "(";
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+}
+
+.page-head__count::after {
+  content: ")";
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+}
+
 .page-head--row {
   display: flex;
   align-items: center;
