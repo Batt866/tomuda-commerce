@@ -8580,8 +8580,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* B fits «Дансны дугаар:»; C holds right-flush IBAN */
-.receipt-grid__a { width: 4.0%; } .receipt-grid__b { width: 18.0%; } .receipt-grid__c { width: 9.2%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 12.3%; }
+/* B fits «Дансны дугаар:»; C = right-flush IBAN only */
+.receipt-grid__a { width: 3.5%; } .receipt-grid__b { width: 18.5%; } .receipt-grid__c { width: 10.5%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 11.0%; }
 .receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -9233,7 +9233,7 @@ td, th { border: none; }
   font-weight: 700;
   font-size: 9px;
   white-space: nowrap;
-  padding-right: 2px !important;
+  padding-right: 4px !important;
   vertical-align: middle;
   background: transparent !important;
 }
@@ -9519,9 +9519,9 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K: B fits «Дансны дугаар:» (no overflow into C); C right-flush «IBAN:»
+// ҮНДСЭН A–K: B fits «Дансны дугаар:»; C wide enough for right-flush «IBAN:»
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 18.0, 9.0, 2.875, 9.75, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  3.0, 18.5, 11.0, 2.875, 8.25, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -9888,7 +9888,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // B = Дансны дугаар:; C = IBAN: (right edge); D:E = short; next = account
+    // B = Дансны дугаар: (alone); C = IBAN: right-flush; D:E = number only
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
@@ -9916,8 +9916,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR3, "E", "E", 5),
   ]);
   pushRow(perBankH, [
-    // B only (not merged) — width fits label so it cannot cover C.
-    // 52 = bold 9pt right — IBAN flush to the right edge of column C.
+    // Do not merge B:C — C must stay free for right-aligned «IBAN:»
     xlsxCellXml(`B${bankR4}`, 15, si("Дансны дугаар:"), "s"),
     xlsxCellXml(`C${bankR4}`, 52, si("IBAN:"), "s"),
     xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
