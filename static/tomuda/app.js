@@ -6057,13 +6057,6 @@ function productBoxQtyTotal(
   }
   return total;
 }
-function productPackLabel(p) {
-  const small = productPackSize(p);
-  const large = productLargeBoxCount(p);
-  if (small && large) return `1 том = ${large} жижиг · 1 жижиг = ${small}ш`;
-  if (small) return `1 жижиг = ${small}ш`;
-  return "";
-}
 function ensureWorkerQtyParts() {
   if (!state.workerQtyParts || typeof state.workerQtyParts !== "object") {
     state.workerQtyParts = {};
@@ -6095,19 +6088,31 @@ function formatOrderQtyParts(
   const lc = product ? productLargeBoxCount(product) : largeCount;
   const p = exclusiveOrderQtyParts(parts, lc);
   const bits = [];
-  if (p.largePacks) bits.push(`${p.largePacks} том`);
-  if (p.packs) bits.push(`${p.packs} жижиг`);
-  if (p.pieces) bits.push(`${p.pieces} ${unit}`);
+  if (p.largePacks) bits.push(`Том хайрцаг ${p.largePacks}`);
+  if (p.packs) bits.push(`Жижиг хайрцаг ${p.packs}`);
+  if (p.pieces) bits.push(`тоо ширхэг ${p.pieces}`);
   if (!bits.length) return empty || `0 ${unit}`;
   return bits.join(" · ");
+}
+/** Захиалгын тоо: «Жижиг хайрцаг 3 · тоо ширхэг 16» гэх мэт. */
+function prepareQtyColsHtml(parts, { largeCount = 0, product = null, unit = "ш" } = {}) {
+  return `<span class="order-qty-parts">${esc(
+    formatOrderQtyParts(parts, { largeCount, product, unit }),
+  )}</span>`;
 }
 function orderLineQtyLabel(item, product) {
   const p =
     product ||
     state.products.find((x) => x.id === item?.productId) ||
     {};
-  const unit = p.unit || item?.unit || "ш";
-  const parts = orderItemPrepareParts(item || {}, p);
+  const total = Math.max(0, Math.floor(Number(item?.quantity) || 0));
+  const hasPack =
+    productPackSize(p) ||
+    productLargeBoxPieceCount(p) ||
+    Number(item?.boxQuantity) > 1 ||
+    Number(item?.largeBoxQuantity) > 1;
+  if (!hasPack) return `${total}`;
+  const parts = orderItemPrepareParts(item, p);
   return formatOrderQtyParts(
     {
       largePacks: parts.largePacks,
@@ -6115,12 +6120,12 @@ function orderLineQtyLabel(item, product) {
       pieces: parts.loosePieces,
     },
     {
-      unit,
       product: p,
       largeCount:
         Number(item?.largeBoxQuantity) > 1
           ? Math.floor(Number(item.largeBoxQuantity))
           : productLargeBoxCount(p),
+      empty: `${total}`,
     },
   );
 }
@@ -6658,24 +6663,17 @@ function syncPickerQtySheetUi(id) {
   const p = state.products.find((x) => x.id === id);
   const totalEl = document.querySelector("[data-picker-qty-total]");
   if (totalEl) totalEl.textContent = `${q} ш`;
-  const partsEl = document.querySelector("[data-picker-qty-parts]");
-  if (partsEl && p) {
+  const partsWrap = document.querySelector("[data-picker-qty-parts]");
+  if (partsWrap && p) {
     const parts = pickerQtyToParts(q, p);
-    partsEl.textContent = formatOrderQtyParts(parts, {
-      unit: p.unit || "ш",
-      product: p,
-    });
+    partsWrap.innerHTML = `${prepareQtyColsHtml(parts, { product: p })}<span class="picker-qty-sheet__total-sep">·</span>Нийт <b data-picker-qty-total>${q} ш</b>`;
   }
   const workerSum = document.querySelector(
     `[data-worker-pack-edit="${CSS.escape(id)}"] .worker-pack-edit__sum`,
   );
   if (workerSum && p) {
     const parts = pickerQtyToParts(q, p);
-    const label = formatOrderQtyParts(parts, {
-      unit: p.unit || "ш",
-      product: p,
-    });
-    workerSum.textContent = `${label} · ${q} ш`;
+    workerSum.innerHTML = `${prepareQtyColsHtml(parts, { product: p })}<span class="worker-pack-edit__pcs">· ${q} ш</span>`;
   }
   updatePickerQtySteppers(id);
   if (pickerOpen()) {
@@ -6741,11 +6739,11 @@ function workerPackQtyEditHtml(p, q) {
   rows.push(
     `<div class="worker-pack-edit__row"><span class="worker-pack-edit__label">Задгай</span>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs) })}</div>`,
   );
-  const partsLabel = formatOrderQtyParts(
+  const partsLabel = prepareQtyColsHtml(
     { largePacks, packs, pieces },
-    { unit: p.unit || "ш", product: p },
+    { product: p },
   );
-  return `<div class="worker-pack-edit" data-worker-pack-edit="${esc(p.id)}">${rows.join("")}<p class="worker-pack-edit__sum">${esc(partsLabel)} · ${q} ш</p><button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
+  return `<div class="worker-pack-edit" data-worker-pack-edit="${esc(p.id)}">${rows.join("")}<div class="worker-pack-edit__sum">${partsLabel}<span class="worker-pack-edit__pcs">· ${q} ш</span></div><button type="button" class="worker-row-done-link" onclick="finishWorkerOrderEdit()">Болсон</button></div>`;
 }
 function workerQtyStepperHtml(p, q) {
   const idAttr = esc(p.id);
@@ -6798,15 +6796,18 @@ function workerOrderQtyHtml(p, q) {
     ? `<button type="button" class="worker-row-remove" onclick="removeWorkerCartProduct('${id}')" aria-label="Хасах">×</button>`
     : "";
   const parts = workerQtyPartsForProduct(p, q);
-  const label = formatOrderQtyParts(
-    {
-      largePacks: parts.largePacks,
-      packs: parts.packs,
-      pieces: parts.loosePieces,
-    },
-    { unit: p.unit || "ш", product: p },
-  );
-  return `<div class="worker-row-qty-wrap"><button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')"><span class="worker-row-qty__n">${esc(label)}</span></button>${removeBtn}</div>`;
+  const qtyHtml =
+    productPackSize(p) || productLargeBoxPieceCount(p)
+      ? prepareQtyColsHtml(
+          {
+            largePacks: parts.largePacks,
+            packs: parts.packs,
+            pieces: parts.loosePieces,
+          },
+          { product: p },
+        )
+      : `<span class="worker-row-qty__n">${q} ${esc(p.unit || "ш")}</span>`;
+  return `<div class="worker-row-qty-wrap"><button type="button" class="worker-row-qty" onclick="setWorkerOrderActive('${id}')">${qtyHtml}</button>${removeBtn}</div>`;
 }
 function removeWorkerCartProduct(id) {
   setWorkerQty(id, 0);
@@ -11021,12 +11022,12 @@ function customerCardPhonesHtml(c) {
     .join("")}</div>`;
 }
 function customerListHead() {
-  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Утас</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
+  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${sub ? `<span class="customer-card__sub">${esc(sub)}</span>` : ""}</div></div></header><div class="customer-card__contact">${customerCardPhonesHtml(c)}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__title-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${customerCardPhonesHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName) {
   if (!customerId) return;
@@ -18358,9 +18359,6 @@ function workerOrdersList() {
   if (state.currentEmployee?.role === "sales") {
     list = list.filter((o) => o.employeeId === state.currentEmployee.id);
   }
-  const pay = state.filters.workerPay;
-  if (pay === "paid") list = list.filter((o) => orderIsPaid(o));
-  if (pay === "unpaid") list = list.filter((o) => !orderIsPaid(o));
   const day = state.filters.workerDate;
   if (day) list = list.filter((o) => orderMatchesWorkerDate(o, day));
   return list.sort(compareOrdersNewestFirst);
@@ -18956,20 +18954,18 @@ function qtyDetail(orders) {
 }
 function detailRow(x) {
   const p = x.product;
-  const label = formatOrderQtyParts(
+  const qtyHtml = prepareQtyColsHtml(
     {
       largePacks: x.largePacks,
       packs: x.packs,
       pieces: x.loosePieces,
     },
     {
-      unit: p.unit || "ш",
       product: p,
       largeCount: x.largeBoxQuantity || productLargeBoxCount(p),
-      empty: `${x.qty} ${p.unit || "ш"}`,
     },
   );
-  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><b class="text-sm shrink-0">${esc(label)}</b></div>`;
+  return `<div class="detail-row flex items-center gap-3 px-3 py-2"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb shrink-0" width="48" height="48" loading="lazy" decoding="async" alt=""><div class="min-w-0 flex-1"><p class="font-medium truncate text-sm">${p.name || "-"}</p></div><div class="detail-row__qty shrink-0">${qtyHtml}</div></div>`;
 }
 function customerDistrictKhoroo(c) {
   return [c?.district, c?.khoroo].filter(Boolean).join(" · ");
@@ -19322,11 +19318,9 @@ function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = ""
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
   const remain = Math.max(0, productStockWithEditCredit(p.id) - p.qty);
-  const packLabel = productPackLabel(p);
   const lineTotal = p.price * p.qty;
   const tags = [
     p.category ? `<span>${esc(p.category)}</span>` : "",
-    packLabel ? `<span>${esc(packLabel)}</span>` : "",
     `<span>Үлд ${remain}</span>`,
   ]
     .filter(Boolean)
@@ -19338,12 +19332,11 @@ function workerOrders(orders) {
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
     orderCount = orders.length,
     day = state.filters.workerDate || "",
-    pay = state.filters.workerPay,
     today = todayIso(),
     todayActive = day === today,
     todayBtnClass = `worker-orders-filters__chip${todayActive ? " is-active" : ""}`;
   // Өнөөдөр must always be clickable — even when a past date is selected.
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"><select onchange="setWorkerPayFilter(this.value)"${pageToolbarSelectHandlers()} class="px-3 py-2 bg-secondary rounded text-sm app-input"><option value="all" ${pay === "all" ? "selected" : ""}>Бүгд</option><option value="paid" ${pay === "paid" ? "selected" : ""}>Төлсөн</option><option value="unpaid" ${pay === "unpaid" ? "selected" : ""}>Төлөөгүй</option></select></div><div class="line-list line-list--scroll">${orders.length ? orders.map(workerOrderListRow).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"></div><div class="line-list line-list--scroll">${orders.length ? orders.map(workerOrderListRow).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
 }
 function workerOrderDetail(id) {
   openWorkerOrderEdit(id);
@@ -22763,7 +22756,6 @@ function pickerQtySheetHtml(productId) {
   const id = esc(p.id);
   const q = getWorkerQty(p.id);
   const packSize = productPackSize(p);
-  const largeCount = productLargeBoxCount(p);
   const largePieces = productLargeBoxPieceCount(p);
   const { largePacks, packs, pieces } = pickerQtyToParts(q, p);
   let qtyBody;
@@ -22771,51 +22763,38 @@ function pickerQtySheetHtml(productId) {
     const rows = [];
     if (largePieces) {
       rows.push(
-        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Том хайрцаг</span><span class="picker-qty-sheet__row-hint">1 том = ${largeCount} жижиг (${largePieces}ш)</span></div>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces), sheet: true })}</div>`,
+        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Том хайрцаг</span></div>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces), sheet: true })}</div>`,
       );
     }
     if (packSize) {
       rows.push(
-        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Жижиг хайрцаг</span><span class="picker-qty-sheet__row-hint">1 жижиг = ${packSize}ш</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div>`,
+        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Жижиг хайрцаг</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces), sheet: true })}</div>`,
       );
     }
     rows.push(
       `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Задгай ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs), sheet: true })}</div>`,
     );
-    const partsLabel = formatOrderQtyParts(
+    const partsLabel = prepareQtyColsHtml(
       { largePacks, packs, pieces },
-      { unit: p.unit || "ш", product: p },
+      { product: p },
     );
-    qtyBody = `<div class="picker-qty-sheet__qty">${rows.join("")}<p class="picker-qty-sheet__total">Захиалга: <b data-picker-qty-parts>${esc(partsLabel)}</b> · Нийт <b data-picker-qty-total>${q} ш</b></p></div>`;
+    qtyBody = `<div class="picker-qty-sheet__qty">${rows.join("")}<p class="picker-qty-sheet__total" data-picker-qty-parts>${partsLabel}<span class="picker-qty-sheet__total-sep">·</span>Нийт <b data-picker-qty-total>${q} ш</b></p></div>`;
   } else {
     qtyBody = `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
   }
   const promoHtml = "";
   const stockHave = productStockWithEditCredit(p.id);
-  const packMeta = productPackLabel(p)
-    ? `<span class="picker-qty-sheet__meta-sep">·</span><span>${esc(productPackLabel(p))}</span>`
-    : "";
-  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${stockHave} ${esc(p.unit || "ш")}${packMeta}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
+  return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${stockHave} ${esc(p.unit || "ш")}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
     inCart = q > 0,
     left = productStockWithEditCredit(p.id) - q,
     promoHint = pickerProductPromoHintHtml(p),
-    packLabel = productPackLabel(p),
-    packMeta = packLabel
-      ? `<span class="picker-row__meta-sep">·</span><span class="picker-row__value--pack">${esc(packLabel)}</span>`
-      : "",
-    qtyLabel = inCart
-      ? formatOrderQtyParts(pickerQtyToParts(q, p), {
-          unit: p.unit || "ш",
-          product: p,
-        })
-      : "",
     qtyBadge = inCart
-      ? `<span class="picker-row__qty" aria-label="Сонгосон ${esc(qtyLabel)}">${esc(qtyLabel)}</span>`
+      ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
       : "";
-  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="picker-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${packMeta}${promoHint}</span></div>${qtyBadge}</button>`;
+  return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="picker-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${promoHint}</span></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = cat || "";

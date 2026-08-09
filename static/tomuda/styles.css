@@ -605,9 +605,8 @@ textarea.text-sm,
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     "head actions"
-    "contact actions"
     "addr actions";
-  gap: 6px 10px;
+  gap: 8px 4px;
   align-items: center;
   padding: 10px 4px 10px 0;
   border-radius: 0;
@@ -1048,19 +1047,17 @@ textarea.text-sm,
 
 .customer-card__title-row {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: baseline;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   min-width: 0;
 }
 
 .customer-card__name {
-  flex: 0 1 auto;
-  max-width: 55%;
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.25;
   color: var(--hex-foreground);
@@ -1072,12 +1069,12 @@ textarea.text-sm,
 .customer-card__phones {
   flex: 0 1 auto;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 4px 10px;
   min-width: 0;
-  max-width: none;
+  max-width: 58%;
 }
 
 .customer-card__phone-link {
@@ -1112,21 +1109,13 @@ textarea.text-sm,
 }
 
 .customer-card__sub {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.25;
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.3;
   color: var(--hex-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.customer-card__contact {
-  grid-area: contact;
-  min-width: 0;
 }
 
 .customer-card__phone,
@@ -1185,11 +1174,11 @@ a.customer-card__line .customer-card__icon {
 .customer-card__actions {
   grid-area: actions;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
   flex-shrink: 0;
   padding: 0;
   margin: 0;
@@ -1497,23 +1486,18 @@ img.worker-pick-card__avatar {
 
 .list-panel--customers .customer-card__avatar,
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 64px;
-  height: 64px;
-  min-width: 64px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
   border-radius: 0;
-  border: none;
-  box-shadow: none;
-  overflow: hidden;
 }
 
 .list-panel--customers .customer-card__avatar {
-  font-size: 22px;
-  background: var(--hex-primary);
-  color: var(--hex-primary-foreground);
+  font-size: 20px;
 }
 
 .list-panel--customers .customer-card__avatar-img {
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   background: transparent;
 }
@@ -3054,13 +3038,13 @@ img[data-product-img],
 
   .customer-list__head {
     display: grid;
-    grid-template-columns: minmax(220px, 1.15fr) minmax(110px, 0.45fr) minmax(
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(
         200px,
-        1.25fr
-      ) auto;
-    gap: 12px 16px;
+        auto
+      );
+    gap: 16px;
     align-items: center;
-    padding: 8px 16px;
+    padding: 10px 16px;
     background: var(--hex-secondary);
     color: var(--hex-muted-foreground);
     font-size: 12px;
@@ -3068,7 +3052,7 @@ img[data-product-img],
     letter-spacing: 0.02em;
     text-transform: none;
     border-bottom: 1px solid var(--hex-border);
-    min-height: 0;
+    min-height: calc(108px + 20px);
   }
 
   .customer-list__head-actions {
@@ -3077,14 +3061,11 @@ img[data-product-img],
 
   .customer-card {
     display: grid;
-    grid-template-columns: minmax(220px, 1.15fr) minmax(110px, 0.45fr) minmax(
-        200px,
-        1.25fr
-      ) auto;
-    grid-template-areas: "head contact addr actions";
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) auto;
+    grid-template-areas: "head addr actions";
     gap: 12px 16px;
     align-items: center;
-    min-height: 0;
+    min-height: calc(108px + 20px);
     padding: 10px 16px;
     border-radius: 0;
     border: none;
@@ -3094,57 +3075,42 @@ img[data-product-img],
 
   .list-panel--customers .customer-card__avatar,
   .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-    width: 64px;
-    height: 64px;
-    min-width: 64px;
-    border-radius: 0;
-    border: none;
-    box-shadow: none;
-    background: var(--hex-primary);
+    width: 108px;
+    height: 108px;
+    min-width: 108px;
+    border-radius: 8px;
+    border: 1px solid var(--hex-border);
+    background: #fff;
   }
 
   .list-panel--customers .customer-card__avatar {
-    font-size: 22px;
-  }
-
-  .list-panel--customers .customer-card__avatar-img {
-    background: transparent;
+    font-size: 28px;
   }
 
   .customer-card__head {
     grid-area: head;
-    gap: 12px;
+    gap: 14px;
   }
 
   .customer-card__name {
-    max-width: none;
-    flex: 0 1 auto;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.25;
   }
 
   .customer-card__sub {
-    flex: 1 1 auto;
-    margin: 0;
+    margin: 2px 0 0;
     font-size: 12px;
-    line-height: 1.25;
-  }
-
-  .customer-card__contact {
-    grid-area: contact;
+    line-height: 1.3;
   }
 
   .customer-card__phones {
-    font-size: 13px;
-    max-width: none;
-    justify-content: flex-start;
+    font-size: 12px;
   }
 
   .customer-card__line {
-    font-size: 13px;
-    line-height: 1.3;
-    align-items: center;
+    font-size: 12px;
+    line-height: 1.35;
   }
 
   .customer-card__addr {
@@ -3154,11 +3120,10 @@ img[data-product-img],
 
   .customer-card__actions {
     grid-area: actions;
-    flex-direction: row;
-    justify-content: flex-end;
+    flex-direction: column;
+    justify-content: center;
     justify-self: end;
     flex-wrap: nowrap;
-    gap: 6px;
     padding: 0;
     margin: 0;
     border-top: none;
@@ -8309,6 +8274,34 @@ textarea::placeholder {
   box-shadow: none !important;
 }
 
+.worker-row-qty .order-qty-parts {
+  max-width: 140px;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.order-qty-parts {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+}
+
+.detail-row__qty {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 46%;
+  text-align: right;
+}
+
+.detail-row__qty .order-qty-parts {
+  font-size: 13px;
+}
+
 .worker-row-qty-wrap {
   display: flex;
   align-items: center;
@@ -8402,11 +8395,21 @@ textarea::placeholder {
 }
 
 .worker-pack-edit__sum {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0;
   font-size: 12px;
   font-weight: 700;
   color: var(--hex-foreground);
   text-align: right;
+}
+
+.worker-pack-edit__pcs {
+  color: var(--hex-muted-foreground);
+  font-weight: 600;
 }
 
 .worker-pack-edit .picker-qty-stepper {
@@ -9536,15 +9539,29 @@ textarea::placeholder {
 }
 
 .picker-qty-sheet__total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin: 0;
   text-align: center;
   font-size: 14px;
   color: var(--hex-muted-foreground);
 }
 
+.picker-qty-sheet__total-sep {
+  color: #8a94a6;
+}
+
 .picker-qty-sheet__total b {
   font-size: 20px;
   font-weight: 800;
+  color: var(--hex-foreground);
+}
+
+.picker-qty-sheet__total .order-qty-parts {
+  font-size: 14px;
   color: var(--hex-foreground);
 }
 
