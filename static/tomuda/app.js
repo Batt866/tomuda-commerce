@@ -4913,6 +4913,8 @@ function finishPromotionSave(kind) {
           ? "Төлбөрийн урамшуулал хадгалагдлаа"
           : "Урамшуулал хадгалагдлаа";
   resetPromotionModalDraft(kind);
+  // Шинэ/зассан дүрмийг авсан захиалгууд дээр шууд бодоод бэлэг нэмнэ.
+  healOrdersMissingPromoItems();
   closeModal();
   render();
   showAppToast(msg, "success");
@@ -5161,6 +5163,7 @@ function applyPersistentState(data) {
   normalizeOrderTotals();
   healOrderCustomerNames();
   normalizeProductUnitsInState();
+  healOrdersMissingPromoItems();
   return true;
 }
 function applyDeletionLogToCollections() {
@@ -11318,19 +11321,17 @@ function customerCardPhonesHtml(c) {
   return `<div class="customer-card__phones">${phones
     .map(
       (phone) =>
-        `<button type="button" class="customer-card__phone-link" data-phone="${esc(phone)}" onclick="event.stopPropagation();dialPhoneNumber(this.getAttribute('data-phone'))" aria-label="Залгах ${esc(phone)}">${customerCardPhoneIcon()}<span>${esc(phone)}</span></button>`,
+        `<button type="button" class="customer-card__phone-link" data-phone="${esc(phone)}" onclick="dialPhoneNumber(this.getAttribute('data-phone'))" aria-label="Залгах ${esc(phone)}">${customerCardPhoneIcon()}<span>${esc(phone)}</span></button>`,
     )
     .join("")}</div>`;
 }
 function customerListHead() {
-  return `<div class="customer-list__head" aria-hidden="true"><span class="customer-list__col customer-list__col--name">Харилцагч</span><span class="customer-list__col customer-list__col--phone">Утас</span><span class="customer-list__col customer-list__col--addr">Хаяг</span><span class="customer-list__col customer-list__col--actions">Үйлдэл</span></div>`;
+  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
-  const id = esc(c.id);
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  const phones = customerCardPhonesHtml(c);
-  return `<article class="customer-card customer-card--clickable${active ? " customer-card--active" : ""}" data-customer-id="${id}" role="button" tabindex="0" onclick="customerDetail('${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();customerDetail('${id}')}"><div class="customer-card__main"><span class="customer-card__media" aria-hidden="true">${customerAvatarHtml(c, "customer-card__img")}</span><div class="customer-card__copy"><p class="customer-card__title">${esc(customerDisplayName(c))}</p>${sub ? `<p class="customer-card__subtitle">${esc(sub)}</p>` : `<p class="customer-card__subtitle">—</p>`}</div></div><div class="customer-card__fields"><div class="customer-card__phone-cell">${phones}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div></div>${actionsHtml ? `<div class="customer-card__actions" onclick="event.stopPropagation()">${actionsHtml}</div>` : ""}</article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div>${customerCardPhonesHtml(c)}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName) {
   if (!customerId) return;
@@ -12122,23 +12123,21 @@ function customerRow(c) {
   const id = esc(c.id);
   const editBtn = canEditCustomer()
     ? editIconButton({
-        className:
-          "customer-card__action-btn customer-card__action-btn--edit",
+        className: "customer-card__icon-btn",
         attrs: `onclick="confirmEditCustomer('${id}')"`,
         label: "Харилцагч засах",
       })
     : "";
   const deleteBtn = canDelete()
     ? deleteIconButton({
-        className:
-          "customer-card__action-btn customer-card__action-btn--delete",
+        className: "customer-card__icon-btn",
         attrs: `data-confirm-delete="customer" data-id="${id}"`,
         label: "Харилцагч устгах",
       })
     : "";
   return customerListRow(
     c,
-    `${editBtn}${deleteBtn}`,
+    `${viewIconButton({ className: "customer-card__icon-btn", attrs: `onclick="customerDetail('${id}')"`, label: "Харах" })}${editBtn}${deleteBtn}`,
     state.customerHighlightId === c.id,
   );
 }
@@ -15837,7 +15836,7 @@ function warehouseOrderProductsGrouped(orders, opts = {}) {
   const promoOnly = !!opts.promoOnly;
   const map = {};
   orders.forEach((o) =>
-    o.items.forEach((i) => {
+    orderItemsWithPromos(o).forEach((i) => {
       if (!!i.isPromoFree !== promoOnly) return;
       const key = i.productId || i.productName;
       if (!map[key]) {
@@ -15963,12 +15962,18 @@ function xlsxBarcodeCell(ref, styleId, barcode, si) {
 }
 function warehousePrepareBarcodeCell(ref, barcode, si) {
   const text = String(barcode ?? "").trim();
-  if (!text) return xlsxCellXml(ref, 9, null, "empty");
-  return xlsxCellXml(ref, 9, text, "inlineStr");
+  // Style 8: single-line shrink-to-fit body text (patched in styles).
+  if (!text) return xlsxCellXml(ref, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, null, "empty");
+  return xlsxCellXml(ref, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
-/** A name · B unit · C barcode · D Том/х · E Жижиг/х · F Тоо/ш · G Үлдэгдэл — sample proportions. */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [28, 9, 12, 8.5, 10.5, 8.5, 11.5];
+/**
+ * A4 sample (Агуулах бэлдэх): fixed widths so «Хэмжих нэгж» / «ширхэг»
+ * stay on one line without clipping when fitToWidth scales the sheet.
+ */
+const WAREHOUSE_PREPARE_COL_WIDTHS = [
+  24.5, 12.5, 13.5, 8.5, 10.5, 8.5, 11.5,
+];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -15978,40 +15983,14 @@ const WAREHOUSE_PREPARE_SMALL_HEAD_STYLE = 22;
 const WAREHOUSE_PREPARE_SMALL_CELL_STYLE = 23;
 const WAREHOUSE_PREPARE_PIECE_HEAD_STYLE = 24;
 const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
-/** Wrapped header for «Хэмжих\nнэгж». */
-const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 26;
+/** Patched template styles: single-line header / body text (shrink, no wrap). */
+const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
+const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
 const WAREHOUSE_PREPARE_GRAY_LARGE = "FFE4E7EB";
 const WAREHOUSE_PREPARE_GRAY_SMALL = "FFC5CAD0";
 const WAREHOUSE_PREPARE_GRAY_PIECE = "FFA3AAB3";
-function warehousePrepareMaxBarcodeLen(sections) {
-  let maxLen = String("Баркод").length;
-  const scan = (groups) => {
-    for (const item of groups || []) {
-      if (item?.type === "cat") continue;
-      const n = String(item?.product?.barcode || "").trim().length;
-      if (n > maxLen) maxLen = n;
-    }
-  };
-  scan(sections?.regular);
-  scan(sections?.promo);
-  return maxLen;
-}
-/** Column widths tuned for A4; Жижиг/х stays on one line. */
-function warehousePrepareColWidthsFor(sections) {
-  const barcodeChars = warehousePrepareMaxBarcodeLen(sections);
-  const barcodeW = Math.min(
-    14,
-    Math.max(11, Math.round(barcodeChars * 1.02) + 0.5),
-  );
-  return [
-    WAREHOUSE_PREPARE_COL_WIDTHS[0],
-    WAREHOUSE_PREPARE_COL_WIDTHS[1],
-    barcodeW,
-    WAREHOUSE_PREPARE_COL_WIDTHS[3],
-    WAREHOUSE_PREPARE_COL_WIDTHS[4],
-    WAREHOUSE_PREPARE_COL_WIDTHS[5],
-    WAREHOUSE_PREPARE_COL_WIDTHS[6],
-  ];
+function warehousePrepareColWidthsFor() {
+  return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
 }
 function warehousePrepareGrayFillXml(rgb) {
   return `<fill><patternFill patternType="solid"><fgColor rgb="${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
@@ -16059,26 +16038,30 @@ function warehousePreparePatchStylesXml(stylesXml) {
     WAREHOUSE_PREPARE_GRAY_PIECE,
   );
 
-  // Table headers (style 7): center + wrap for multi-line labels.
-  const headerXfNoWrap =
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" /></xf>';
-  const headerXfWrap =
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>';
-  if (out.includes(headerXfNoWrap)) out = out.replace(headerXfNoWrap, headerXfWrap);
+  // Table headers (style 7): single line, shrink — never wrap down.
+  const headerXfPlain =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+  const headerXfSingle =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>';
+  if (out.includes(headerXfPlain)) out = out.replace(headerXfPlain, headerXfSingle);
 
-  // Dedicated unit-header xf (appended after qty styles) — always wrap.
-  // (actual xf string is appended below with shrinkToFit marker)
-
-  // Qty numbers: center (sample).
+  // Qty / stock numbers: center (sample).
   const numStyleLeft =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
   const numStyleRight =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top" /></xf>';
   const numStyleCenter =
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>';
   if (out.includes(numStyleLeft)) out = out.replace(numStyleLeft, numStyleCenter);
   else if (out.includes(numStyleRight))
     out = out.replace(numStyleRight, numStyleCenter);
+
+  // Name / unit / barcode body: never wrap to a second line.
+  const textCellLeft =
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
+  const textCellSingle =
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>';
+  if (out.includes(textCellLeft)) out = out.replace(textCellLeft, textCellSingle);
 
   // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
@@ -16098,9 +16081,9 @@ function warehousePreparePatchStylesXml(stylesXml) {
   const signXf =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
   const qtyHeadXf = (fillId) =>
-    `<xf numFmtId="0" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
+    `<xf numFmtId="0" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`;
   const qtyCellXf = (fillId) =>
-    `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
+    `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
 
   const appendXfs = [];
   if (!out.includes(signXf)) appendXfs.push(signXf);
@@ -16109,12 +16092,6 @@ function warehousePreparePatchStylesXml(stylesXml) {
     const cell = qtyCellXf(fillId);
     if (!out.includes(head)) appendXfs.push(head);
     if (!out.includes(cell)) appendXfs.push(cell);
-  }
-  // Unique xf for unit header (wrap + marker) — style id 26 after qty pair append.
-  if (!out.includes('applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" shrinkToFit="0"/>')) {
-    appendXfs.push(
-      '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" shrinkToFit="0"/></xf>',
-    );
   }
   if (appendXfs.length) {
     out = out.replace(
@@ -16261,13 +16238,13 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   }
   pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
-  // Two-line unit header: explicit break so print/fitToWidth cannot clip «Хэмжих нэгж».
-  pushRow(46, [
+  // Single-line headers (sample layout + no downward wrap / clipped unit).
+  pushRow(28.5, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(
       `B${headerRow}`,
       WAREHOUSE_PREPARE_UNIT_HEAD_STYLE,
-      si("Хэмжих\nнэгж"),
+      si("Хэмжих нэгж"),
       "s",
     ),
     xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
@@ -16291,6 +16268,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ),
     xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл (ш)"), "s"),
   ]);
+  const textSi = WAREHOUSE_PREPARE_TEXT_CELL_STYLE;
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
       if (item.type === "cat") {
@@ -16311,8 +16289,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       const parts = warehousePreparePrintParts(item, p);
       const r = rowNum;
       pushRow(15, [
-        xlsxCellXml(`A${r}`, 8, si(p.name || ""), "s"),
-        xlsxCellXml(`B${r}`, 8, si(p.unit || "ширхэг"), "s"),
+        xlsxCellXml(`A${r}`, textSi, si(p.name || ""), "s"),
+        xlsxCellXml(`B${r}`, textSi, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
         xlsxPrepareQtyCell(
           `D${r}`,
@@ -16366,7 +16344,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     rows,
     merges,
     lastRow,
-    warehousePrepareColWidthsFor(sections),
+    warehousePrepareColWidthsFor(),
   );
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
@@ -16432,44 +16410,43 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-@page { size: A4 portrait; margin: 8mm 6mm; }
+@page { size: A4 portrait; margin: 10mm 7mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
-table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
-.prepare col.c-name { width: 31%; }
-.prepare col.c-unit { width: 11%; }
-.prepare col.c-barcode { width: 13%; }
-.prepare col.c-large { width: 10%; }
-.prepare col.c-small { width: 12%; }
-.prepare col.c-piece { width: 10%; }
-.prepare col.c-stock { width: 13%; }
-.prepare td, .prepare th { border: 1px solid #444; padding: 3px 5px; vertical-align: middle; }
-.prepare td.name { overflow-wrap: anywhere; text-align: left; }
-.prepare td.unit { text-align: center; }
-.title { height: 48px; text-align: center; font-size: 22px; font-weight: 800; border: none !important; }
-.meta-label { text-align: left; font-weight: 700; white-space: nowrap; border: none !important; }
+table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.prepare col.c-name { width: 28%; }
+.prepare col.c-unit { width: 14%; }
+.prepare col.c-barcode { width: 15%; }
+.prepare col.c-large { width: 9%; }
+.prepare col.c-small { width: 11%; }
+.prepare col.c-piece { width: 9%; }
+.prepare col.c-stock { width: 14%; }
+.prepare td, .prepare th { border: 1px solid #444; padding: 2px 4px; vertical-align: middle; }
+.prepare td.name,
+.prepare td.unit,
+.prepare td.barcode { text-align: left; white-space: nowrap; overflow: visible; }
+.prepare td.unit { text-align: left; }
+.title { height: 44px; text-align: center; font-size: 20px; font-weight: 800; border: none !important; }
+.meta-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
 .meta-value { font-weight: 400; white-space: nowrap; border: none !important; }
-.date-label { text-align: right; font-weight: 700; white-space: nowrap; border: none !important; }
+.date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 48px; text-align: center; font-size: 12px; font-weight: 800; border: 1.5px solid #000; white-space: normal; line-height: 1.15; background: #f3f3f3; overflow: visible; }
-.head th.unit-head { white-space: normal; line-height: 1.2; padding-top: 4px; padding-bottom: 4px; }
-.head th.qty-large,
-.head th.qty-small,
-.head th.qty-piece { white-space: nowrap; }
+.head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
+.head th.unit-head { white-space: nowrap; }
 .head th.qty-large { background: #e4e7eb; white-space: nowrap; }
 .head th.qty-small { background: #c5cad0; white-space: nowrap; }
 .head th.qty-piece { background: #a3aab3; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; }
+.cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; white-space: nowrap; }
 .promo-head { border-top: 2px solid #000 !important; }
-.barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; }
-.num { text-align: center; font-weight: 700; }
+.barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
+.num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #e4e7eb; }
 .num.qty-small { background: #c5cad0; }
 .num.qty-piece { background: #a3aab3; }
 .num.qty-large:empty,
 .num.qty-small:empty,
 .num.qty-piece:empty { font-weight: 400; }
-.stock { font-weight: 600; background: #fff; }
+.stock { font-weight: 700; background: #fff; white-space: nowrap; }
 .spacer td { height: 18px; border: none !important; }
 .sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
@@ -16480,7 +16457,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 <tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value" colspan="2">${h(warehouseEmp)}</td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td colspan="7"></td></tr>
-<tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих<br>нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
+<tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
 <tr><td class="sign-label">Хүлээн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
@@ -18831,18 +18808,78 @@ function orderPromotionLines(paidItems, paymentTerm) {
     paymentTerm || "cash",
   ).filter((line) => line.isPromoFree);
 }
-function orderItemsWithPromos(o) {
+function orderPaidItems(o) {
+  return (o?.items || [])
+    .filter((line) => !line?.isPromoFree)
+    .map((line) => ({ ...line }));
+}
+function promoItemsFingerprint(items) {
+  return (items || [])
+    .filter((line) => line?.isPromoFree)
+    .map((line) => {
+      const id = String(line.productId || line.productName || "");
+      const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+      const kind = line.isPricePromo
+        ? "price"
+        : line.isPaymentPromo
+          ? "payment"
+          : "qty";
+      return `${id}:${qty}:${kind}`;
+    })
+    .sort()
+    .join("|");
+}
+/** Paid lines + үнэгүй урамшуулал одоогийн дүрмээр (хадгалсан хуучин бэлгийг орлоно). */
+function rebuildOrderItemsWithPromos(o) {
   if (!o) return [];
-  const items = (o.items || []).map((line) => ({ ...line })),
-    paid = items.filter((line) => !line.isPromoFree),
-    existingPromo = items.filter((line) => line.isPromoFree),
-    existingPromoKeys = new Set(
-      existingPromo.map((line) => String(line.productId || "")),
-    ),
-    generatedPromo = orderPromotionLines(paid, o.paymentTerm).filter(
-      (line) => !existingPromoKeys.has(String(line.productId || "")),
-    );
-  return [...paid, ...existingPromo, ...generatedPromo];
+  const paid = orderPaidItems(o);
+  const generated = orderPromotionLines(paid, o.paymentTerm || "cash");
+  return [...paid, ...generated];
+}
+function orderItemsWithPromos(o) {
+  return rebuildOrderItemsWithPromos(o);
+}
+/**
+ * Авсан захиалгууд дээр одоогийн урамшууллын дүрмийг дахин бодоод
+ * үнэгүй барааг items-д нэмнэ/шинэчилнэ. Үлдэгдлийг зөрүүгээр засварлана.
+ */
+function syncOrderPromoItemsFromRules(o, { adjustStock = true } = {}) {
+  if (!o || o.status === "cancelled") return false;
+  const paid = orderPaidItems(o);
+  if (!paid.length) return false;
+  const generated = orderPromotionLines(paid, o.paymentTerm || "cash");
+  // Дүрэм одоогоор юу ч олгохгүй бол хуучин бэлгийг бүү устга (дүрэм ачаалаагүй байж болно).
+  if (!generated.length) return false;
+  const next = [...paid, ...generated];
+  const nextFp = promoItemsFingerprint(next);
+  if (promoItemsFingerprint(o.items) === nextFp) {
+    if (!o.promoItemsFingerprint) o.promoItemsFingerprint = nextFp;
+    return false;
+  }
+  const before = (o.items || []).map((line) => ({ ...line }));
+  // Нэг fingerprint дээр үлдэгдлийг дахин бүү хас (merge/heal давхардал).
+  if (adjustStock && o.promoStockFingerprint !== nextFp) {
+    adjustReceiptEditStock(before, next);
+    o.promoStockFingerprint = nextFp;
+  }
+  o.items = next;
+  o.promoItemsFingerprint = nextFp;
+  recalcOrderTotals(o);
+  return true;
+}
+function syncAllOrdersPromoItemsFromRules(opts = {}) {
+  let changed = 0;
+  (state.orders || []).forEach((o) => {
+    if (syncOrderPromoItemsFromRules(o, opts)) changed += 1;
+  });
+  return changed;
+}
+function healOrdersMissingPromoItems() {
+  const changed = syncAllOrdersPromoItemsFromRules({ adjustStock: true });
+  if (changed > 0 && typeof scheduleBackendSave === "function") {
+    scheduleBackendSave();
+  }
+  return changed;
 }
 function workerCartSummary() {
   const paid = workerPaidLines(),
@@ -19947,7 +19984,7 @@ function clearDeliveryEmployee() {
 function qtyDetail(orders) {
   const map = {};
   orders.forEach((o) =>
-    o.items.forEach((i) => {
+    orderItemsWithPromos(o).forEach((i) => {
       const key = i.productId || i.productName;
       if (!map[key]) {
         map[key] = {
