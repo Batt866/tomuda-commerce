@@ -17494,11 +17494,10 @@ function promoConditionSectionHtml({
 }
 function promotionQtyField(name, label, defaultValue, variant = false) {
   const draftVal = promoFormDraftVal(name, "");
-  const val = draftVal !== "" ? ` value="${esc(draftVal)}"` : "";
-  const ph =
-    defaultValue !== undefined && defaultValue !== ""
-      ? String(defaultValue)
-      : "1";
+  const fallback = String(defaultValue ?? "1");
+  const filled = draftVal !== "" ? draftVal : fallback;
+  const val = ` value="${esc(filled)}"`;
+  const ph = fallback || "1";
   const mode =
     variant === "bar" ? "bar" : variant === true || variant === "inline" ? "inline" : "block";
   const cls =
@@ -17803,6 +17802,55 @@ function productQuantityPromoRules(productId) {
 }
 function workerQuantityPromoHintsHtml(cart) {
   return "";
+}
+function workerAmountPromoHintsHtml(cart) {
+  if (!cart?.paid?.length) return "";
+  const gross = Number(cart.gross) || 0;
+  const priceRule = cart.priceRule || matchingPricePromotionRule(gross);
+  const paymentRule =
+    cart.paymentRule || matchingPaymentPromotionRule(gross, state.paymentTerm);
+  const parts = [];
+  const describeFree = (rule) => {
+    const names = promotionProductLabels(promotionFreeProductIds(rule));
+    const qty = Math.max(1, Math.floor(Number(rule.freeQty) || 1));
+    return names ? `${names} × ${qty} ш үнэгүй` : `${qty} ш үнэгүй бараа`;
+  };
+  if (priceRule && promotionFreeProductIds(priceRule).length) {
+    const active = pricePromotionAmountInRange(gross, priceRule);
+    if (active) {
+      parts.push(
+        `<p class="worker-order-stats__promo is-active">Нийт дүнгийн урамшуулал: <b>${esc(describeFree(priceRule))}</b></p>`,
+      );
+    }
+  } else {
+    // Closest upcoming price free-gift rule (not yet reached).
+    let next = null;
+    (state.promotionRules.price || []).forEach((r) => {
+      if (!promotionFreeProductIds(r).length) return;
+      if (r.type === "percent") return;
+      const min = Number(r.minAmount) || 0;
+      if (min <= 0 || gross >= min) return;
+      if (!next || min < (Number(next.minAmount) || 0)) next = r;
+    });
+    if (next) {
+      const need = Math.max(0, (Number(next.minAmount) || 0) - gross);
+      parts.push(
+        `<p class="worker-order-stats__promo">Нийт дүнгийн урамшуулал хүртэл: <b>${fmt(need)}</b> · ${esc(describeFree(next))}</p>`,
+      );
+    }
+  }
+  if (
+    paymentRule &&
+    promotionFreeProductIds(paymentRule).length &&
+    (paymentRule.type === "free" ||
+      (promotionFreeProductIds(paymentRule).length &&
+        !paymentRule.discountPercent))
+  ) {
+    parts.push(
+      `<p class="worker-order-stats__promo is-active">Төлбөрийн урамшуулал: <b>${esc(describeFree(paymentRule))}</b></p>`,
+    );
+  }
+  return parts.join("");
 }
 function pickerProductPromoHintHtml(p) {
   return "";
@@ -18459,14 +18507,21 @@ function savePromotionQty(e) {
     if (submitBtn) submitBtn.disabled = false;
   }
 }
+function pricePromotionAmountInRange(gross, rule) {
+  if (!rule || rule.minAmount == null) return false;
+  const amount = Number(gross) || 0;
+  const min = Number(rule.minAmount) || 0;
+  const max = Number(rule.maxAmount) || 0;
+  if (amount < min) return false;
+  // Дээд дүн = "хүртэл" (inclusive). Хоосон = хязгааргүй.
+  if (max > 0 && amount > max) return false;
+  return true;
+}
 function matchingPricePromotionRule(gross) {
   let best = null;
   (state.promotionRules.price || []).forEach((r) => {
-    if (r.minAmount == null) return;
-    const min = Number(r.minAmount) || 0,
-      max = Number(r.maxAmount) || 0;
-    if (gross < min) return;
-    if (max > 0 && gross > max) return;
+    if (!pricePromotionAmountInRange(gross, r)) return;
+    const min = Number(r.minAmount) || 0;
     if (!best || min > (Number(best.minAmount) || 0)) best = r;
   });
   return best;
@@ -18479,6 +18534,13 @@ function pricePromotionDiscountAmount(gross, rule) {
   if (!isPercent) return 0;
   return Math.round((gross * Number(rule.discountPercent || 0)) / 100);
 }
+function findProductByIdLoose(id) {
+  const want = String(id ?? "").trim();
+  if (!want) return null;
+  return (
+    state.products.find((p) => String(p?.id ?? "").trim() === want) || null
+  );
+}
 /**
  * Add free promo lines for the full grant qty.
  * Stock is NOT truncated here — paid+promo must fit warehouse via orderStockIssues / maxWorkerPaidQty.
@@ -18486,31 +18548,31 @@ function pricePromotionDiscountAmount(gross, rule) {
 function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
   const grantWanted = Math.max(0, Math.floor(Number(freeQty) || 0));
   if (grantWanted < 1) return result;
-  const ids = (Array.isArray(freeIds) ? freeIds : []).filter(Boolean);
+  const ids = (Array.isArray(freeIds) ? freeIds : [])
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean);
   if (!ids.length) return result;
   // Multiple freeProductIds are alternatives in one pool — grant total freeQty once.
   const targets =
     ids.length === 1
       ? ids
-      : [ids.find((id) => state.products.some((p) => p.id === id))].filter(
-          Boolean,
-        );
+      : [ids.find((id) => !!findProductByIdLoose(id))].filter(Boolean);
   let remaining = grantWanted;
   for (const freeId of targets) {
     if (remaining < 1) break;
-    const product = state.products.find((p) => p.id === freeId);
+    const product = findProductByIdLoose(freeId);
     if (!product) continue;
     const addQty = remaining;
     remaining = 0;
     const existing = result.find(
-      (l) => l.productId === freeId && l.isPromoFree,
+      (l) => String(l.productId) === String(product.id) && l.isPromoFree,
     );
     if (existing) {
       existing.quantity += addQty;
       existing.total = 0;
     } else {
       result.push({
-        productId: freeId,
+        productId: product.id,
         productName: product.name,
         quantity: addQty,
         price: 0,
@@ -18573,6 +18635,7 @@ function workerPaidLines() {
       const packSize = productPackSize(p);
       const largeCount = productLargeBoxCount(p);
       const raw = workerQtyPartsForProduct(p, q);
+      const unitPrice = Number(p.price) || 0;
       return {
         productId: p.id,
         productName: p.name,
@@ -18582,8 +18645,8 @@ function workerPaidLines() {
         loosePieces: raw.loosePieces,
         boxQuantity: packSize || 0,
         largeBoxQuantity: largeCount || 0,
-        price: p.price,
-        total: p.price * q,
+        price: unitPrice,
+        total: unitPrice * q,
       };
     })
     .filter(Boolean);
@@ -18694,16 +18757,24 @@ function savePromotionPrice(e) {
     const type = f.type === "percent" ? "percent" : "free",
       rule = { minAmount, maxAmount, type };
     if (type === "free") {
-      const freeProductIds = formData
+      let freeProductIds = formData
         .getAll("priceFreeProductIds")
+        .map((id) => String(id || "").trim())
         .filter(Boolean);
+      if (!freeProductIds.length) {
+        freeProductIds = promotionPickIds(
+          state.promoPick,
+          "priceFreeProductIds",
+        ).map((id) => String(id || "").trim())
+          .filter(Boolean);
+      }
       if (!freeProductIds.length) {
         alert(`${PROMO_PRODUCT_LABEL} сонгоно уу`);
         return;
       }
       rule.freeProductIds = freeProductIds;
       rule.freeProductId = freeProductIds[0];
-      rule.freeQty = Number(f.freeQty) || 1;
+      rule.freeQty = Math.max(1, Math.floor(Number(f.freeQty) || 1));
     } else {
       const pct = Number(f.discountPercent);
       if (!pct || pct < 1 || pct > 100) {
@@ -18741,16 +18812,25 @@ function savePromotionPayment(e) {
         type,
       };
     if (type === "free") {
-      const freeProductIds = formData
+      let freeProductIds = formData
         .getAll("paymentFreeProductIds")
+        .map((id) => String(id || "").trim())
         .filter(Boolean);
+      if (!freeProductIds.length) {
+        freeProductIds = promotionPickIds(
+          state.promoPick,
+          "paymentFreeProductIds",
+        )
+          .map((id) => String(id || "").trim())
+          .filter(Boolean);
+      }
       if (!freeProductIds.length) {
         alert(`${PROMO_PRODUCT_LABEL} сонгоно уу`);
         return;
       }
       rule.freeProductIds = freeProductIds;
       rule.freeProductId = freeProductIds[0];
-      rule.freeQty = Number(f.freeQty) || 1;
+      rule.freeQty = Math.max(1, Math.floor(Number(f.freeQty) || 1));
     } else {
       const pct = Number(f.discountPercent);
       if (!pct || pct < 1 || pct > 100) {
@@ -20104,8 +20184,14 @@ function workerNewOrderStep(cart) {
   return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
 }
 function workerPromoRow(line) {
-  const p = state.products.find((x) => x.id === line.productId) || {};
-  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${line.quantity} ш урамшуулал</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
+  const p = findProductByIdLoose(line.productId) || {};
+  const kind =
+    line.isPricePromo
+      ? "Нийт дүнгийн урамшуулал"
+      : line.isPaymentPromo
+        ? "Төлбөрийн урамшуулал"
+        : "Урамшуулал";
+  return `<div class="worker-selected-row worker-promo-row"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${line.quantity} ш · ${esc(kind)}</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
   const term = state.paymentTerm;
@@ -20132,7 +20218,8 @@ function setPaymentTerm(term) {
 }
 function workerOrderStatsHtml(cart) {
   if (!cart.skuCount) return "";
-  const promoHints = workerQuantityPromoHintsHtml(cart);
+  const promoHints =
+    workerQuantityPromoHintsHtml(cart) + workerAmountPromoHintsHtml(cart);
   return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${promoHints}${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
 }
 function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = "", hasItems = false } = {}) {
@@ -23226,8 +23313,9 @@ function productStockWithEditCredit(productId) {
   const have = Math.max(0, Math.floor(Number(p?.stock) || 0));
   return have + (editingOrderStockCreditMap()[productId] || 0);
 }
-function workerLinesWithPaidQty(productId, qty) {
+function workerLinesWithPaidQty(productId, qty, opts = {}) {
   const targetId = String(productId || "");
+  const includeAmountPromos = opts.includeAmountPromos !== false;
   const paid = state.products
     .map((p) => {
       const stockHave = productStockWithEditCredit(p.id);
@@ -23236,21 +23324,28 @@ function workerLinesWithPaidQty(productId, qty) {
           ? Math.max(0, Math.min(Math.floor(Number(qty) || 0), stockHave))
           : Math.min(getWorkerQtyRaw(p.id), stockHave);
       if (q < 1) return null;
+      const unitPrice = Number(p.price) || 0;
       return {
         productId: p.id,
         productName: p.name,
         quantity: q,
-        price: p.price,
-        total: p.price * q,
+        price: unitPrice,
+        total: unitPrice * q,
       };
     })
     .filter(Boolean);
   const gross = paid.reduce((s, l) => s + l.total, 0);
-  return applyPaymentPromotions(
-    applyPricePromotions(applyQuantityPromotions(paid), gross),
-    gross,
-    state.paymentTerm,
-  );
+  let lines = applyQuantityPromotions(paid);
+  // Дүнгээр/төлбөрөөр өгөх үнэгүй барааг stock-cap-д бүү оруул —
+  // үнэгүй бэлгийн үлдэгдэл дууссан үед дүнд хүрэх боломжгүй болдог байсан.
+  if (includeAmountPromos) {
+    lines = applyPaymentPromotions(
+      applyPricePromotions(lines, gross),
+      gross,
+      state.paymentTerm,
+    );
+  }
+  return lines;
 }
 /** Raw cart qty without stock clamp (avoids recursion in max search). */
 function getWorkerQtyRaw(productId) {
@@ -23259,8 +23354,8 @@ function getWorkerQtyRaw(productId) {
   return Math.floor(n);
 }
 /**
- * Largest paid qty for a product such that paid + урамшуулал still fits stock
- * for every SKU in the cart.
+ * Largest paid qty for a product such that paid + багц урамшуулал still fits stock.
+ * Нийт дүн / төлбөрийн үнэгүй бэлгийг энд тооцохгүй (хадгалах үед шалгана).
  */
 function maxWorkerPaidQty(productId) {
   const p = state.products.find((x) => x.id === productId);
@@ -23272,9 +23367,12 @@ function maxWorkerPaidQty(productId) {
   let best = 0;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
-    const issues = orderStockIssues(workerLinesWithPaidQty(productId, mid), {
-      stockCredit: editingOrderStockCreditMap(),
-    });
+    const issues = orderStockIssues(
+      workerLinesWithPaidQty(productId, mid, { includeAmountPromos: false }),
+      {
+        stockCredit: editingOrderStockCreditMap(),
+      },
+    );
     if (!issues.length) {
       best = mid;
       lo = mid + 1;

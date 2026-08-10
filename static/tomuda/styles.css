@@ -7307,6 +7307,19 @@ textarea::placeholder {
   text-align: center;
 }
 
+.worker-order-stats__promo {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--hex-muted-foreground);
+  text-align: center;
+}
+
+.worker-order-stats__promo.is-active {
+  color: var(--hex-primary, #0f766e);
+  font-weight: 600;
+}
+
 .worker-order-stats__note strong {
   color: var(--hex-foreground);
   font-weight: 700;
