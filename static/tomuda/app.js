@@ -11618,7 +11618,7 @@ function requireReceiptPrintDelivery(action = "татах") {
     action === "хэвлэх" ? "Баримт хэвлэхийн" : "Баримт татахын";
   alertModal(
     "Түгээгч сонгох",
-    `${step} өмнө дээрээс <b>Түгээгч</b> сонгоно уу.`,
+    `${step} өмнө түгээгч сонгоно уу.`,
   );
   return false;
 }
