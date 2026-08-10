@@ -9713,7 +9713,8 @@ function warehousePrepareStylesXml() {
 const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFBDD7EE";
 /**
  * Style ids after stockReceiptPatchStylesXml(receiptXlsxStylesXml()):
- * base 59 + prepare patch (sign+6 qty+unit) + blue head/cell.
+ * base 59 (0–58) + prepare (sign + 6 qty) + total blue head/cell.
+ * 59 sign · 60–65 Том/Жижиг/Тоо · 66–67 Нийт тоо/ш.
  */
 const STOCK_RECEIPT_LARGE_HEAD_STYLE = 60;
 const STOCK_RECEIPT_LARGE_CELL_STYLE = 61;
@@ -9721,8 +9722,8 @@ const STOCK_RECEIPT_SMALL_HEAD_STYLE = 62;
 const STOCK_RECEIPT_SMALL_CELL_STYLE = 63;
 const STOCK_RECEIPT_PIECE_HEAD_STYLE = 64;
 const STOCK_RECEIPT_PIECE_CELL_STYLE = 65;
-const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 67;
-const STOCK_RECEIPT_TOTAL_CELL_STYLE = 68;
+const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 66;
+const STOCK_RECEIPT_TOTAL_CELL_STYLE = 67;
 /** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
 const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
 function stockReceiptQtyHeadXf(fillId) {
@@ -14133,17 +14134,17 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #e4e7eb; }
-.head th.qty-small { background: #c5cad0; }
-.head th.qty-piece { background: #a3aab3; }
+.head th.qty-large { background: #ddebf7; }
+.head th.qty-small { background: #bdd7ee; }
+.head th.qty-piece { background: #9bc2e6; }
 .head th.qty-total { background: #bdd7ee; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #e4e7eb; text-align: center; }
-.num.qty-small { background: #c5cad0; text-align: center; }
-.num.qty-piece { background: #a3aab3; text-align: center; }
+.num.qty-large { background: #ddebf7; text-align: center; }
+.num.qty-small { background: #bdd7ee; text-align: center; }
+.num.qty-piece { background: #9bc2e6; text-align: center; }
 .num.qty-total { background: #bdd7ee; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
@@ -14345,17 +14346,17 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #e4e7eb; }
-.head th.qty-small { background: #c5cad0; }
-.head th.qty-piece { background: #a3aab3; }
+.head th.qty-large { background: #ddebf7; }
+.head th.qty-small { background: #bdd7ee; }
+.head th.qty-piece { background: #9bc2e6; }
 .head th.qty-total { background: #bdd7ee; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #e4e7eb; text-align: center; }
-.num.qty-small { background: #c5cad0; text-align: center; }
-.num.qty-piece { background: #a3aab3; text-align: center; }
+.num.qty-large { background: #ddebf7; text-align: center; }
+.num.qty-small { background: #bdd7ee; text-align: center; }
+.num.qty-piece { background: #9bc2e6; text-align: center; }
 .num.qty-total { background: #bdd7ee; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
@@ -15986,9 +15987,10 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header / body text (shrink, no wrap). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
-const WAREHOUSE_PREPARE_GRAY_LARGE = "FFE4E7EB";
-const WAREHOUSE_PREPARE_GRAY_SMALL = "FFC5CAD0";
-const WAREHOUSE_PREPARE_GRAY_PIECE = "FFA3AAB3";
+/** Excel Blue Accent 1: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо). */
+const WAREHOUSE_PREPARE_GRAY_LARGE = "FFDDEBF7";
+const WAREHOUSE_PREPARE_GRAY_SMALL = "FFBDD7EE";
+const WAREHOUSE_PREPARE_GRAY_PIECE = "FF9BC2E6";
 function warehousePrepareColWidthsFor() {
   return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
 }
@@ -16009,7 +16011,7 @@ function warehousePrepareFillIdForRgb(stylesXml, rgb) {
 function warehousePreparePatchStylesXml(stylesXml) {
   let out = String(stylesXml || "");
 
-  // Progressive gray: Том/х light · Жижиг/х mid · Тоо/ш darkest.
+  // Progressive blue: Том/х light · Жижиг/х mid · Тоо/ш darkest.
   const grayRgbs = [
     WAREHOUSE_PREPARE_GRAY_LARGE,
     WAREHOUSE_PREPARE_GRAY_SMALL,
@@ -16433,16 +16435,16 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .blank td { height: 14px; border: none !important; }
 .head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
-.head th.qty-large { background: #e4e7eb; white-space: nowrap; }
-.head th.qty-small { background: #c5cad0; white-space: nowrap; }
-.head th.qty-piece { background: #a3aab3; white-space: nowrap; }
+.head th.qty-large { background: #ddebf7; white-space: nowrap; }
+.head th.qty-small { background: #bdd7ee; white-space: nowrap; }
+.head th.qty-piece { background: #9bc2e6; white-space: nowrap; }
 .cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; white-space: nowrap; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
-.num.qty-large { background: #e4e7eb; }
-.num.qty-small { background: #c5cad0; }
-.num.qty-piece { background: #a3aab3; }
+.num.qty-large { background: #ddebf7; }
+.num.qty-small { background: #bdd7ee; }
+.num.qty-piece { background: #9bc2e6; }
 .num.qty-large:empty,
 .num.qty-small:empty,
 .num.qty-piece:empty { font-weight: 400; }
