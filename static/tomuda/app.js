@@ -9735,8 +9735,8 @@ function receiptXlsxStylesXml() {
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
-/** «Нийт тоо/ш» fill — Accent 3 Lighter 60% (same as Жижиг/х). */
-const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFD9D9D9";
+/** «Нийт тоо/ш» fill — pale blue (зарлага sample). */
+const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFBDD7EE";
 /**
  * Style ids after stockReceiptPatchStylesXml(warehouse-prepare template):
  * base 19 (0–18) + prepare (sign + 6 qty) + total blue head/cell.
@@ -9788,9 +9788,17 @@ function stockReceiptQtyCellXf(fillId) {
   return `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
 }
 function stockReceiptPatchStylesXml(stylesXml) {
-  let out = warehousePreparePatchStylesXml(stylesXml);
-  // Нийт тоо/ш uses Accent 3 Lighter 60% (already added by prepare patch).
-  const fillId = warehousePrepareFillIdForSpec(out, WAREHOUSE_PREPARE_FILL_SMALL);
+  // Stock in/out: qty grays only — no category-row fill (зарлага sample is plain).
+  let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
+  const blue = STOCK_RECEIPT_TOTAL_QTY_BLUE;
+  if (!out.includes(`rgb="${blue}"`)) {
+    out = out.replace(
+      /(<fills count=")(\d+)(">)([\s\S]*?)(<\/fills>)/,
+      (_, a, count, c, body, end) =>
+        `${a}${Number(count) + 1}${c}${body}${warehousePrepareGrayFillXml(blue)}${end}`,
+    );
+  }
+  const fillId = warehousePrepareFillIdForRgb(out, blue);
   const appendXfs = [];
   const head = stockReceiptQtyHeadXf(fillId);
   const cell = stockReceiptQtyCellXf(fillId);
@@ -14310,15 +14318,15 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-large { background: #f2f2f2; }
 .head th.qty-small { background: #d9d9d9; }
 .head th.qty-piece { background: #bfbfbf; }
-.head th.qty-total { background: #d9d9d9; }
-.cat { text-align: center; font-weight: 800; background: #bfbfbf; }
-.cat-total td { font-weight: 700; background: #f3f4f6; }
+.head th.qty-total { background: #bdd7ee; }
+.cat { text-align: center; font-weight: 800; background: #fff; }
+.cat-total td { font-weight: 700; background: #fff; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
 .num.qty-large { background: #f2f2f2; text-align: center; }
 .num.qty-small { background: #d9d9d9; text-align: center; }
 .num.qty-piece { background: #bfbfbf; text-align: center; }
-.num.qty-total { background: #d9d9d9; text-align: center; }
+.num.qty-total { background: #bdd7ee; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -14531,15 +14539,15 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-large { background: #f2f2f2; }
 .head th.qty-small { background: #d9d9d9; }
 .head th.qty-piece { background: #bfbfbf; }
-.head th.qty-total { background: #d9d9d9; }
-.cat { text-align: center; font-weight: 800; background: #bfbfbf; }
-.cat-total td { font-weight: 700; background: #f3f4f6; }
+.head th.qty-total { background: #bdd7ee; }
+.cat { text-align: center; font-weight: 800; background: #fff; }
+.cat-total td { font-weight: 700; background: #fff; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
 .num.qty-large { background: #f2f2f2; text-align: center; }
 .num.qty-small { background: #d9d9d9; text-align: center; }
 .num.qty-piece { background: #bfbfbf; text-align: center; }
-.num.qty-total { background: #d9d9d9; text-align: center; }
+.num.qty-total { background: #bdd7ee; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -16238,7 +16246,7 @@ function warehousePrepareFillIdForSpec(stylesXml, spec) {
 function warehousePrepareFillIdForRgb(stylesXml, rgb) {
   return warehousePrepareFillIdForSpec(stylesXml, { rgb });
 }
-function warehousePreparePatchStylesXml(stylesXml) {
+function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {}) {
   let out = String(stylesXml || "");
 
   // Gray Accent 3 Lighter 80/60/40 — same theme fills as the Excel sample.
@@ -16340,12 +16348,14 @@ function warehousePreparePatchStylesXml(stylesXml) {
 
   const signXf =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
-  // Category row (style 15): Gray Accent 3 Lighter 40% fill.
-  const catXfPlain =
-    '<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
-  const catXfFilled =
-    `<xf numFmtId="0" fontId="2" fillId="${categoryFillId}" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>`;
-  if (out.includes(catXfPlain)) out = out.replace(catXfPlain, catXfFilled);
+  // Category row (style 15): Accent 3 Lighter 40% only on prepare sheet.
+  if (fillCategory) {
+    const catXfPlain =
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+    const catXfFilled =
+      `<xf numFmtId="0" fontId="2" fillId="${categoryFillId}" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>`;
+    if (out.includes(catXfPlain)) out = out.replace(catXfPlain, catXfFilled);
+  }
   const qtyHeadXf = (fillId) =>
     `<xf numFmtId="0" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`;
   const qtyCellXf = (fillId) =>
