@@ -8804,15 +8804,15 @@ td, th { border: none; }
   text-align: right;
   white-space: nowrap;
   font-size: 9px;
-  font-weight: 400;
-  color: #C0C0C0 !important;
+  font-weight: 700;
+  color: #000 !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
   text-align: right;
   white-space: nowrap;
   font-size: 11px;
   font-weight: 400;
-  color: #C0C0C0 !important;
+  color: #BDD7EE !important;
 }
 .receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 1px 0 !important; }
 .receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 1px 0 0 !important; }
@@ -9084,8 +9084,8 @@ td, th { border: none; }
   vertical-align: middle;
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
-.receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #C0C0C0 !important; }
-.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #C0C0C0 !important; }
+.receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #000 !important; font-weight: 700; }
+.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #BDD7EE !important; }
 .receipt-grid--sheet .receipt-grid__return td {
   padding: 3px 6px;
   height: auto;
@@ -9730,13 +9730,13 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="15"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FFC0C0C0"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="60"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="15"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FFBDD7EE"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="60"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 /** Light blue for «Нийт тоо/ш» (matches zarlaga sample). */
-const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFD9D9D9";
+const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFF5F5F5";
 /**
  * Style ids after stockReceiptPatchStylesXml(warehouse-prepare template):
  * base 19 (0–18) + prepare (sign + 6 qty) + total blue head/cell.
@@ -10357,8 +10357,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const bodyStyle = 35;
     const labelStyle = idx === 0 ? 52 : clearStyle;
     const qtyStyle = 37;
-    // Style 59 = muted gray money (promo unit/total only) — see receiptXlsxStylesXml.
-    const moneyStyle = 59;
+    const unitMoneyStyle = 47; // black — нэгж үнэ
+    // Style 59 = pale blue Нийт үнэ (promo only) — see receiptXlsxStylesXml.
+    const totalMoneyStyle = 59;
     pushItemTableRow(promoH, [
       xlsxCellXml(`A${r}`, clearStyle, null, "empty"),
       xlsxCellXml(`B${r}`, clearStyle, null, "empty"),
@@ -10367,8 +10368,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         : xlsxCellXml(`C${r}`, clearStyle, null, "empty"),
       xlsxCellXml(`E${r}`, bodyStyle, si(nameText), "s"),
       xlsxCellXml(`H${r}`, qtyStyle, qty, "n"),
-      xlsxCellXml(`J${r}`, moneyStyle, Number(unitPrice) || 0, "n"),
-      xlsxCellXml(`K${r}`, moneyStyle, Number(lineTotal) || 0, "n"),
+      xlsxCellXml(`J${r}`, unitMoneyStyle, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(`K${r}`, totalMoneyStyle, Number(lineTotal) || 0, "n"),
       ...emptyCells(r, "D", "D", labelStyle),
       ...emptyCells(r, "F", "G", bodyStyle),
       ...emptyCells(r, "I", "I", qtyStyle),
@@ -10388,7 +10389,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const r = rowNum;
     // Non-grand: label B:D, amount E:K.
     // Grand: same span B:D / E:K; label + amount both bold 9pt gray (58 / 50).
-    // cellXfs are 0..59 (59 = promo muted money). Do not invent higher ids without appending xfs.
+    // cellXfs are 0..59 (59 = promo Нийт үнэ pale blue). Do not invent higher ids without appending xfs.
     const labelStyle = grand ? 58 : 30;
     const valueStyle = grand ? 50 : decimals ? 29 : 47;
     const midStyle = grand ? 58 : 1;
@@ -13183,7 +13184,9 @@ function finalizeStockOutReceipt(receipt) {
 }
 function stockOutReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `Зарлагын баримт - ${no}.xls` : `Зарлагын баримт - ${todayIso()}.xls`;
+  return no
+    ? `Зарлагын баримт - ${no}.xlsx`
+    : `Зарлагын баримт - ${todayIso()}.xlsx`;
 }
 function stockOutReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -13440,8 +13443,9 @@ function finalizeStockInReceipt(receipt) {
 }
 function stockInReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  // SpreadsheetML download — must be .xls (not .xlsx) or Excel runs OOXML repair.
-  return no ? `Орлогын-баримт-${no}.xls` : `Орлогын-баримт-${todayIso()}.xls`;
+  return no
+    ? `Орлогын-баримт-${no}.xlsx`
+    : `Орлогын-баримт-${todayIso()}.xlsx`;
 }
 function stockInReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -14245,13 +14249,19 @@ function stockOutPanel(list) {
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
-  // Only SpreadsheetML .xls — never emit OOXML .xlsx (Excel repair dialog).
-  try {
-    exportStockInExcelFallback(receipt);
-  } catch (err) {
-    console.warn("Stock-in excel failed", err);
-    alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
-  }
+  // Real OOXML .xlsx — HTML-as-.xls always triggers Excel format mismatch.
+  return exportStockInExcelXlsx(receipt)
+    .then(() => showInstallToast("Мэдээлэл татагдлаа"))
+    .catch((err) => {
+      console.warn("Stock-in xlsx failed", err);
+      try {
+        exportStockInExcelFallback(receipt);
+        showInstallToast("Мэдээлэл татагдлаа");
+      } catch (fallbackErr) {
+        console.warn("Stock-in excel fallback failed", fallbackErr);
+        alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
+      }
+    });
 }
 function confirmStockInExcel() {
   if (state.stockInDone && state.stockInReceipt) {
@@ -14304,18 +14314,18 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #f2f2f2; }
-.head th.qty-small { background: #d9d9d9; }
-.head th.qty-piece { background: #bfbfbf; }
-.head th.qty-total { background: #d9d9d9; }
+.head th.qty-large { background: #fafafa; }
+.head th.qty-small { background: #f5f5f5; }
+.head th.qty-piece { background: #efefef; }
+.head th.qty-total { background: #f5f5f5; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #f2f2f2; text-align: center; }
-.num.qty-small { background: #d9d9d9; text-align: center; }
-.num.qty-piece { background: #bfbfbf; text-align: center; }
-.num.qty-total { background: #d9d9d9; text-align: center; }
+.num.qty-large { background: #fafafa; text-align: center; }
+.num.qty-small { background: #f5f5f5; text-align: center; }
+.num.qty-piece { background: #efefef; text-align: center; }
+.num.qty-total { background: #f5f5f5; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -14329,12 +14339,12 @@ ${bodyRows}
 <tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
 <tr class="sign"><td colspan="9">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
-  const blob = new Blob([html], {
-    type: "application/vnd.ms-excel;charset=utf-8",
+  const blob = new Blob(["\uFEFF" + html], {
+    type: "text/html;charset=utf-8",
   });
   void downloadBlobFile(
     blob,
-    legacyExcelFileName(stockInReceiptFileName(receipt)),
+    stockInReceiptFileName(receipt).replace(/\.xlsx$/i, ".html"),
   );
 }
 function stockActionRow(p, tab) {
@@ -14473,12 +14483,18 @@ function applyStockOutModal(e, id) {
 }
 function exportStockOutExcel(receipt) {
   if (!receipt?.lines?.length) return alert("Зарлагын баримт байхгүй");
-  try {
-    exportStockOutExcelFallback(receipt);
-  } catch (err) {
-    console.warn("Stock-out excel failed", err);
-    alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
-  }
+  return exportStockOutExcelXlsx(receipt)
+    .then(() => showInstallToast("Мэдээлэл татагдлаа"))
+    .catch((err) => {
+      console.warn("Stock-out xlsx failed", err);
+      try {
+        exportStockOutExcelFallback(receipt);
+        showInstallToast("Мэдээлэл татагдлаа");
+      } catch (fallbackErr) {
+        console.warn("Stock-out excel fallback failed", fallbackErr);
+        alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
+      }
+    });
 }
 function exportStockOutExcelFallback(receipt) {
   const receivedDateValue = warehouseSheetDateValue(
@@ -14519,18 +14535,18 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #f2f2f2; }
-.head th.qty-small { background: #d9d9d9; }
-.head th.qty-piece { background: #bfbfbf; }
-.head th.qty-total { background: #d9d9d9; }
+.head th.qty-large { background: #fafafa; }
+.head th.qty-small { background: #f5f5f5; }
+.head th.qty-piece { background: #efefef; }
+.head th.qty-total { background: #f5f5f5; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #f2f2f2; text-align: center; }
-.num.qty-small { background: #d9d9d9; text-align: center; }
-.num.qty-piece { background: #bfbfbf; text-align: center; }
-.num.qty-total { background: #d9d9d9; text-align: center; }
+.num.qty-large { background: #fafafa; text-align: center; }
+.num.qty-small { background: #f5f5f5; text-align: center; }
+.num.qty-piece { background: #efefef; text-align: center; }
+.num.qty-total { background: #f5f5f5; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -14544,12 +14560,12 @@ ${bodyRows}
 <tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
 <tr class="sign"><td colspan="9">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
-  const blob = new Blob([html], {
-    type: "application/vnd.ms-excel;charset=utf-8",
+  const blob = new Blob(["\uFEFF" + html], {
+    type: "text/html;charset=utf-8",
   });
   void downloadBlobFile(
     blob,
-    legacyExcelFileName(stockOutReceiptFileName(receipt)),
+    stockOutReceiptFileName(receipt).replace(/\.xlsx$/i, ".html"),
   );
 }
 function inventoryStockModal(id, tab) {
@@ -16172,10 +16188,10 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
-/** Excel Gray Accent 3: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо). */
-const WAREHOUSE_PREPARE_GRAY_LARGE = "FFF2F2F2";
-const WAREHOUSE_PREPARE_GRAY_SMALL = "FFD9D9D9";
-const WAREHOUSE_PREPARE_GRAY_PIECE = "FFBFBFBF";
+/** Excel Gray Accent 3 — very light (Том → Жижиг → Тоо). */
+const WAREHOUSE_PREPARE_GRAY_LARGE = "FFFAFAFA";
+const WAREHOUSE_PREPARE_GRAY_SMALL = "FFF5F5F5";
+const WAREHOUSE_PREPARE_GRAY_PIECE = "FFEFEFEF";
 function warehousePrepareColWidthsFor() {
   return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
 }
@@ -16630,16 +16646,16 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .blank td { height: 14px; border: none !important; }
 .head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
-.head th.qty-large { background: #f2f2f2; white-space: nowrap; }
-.head th.qty-small { background: #d9d9d9; white-space: nowrap; }
-.head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
+.head th.qty-large { background: #fafafa; white-space: nowrap; }
+.head th.qty-small { background: #f5f5f5; white-space: nowrap; }
+.head th.qty-piece { background: #efefef; white-space: nowrap; }
 .cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; white-space: nowrap; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
-.num.qty-large { background: #f2f2f2; }
-.num.qty-small { background: #d9d9d9; }
-.num.qty-piece { background: #bfbfbf; }
+.num.qty-large { background: #fafafa; }
+.num.qty-small { background: #f5f5f5; }
+.num.qty-piece { background: #efefef; }
 .num.qty-large:empty,
 .num.qty-small:empty,
 .num.qty-piece:empty { font-weight: 400; }
