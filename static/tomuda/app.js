@@ -16028,7 +16028,7 @@ const WAREHOUSE_PREPARE_SMALL_HEAD_STYLE = 22;
 const WAREHOUSE_PREPARE_SMALL_CELL_STYLE = 23;
 const WAREHOUSE_PREPARE_PIECE_HEAD_STYLE = 24;
 const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
-/** Patched template styles: single-line header / body text (shrink, no wrap). */
+/** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
 /** Excel Blue Accent 1: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо). */
@@ -16102,12 +16102,18 @@ function warehousePreparePatchStylesXml(stylesXml) {
   else if (out.includes(numStyleRight))
     out = out.replace(numStyleRight, numStyleCenter);
 
-  // Name / unit / barcode body: never wrap to a second line.
+  // Name / unit / barcode body: fixed font size (no shrinkToFit — that made
+  // long names look tiny next to short ones on the prepare sheet).
   const textCellLeft =
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
   const textCellSingle =
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>';
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>';
   if (out.includes(textCellLeft)) out = out.replace(textCellLeft, textCellSingle);
+  // Older builds patched shrinkToFit on; strip it so re-exports stay uniform.
+  out = out.replace(
+    /(<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0") shrinkToFit="1"(\/>)/g,
+    "$1$2",
+  );
 
   // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
@@ -16468,7 +16474,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .prepare td, .prepare th { border: 1px solid #444; padding: 2px 4px; vertical-align: middle; }
 .prepare td.name,
 .prepare td.unit,
-.prepare td.barcode { text-align: left; white-space: nowrap; overflow: visible; }
+.prepare td.barcode { text-align: left; white-space: nowrap; overflow: hidden; font-size: 11px; font-weight: 400; }
 .prepare td.unit { text-align: left; }
 .title { height: 44px; text-align: center; font-size: 20px; font-weight: 800; border: none !important; }
 .meta-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
@@ -17125,10 +17131,10 @@ function confirmSetPaid(id) {
 const PROMO_PRODUCT_LABEL = "Урамшуулалд олгох бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
 const PROMO_PAYMENT_LABEL = "Шууд төлөлтийн урамшуулал";
-const PROMO_QUANTITY_LABEL = "Багц худалдан авалтын хөнгөлөлт";
+const PROMO_QUANTITY_LABEL = "Багц урамшуулал";
 const PROMO_EMPTY_RULES_TEXT = "Дүрэм байхгүй";
 const PROMO_PAGE_TITLES = {
-  quantity: "Багц худалдан авалт",
+  quantity: "Багц урамшуулал",
   price: "Нийт дүнгээс хөнгөлөлт",
   payment: PROMO_PAYMENT_LABEL,
 };
@@ -17291,6 +17297,85 @@ function promoFormDraftField(el) {
     if (el.value !== v) el.value = v;
   }
   state.promoFormDraft[el.name] = v;
+  syncPromoBundleSummary();
+}
+function syncPromoBundleSummary() {
+  const root = document.querySelector("[data-promo-bundle-summary]");
+  if (!root) return;
+  const buy =
+    Math.max(
+      0,
+      Math.floor(
+        Number(
+          state.promoFormDraft?.buyQty ??
+            document.querySelector('[data-promo-modal] input[name="buyQty"]')
+              ?.value,
+        ) || 0,
+      ),
+    ) || 0;
+  const free =
+    Math.max(
+      0,
+      Math.floor(
+        Number(
+          state.promoFormDraft?.freeQty ??
+            document.querySelector('[data-promo-modal] input[name="freeQty"]')
+              ?.value,
+        ) || 0,
+      ),
+    ) || 0;
+  const buyEl = root.querySelector("[data-promo-sum-buy]");
+  const freeEl = root.querySelector("[data-promo-sum-free]");
+  const tipEl = root.querySelector("[data-promo-sum-tip]");
+  if (buyEl) buyEl.textContent = String(buy);
+  if (freeEl) freeEl.textContent = String(free);
+  if (tipEl) {
+    tipEl.textContent =
+      buy > 0 && free > 0
+        ? `Нөхцөл: нийт ${buy} ш захиалбал ${free} ш урамшуулал олгоно.`
+        : "Захиалгын босго болон урамшууллын тоог оруулна.";
+  }
+}
+function promoBundleRuleSummaryHtml(buyQty, freeQty) {
+  const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
+  const free = Math.max(0, Math.floor(Number(freeQty) || 0));
+  const tip =
+    buy > 0 && free > 0
+      ? `Нөхцөл: нийт ${buy} ш захиалбал ${free} ш урамшуулал олгоно.`
+      : "Захиалгын босго болон урамшууллын тоог оруулна.";
+  return `<div class="promo-bundle-summary" data-promo-bundle-summary>
+  <div class="promo-bundle-summary__row">
+    <div class="promo-bundle-summary__side promo-bundle-summary__side--order">
+      <span class="promo-bundle-summary__label">Нийт захиалгын босго</span>
+      <span class="promo-bundle-summary__value"><b data-promo-sum-buy>${buy}</b> ш</span>
+    </div>
+    <span class="promo-bundle-summary__arrow" aria-hidden="true">→</span>
+    <div class="promo-bundle-summary__side promo-bundle-summary__side--gift">
+      <span class="promo-bundle-summary__label">Урамшуулал</span>
+      <span class="promo-bundle-summary__value"><b data-promo-sum-free>${free}</b> ш</span>
+    </div>
+  </div>
+  <p class="promo-bundle-summary__tip" data-promo-sum-tip>${esc(tip)}</p>
+</div>`;
+}
+function promoBundleConditionFormulaHtml(buyDefault = "8", freeDefault = "1") {
+  const buyField = promotionQtyField(
+    "buyQty",
+    "Захиалгын тоо (ш)",
+    buyDefault,
+    "block",
+  );
+  const freeField = promotionQtyField(
+    "freeQty",
+    "Урамшуулал (ш)",
+    freeDefault,
+    "block",
+  );
+  return `<div class="promo-bundle-formula" role="group" aria-label="Урамшууллын нөхцөл">
+  ${buyField}
+  <span class="promo-bundle-formula__arrow" aria-hidden="true">→</span>
+  ${freeField}
+</div>`;
 }
 function promoAmountInputHtml(
   name,
@@ -18353,9 +18438,9 @@ function promotionPriceRuleCard(r, i) {
 }
 function openPromotionQtyModal() {
   state.promoModalKind = "qty";
-  state.promoQtyBuyMode = "any";
+  state.promoQtyBuyMode = "total";
   state.promoPick = { buyProductIds: [], freeProductIds: [] };
-  state.promoFormDraft = {};
+  state.promoFormDraft = { buyQty: "8", freeQty: "1" };
   resetPromoPickListScroll();
   state.searches.promo_buyProductIds = "";
   state.searches.promo_freeProductIds = "";
@@ -18399,34 +18484,53 @@ function promotionQtyModal() {
       ? "Сонгосон бараанаас аль нэг нь заасан тооноос дээш худалдаалах юм бол урамшуулал олгоно"
       : buyMode === "each"
         ? "Сонгосон бүх бараа тус бүртээ заасан тоонд хүрвэл урамшуулал олгоно"
-        : "Сонгосон барааны нийлбэр тоо заасан хэмжээнд хүрвэл урамшуулал олгоно";
-  const arrowHint =
-    buyMode === "any"
-      ? "жишээ: төмөр 50 эсвэл газан 50 эсвэл энгийн 50 → урамшуулал"
-      : buyMode === "each"
-        ? "жишээ: төмөр 50 + газан 50 + энгийн 50 → төмөр 50 урамшуулал"
-        : "жишээ: төмөр+газан+энгийн нийлээд 150 ш → урамшуулал";
-  const buyBlock =
-    buyMode === "total"
-      ? promotionMultiProductPickerBlock({
-          pickKey: "buyProductIds",
-          fieldName: "buyProductIds",
-          selectedIds: buyIds,
-          excludeIds: [],
-          title: "Захиалгад оруулах бараа",
-          hint: "Нийт тоо — сонгосон барааны ширхэгийн нийлбэр",
-          placeholder: "Бараа хайж нэмэх...",
-          variant: "buy",
-          badge: "1",
-          qty: { name: "buyQty", label: "Нийт ш", defaultValue: "50" },
-          perProductQty: false,
-        })
-      : promotionMultiBuyPickerBlock(buyIds);
+        : "Сонгосон барааны нийлбэр тоо заасан хэмжээнд хүрвэл урамшуулал олгоно. Жишээ: Алим 3 + Лаванда 2 + Лимон 3 = 8 ш → урамшуулал ажиллана.";
+  const buyQtyDefault = promoFormDraftVal("buyQty", "8") || "8";
+  const freeQtyDefault = promoFormDraftVal("freeQty", "1") || "1";
+  const freePicker = promotionMultiFreePickerBlock({
+    pickKey: "freeProductIds",
+    fieldName: "freeProductIds",
+    selectedIds: freeIds,
+    excludeIds: [],
+    title: "Урамшуулалд сонгох бараа",
+    hint: "Энд урамшууллаар ӨГӨХ барааг сонгоно — захиалгын тоо биш. Жишээ: Гүзээлзгэнэ 1 ш",
+    placeholder: "урамшууллын бараа хайж нэмэх...",
+    badge: "2",
+    qty:
+      buyMode === "total"
+        ? null
+        : { name: "freeQty", label: "Урамшуулал (ш)", defaultValue: "1" },
+  });
+  let bodyHtml;
+  if (buyMode === "total") {
+    const buyProducts = promotionMultiProductPickerBlock({
+      pickKey: "buyProductIds",
+      fieldName: "buyProductIds",
+      selectedIds: buyIds,
+      excludeIds: [],
+      title: "Захиалгад тооцогдох бараа",
+      hint: "Эдгээр барааны ширхэгийн нийлбэр босгод хүрвэл урамшуулал олгоно",
+      placeholder: "Бараа хайж нэмэх...",
+      variant: "buy",
+      badge: "",
+      qty: null,
+      perProductQty: false,
+    });
+    const conditionBody = `<p class="promo-section-hint" style="margin:0 0 10px">Аль ч төрлөөс захиалсан ширхэг нийлээд босгод хүрвэл урамшуулал олгоно.</p>${promoBundleConditionFormulaHtml(buyQtyDefault, freeQtyDefault)}<div class="promo-bundle-qualify">${buyProducts}</div>`;
+    bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><div class="promo-reward-toggle">${modeToggle}<p class="promo-section-hint" style="margin:8px 0 0">${esc(modeHint)}</p></div>${promoFormGroupHtml(conditionBody, { step: "1", title: "Урамшууллын нөхцөл" })}${promoBundleRuleSummaryHtml(buyQtyDefault, freeQtyDefault)}${freePicker}`;
+  } else {
+    const arrowHint =
+      buyMode === "any"
+        ? "жишээ: төмөр 50 эсвэл газан 50 → урамшуулал"
+        : "жишээ: төмөр 50 + газан 50 → урамшуулал";
+    const buyBlock = promotionMultiBuyPickerBlock(buyIds);
+    bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><div class="promo-reward-toggle">${modeToggle}<p class="promo-section-hint" style="margin:8px 0 0">${esc(modeHint)}</p></div>${promoFormGroupHtml(buyBlock, { step: "1", title: "Урамшууллын нөхцөл" })}${promoSectionArrow(arrowHint)}${promoFormGroupHtml(freePicker, { step: "2", title: "Урамшуулалд сонгох бараа" })}`;
+  }
   box(
     promotionPageTitle("quantity"),
     promoFormShell(
       `data-promo-modal="qty" onsubmit="savePromotionQty(event)"`,
-      `<input type="hidden" name="buyMode" value="${buyMode}"><div class="promo-reward-toggle">${modeToggle}<p class="promo-section-hint" style="margin:8px 0 0">${esc(modeHint)}</p></div>${buyBlock}${promoSectionArrow(arrowHint)}${promotionMultiFreePickerBlock({ pickKey: "freeProductIds", fieldName: "freeProductIds", selectedIds: freeIds, excludeIds: [], title: "Урамшуулал", hint: "Олон бараа сонгож болно · захиалгын бараатай ижил байж болно", placeholder: "урамшуулал хайж нэмэх...", badge: "2", qty: { name: "freeQty", label: "Ширхэг", defaultValue: "1" } })}`,
+      bodyHtml,
     ),
     "max-w-2xl",
     { panelClass: "modal-panel--promo" },
