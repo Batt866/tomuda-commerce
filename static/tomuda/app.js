@@ -3645,11 +3645,22 @@ function zipFileOptions(extra = {}) {
 }
 async function zipToExcelBlob(zip) {
   // Rebuild without directory stubs — Excel Mobile treats empty folder
-  // entries as corrupt package content.
+  // entries as corrupt package content. Keep OOXML part order: Content_Types
+  // and root rels must lead the package or desktop Excel repairs the file.
   const clean = new JSZip();
   const paths = Object.keys(zip.files || {}).filter(
     (path) => !zip.files[path]?.dir,
   );
+  const rank = (path) => {
+    if (path === "[Content_Types].xml") return 0;
+    if (path === "_rels/.rels") return 1;
+    if (path.startsWith("docProps/")) return 2;
+    if (path === "xl/workbook.xml") return 3;
+    if (path === "xl/_rels/workbook.xml.rels") return 4;
+    if (path.startsWith("xl/")) return 5;
+    return 6;
+  };
+  paths.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
   for (const path of paths) {
     const data = await zip.files[path].async("uint8array");
     clean.file(path, data, zipFileOptions());
@@ -9710,7 +9721,7 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 /** Light blue for «Нийт тоо/ш» (matches zarlaga sample). */
-const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFBDD7EE";
+const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFD9D9D9";
 /**
  * Style ids after stockReceiptPatchStylesXml(warehouse-prepare template):
  * base 19 (0–18) + prepare (sign + 6 qty) + total blue head/cell.
@@ -9769,14 +9780,103 @@ async function sanitizeWarehouseXlsxZip(zip) {
   zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
   const wbFile = zip.file("xl/workbook.xml");
   if (wbFile) {
-    let wb = await wbFile.async("string");
-    wb = wb.replace(
-      /<mc:AlternateContent[\s\S]*?<\/mc:AlternateContent>/g,
-      "",
+    // Replace Excel-Android workbook metadata entirely — stripping tags alone
+    // still leaves mc/xr namespaces that mobile Excel often repairs.
+    zip.file(
+      "xl/workbook.xml",
+      stockReceiptWorkbookXml(),
+      zipFileOptions({ binary: false }),
     );
-    wb = wb.replace(/<xr:revisionPtr\b[^>]*\/>/g, "");
-    zip.file("xl/workbook.xml", wb);
   }
+  const wbRels = zip.file("xl/_rels/workbook.xml.rels");
+  if (wbRels) {
+    zip.file(
+      "xl/_rels/workbook.xml.rels",
+      stockReceiptWorkbookRelsXml({ hasTheme: !!zip.file("xl/theme/theme1.xml") }),
+      zipFileOptions({ binary: false }),
+    );
+  }
+  const ctFile = zip.file("[Content_Types].xml");
+  if (ctFile) {
+    zip.file(
+      "[Content_Types].xml",
+      stockReceiptContentTypesXml({ hasTheme: !!zip.file("xl/theme/theme1.xml") }),
+      zipFileOptions({ binary: false }),
+    );
+  }
+  return zip;
+}
+function stockReceiptWorkbookXml(sheetName = "Sheet1") {
+  const name = xlsxSafeSheetName(sheetName, "Sheet1");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="22228"/><workbookPr/><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="15000"/></bookViews><sheets><sheet name="${xlsxXmlEsc(name)}" sheetId="1" r:id="rId1"/></sheets><calcPr calcId="191029"/></workbook>`;
+}
+function stockReceiptWorkbookRelsXml({ hasTheme = false } = {}) {
+  const rels = [
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>`,
+  ];
+  let next = 2;
+  if (hasTheme) {
+    rels.push(
+      `<Relationship Id="rId${next}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>`,
+    );
+    next += 1;
+  }
+  rels.push(
+    `<Relationship Id="rId${next}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`,
+  );
+  next += 1;
+  rels.push(
+    `<Relationship Id="rId${next}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>`,
+  );
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join("")}</Relationships>`;
+}
+function stockReceiptContentTypesXml({ hasTheme = false } = {}) {
+  const parts = [
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`,
+    `<Default Extension="xml" ContentType="application/xml"/>`,
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>`,
+    `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+    `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>`,
+    `<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>`,
+    `<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>`,
+    `<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>`,
+  ];
+  if (hasTheme) {
+    parts.splice(
+      4,
+      0,
+      `<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>`,
+    );
+  }
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${parts.join("")}</Types>`;
+}
+/** Build stock-in/out .xlsx without Excel-Android template package junk. */
+async function assembleStockReceiptXlsxZip({
+  sharedStringsXml,
+  sheetXml,
+  stylesXml,
+  themeXml = null,
+}) {
+  const zip = new JSZip();
+  const hasTheme = !!themeXml;
+  xlsxZipWriteUtf8(
+    zip,
+    "[Content_Types].xml",
+    stockReceiptContentTypesXml({ hasTheme }),
+  );
+  xlsxZipWriteUtf8(zip, "_rels/.rels", xlsxPackageRootRelsXml());
+  xlsxZipWriteUtf8(zip, "docProps/core.xml", xlsxPackageCoreXml());
+  xlsxZipWriteUtf8(zip, "docProps/app.xml", xlsxPackageAppXml(1));
+  xlsxZipWriteUtf8(zip, "xl/workbook.xml", stockReceiptWorkbookXml());
+  xlsxZipWriteUtf8(
+    zip,
+    "xl/_rels/workbook.xml.rels",
+    stockReceiptWorkbookRelsXml({ hasTheme }),
+  );
+  xlsxZipWriteUtf8(zip, "xl/styles.xml", stylesXml);
+  if (hasTheme) xlsxZipWriteUtf8(zip, "xl/theme/theme1.xml", themeXml);
+  xlsxZipWriteUtf8(zip, "xl/sharedStrings.xml", sharedStringsXml);
+  xlsxZipWriteUtf8(zip, "xl/worksheets/sheet1.xml", sheetXml);
   return zip;
 }
 function receiptDrawingXml() {
@@ -14098,16 +14198,17 @@ function stockOutPanel(list) {
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
-  // Prefer SpreadsheetML .xls — OOXML (.xlsx) from the prepare template still
-  // triggers Excel's "We found a problem with some content" on mobile/desktop.
-  try {
-    exportStockInExcelFallback(receipt);
-  } catch (err) {
-    console.warn("Stock-in excel failed", err);
-    exportStockInExcelXlsx(receipt).catch(() =>
-      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
-    );
-  }
+  // Real OOXML .xlsx from a clean package (not the Excel-Android template zip).
+  // HTML SpreadsheetML is only a fallback if JSZip/template fetch fails.
+  exportStockInExcelXlsx(receipt).catch((err) => {
+    console.warn("Stock-in xlsx failed, using .xls fallback", err);
+    try {
+      exportStockInExcelFallback(receipt);
+    } catch (fallbackErr) {
+      console.warn("Stock-in excel failed", fallbackErr);
+      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
+    }
+  });
 }
 function confirmStockInExcel() {
   if (state.stockInDone && state.stockInReceipt) {
@@ -14160,18 +14261,18 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #ddebf7; }
-.head th.qty-small { background: #bdd7ee; }
-.head th.qty-piece { background: #9bc2e6; }
-.head th.qty-total { background: #bdd7ee; }
+.head th.qty-large { background: #f2f2f2; }
+.head th.qty-small { background: #d9d9d9; }
+.head th.qty-piece { background: #bfbfbf; }
+.head th.qty-total { background: #d9d9d9; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #ddebf7; text-align: center; }
-.num.qty-small { background: #bdd7ee; text-align: center; }
-.num.qty-piece { background: #9bc2e6; text-align: center; }
-.num.qty-total { background: #bdd7ee; text-align: center; }
+.num.qty-large { background: #f2f2f2; text-align: center; }
+.num.qty-small { background: #d9d9d9; text-align: center; }
+.num.qty-piece { background: #bfbfbf; text-align: center; }
+.num.qty-total { background: #d9d9d9; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -14329,14 +14430,15 @@ function applyStockOutModal(e, id) {
 }
 function exportStockOutExcel(receipt) {
   if (!receipt?.lines?.length) return alert("Зарлагын баримт байхгүй");
-  try {
-    exportStockOutExcelFallback(receipt);
-  } catch (err) {
-    console.warn("Stock-out excel failed", err);
-    exportStockOutExcelXlsx(receipt).catch(() =>
-      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
-    );
-  }
+  exportStockOutExcelXlsx(receipt).catch((err) => {
+    console.warn("Stock-out xlsx failed, using .xls fallback", err);
+    try {
+      exportStockOutExcelFallback(receipt);
+    } catch (fallbackErr) {
+      console.warn("Stock-out excel failed", fallbackErr);
+      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
+    }
+  });
 }
 function exportStockOutExcelFallback(receipt) {
   const receivedDateValue = warehouseSheetDateValue(
@@ -14377,18 +14479,18 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #ddebf7; }
-.head th.qty-small { background: #bdd7ee; }
-.head th.qty-piece { background: #9bc2e6; }
-.head th.qty-total { background: #bdd7ee; }
+.head th.qty-large { background: #f2f2f2; }
+.head th.qty-small { background: #d9d9d9; }
+.head th.qty-piece { background: #bfbfbf; }
+.head th.qty-total { background: #d9d9d9; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #ddebf7; text-align: center; }
-.num.qty-small { background: #bdd7ee; text-align: center; }
-.num.qty-piece { background: #9bc2e6; text-align: center; }
-.num.qty-total { background: #bdd7ee; text-align: center; }
+.num.qty-large { background: #f2f2f2; text-align: center; }
+.num.qty-small { background: #d9d9d9; text-align: center; }
+.num.qty-piece { background: #bfbfbf; text-align: center; }
+.num.qty-total { background: #d9d9d9; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -15561,14 +15663,18 @@ async function exportStockInExcelXlsx(receipt) {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
-  const zip = await JSZip.loadAsync(tpl);
+  const tplZip = await JSZip.loadAsync(tpl);
   const stylesXml = stockReceiptPatchStylesXml(
-    await zip.file("xl/styles.xml").async("string"),
+    await tplZip.file("xl/styles.xml").async("string"),
   );
-  zip.file("xl/sharedStrings.xml", sharedStringsXml);
-  zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", stylesXml);
-  await sanitizeWarehouseXlsxZip(zip);
+  const themeFile = tplZip.file("xl/theme/theme1.xml");
+  const themeXml = themeFile ? await themeFile.async("string") : null;
+  const zip = await assembleStockReceiptXlsxZip({
+    sharedStringsXml,
+    sheetXml,
+    stylesXml,
+    themeXml,
+  });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
 }
@@ -15799,14 +15905,18 @@ async function exportStockOutExcelXlsx(receipt) {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
-  const zip = await JSZip.loadAsync(tpl);
+  const tplZip = await JSZip.loadAsync(tpl);
   const stylesXml = stockReceiptPatchStylesXml(
-    await zip.file("xl/styles.xml").async("string"),
+    await tplZip.file("xl/styles.xml").async("string"),
   );
-  zip.file("xl/sharedStrings.xml", sharedStringsXml);
-  zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", stylesXml);
-  await sanitizeWarehouseXlsxZip(zip);
+  const themeFile = tplZip.file("xl/theme/theme1.xml");
+  const themeXml = themeFile ? await themeFile.async("string") : null;
+  const zip = await assembleStockReceiptXlsxZip({
+    sharedStringsXml,
+    sheetXml,
+    stylesXml,
+    themeXml,
+  });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockOutReceiptFileName(receipt));
 }
@@ -16031,10 +16141,10 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
-/** Excel Blue Accent 1: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо). */
-const WAREHOUSE_PREPARE_GRAY_LARGE = "FFDDEBF7";
-const WAREHOUSE_PREPARE_GRAY_SMALL = "FFBDD7EE";
-const WAREHOUSE_PREPARE_GRAY_PIECE = "FF9BC2E6";
+/** Excel Gray Accent 3: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо). */
+const WAREHOUSE_PREPARE_GRAY_LARGE = "FFF2F2F2";
+const WAREHOUSE_PREPARE_GRAY_SMALL = "FFD9D9D9";
+const WAREHOUSE_PREPARE_GRAY_PIECE = "FFBFBFBF";
 function warehousePrepareColWidthsFor() {
   return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
 }
@@ -16055,7 +16165,7 @@ function warehousePrepareFillIdForRgb(stylesXml, rgb) {
 function warehousePreparePatchStylesXml(stylesXml) {
   let out = String(stylesXml || "");
 
-  // Progressive blue: Том/х light · Жижиг/х mid · Тоо/ш darkest.
+  // Progressive gray Accent 3: Том/х light · Жижиг/х mid · Тоо/ш darkest.
   const grayRgbs = [
     WAREHOUSE_PREPARE_GRAY_LARGE,
     WAREHOUSE_PREPARE_GRAY_SMALL,
@@ -16419,11 +16529,15 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   const stylesXml = warehousePreparePatchStylesXml(
     await zip.file("xl/styles.xml").async("string"),
   );
-      zip.file("xl/sharedStrings.xml", sharedStringsXml);
-  zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", stylesXml);
-  await sanitizeWarehouseXlsxZip(zip);
-  const blob = await zipToExcelBlob(zip);
+  const themeFile = zip.file("xl/theme/theme1.xml");
+  const themeXml = themeFile ? await themeFile.async("string") : null;
+  const clean = await assembleStockReceiptXlsxZip({
+    sharedStringsXml,
+    sheetXml,
+    stylesXml,
+    themeXml,
+  });
+  const blob = await zipToExcelBlob(clean);
   await downloadBlobFile(blob, `Агуулах-бэлдэх-${stamp}.xlsx`);
 }
 function exportWarehousePrepareExcelFallback(orders, workerIds) {
@@ -16484,16 +16598,16 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .blank td { height: 14px; border: none !important; }
 .head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
-.head th.qty-large { background: #ddebf7; white-space: nowrap; }
-.head th.qty-small { background: #bdd7ee; white-space: nowrap; }
-.head th.qty-piece { background: #9bc2e6; white-space: nowrap; }
+.head th.qty-large { background: #f2f2f2; white-space: nowrap; }
+.head th.qty-small { background: #d9d9d9; white-space: nowrap; }
+.head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; white-space: nowrap; }
 .promo-head { border-top: 2px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
-.num.qty-large { background: #ddebf7; }
-.num.qty-small { background: #bdd7ee; }
-.num.qty-piece { background: #9bc2e6; }
+.num.qty-large { background: #f2f2f2; }
+.num.qty-small { background: #d9d9d9; }
+.num.qty-piece { background: #bfbfbf; }
 .num.qty-large:empty,
 .num.qty-small:empty,
 .num.qty-piece:empty { font-weight: 400; }
