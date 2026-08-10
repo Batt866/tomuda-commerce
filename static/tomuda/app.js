@@ -8670,7 +8670,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* B fits «Дансны дугаар:»; C = right-flush IBAN only */
-.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 16.8%; } .receipt-grid__c { width: 11.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 12.4%; }
+.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 16.8%; } .receipt-grid__c { width: 8.4%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 15.9%; }
 .receipt-grid__f { width: 11.5%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -8993,7 +8993,7 @@ td, th { border: none; }
   vertical-align: middle;
   line-height: 1.12;
 }
-.receipt-items__unit { width: 12.4%; text-align: center; white-space: nowrap; overflow: visible; }
+.receipt-items__unit { width: 15.9%; text-align: center; white-space: nowrap; overflow: visible; }
 .receipt-items__head .receipt-items__unit { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
 .receipt-items__barcode {
   width: 18%;
@@ -9618,10 +9618,10 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-// ҮНДСЭН A–K from zarlaga-receipt-undsen.xls (exact).
-// B+C redistributed so «Дансны дугаар:» + «IBAN:» still fit; E stays undsen unit width.
+// ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» on one line.
+// B kept for «Дансны дугаар:»; C trimmed so E can grow.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 14.0, 9.625, 3.875, 10.375, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
+  3.0, 14.0, 7.0, 3.875, 13.25, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -9736,7 +9736,7 @@ function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
 /** Light blue for «Нийт тоо/ш» (matches zarlaga sample). */
-const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFF5F5F5";
+const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFD9D9D9";
 /**
  * Style ids after stockReceiptPatchStylesXml(warehouse-prepare template):
  * base 19 (0–18) + prepare (sign + 6 qty) + total blue head/cell.
@@ -14308,24 +14308,24 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-piece { width: 72px; }
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
-.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
+.stock-in td, .stock-in th { border: 1px dotted #999; padding: 4px 5px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #fafafa; }
-.head th.qty-small { background: #f5f5f5; }
-.head th.qty-piece { background: #efefef; }
-.head th.qty-total { background: #f5f5f5; }
+.head th.qty-large { background: #f2f2f2; }
+.head th.qty-small { background: #d9d9d9; }
+.head th.qty-piece { background: #bfbfbf; }
+.head th.qty-total { background: #d9d9d9; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #fafafa; text-align: center; }
-.num.qty-small { background: #f5f5f5; text-align: center; }
-.num.qty-piece { background: #efefef; text-align: center; }
-.num.qty-total { background: #f5f5f5; text-align: center; }
+.num.qty-large { background: #f2f2f2; text-align: center; }
+.num.qty-small { background: #d9d9d9; text-align: center; }
+.num.qty-piece { background: #bfbfbf; text-align: center; }
+.num.qty-total { background: #d9d9d9; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -14529,24 +14529,24 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-piece { width: 72px; }
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
-.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
+.stock-in td, .stock-in th { border: 1px dotted #999; padding: 4px 5px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
 .head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
-.head th.qty-large { background: #fafafa; }
-.head th.qty-small { background: #f5f5f5; }
-.head th.qty-piece { background: #efefef; }
-.head th.qty-total { background: #f5f5f5; }
+.head th.qty-large { background: #f2f2f2; }
+.head th.qty-small { background: #d9d9d9; }
+.head th.qty-piece { background: #bfbfbf; }
+.head th.qty-total { background: #d9d9d9; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #fafafa; text-align: center; }
-.num.qty-small { background: #f5f5f5; text-align: center; }
-.num.qty-piece { background: #efefef; text-align: center; }
-.num.qty-total { background: #f5f5f5; text-align: center; }
+.num.qty-large { background: #f2f2f2; text-align: center; }
+.num.qty-small { background: #d9d9d9; text-align: center; }
+.num.qty-piece { background: #bfbfbf; text-align: center; }
+.num.qty-total { background: #d9d9d9; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -16188,10 +16188,10 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
-/** Excel Gray Accent 3 — very light (Том → Жижиг → Тоо). */
-const WAREHOUSE_PREPARE_GRAY_LARGE = "FFFAFAFA";
-const WAREHOUSE_PREPARE_GRAY_SMALL = "FFF5F5F5";
-const WAREHOUSE_PREPARE_GRAY_PIECE = "FFEFEFEF";
+/** Excel Gray Accent 3: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо) — visible, not washed out. */
+const WAREHOUSE_PREPARE_GRAY_LARGE = "FFF2F2F2";
+const WAREHOUSE_PREPARE_GRAY_SMALL = "FFD9D9D9";
+const WAREHOUSE_PREPARE_GRAY_PIECE = "FFBFBFBF";
 function warehousePrepareColWidthsFor() {
   return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
 }
@@ -16271,6 +16271,17 @@ function warehousePreparePatchStylesXml(stylesXml) {
     /(<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0") shrinkToFit="1"(\/>)/g,
     "$1$2",
   );
+
+  // Table grid (borderId 1): thinnest dotted — template uses solid thin (too heavy).
+  const thinSolidGrid =
+    '<border><left style="thin"><color indexed="64" /></left><right style="thin"><color indexed="64" /></right><top style="thin"><color indexed="64" /></top><bottom style="thin"><color indexed="64" /></bottom><diagonal /></border>';
+  const thinSolidGridAlt =
+    '<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>';
+  const dottedGrid =
+    '<border><left style="dotted"><color rgb="FF999999"/></left><right style="dotted"><color rgb="FF999999"/></right><top style="dotted"><color rgb="FF999999"/></top><bottom style="dotted"><color rgb="FF999999"/></bottom><diagonal/></border>';
+  if (out.includes(thinSolidGrid)) out = out.replace(thinSolidGrid, dottedGrid);
+  else if (out.includes(thinSolidGridAlt))
+    out = out.replace(thinSolidGridAlt, dottedGrid);
 
   // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
@@ -16633,7 +16644,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .prepare col.c-small { width: 11%; }
 .prepare col.c-piece { width: 9%; }
 .prepare col.c-stock { width: 14%; }
-.prepare td, .prepare th { border: 1px solid #444; padding: 2px 4px; vertical-align: middle; }
+.prepare td, .prepare th { border: 1px dotted #999; padding: 2px 4px; vertical-align: middle; }
 .prepare td.name,
 .prepare td.unit,
 .prepare td.barcode { text-align: left; white-space: nowrap; overflow: hidden; font-size: 11px; font-weight: 400; }
@@ -16644,18 +16655,18 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1.5px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
+.head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1px dotted #999; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
-.head th.qty-large { background: #fafafa; white-space: nowrap; }
-.head th.qty-small { background: #f5f5f5; white-space: nowrap; }
-.head th.qty-piece { background: #efefef; white-space: nowrap; }
+.head th.qty-large { background: #f2f2f2; white-space: nowrap; }
+.head th.qty-small { background: #d9d9d9; white-space: nowrap; }
+.head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; white-space: nowrap; }
-.promo-head { border-top: 2px solid #000 !important; }
+.promo-head { border-top: 1px dotted #999 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
-.num.qty-large { background: #fafafa; }
-.num.qty-small { background: #f5f5f5; }
-.num.qty-piece { background: #efefef; }
+.num.qty-large { background: #f2f2f2; }
+.num.qty-small { background: #d9d9d9; }
+.num.qty-piece { background: #bfbfbf; }
 .num.qty-large:empty,
 .num.qty-small:empty,
 .num.qty-piece:empty { font-weight: 400; }
