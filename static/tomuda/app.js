@@ -9735,6 +9735,35 @@ const STOCK_RECEIPT_PIECE_HEAD_STYLE = 24;
 const STOCK_RECEIPT_PIECE_CELL_STYLE = 25;
 const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 26;
 const STOCK_RECEIPT_TOTAL_CELL_STYLE = 27;
+/** Resolve qty style ids from the patched styles.xml tail (never hardcode past EOF). */
+function stockReceiptQtyStyleIds(stylesXml) {
+  const body = String(stylesXml || "").match(
+    /<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/,
+  );
+  const count = body ? (body[1].match(/<xf\b/g) || []).length : 0;
+  if (count < 8) {
+    return {
+      largeHead: STOCK_RECEIPT_LARGE_HEAD_STYLE,
+      largeCell: STOCK_RECEIPT_LARGE_CELL_STYLE,
+      smallHead: STOCK_RECEIPT_SMALL_HEAD_STYLE,
+      smallCell: STOCK_RECEIPT_SMALL_CELL_STYLE,
+      pieceHead: STOCK_RECEIPT_PIECE_HEAD_STYLE,
+      pieceCell: STOCK_RECEIPT_PIECE_CELL_STYLE,
+      totalHead: STOCK_RECEIPT_TOTAL_HEAD_STYLE,
+      totalCell: STOCK_RECEIPT_TOTAL_CELL_STYLE,
+    };
+  }
+  return {
+    largeHead: count - 8,
+    largeCell: count - 7,
+    smallHead: count - 6,
+    smallCell: count - 5,
+    pieceHead: count - 4,
+    pieceCell: count - 3,
+    totalHead: count - 2,
+    totalCell: count - 1,
+  };
+}
 /** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
 const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
 function stockReceiptQtyHeadXf(fillId) {
@@ -14198,17 +14227,16 @@ function stockOutPanel(list) {
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
-  // Real OOXML .xlsx from a clean package (not the Excel-Android template zip).
-  // HTML SpreadsheetML is only a fallback if JSZip/template fetch fails.
-  exportStockInExcelXlsx(receipt).catch((err) => {
-    console.warn("Stock-in xlsx failed, using .xls fallback", err);
-    try {
-      exportStockInExcelFallback(receipt);
-    } catch (fallbackErr) {
-      console.warn("Stock-in excel failed", fallbackErr);
-      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
-    }
-  });
+  // SpreadsheetML .xls — Excel never shows the OOXML "We found a problem"
+  // repair dialog (that only happens on broken .xlsx packages).
+  try {
+    exportStockInExcelFallback(receipt);
+  } catch (err) {
+    console.warn("Stock-in .xls failed, trying xlsx", err);
+    exportStockInExcelXlsx(receipt).catch(() =>
+      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
+    );
+  }
 }
 function confirmStockInExcel() {
   if (state.stockInDone && state.stockInReceipt) {
@@ -14430,15 +14458,14 @@ function applyStockOutModal(e, id) {
 }
 function exportStockOutExcel(receipt) {
   if (!receipt?.lines?.length) return alert("Зарлагын баримт байхгүй");
-  exportStockOutExcelXlsx(receipt).catch((err) => {
-    console.warn("Stock-out xlsx failed, using .xls fallback", err);
-    try {
-      exportStockOutExcelFallback(receipt);
-    } catch (fallbackErr) {
-      console.warn("Stock-out excel failed", fallbackErr);
-      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
-    }
-  });
+  try {
+    exportStockOutExcelFallback(receipt);
+  } catch (err) {
+    console.warn("Stock-out .xls failed, trying xlsx", err);
+    exportStockOutExcelXlsx(receipt).catch(() =>
+      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
+    );
+  }
 }
 function exportStockOutExcelFallback(receipt) {
   const receivedDateValue = warehouseSheetDateValue(
@@ -15648,17 +15675,18 @@ const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
 function buildStockInSheetXml(receipt, {
   titleText = null,
   receivedLabel = "Орлого авсан огноо:",
+  styleIds = null,
 } = {}) {
   return buildStockOutSheetXmlLegacy(receipt, {
     titleText: titleText || stockInReceiptTitle(receipt),
     receivedLabel,
+    styleIds,
   });
 }
 async function exportStockInExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
-  const { sharedStringsXml, sheetXml } = buildStockInSheetXml(receipt);
   const tpl = await fetch(staticAssetUrl(STOCK_IN_XLSX_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
@@ -15667,6 +15695,10 @@ async function exportStockInExcelXlsx(receipt) {
   const stylesXml = stockReceiptPatchStylesXml(
     await tplZip.file("xl/styles.xml").async("string"),
   );
+  const styleIds = stockReceiptQtyStyleIds(stylesXml);
+  const { sharedStringsXml, sheetXml } = buildStockInSheetXml(receipt, {
+    styleIds,
+  });
   const themeFile = tplZip.file("xl/theme/theme1.xml");
   const themeXml = themeFile ? await themeFile.async("string") : null;
   const zip = await assembleStockReceiptXlsxZip({
@@ -15678,7 +15710,7 @@ async function exportStockInExcelXlsx(receipt) {
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
 }
-function buildStockOutSheetXml(receipt) {
+function buildStockOutSheetXml(receipt, { styleIds = null } = {}) {
   const asIn = normalizeStockInReceiptTotals({
     ...receipt,
     lines: (receipt.lines || []).map((line) => ({
@@ -15694,13 +15726,25 @@ function buildStockOutSheetXml(receipt) {
   return buildStockOutSheetXmlLegacy(asIn, {
     titleText: stockOutReceiptTitle(receipt),
     receivedLabel: "Зарлага гарсан огноо:",
+    styleIds,
   });
 }
 function buildStockOutSheetXmlLegacy(receipt, {
   titleText = null,
   receivedLabel = "Зарлага гарсан огноо:",
+  styleIds = null,
 } = {}) {
   receipt = normalizeStockInReceiptTotals(receipt);
+  const qtyStyles = styleIds || {
+    largeHead: STOCK_RECEIPT_LARGE_HEAD_STYLE,
+    largeCell: STOCK_RECEIPT_LARGE_CELL_STYLE,
+    smallHead: STOCK_RECEIPT_SMALL_HEAD_STYLE,
+    smallCell: STOCK_RECEIPT_SMALL_CELL_STYLE,
+    pieceHead: STOCK_RECEIPT_PIECE_HEAD_STYLE,
+    pieceCell: STOCK_RECEIPT_PIECE_CELL_STYLE,
+    totalHead: STOCK_RECEIPT_TOTAL_HEAD_STYLE,
+    totalCell: STOCK_RECEIPT_TOTAL_CELL_STYLE,
+  };
   const lastCol = "I";
   const colLetters = "ABCDEFGHI";
   const strings = [];
@@ -15722,7 +15766,14 @@ function buildStockOutSheetXmlLegacy(receipt, {
   const merges = [`A1:${lastCol}1`, `A2:C2`, `D2:F2`, `G2:${lastCol}2`, `D3:F3`, `G3:${lastCol}3`];
   let rowNum = 1;
   const pushRow = (height, cells) => {
-    rows.push(xlsxRowXml(rowNum, height, cells, lastCol));
+    rows.push(
+      xlsxRowXml(
+        rowNum,
+        height,
+        filterXlsxCellsOutsideMerges(cells, merges),
+        lastCol,
+      ),
+    );
     rowNum += 1;
   };
   const emptyCells = (row, from = "A", to = lastCol, style = 1) => {
@@ -15773,30 +15824,10 @@ function buildStockOutSheetXmlLegacy(receipt, {
   pushRow(18, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
-    xlsxCellXml(
-      `C${headerRow}`,
-      STOCK_RECEIPT_LARGE_HEAD_STYLE,
-      si("Том/х"),
-      "s",
-    ),
-    xlsxCellXml(
-      `D${headerRow}`,
-      STOCK_RECEIPT_SMALL_HEAD_STYLE,
-      si("Жижиг/х"),
-      "s",
-    ),
-    xlsxCellXml(
-      `E${headerRow}`,
-      STOCK_RECEIPT_PIECE_HEAD_STYLE,
-      si("Тоо/ш"),
-      "s",
-    ),
-    xlsxCellXml(
-      `F${headerRow}`,
-      STOCK_RECEIPT_TOTAL_HEAD_STYLE,
-      si("Нийт тоо/ш"),
-      "s",
-    ),
+    xlsxCellXml(`C${headerRow}`, qtyStyles.largeHead, si("Том/х"), "s"),
+    xlsxCellXml(`D${headerRow}`, qtyStyles.smallHead, si("Жижиг/х"), "s"),
+    xlsxCellXml(`E${headerRow}`, qtyStyles.pieceHead, si("Тоо/ш"), "s"),
+    xlsxCellXml(`F${headerRow}`, qtyStyles.totalHead, si("Нийт тоо/ш"), "s"),
     xlsxCellXml(`G${headerRow}`, 7, si("Өртөг үнэ"), "s"),
     xlsxCellXml(`H${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`I${headerRow}`, 7, si("Нийт үнэ"), "s"),
@@ -15830,26 +15861,10 @@ function buildStockOutSheetXmlLegacy(receipt, {
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
       xlsxBarcodeCell(`B${r}`, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, line.barcode, si),
-      xlsxPrepareQtyCell(
-        `C${r}`,
-        STOCK_RECEIPT_LARGE_CELL_STYLE,
-        parts.largePacks,
-      ),
-      xlsxPrepareQtyCell(
-        `D${r}`,
-        STOCK_RECEIPT_SMALL_CELL_STYLE,
-        parts.packs,
-      ),
-      xlsxPrepareQtyCell(
-        `E${r}`,
-        STOCK_RECEIPT_PIECE_CELL_STYLE,
-        parts.pieces,
-      ),
-      xlsxPrepareQtyCell(
-        `F${r}`,
-        STOCK_RECEIPT_TOTAL_CELL_STYLE,
-        totalQty,
-      ),
+      xlsxPrepareQtyCell(`C${r}`, qtyStyles.largeCell, parts.largePacks),
+      xlsxPrepareQtyCell(`D${r}`, qtyStyles.smallCell, parts.packs),
+      xlsxPrepareQtyCell(`E${r}`, qtyStyles.pieceCell, parts.pieces),
+      xlsxPrepareQtyCell(`F${r}`, qtyStyles.totalCell, totalQty),
       xlsxCellXml(`G${r}`, 10, costPrice, "n"),
       xlsxCellXml(`H${r}`, 10, salesPrice, "n"),
       xlsxCellXml(`I${r}`, 10, stockInReceiptLineTotal(line), "n"),
@@ -15886,7 +15901,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
   pushSignatureBlock("Хүлээлгэн өгсөн:");
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   pushSignatureBlock("Хүлээн авсан:");
-  const lastRow = rowNum;
+  const lastRow = Math.max(1, rowNum - 1);
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const colsXml = STOCK_RECEIPT_COL_WIDTHS.map(
     (width, index) =>
@@ -15900,7 +15915,6 @@ async function exportStockOutExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
-  const { sharedStringsXml, sheetXml } = buildStockOutSheetXml(receipt);
   const tpl = await fetch(staticAssetUrl(STOCK_IN_XLSX_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
@@ -15909,6 +15923,10 @@ async function exportStockOutExcelXlsx(receipt) {
   const stylesXml = stockReceiptPatchStylesXml(
     await tplZip.file("xl/styles.xml").async("string"),
   );
+  const styleIds = stockReceiptQtyStyleIds(stylesXml);
+  const { sharedStringsXml, sheetXml } = buildStockOutSheetXml(receipt, {
+    styleIds,
+  });
   const themeFile = tplZip.file("xl/theme/theme1.xml");
   const themeXml = themeFile ? await themeFile.async("string") : null;
   const zip = await assembleStockReceiptXlsxZip({
