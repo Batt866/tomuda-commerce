@@ -14271,7 +14271,7 @@ function exportStockInExcelFallback(receipt) {
       return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num qty-total">${h(prepareQtyDisplay(totalQty))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineCostPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+  const html = `<!doctype html><!-- tomuda-stock-xls-v678 --><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
 table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
 .stock-in col.c-name { width: 240px; }
@@ -14486,7 +14486,7 @@ function exportStockOutExcelFallback(receipt) {
       return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num qty-total">${h(prepareQtyDisplay(totalQty))}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
     })
     .join("");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+  const html = `<!doctype html><!-- tomuda-stock-xls-v678 --><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
 table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
 .stock-in col.c-name { width: 240px; }
@@ -16588,7 +16588,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
   const promoRows = sections.promo.length
     ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+  const html = `<!doctype html><!-- tomuda-stock-xls-v678 --><html><head><meta charset="utf-8"><style>
 @page { size: A4 portrait; margin: 10mm 7mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
 table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
