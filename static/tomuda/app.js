@@ -14098,9 +14098,16 @@ function stockOutPanel(list) {
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
-  exportStockInExcelXlsx(receipt).catch(() =>
-    exportStockInExcelFallback(receipt),
-  );
+  // Prefer SpreadsheetML .xls — OOXML (.xlsx) from the prepare template still
+  // triggers Excel's "We found a problem with some content" on mobile/desktop.
+  try {
+    exportStockInExcelFallback(receipt);
+  } catch (err) {
+    console.warn("Stock-in excel failed", err);
+    exportStockInExcelXlsx(receipt).catch(() =>
+      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
+    );
+  }
 }
 function confirmStockInExcel() {
   if (state.stockInDone && state.stockInReceipt) {
@@ -14322,9 +14329,14 @@ function applyStockOutModal(e, id) {
 }
 function exportStockOutExcel(receipt) {
   if (!receipt?.lines?.length) return alert("Зарлагын баримт байхгүй");
-  exportStockOutExcelXlsx(receipt).catch(() =>
-    exportStockOutExcelFallback(receipt),
-  );
+  try {
+    exportStockOutExcelFallback(receipt);
+  } catch (err) {
+    console.warn("Stock-out excel failed", err);
+    exportStockOutExcelXlsx(receipt).catch(() =>
+      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
+    );
+  }
 }
 function exportStockOutExcelFallback(receipt) {
   const receivedDateValue = warehouseSheetDateValue(
