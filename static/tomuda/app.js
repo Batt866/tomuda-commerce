@@ -12909,6 +12909,7 @@ function buildStockOutReceiptSnapshot(productIds = null) {
     const qty = stockOutLineQty(p);
     const largePacks = Math.max(0, Math.floor(Number(d.largePacks) || 0));
     const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+    const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
     const unitPrice = productSalesPrice(p) || productCostPrice(p) || 0;
     return {
       productId: p.id,
@@ -12917,6 +12918,7 @@ function buildStockOutReceiptSnapshot(productIds = null) {
       barcode: p.barcode || "",
       largePacks,
       packs,
+      pieces,
       quantity: qty,
       unitPrice,
       totalPrice: qty * unitPrice,
@@ -13164,6 +13166,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
     const qty = stockInLineQty(p);
     const largePacks = Math.max(0, Math.floor(Number(d.largePacks) || 0));
     const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+    const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
     const cost = stockInLineCost(p);
     const sales = productSalesPrice(p) || 0;
     return {
@@ -13173,6 +13176,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
       barcode: p.barcode || "",
       largePacks,
       packs,
+      pieces,
       quantity: qty,
       costPrice: cost,
       unitPrice: sales,
@@ -13575,11 +13579,41 @@ function applyStockInEntryModal(e, id) {
   render();
   showAppToast(`${p.name} · ${qty} ш нэмэгдлээ`, "success");
 }
+function stockReceiptQtyParts(line) {
+  const p =
+    state.products.find((x) => String(x.id) === String(line?.productId)) ||
+    null;
+  const largeCount = productLargeBoxCount(p);
+  const excl = exclusiveOrderQtyParts(
+    {
+      largePacks: line?.largePacks,
+      packs: line?.packs,
+      pieces: line?.pieces,
+    },
+    largeCount,
+  );
+  let pieces = Math.max(0, Math.floor(Number(excl.pieces) || 0));
+  if (
+    (line?.pieces == null || line?.pieces === "") &&
+    Number(line?.quantity) > 0
+  ) {
+    const boxed = productBoxQtyTotal(p, {
+      largePacks: excl.largePacks,
+      packs: excl.packs,
+      qty: 0,
+    });
+    pieces = Math.max(0, Math.floor(Number(line.quantity) || 0) - boxed);
+  }
+  return {
+    largePacks: excl.largePacks,
+    packs: excl.packs,
+    pieces,
+  };
+}
 function stockReceiptPackCell(line) {
+  const { largePacks, packs } = stockReceiptQtyParts(line);
   const parts = [];
-  const large = Math.max(0, Math.floor(Number(line?.largePacks) || 0));
-  const packs = Math.max(0, Math.floor(Number(line?.packs) || 0));
-  if (large) parts.push(`${large} том`);
+  if (largePacks) parts.push(`${largePacks} том`);
   if (packs) parts.push(`${packs} жижиг`);
   return parts.length ? parts.join(" · ") : "-";
 }
@@ -13738,40 +13772,53 @@ function exportStockInExcelFallback(receipt) {
   const bodyRows = stockInReceiptGroupedLines(receipt.lines || [])
     .map((item) => {
       if (item.type === "cat") {
-        return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
+        return `<tr><td colspan="8" class="cat">${h(item.name)}</td></tr>`;
       }
       if (item.type === "catTotal") {
-        return `<tr class="cat-total"><td colspan="6" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
+        return `<tr class="cat-total"><td colspan="7" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
       }
       const line = item.line;
-      const pack = stockReceiptPackCell(line);
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${h(pack === "-" ? "" : pack)}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(stockInReceiptLineCostPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
+      const parts = stockReceiptQtyParts(line);
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineCostPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+table.stock-in { width: 1180px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+.stock-in col.c-name { width: 280px; }
+.stock-in col.c-barcode { width: 150px; }
+.stock-in col.c-large { width: 72px; }
+.stock-in col.c-small { width: 84px; }
+.stock-in col.c-piece { width: 72px; }
+.stock-in col.c-money { width: 110px; }
 .stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
-.head th { text-align: center; font-weight: 800; background: #eef0f2; }
+.head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
+.head th.qty-large { background: #e4e7eb; }
+.head th.qty-small { background: #c5cad0; }
+.head th.qty-piece { background: #a3aab3; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
+.num.qty-large { background: #e4e7eb; }
+.num.qty-small { background: #c5cad0; }
+.num.qty-piece { background: #a3aab3; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
-<tr><td colspan="7" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
-<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Хайрцаг</th><th>Тоо ширхэг</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
+<tr><td colspan="8" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
+<tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
-<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________</td></tr>
+<tr class="total"><td colspan="7" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
+<tr class="sign"><td colspan="8">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="8">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -13931,40 +13978,54 @@ function exportStockOutExcelFallback(receipt) {
   const bodyRows = stockInReceiptGroupedLines(receipt.lines || [])
     .map((item) => {
       if (item.type === "cat") {
-        return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
+        return `<tr><td colspan="8" class="cat">${h(item.name)}</td></tr>`;
       }
       if (item.type === "catTotal") {
-        return `<tr class="cat-total"><td colspan="6" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
+        return `<tr class="cat-total"><td colspan="7" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
       }
       const line = item.line;
       const unitPrice = Number(line.unitPrice) || 0;
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num">${h(stockReceiptPackCell(line) === "-" ? "" : stockReceiptPackCell(line))}</td><td class="num">${line.quantity}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
+      const parts = stockReceiptQtyParts(line);
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1100px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+table.stock-in { width: 1180px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
+.stock-in col.c-name { width: 280px; }
+.stock-in col.c-barcode { width: 150px; }
+.stock-in col.c-large { width: 72px; }
+.stock-in col.c-small { width: 84px; }
+.stock-in col.c-piece { width: 72px; }
+.stock-in col.c-money { width: 110px; }
 .stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
-.head th { text-align: center; font-weight: 800; background: #eef0f2; }
+.head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
+.head th.qty-large { background: #e4e7eb; }
+.head th.qty-small { background: #c5cad0; }
+.head th.qty-piece { background: #a3aab3; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
+.num.qty-large { background: #e4e7eb; }
+.num.qty-small { background: #c5cad0; }
+.num.qty-piece { background: #a3aab3; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
-<tr><td colspan="7" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
-<tr class="meta"><td colspan="4">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="4"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th>Хайрцаг</th><th>Тоо ширхэг</th><th>Нэгж үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
+<tr><td colspan="8" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
+<tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Нэгж үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="6" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
-<tr class="sign"><td colspan="7">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="7">Хүлээн авсан: ________________________</td></tr>
+<tr class="total"><td colspan="7" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
+<tr class="sign"><td colspan="8">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="8">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -15155,7 +15216,8 @@ function buildStockOutSheetXmlLegacy(receipt, {
   receivedLabel = "Зарлага гарсан огноо:",
 } = {}) {
   receipt = normalizeStockInReceiptTotals(receipt);
-  const lastCol = "G";
+  const lastCol = "H";
+  const colLetters = "ABCDEFGH";
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -15179,9 +15241,9 @@ function buildStockOutSheetXmlLegacy(receipt, {
     rowNum += 1;
   };
   const emptyCells = (row, from = "A", to = lastCol, style = 1) => {
-    const cols = "ABCDEFG".slice(
-      "ABCDEFG".indexOf(from),
-      "ABCDEFG".indexOf(to) + 1,
+    const cols = colLetters.slice(
+      colLetters.indexOf(from),
+      colLetters.indexOf(to) + 1,
     );
     return cols
       .split("")
@@ -15207,6 +15269,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
     xlsxCellXml("E2", 14, null, "empty"),
     xlsxCellXml("F2", 14, si(receivedDateValue), "s"),
     xlsxCellXml("G2", 14, null, "empty"),
+    xlsxCellXml("H2", 14, null, "empty"),
   ]);
   pushRow(20.25, [
     xlsxCellXml("A3", 6, null, "empty"),
@@ -15216,17 +15279,34 @@ function buildStockOutSheetXmlLegacy(receipt, {
     xlsxCellXml("E3", 14, null, "empty"),
     xlsxCellXml("F3", 14, si(printedDateValue), "s"),
     xlsxCellXml("G3", 14, null, "empty"),
+    xlsxCellXml("H3", 14, null, "empty"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   const headerRow = rowNum;
   pushRow(30.75, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
-    xlsxCellXml(`C${headerRow}`, 7, si("Хайрцаг"), "s"),
-    xlsxCellXml(`D${headerRow}`, 7, si("Тоо ширхэг"), "s"),
-    xlsxCellXml(`E${headerRow}`, 7, si("Өртөг үнэ"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Нэгж үнэ"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, si("Нийт үнэ"), "s"),
+    xlsxCellXml(
+      `C${headerRow}`,
+      WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
+      si("Том/х"),
+      "s",
+    ),
+    xlsxCellXml(
+      `D${headerRow}`,
+      WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
+      si("Жижиг/х"),
+      "s",
+    ),
+    xlsxCellXml(
+      `E${headerRow}`,
+      WAREHOUSE_PREPARE_PIECE_HEAD_STYLE,
+      si("Тоо/ш"),
+      "s",
+    ),
+    xlsxCellXml(`F${headerRow}`, 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml(`G${headerRow}`, 7, si("Нэгж үнэ"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Нийт үнэ"), "s"),
   ]);
   for (const item of groups) {
     if (item.type === "cat") {
@@ -15240,11 +15320,11 @@ function buildStockOutSheetXmlLegacy(receipt, {
     }
     if (item.type === "catTotal") {
       const r = rowNum;
-      merges.push(`A${r}:F${r}`);
+      merges.push(`A${r}:G${r}`);
       pushRow(16.5, [
         xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
-        ...emptyCells(r, "B", "F", 3),
-        xlsxCellXml(`G${r}`, 10, item.amount, "n"),
+        ...emptyCells(r, "B", "G", 3),
+        xlsxCellXml(`H${r}`, 10, item.amount, "n"),
       ]);
       continue;
     }
@@ -15252,32 +15332,43 @@ function buildStockOutSheetXmlLegacy(receipt, {
     const r = rowNum;
     const costPrice = stockInReceiptLineCostPrice(line);
     const salesPrice = stockInReceiptLineSalesPrice(line);
-    const packCell = stockReceiptPackCell(line);
+    const parts = stockReceiptQtyParts(line);
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
       xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
-      packCell === "-"
-        ? xlsxCellXml(`C${r}`, 10, null, "empty")
-        : xlsxCellXml(`C${r}`, 8, si(packCell), "s"),
-      xlsxCellXml(`D${r}`, 10, Number(line.quantity) || 0, "n"),
-      xlsxCellXml(`E${r}`, 10, costPrice, "n"),
-      xlsxCellXml(`F${r}`, 10, salesPrice, "n"),
-      xlsxCellXml(`G${r}`, 10, stockInReceiptLineTotal(line), "n"),
+      xlsxPrepareQtyCell(
+        `C${r}`,
+        WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
+        parts.largePacks,
+      ),
+      xlsxPrepareQtyCell(
+        `D${r}`,
+        WAREHOUSE_PREPARE_SMALL_CELL_STYLE,
+        parts.packs,
+      ),
+      xlsxPrepareQtyCell(
+        `E${r}`,
+        WAREHOUSE_PREPARE_PIECE_CELL_STYLE,
+        parts.pieces,
+      ),
+      xlsxCellXml(`F${r}`, 10, costPrice, "n"),
+      xlsxCellXml(`G${r}`, 10, salesPrice, "n"),
+      xlsxCellXml(`H${r}`, 10, stockInReceiptLineTotal(line), "n"),
     ]);
   }
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   const totalRow = rowNum;
-  merges.push(`A${totalRow}:F${totalRow}`);
+  merges.push(`A${totalRow}:G${totalRow}`);
   pushRow(16.5, [
     xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
-    ...emptyCells(totalRow, "B", "F", 10),
-    xlsxCellXml(`G${totalRow}`, 10, receipt.totalAmount, "n"),
+    ...emptyCells(totalRow, "B", "G", 10),
+    xlsxCellXml(`H${totalRow}`, 10, receipt.totalAmount, "n"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   const signDots = "....................................................";
   const pushSignatureBlock = (roleLabel) => {
     const nameRow = rowNum;
-    merges.push(`C${nameRow}:G${nameRow}`);
+    merges.push(`C${nameRow}:${lastCol}${nameRow}`);
     pushRow(null, [
       xlsxCellXml(`A${nameRow}`, 17, si(roleLabel), "s"),
       xlsxCellXml(`B${nameRow}`, 18, si("Нэр"), "s"),
@@ -15285,7 +15376,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
       ...emptyCells(nameRow, "D", lastCol, 18),
     ]);
     const signRow = rowNum;
-    merges.push(`C${signRow}:G${signRow}`);
+    merges.push(`C${signRow}:${lastCol}${signRow}`);
     pushRow(null, [
       xlsxCellXml(`A${signRow}`, 12, null, "empty"),
       xlsxCellXml(`B${signRow}`, 6, si("Гарын үсэг"), "s"),
@@ -15298,7 +15389,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
   pushSignatureBlock("Хүлээн авсан:");
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="8" customWidth="1"/><col min="4" max="4" width="10" customWidth="1"/><col min="5" max="5" width="12" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="14" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.95" right="0.7" top="1.2" bottom="0.85" header="0.4" footer="0.4"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="24" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="7.5" customWidth="1"/><col min="4" max="4" width="9" customWidth="1"/><col min="5" max="5" width="7.5" customWidth="1"/><col min="6" max="6" width="11" customWidth="1"/><col min="7" max="7" width="11" customWidth="1"/><col min="8" max="8" width="12" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.55" top="1" bottom="0.75" header="0.35" footer="0.35"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 
