@@ -12410,40 +12410,24 @@ function stockInTakeRowHtml({
   oninput = "stockInQtyFieldsInput(this)",
   placeholder = "0",
   ariaLabel = "",
+  hint = "",
+  hintAttr = "",
 }) {
   const idAttr = `stock-in-${name}`;
   const inputAttrs = readonly
     ? `id="${idAttr}" name="${name}" readonly tabindex="-1" data-stock-in-${name}`
     : `id="${idAttr}" name="${name}" oninput="${oninput}"`;
   const inputClass = `stock-in-take__input${accent ? " stock-in-take__input--accent" : ""}${soft ? " stock-in-take__input--soft" : ""}`;
-  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><span class="stock-in-take__label">${label}</span><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label></div>`;
-}
-function syncStockInSmallPacksFromLarge(scope) {
-  if (!scope) return;
-  const largeInput = scope.querySelector('input[name="largePacks"]');
-  const packsInput = scope.querySelector('input[name="packs"]');
-  const root = scope.closest?.(".stock-in-take") || scope;
-  const largeCount = Math.max(
-    0,
-    Math.floor(Number(root.dataset?.largeBoxCount || 0) || 0),
-  );
-  if (!largeInput || !packsInput || largeCount <= 0) return;
-  const lp = Math.max(0, Math.floor(Number(largeInput.value) || 0));
-  const derived = lp * largeCount;
-  packsInput.value = derived > 0 ? String(derived) : "";
-  packsInput.classList.toggle("stock-in-take__input--soft", derived > 0);
-  packsInput.dataset.autoFromLarge = derived > 0 ? "1" : "";
+  const hintHtml =
+    hintAttr || hint
+      ? `<p class="stock-in-take__hint"${hintAttr ? ` ${hintAttr}` : ""}>${hint}</p>`
+      : "";
+  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><span class="stock-in-take__label">${label}</span><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label>${hintHtml}</div>`;
 }
 function stockInLargePacksInput(el) {
-  const form = el?.closest?.("form") || el?.closest?.(".stock-in-take");
-  syncStockInSmallPacksFromLarge(form);
   stockInQtyFieldsInput(el);
 }
 function stockInSmallPacksInput(el) {
-  if (el) {
-    el.classList.remove("stock-in-take__input--soft");
-    delete el.dataset.autoFromLarge;
-  }
   stockInQtyFieldsInput(el);
 }
 function stockInQtyFieldsInput(_el) {
@@ -12454,11 +12438,6 @@ function stockInQtyFieldsInput(_el) {
     form;
   if (!root) return;
   const scope = form || root;
-  const name = String(_el?.name || _el?.getAttribute?.("name") || "");
-  // Том өөрчлөгдөхөд жижиг = том × (1 том дахь жижиг), засах боломжтой
-  if (name === "largePacks") {
-    syncStockInSmallPacksFromLarge(scope);
-  }
   const largePacks =
     scope.querySelector('input[name="largePacks"]')?.value ?? "";
   const packs = scope.querySelector('input[name="packs"]')?.value ?? "";
@@ -12489,19 +12468,13 @@ function stockInQtyFieldsInput(_el) {
   const totalCostEl = scope.querySelector("[data-stock-in-total-cost]");
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
   const fromLarge = largeCount ? lp * largeCount : 0;
-  const largeDerived =
-    pk > 0 ? 0 : stockInPackDerivedPieces(largePacks, largePieces);
-  const smallDerived =
-    pk > 0
-      ? pk * smallSize
-      : fromLarge > 0
-        ? fromLarge * smallSize
-        : 0;
+  const totalSmall = fromLarge + pk;
   const total =
-    largeDerived +
-    smallDerived +
-    Math.max(0, Math.floor(Number(pieces) || 0));
+    (largePieces ? lp * largePieces : 0) +
+    (smallSize ? pk * smallSize : 0) +
+    pc;
   const unitCost = costTyped
     ? Math.max(0, Math.floor(Number(costRaw) || 0))
     : priorCost;
@@ -12514,7 +12487,7 @@ function stockInQtyFieldsInput(_el) {
   }
   if (largePreview) {
     if (lp > 0 && largeCount) {
-      largePreview.textContent = `= ${lp * largeCount} жижиг`;
+      largePreview.textContent = `= ${fromLarge} жижиг хайрцаг`;
     } else if (largeCount && smallSize) {
       largePreview.textContent = `1 том = ${largeCount} жижиг (= ${largePieces} ш)`;
     } else {
@@ -12522,11 +12495,15 @@ function stockInQtyFieldsInput(_el) {
     }
   }
   if (packPreview) {
-    packPreview.textContent = smallDerived
-      ? `= ${smallDerived} ширхэг`
-      : smallSize
-        ? `1 жижиг = ${smallSize} ширхэг`
-        : "";
+    if (fromLarge > 0) {
+      packPreview.textContent = `Нийт жижиг: ${totalSmall}`;
+    } else if (pk > 0 && smallSize) {
+      packPreview.textContent = `= ${pk * smallSize} ширхэг`;
+    } else if (smallSize) {
+      packPreview.textContent = `1 жижиг = ${smallSize} ширхэг`;
+    } else {
+      packPreview.textContent = "";
+    }
   }
   if (totalPreview) {
     totalPreview.textContent = total > 0 ? `Нийт: ${total} ширхэг` : "";
@@ -12542,23 +12519,30 @@ function stockInPackQtyFieldsHtml(p, d = {}) {
     d.largePacks != null && d.largePacks !== ""
       ? esc(String(d.largePacks))
       : "";
-  const packsVal =
-    d.packs != null && d.packs !== "" ? esc(String(d.packs)) : "";
+  let packsExclusive = Math.max(0, Math.floor(Number(d.packs) || 0));
+  const lpN = Math.max(0, Math.floor(Number(d.largePacks) || 0));
+  if (largeCount > 1 && lpN > 0 && packsExclusive >= lpN * largeCount) {
+    packsExclusive -= lpN * largeCount;
+  }
+  const packsVal = packsExclusive > 0 ? esc(String(packsExclusive)) : "";
   const qtyVal = d.qty != null && d.qty !== "" ? esc(String(d.qty)) : "";
   if (!smallSize && !largePieces) {
     return `<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг"></label>`;
   }
   const total = stockInEntryTotalQty(d.largePacks, d.packs, d.qty, p);
-  const largePreviewText = stockInPackDerivedPieces(d.largePacks, largePieces)
-    ? `= ${stockInPackDerivedPieces(d.largePacks, largePieces)} ширхэг`
+  const fromLarge = largeCount ? lpN * largeCount : 0;
+  const largePreviewText = fromLarge
+    ? `= ${fromLarge} жижиг хайрцаг`
     : largeCount && smallSize
       ? `1 том = ${largeCount} жижиг (= ${largePieces} ш)`
       : "";
-  const packPreviewText = smallSize
-    ? stockInPackDerivedPieces(d.packs, smallSize)
-      ? `= ${stockInPackDerivedPieces(d.packs, smallSize)} ширхэг`
-      : `1 жижиг = ${smallSize} ширхэг`
-    : "";
+  const packPreviewText = fromLarge
+    ? `Нийт жижиг: ${fromLarge + packsExclusive}`
+    : smallSize
+      ? packsExclusive
+        ? `= ${packsExclusive * smallSize} ширхэг`
+        : `1 жижиг = ${smallSize} ширхэг`
+      : "";
   const totalPreviewText = total > 0 ? `Нийт: ${total} ширхэг` : "";
   const largeField = largePieces
     ? `<label class="block"><span class="field-label">Том хайрцаг</span><input name="largePacks" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${largeVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} том хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-large-preview>${largePreviewText}</p></label>`
@@ -12581,15 +12565,13 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const priorCost = productCostPrice(p) || 0;
   const largeVal =
     d.largePacks != null && d.largePacks !== "" ? String(d.largePacks) : "";
-  let packsVal = d.packs != null && d.packs !== "" ? String(d.packs) : "";
-  if (
-    !packsVal &&
-    largeVal &&
-    largeCount > 0 &&
-    Math.floor(Number(largeVal) || 0) > 0
-  ) {
-    packsVal = String(Math.floor(Number(largeVal)) * largeCount);
+  let packsExclusive = Math.max(0, Math.floor(Number(d.packs) || 0));
+  const lpN = Math.max(0, Math.floor(Number(largeVal) || 0));
+  // Хуучин nested draft: packs = том×n (+ нэмэлт) → зөвхөн нэмэлт жижиг харуулна
+  if (largeCount > 1 && lpN > 0 && packsExclusive >= lpN * largeCount) {
+    packsExclusive -= lpN * largeCount;
   }
+  const packsVal = packsExclusive > 0 ? String(packsExclusive) : "";
   const qtyVal = d.qty != null && d.qty !== "" ? String(d.qty) : "";
   const costVal =
     d.costPrice != null && d.costPrice !== "" ? String(d.costPrice) : "";
@@ -12600,10 +12582,23 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
     : false;
   const initialTotal = stockInEntryTotalQty(
     largeVal,
-    packsVal || d.packs,
+    d.packs,
     d.qty,
     p,
   );
+  const fromLarge = largeCount && lpN > 0 ? lpN * largeCount : 0;
+  const largeHint = fromLarge
+    ? `= ${fromLarge} жижиг хайрцаг`
+    : largeCount && smallSize
+      ? `1 том = ${largeCount} жижиг (= ${largePieces} ш)`
+      : "";
+  const packHint = fromLarge
+    ? `Нийт жижиг: ${fromLarge + packsExclusive}`
+    : smallSize
+      ? packsExclusive
+        ? `= ${packsExclusive * smallSize} ширхэг`
+        : `1 жижиг = ${smallSize} ширхэг`
+      : "";
   const effectiveUnitCost = costVal
     ? Math.max(0, Math.floor(Number(costVal) || 0))
     : priorCost;
@@ -12627,12 +12622,6 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
     .filter(Boolean)
     .join("");
   const qtyRows = [];
-  const autoPacks =
-    !!packsVal &&
-    !!largeVal &&
-    largeCount > 0 &&
-    Math.floor(Number(packsVal) || 0) ===
-      Math.floor(Number(largeVal) || 0) * largeCount;
   if (largePieces) {
     qtyRows.push(
       stockInTakeRowHtml({
@@ -12642,6 +12631,8 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
         value: largeVal,
         oninput: "stockInLargePacksInput(this)",
         ariaLabel: `${p.name} том хайрцаг`,
+        hint: largeHint,
+        hintAttr: 'data-stock-in-large-preview',
       }),
     );
   }
@@ -12652,9 +12643,10 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
         label: "Жижиг хайрцагны тоо",
         name: "packs",
         value: packsVal,
-        soft: autoPacks,
         oninput: "stockInSmallPacksInput(this)",
         ariaLabel: `${p.name} жижиг хайрцаг`,
+        hint: packHint,
+        hintAttr: 'data-stock-in-pack-preview',
       }),
     );
   }
@@ -13510,22 +13502,11 @@ function stockInPackDerivedPieces(packs, packSize) {
   return pk * size;
 }
 function stockInEntryTotalQty(largePacks, packs, pieces, p) {
-  // Орлого: жижиг nested (том-оос автоматаар орсон тоо packs-д орно)
-  const small = productPackSize(p);
-  const largeCount = productLargeBoxCount(p);
-  const largePieces = productLargeBoxPieceCount(p);
-  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
-  const pk = Math.max(0, Math.floor(Number(packs) || 0));
-  const pc = Math.max(0, Math.floor(Number(pieces) || 0));
-  let total = pc;
-  if (small) {
-    if (pk > 0) total += pk * small;
-    else if (largeCount && lp > 0) total += lp * largeCount * small;
-    else if (largePieces && lp > 0) total += lp * largePieces;
-  } else if (largePieces) {
-    total += lp * largePieces;
-  }
-  return total;
+  return productBoxQtyTotal(p, {
+    largePacks,
+    packs,
+    qty: pieces,
+  });
 }
 function applyStockInEntryModal(e, id) {
   e.preventDefault();
