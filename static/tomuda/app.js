@@ -13166,7 +13166,7 @@ function finalizeStockOutReceipt(receipt) {
 }
 function stockOutReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `Зарлагын-баримт-${no}.xlsx` : `Зарлагын-баримт-${todayIso()}.xlsx`;
+  return no ? `Зарлагын-баримт-${no}.xls` : `Зарлагын-баримт-${todayIso()}.xls`;
 }
 function stockOutReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -13423,7 +13423,8 @@ function finalizeStockInReceipt(receipt) {
 }
 function stockInReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `Орлогын-баримт-${no}.xlsx` : `Орлогын-баримт-${todayIso()}.xlsx`;
+  // SpreadsheetML download — must be .xls (not .xlsx) or Excel runs OOXML repair.
+  return no ? `Орлогын-баримт-${no}.xls` : `Орлогын-баримт-${todayIso()}.xls`;
 }
 function stockInReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -14227,15 +14228,12 @@ function stockOutPanel(list) {
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   if (!receipt?.lines?.length) return alert("Орлогын баримт байхгүй");
-  // SpreadsheetML .xls — Excel never shows the OOXML "We found a problem"
-  // repair dialog (that only happens on broken .xlsx packages).
+  // Only SpreadsheetML .xls — never emit OOXML .xlsx (Excel repair dialog).
   try {
     exportStockInExcelFallback(receipt);
   } catch (err) {
-    console.warn("Stock-in .xls failed, trying xlsx", err);
-    exportStockInExcelXlsx(receipt).catch(() =>
-      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
-    );
+    console.warn("Stock-in excel failed", err);
+    alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
   }
 }
 function confirmStockInExcel() {
@@ -14461,10 +14459,8 @@ function exportStockOutExcel(receipt) {
   try {
     exportStockOutExcelFallback(receipt);
   } catch (err) {
-    console.warn("Stock-out .xls failed, trying xlsx", err);
-    exportStockOutExcelXlsx(receipt).catch(() =>
-      alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу."),
-    );
+    console.warn("Stock-out excel failed", err);
+    alert("Мэдээлэл татахад алдаа гарлаа. Дахин оролдоно уу.");
   }
 }
 function exportStockOutExcelFallback(receipt) {
@@ -20033,11 +20029,71 @@ function destroyDeliveryMap() {
     window.deliveryMapResizeTimer = null;
   }
   cleanupDeliveryMapInstance();
+  window.deliveryMapSelectedId = "";
   const el = document.getElementById("deliveryMap");
   if (el) {
     el.removeAttribute("data-leaflet-id");
     el._leaflet_id = undefined;
     el.innerHTML = "";
+  }
+}
+/** Keep the live Leaflet host across SPA re-renders (search/filter/etc.). */
+function detachDeliveryMapHost() {
+  const el = document.getElementById("deliveryMap");
+  if (!el || !window.deliveryMap) return null;
+  try {
+    el.remove();
+  } catch (e) {
+    return null;
+  }
+  return el;
+}
+function restoreDeliveryMapHost(savedEl) {
+  const slot = document.getElementById("deliveryMap");
+  if (!savedEl || !slot || !window.deliveryMap) return false;
+  try {
+    slot.replaceWith(savedEl);
+  } catch (e) {
+    return false;
+  }
+  const status = document.getElementById("deliveryMapStatus");
+  if (status) {
+    const n = window.deliveryMapMarkers?.length || 0;
+    status.textContent = n
+      ? `${n} дэлгүүр газрын зураг дээр`
+      : "Байршил бүртгэлтэй дэлгүүр байхгүй";
+  }
+  syncDeliveryMapSelection(state.deliveryStoreId);
+  scheduleDeliveryMapResize();
+  return true;
+}
+function syncDeliveryMapSelection(selectedId) {
+  if (!window.deliveryMap || !window.deliveryMapMarkers?.length) return;
+  window.deliveryMapSelectedId = selectedId || "";
+  window.deliveryMapMarkers.forEach((marker) => {
+    const id = marker.__deliveryStoreId;
+    if (!id) return;
+    const active = id === selectedId;
+    const name = marker.__deliveryStoreName || "Дэлгүүр";
+    const label = esc(String(name).slice(0, 22));
+    try {
+      marker.setIcon(
+        L.divIcon({
+          className: `delivery-map-pin${active ? " delivery-map-pin--active" : ""}`,
+          html: `<span class="delivery-map-pin__dot" aria-hidden="true"></span><span class="delivery-map-pin__label">${label}</span>`,
+          iconSize: [120, 44],
+          iconAnchor: [60, 28],
+        }),
+      );
+    } catch (e) {}
+  });
+  const active = window.deliveryMapMarkers.find(
+    (m) => m.__deliveryStoreId === selectedId,
+  );
+  if (active?.getLatLng) {
+    try {
+      window.deliveryMap.setView(active.getLatLng(), 15);
+    } catch (e) {}
   }
 }
 function scheduleDeliveryMapResize() {
@@ -20059,6 +20115,16 @@ function initDeliveryRouteMap(stores, selectedId) {
     loadLeaflet(() => initDeliveryRouteMap(stores, selectedId));
     return;
   }
+  // Already mounted on this same DOM node for this selection — only resize.
+  if (
+    window.deliveryMap &&
+    el._leaflet_id &&
+    window.deliveryMapSelectedId === selectedId &&
+    window.deliveryMap.getContainer?.() === el
+  ) {
+    scheduleDeliveryMapResize();
+    return;
+  }
   cleanupDeliveryMapInstance();
   if (!document.getElementById("deliveryMap")) return;
   const mapEl = document.getElementById("deliveryMap");
@@ -20076,10 +20142,14 @@ function initDeliveryRouteMap(stores, selectedId) {
     }));
   const selected = points.find((p) => p.id === selectedId) || points[0],
     start = selected ? [selected.lat, selected.lng] : [47.9189, 106.9176];
-  window.deliveryMap = L.map(mapEl, { tap: true, zoomControl: true }).setView(
-    start,
-    selected ? 15 : 12,
-  );
+  window.deliveryMap = L.map(mapEl, {
+    tap: true,
+    zoomControl: true,
+    // Prefer touch-friendly defaults; avoid double-init flicker.
+    fadeAnimation: false,
+    zoomAnimation: true,
+  }).setView(start, selected ? 15 : 12);
+  window.deliveryMapSelectedId = selectedId || "";
   window.deliveryTileLayer = L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     { maxZoom: 19, attribution: "&copy; OpenStreetMap" },
@@ -20101,6 +20171,8 @@ function initDeliveryRouteMap(stores, selectedId) {
         direction: "top",
         permanent: false,
       });
+    marker.__deliveryStoreId = p.id;
+    marker.__deliveryStoreName = p.name || "Дэлгүүр";
     marker.on("click", () => pickDeliveryStore(p.id));
     window.deliveryMapMarkers.push(marker);
     bounds.push([p.lat, p.lng]);
@@ -20778,6 +20850,11 @@ function render() {
   whReceiptPickerSkipAnim = isWhReceiptPickerOpen();
   const scrollSnap = captureRenderScroll();
   const scanSnap = captureStockInScanFocus();
+  const keepDeliveryMap =
+    state.currentView === "delivery" &&
+    state.deliveryStoreReady &&
+    !!window.deliveryMap;
+  const savedDeliveryMapHost = keepDeliveryMap ? detachDeliveryMapHost() : null;
   app.innerHTML = shell(view());
   lastRenderedView = state.currentView;
   restoreRenderScroll(scrollSnap);
@@ -20795,9 +20872,22 @@ function render() {
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     requestAnimationFrame(() => {
+      if (savedDeliveryMapHost && restoreDeliveryMapHost(savedDeliveryMapHost)) {
+        return;
+      }
+      if (savedDeliveryMapHost) {
+        try {
+          cleanupDeliveryMapInstance();
+        } catch (e) {}
+      }
       initDeliveryRouteMap(deliveryStoresWithOrders(), state.deliveryStoreId);
     });
   } else {
+    if (savedDeliveryMapHost) {
+      try {
+        cleanupDeliveryMapInstance();
+      } catch (e) {}
+    }
     destroyDeliveryMap();
   }
   if (state.currentView === "warehouseReceipts" && !isWhReceiptPickerOpen())
