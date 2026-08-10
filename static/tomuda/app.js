@@ -19430,6 +19430,8 @@ function clearWorkerOrderEditState() {
 }
 function canEditWorkerOrder(order) {
   if (!order || order.status === "cancelled") return false;
+  // Авлагатай (төлөөгүй) захиалга огт засахгүй.
+  if (!orderIsPaid(order)) return false;
   if (
     state.currentEmployee?.role === "sales" &&
     String(order.employeeId) !== String(state.currentEmployee.id)
@@ -22164,10 +22166,17 @@ function receiptEditDraftOrder() {
   return recalcOrderTotals(draft);
 }
 function orderReceiptEditRows() {
+  const order = state.orders.find(
+    (x) => x.id === state.receiptEditOrderId,
+  );
+  const editable = canEditWorkerOrder(order);
   return (state.receiptEditItems || [])
     .map((i, idx) => {
       if (i.isPromoFree) {
         return `<tr class="receipt-edit-row receipt-edit-row--promo"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum">0</td></tr>`;
+      }
+      if (!editable) {
+        return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty">${i.quantity}</td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
       }
       return `<tr class="receipt-edit-row"><td class="receipt-edit-row__name">${esc(i.productName)}</td><td class="receipt-edit-row__qty"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" class="receipt-edit-qty app-input" data-receipt-qty="${idx}" value="${i.quantity}" onfocus="receiptEditQtyFocus(this)" oninput="receiptEditQtyDraft(this)" onkeydown="receiptEditQtyKeydown(event, this)" onblur="receiptEditQtyCommit(this)" aria-label="${esc(i.productName)} тоо"></td><td class="receipt-edit-row__sum" data-receipt-line-total="${idx}">${fmt(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
@@ -22217,6 +22226,10 @@ function receiptEditQtyDraft(el) {
 }
 function receiptEditQtyCommit(el) {
   if (receiptEditQtyConfirmOpen) return;
+  const order = state.orders.find(
+    (x) => x.id === state.receiptEditOrderId,
+  );
+  if (!canEditWorkerOrder(order)) return;
   const idx = Number(el.getAttribute("data-receipt-qty"));
   const item = state.receiptEditItems?.[idx];
   if (!item || item.isPromoFree) return;
@@ -22272,6 +22285,7 @@ function adjustReceiptEditStock(beforeItems, afterItems) {
 function applyReceiptEditToOrder() {
   const o = state.orders.find((x) => x.id === state.receiptEditOrderId);
   if (!o || !state.receiptEditItems) return false;
+  if (!canEditWorkerOrder(o)) return false;
   const orig = state.receiptEditOriginalItems || o.items;
   adjustReceiptEditStock(orig, state.receiptEditItems);
   o.items = state.receiptEditItems.map((i) => ({ ...i }));
@@ -22289,9 +22303,15 @@ function orderReceiptModal(id, keepDraft = false) {
     state.receiptEditItems = items.map((i) => ({ ...i }));
   }
   const draft = receiptEditDraftOrder();
+  const editable = canEditWorkerOrder(o);
+  const lockNote = !editable
+    ? !orderIsPaid(o)
+      ? `<p class="receipt-edit-lock-note">Авлагатай захиалга засах боломжгүй.</p>`
+      : `<p class="receipt-edit-lock-note">Энэ захиалгыг засах эрхгүй.</p>`
+    : "";
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div><table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
+    `<div class="receipt-edit-modal${editable ? "" : " receipt-edit-modal--locked"}"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div>${lockNote}<table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
@@ -23465,7 +23485,13 @@ async function saveWorkerOrderEdit() {
     clearWorkerOrderEditState();
     return alert("Захиалга олдсонгүй");
   }
-  if (!canEditWorkerOrder(order)) return alert("Захиалга засах эрхгүй");
+  if (!canEditWorkerOrder(order)) {
+    return alert(
+      !orderIsPaid(order)
+        ? "Авлагатай захиалга засах боломжгүй"
+        : "Захиалга засах эрхгүй",
+    );
+  }
   const cart = workerCartSummary();
   if (!cart.paid.length) return alert("Бараа сонгоно уу");
   if (state.applyPercentDiscount && !workerPercentDiscountActive())

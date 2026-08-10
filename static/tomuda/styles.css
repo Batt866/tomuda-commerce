@@ -1067,16 +1067,16 @@ textarea.text-sm,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: min(42vh, 360px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  /* Full history scrolls with the customer detail modal — no nested clip. */
+  max-height: none;
+  overflow: visible;
 }
 
 .customer-history__order {
   border: 1px solid var(--hex-border);
   border-radius: 12px;
   background: var(--hex-secondary);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .customer-history__summary {
@@ -1089,8 +1089,10 @@ textarea.text-sm,
   list-style: none;
 }
 
-.customer-history__summary::-webkit-details-marker {
+.customer-history__summary::-webkit-details-marker,
+.customer-history__summary::marker {
   display: none;
+  content: "";
 }
 
 .customer-history__summary-main {
@@ -1117,12 +1119,15 @@ textarea.text-sm,
 .customer-history__body {
   padding: 0 12px 12px;
   border-top: 1px dashed var(--hex-border);
+  overflow: visible;
 }
 
 .customer-history__meta {
   margin: 8px 0;
   font-size: 12px;
   color: var(--hex-muted-foreground);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .customer-history__items {
@@ -1141,16 +1146,24 @@ textarea.text-sm,
   gap: 10px;
   font-size: 13px;
   line-height: 1.35;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .customer-history__item-name {
+  flex: 1 1 auto;
   min-width: 0;
   font-weight: 600;
   color: var(--hex-foreground);
+  text-align: start;
+  direction: ltr;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .customer-history__item-qty {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   font-weight: 700;
   color: var(--hex-muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -5466,6 +5479,17 @@ button:focus-visible,
   gap: 14px;
   max-height: calc(90vh - 72px);
   overflow-y: auto;
+}
+
+.receipt-edit-lock-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-danger, #b42318) 10%, transparent);
+  color: var(--hex-danger, #b42318);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .receipt-edit-store {
