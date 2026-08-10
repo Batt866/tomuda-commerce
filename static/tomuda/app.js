@@ -11202,17 +11202,19 @@ function customerCardPhonesHtml(c) {
   return `<div class="customer-card__phones">${phones
     .map(
       (phone) =>
-        `<button type="button" class="customer-card__phone-link" data-phone="${esc(phone)}" onclick="dialPhoneNumber(this.getAttribute('data-phone'))" aria-label="Залгах ${esc(phone)}">${customerCardPhoneIcon()}<span>${esc(phone)}</span></button>`,
+        `<button type="button" class="customer-card__phone-link" data-phone="${esc(phone)}" onclick="event.stopPropagation();dialPhoneNumber(this.getAttribute('data-phone'))" aria-label="Залгах ${esc(phone)}">${customerCardPhoneIcon()}<span>${esc(phone)}</span></button>`,
     )
     .join("")}</div>`;
 }
 function customerListHead() {
-  return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
+  return `<div class="customer-list__head" aria-hidden="true"><span class="customer-list__col customer-list__col--name">Харилцагч</span><span class="customer-list__col customer-list__col--phone">Утас</span><span class="customer-list__col customer-list__col--addr">Хаяг</span><span class="customer-list__col customer-list__col--actions">Үйлдэл</span></div>`;
 }
 function customerListRow(c, actionsHtml, active = false) {
+  const id = esc(c.id);
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}</div>${customerCardPhonesHtml(c)}</div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  const phones = customerCardPhonesHtml(c);
+  return `<article class="customer-card customer-card--clickable${active ? " customer-card--active" : ""}" data-customer-id="${id}" role="button" tabindex="0" onclick="customerDetail('${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();customerDetail('${id}')}"><div class="customer-card__main"><span class="customer-card__media" aria-hidden="true">${customerAvatarHtml(c, "customer-card__img")}</span><div class="customer-card__copy"><p class="customer-card__title">${esc(customerDisplayName(c))}</p>${sub ? `<p class="customer-card__subtitle">${esc(sub)}</p>` : `<p class="customer-card__subtitle">—</p>`}</div></div><div class="customer-card__fields"><div class="customer-card__phone-cell">${phones}</div><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div></div>${actionsHtml ? `<div class="customer-card__actions" onclick="event.stopPropagation()">${actionsHtml}</div>` : ""}</article>`;
 }
 function focusSavedCustomer(customerId, customerName) {
   if (!customerId) return;
@@ -11259,7 +11261,7 @@ function customersView() {
       hasPermission("customerAdd.view")
         ? pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer")
         : "";
-  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="list-panel list-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="list-panel__table">${customerListHead()}<div class="list-panel__body customer-list">${rows.length ? rows.map(customerRow).join("") : `<div class="list-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div></div>`;
+  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${rows.length ? `${customerListHead()}${rows.map(customerRow).join("")}` : `<div class="line-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Мэдээлэл татах уу?") {
   confirmModal(title, message, {
@@ -12004,21 +12006,23 @@ function customerRow(c) {
   const id = esc(c.id);
   const editBtn = canEditCustomer()
     ? editIconButton({
-        className: "customer-card__icon-btn",
+        className:
+          "customer-card__action-btn customer-card__action-btn--edit",
         attrs: `onclick="confirmEditCustomer('${id}')"`,
         label: "Харилцагч засах",
       })
     : "";
   const deleteBtn = canDelete()
     ? deleteIconButton({
-        className: "customer-card__icon-btn",
+        className:
+          "customer-card__action-btn customer-card__action-btn--delete",
         attrs: `data-confirm-delete="customer" data-id="${id}"`,
         label: "Харилцагч устгах",
       })
     : "";
   return customerListRow(
     c,
-    `${viewIconButton({ className: "customer-card__icon-btn", attrs: `onclick="customerDetail('${id}')"`, label: "Харах" })}${editBtn}${deleteBtn}`,
+    `${editBtn}${deleteBtn}`,
     state.customerHighlightId === c.id,
   );
 }
