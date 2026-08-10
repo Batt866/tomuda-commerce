@@ -15652,19 +15652,35 @@ body.image-lightbox-open {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px 10px;
+  padding: 8px 12px;
   border-radius: 12px;
   background: var(--hex-card);
   border: 1px solid var(--hex-border);
 }
 
-.stock-in-take__hint {
-  grid-column: 2 / -1;
-  margin: -2px 0 0;
-  font-size: 12px;
+.stock-in-take__text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  text-align: center;
+}
+
+.stock-in-take__label {
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.3;
+  color: var(--hex-foreground);
+  line-height: 1.1;
+}
+
+.stock-in-take__hint {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
   color: var(--hex-primary);
 }
 
@@ -15691,13 +15707,6 @@ body.image-lightbox-open {
 .stock-in-take__svg {
   width: 20px;
   height: 20px;
-}
-
-.stock-in-take__label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--hex-foreground);
-  line-height: 1.25;
 }
 
 .stock-in-take__control {
