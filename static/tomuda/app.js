@@ -14308,7 +14308,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-piece { width: 72px; }
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
-.stock-in td, .stock-in th { border: 1px dotted #999; padding: 4px 5px; vertical-align: middle; }
+.stock-in td, .stock-in th { border: 0.5pt solid #b0b0b0; padding: 4px 5px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
@@ -14318,7 +14318,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-small { background: #d9d9d9; }
 .head th.qty-piece { background: #bfbfbf; }
 .head th.qty-total { background: #d9d9d9; }
-.cat { text-align: center; font-weight: 800; background: #f7f7f7; }
+.cat { text-align: center; font-weight: 800; background: #bfbfbf; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
@@ -14529,7 +14529,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-piece { width: 72px; }
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
-.stock-in td, .stock-in th { border: 1px dotted #999; padding: 4px 5px; vertical-align: middle; }
+.stock-in td, .stock-in th { border: 0.5pt solid #b0b0b0; padding: 4px 5px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
@@ -14539,7 +14539,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-small { background: #d9d9d9; }
 .head th.qty-piece { background: #bfbfbf; }
 .head th.qty-total { background: #d9d9d9; }
-.cat { text-align: center; font-weight: 800; background: #f7f7f7; }
+.cat { text-align: center; font-weight: 800; background: #bfbfbf; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
@@ -16188,10 +16188,13 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
-/** Excel Gray Accent 3: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо) — visible, not washed out. */
+/** Excel Gray Accent 3: Lighter 80% / 60% / 40% (Том → Жижиг → Тоо). */
 const WAREHOUSE_PREPARE_GRAY_LARGE = "FFF2F2F2";
 const WAREHOUSE_PREPARE_GRAY_SMALL = "FFD9D9D9";
+/** Gray, Accent 3, Lighter 40% — Excel theme sample. */
 const WAREHOUSE_PREPARE_GRAY_PIECE = "FFBFBFBF";
+/** Category / section header fill (same Accent 3 Lighter 40%). */
+const WAREHOUSE_PREPARE_GRAY_CATEGORY = "FFBFBFBF";
 function warehousePrepareColWidthsFor() {
   return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
 }
@@ -16212,11 +16215,12 @@ function warehousePrepareFillIdForRgb(stylesXml, rgb) {
 function warehousePreparePatchStylesXml(stylesXml) {
   let out = String(stylesXml || "");
 
-  // Progressive gray Accent 3: Том/х light · Жижиг/х mid · Тоо/ш darkest.
+  // Progressive gray Accent 3: Том/х light · Жижиг/х mid · Тоо/ш Lighter 40%.
   const grayRgbs = [
     WAREHOUSE_PREPARE_GRAY_LARGE,
     WAREHOUSE_PREPARE_GRAY_SMALL,
     WAREHOUSE_PREPARE_GRAY_PIECE,
+    WAREHOUSE_PREPARE_GRAY_CATEGORY,
   ];
   const missingFills = grayRgbs
     .filter((rgb) => !out.includes(`rgb="${rgb}"`))
@@ -16239,6 +16243,10 @@ function warehousePreparePatchStylesXml(stylesXml) {
   const pieceFillId = warehousePrepareFillIdForRgb(
     out,
     WAREHOUSE_PREPARE_GRAY_PIECE,
+  );
+  const categoryFillId = warehousePrepareFillIdForRgb(
+    out,
+    WAREHOUSE_PREPARE_GRAY_CATEGORY,
   );
 
   // Table headers (style 7): single line, shrink — never wrap down.
@@ -16272,16 +16280,31 @@ function warehousePreparePatchStylesXml(stylesXml) {
     "$1$2",
   );
 
-  // Table grid (borderId 1): thinnest dotted — template uses solid thin (too heavy).
+  // Table grid (borderId 1): Excel «dotted» ≈ same weight as «thin» (still heavy).
+  // Use hair (finest) + soft gray so the grid reads thin, not bold black bars.
   const thinSolidGrid =
     '<border><left style="thin"><color indexed="64" /></left><right style="thin"><color indexed="64" /></right><top style="thin"><color indexed="64" /></top><bottom style="thin"><color indexed="64" /></bottom><diagonal /></border>';
   const thinSolidGridAlt =
     '<border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>';
-  const dottedGrid =
+  const dottedGridPrev =
     '<border><left style="dotted"><color rgb="FF999999"/></left><right style="dotted"><color rgb="FF999999"/></right><top style="dotted"><color rgb="FF999999"/></top><bottom style="dotted"><color rgb="FF999999"/></bottom><diagonal/></border>';
-  if (out.includes(thinSolidGrid)) out = out.replace(thinSolidGrid, dottedGrid);
+  const hairGrid =
+    '<border><left style="hair"><color rgb="FFB0B0B0"/></left><right style="hair"><color rgb="FFB0B0B0"/></right><top style="hair"><color rgb="FFB0B0B0"/></top><bottom style="hair"><color rgb="FFB0B0B0"/></bottom><diagonal/></border>';
+  if (out.includes(thinSolidGrid)) out = out.replace(thinSolidGrid, hairGrid);
   else if (out.includes(thinSolidGridAlt))
-    out = out.replace(thinSolidGridAlt, dottedGrid);
+    out = out.replace(thinSolidGridAlt, hairGrid);
+  else if (out.includes(dottedGridPrev)) out = out.replace(dottedGridPrev, hairGrid);
+
+  // Category row border (borderId 2): top+bottom only — also thin→hair.
+  const thinCatBorder =
+    '<border><left /><right /><top style="thin"><color indexed="64" /></top><bottom style="thin"><color indexed="64" /></bottom><diagonal /></border>';
+  const thinCatBorderAlt =
+    '<border><left/><right/><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border>';
+  const hairCatBorder =
+    '<border><left /><right /><top style="hair"><color rgb="FFB0B0B0"/></top><bottom style="hair"><color rgb="FFB0B0B0"/></bottom><diagonal /></border>';
+  if (out.includes(thinCatBorder)) out = out.replace(thinCatBorder, hairCatBorder);
+  else if (out.includes(thinCatBorderAlt))
+    out = out.replace(thinCatBorderAlt, hairCatBorder);
 
   // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
@@ -16300,6 +16323,12 @@ function warehousePreparePatchStylesXml(stylesXml) {
 
   const signXf =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
+  // Category row (style 15): Gray Accent 3 Lighter 40% fill.
+  const catXfPlain =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+  const catXfFilled =
+    `<xf numFmtId="0" fontId="2" fillId="${categoryFillId}" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>`;
+  if (out.includes(catXfPlain)) out = out.replace(catXfPlain, catXfFilled);
   const qtyHeadXf = (fillId) =>
     `<xf numFmtId="0" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`;
   const qtyCellXf = (fillId) =>
@@ -16644,7 +16673,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .prepare col.c-small { width: 11%; }
 .prepare col.c-piece { width: 9%; }
 .prepare col.c-stock { width: 14%; }
-.prepare td, .prepare th { border: 1px dotted #999; padding: 2px 4px; vertical-align: middle; }
+.prepare td, .prepare th { border: 0.5pt solid #b0b0b0; padding: 2px 4px; vertical-align: middle; }
 .prepare td.name,
 .prepare td.unit,
 .prepare td.barcode { text-align: left; white-space: nowrap; overflow: hidden; font-size: 11px; font-weight: 400; }
@@ -16655,13 +16684,13 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1px dotted #999; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
+.head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 0.5pt solid #b0b0b0; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
 .head th.qty-large { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-small { background: #d9d9d9; white-space: nowrap; }
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 28px; background: #d8dce0; white-space: nowrap; }
-.promo-head { border-top: 1px dotted #999 !important; }
+.cat { text-align: center; font-weight: 800; height: 28px; background: #bfbfbf; white-space: nowrap; }
+.promo-head { border-top: 0.5pt solid #b0b0b0 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
