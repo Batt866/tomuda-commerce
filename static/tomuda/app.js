@@ -9712,18 +9712,18 @@ function warehousePrepareStylesXml() {
 /** Light blue for «Нийт тоо/ш» (matches zarlaga sample). */
 const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFBDD7EE";
 /**
- * Style ids after stockReceiptPatchStylesXml(receiptXlsxStylesXml()):
- * base 59 (0–58) + prepare (sign + 6 qty) + total blue head/cell.
- * 59 sign · 60–65 Том/Жижиг/Тоо · 66–67 Нийт тоо/ш.
+ * Style ids after stockReceiptPatchStylesXml(warehouse-prepare template):
+ * base 19 (0–18) + prepare (sign + 6 qty) + total blue head/cell.
+ * 19 sign · 20–25 Том/Жижиг/Тоо · 26–27 Нийт тоо/ш.
  */
-const STOCK_RECEIPT_LARGE_HEAD_STYLE = 60;
-const STOCK_RECEIPT_LARGE_CELL_STYLE = 61;
-const STOCK_RECEIPT_SMALL_HEAD_STYLE = 62;
-const STOCK_RECEIPT_SMALL_CELL_STYLE = 63;
-const STOCK_RECEIPT_PIECE_HEAD_STYLE = 64;
-const STOCK_RECEIPT_PIECE_CELL_STYLE = 65;
-const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 66;
-const STOCK_RECEIPT_TOTAL_CELL_STYLE = 67;
+const STOCK_RECEIPT_LARGE_HEAD_STYLE = 20;
+const STOCK_RECEIPT_LARGE_CELL_STYLE = 21;
+const STOCK_RECEIPT_SMALL_HEAD_STYLE = 22;
+const STOCK_RECEIPT_SMALL_CELL_STYLE = 23;
+const STOCK_RECEIPT_PIECE_HEAD_STYLE = 24;
+const STOCK_RECEIPT_PIECE_CELL_STYLE = 25;
+const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 26;
+const STOCK_RECEIPT_TOTAL_CELL_STYLE = 27;
 /** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
 const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
 function stockReceiptQtyHeadXf(fillId) {
@@ -9758,7 +9758,26 @@ function stockReceiptPatchStylesXml(stylesXml) {
   return out;
 }
 function stockReceiptStylesXml() {
+  // Kept for callers that build styles without the template zip. Prefer
+  // stockReceiptPatchStylesXml(templateStyles) in Excel exports.
   return stockReceiptPatchStylesXml(receiptXlsxStylesXml());
+}
+/** Drop template printerSettings / absPath that make Excel repair the file. */
+async function sanitizeWarehouseXlsxZip(zip) {
+  if (!zip) return zip;
+  zip.remove("xl/printerSettings/printerSettings1.bin");
+  zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
+  const wbFile = zip.file("xl/workbook.xml");
+  if (wbFile) {
+    let wb = await wbFile.async("string");
+    wb = wb.replace(
+      /<mc:AlternateContent[\s\S]*?<\/mc:AlternateContent>/g,
+      "",
+    );
+    wb = wb.replace(/<xr:revisionPtr\b[^>]*\/>/g, "");
+    zip.file("xl/workbook.xml", wb);
+  }
+  return zip;
 }
 function receiptDrawingXml() {
   // Fixed ~14mm logo via oneCellAnchor (size does not depend on narrow column A).
@@ -15531,9 +15550,13 @@ async function exportStockInExcelXlsx(receipt) {
     return r.arrayBuffer();
   });
   const zip = await JSZip.loadAsync(tpl);
+  const stylesXml = stockReceiptPatchStylesXml(
+    await zip.file("xl/styles.xml").async("string"),
+  );
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", stockReceiptStylesXml());
+  zip.file("xl/styles.xml", stylesXml);
+  await sanitizeWarehouseXlsxZip(zip);
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
 }
@@ -15688,7 +15711,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
     const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
-      xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
+      xlsxBarcodeCell(`B${r}`, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, line.barcode, si),
       xlsxPrepareQtyCell(
         `C${r}`,
         STOCK_RECEIPT_LARGE_CELL_STYLE,
@@ -15765,9 +15788,13 @@ async function exportStockOutExcelXlsx(receipt) {
     return r.arrayBuffer();
   });
   const zip = await JSZip.loadAsync(tpl);
+  const stylesXml = stockReceiptPatchStylesXml(
+    await zip.file("xl/styles.xml").async("string"),
+  );
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", stockReceiptStylesXml());
+  zip.file("xl/styles.xml", stylesXml);
+  await sanitizeWarehouseXlsxZip(zip);
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockOutReceiptFileName(receipt));
 }
@@ -15959,7 +15986,12 @@ const XLSX_BARCODE_CELL_STYLE = 34; // numFmtId 49 (@) — full digits, no scien
 function xlsxBarcodeCell(ref, styleId, barcode, si) {
   const text = String(barcode ?? "").trim();
   if (!text) return xlsxCellXml(ref, styleId, null, "empty");
-  return xlsxCellXml(ref, XLSX_BARCODE_CELL_STYLE, text, "inlineStr");
+  // Use caller style when provided (warehouse template). Receipt sheets pass 34 (@).
+  const style =
+    styleId == null || styleId === ""
+      ? XLSX_BARCODE_CELL_STYLE
+      : styleId;
+  return xlsxCellXml(ref, style, text, "inlineStr");
 }
 function warehousePrepareBarcodeCell(ref, barcode, si) {
   const text = String(barcode ?? "").trim();
@@ -16369,11 +16401,10 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   const stylesXml = warehousePreparePatchStylesXml(
     await zip.file("xl/styles.xml").async("string"),
   );
-  zip.file("xl/sharedStrings.xml", sharedStringsXml);
+      zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
   zip.file("xl/styles.xml", stylesXml);
-  zip.remove("xl/printerSettings/printerSettings1.bin");
-  zip.remove("xl/worksheets/_rels/sheet1.xml.rels");
+  await sanitizeWarehouseXlsxZip(zip);
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `Агуулах-бэлдэх-${stamp}.xlsx`);
 }
