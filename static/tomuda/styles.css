@@ -15239,6 +15239,18 @@ textarea::placeholder {
   cursor: not-allowed;
 }
 
+.worker-order-cancel-btn--block {
+  width: 100%;
+  text-align: center;
+  padding: 11px 12px;
+  font-size: 13px;
+}
+
+.receipt-edit-actions {
+  display: flex;
+  margin-top: 2px;
+}
+
 .worker-orders-filters {
   display: flex;
   flex-wrap: wrap;

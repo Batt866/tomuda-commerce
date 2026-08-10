@@ -20572,6 +20572,7 @@ function cancelWorkerOrderNow(id) {
     });
   }
   order.status = "cancelled";
+  closeModal();
   if (String(state.editingOrderId) === String(id)) {
     clearWorkerOrderEditState();
     state.workerStoreReady = false;
@@ -20586,7 +20587,7 @@ function cancelWorkerOrderNow(id) {
   showAppToast("Захиалга цуцлагдлаа", "success");
   criticalBackendSave();
 }
-function confirmCancelWorkerOrder(id) {
+function confirmCancelWorkerOrder(id, returnToReceipt = false) {
   const order = state.orders.find((x) => String(x.id) === String(id));
   if (!canCancelWorkerOrder(order)) {
     return alertModal("Эрхгүй", "Захиалга цуцлах эрхгүй.");
@@ -20600,6 +20601,7 @@ function confirmCancelWorkerOrder(id) {
       danger: true,
       focusCancel: true,
       onConfirm: () => cancelWorkerOrderNow(id),
+      onCancel: returnToReceipt ? () => orderReceiptModal(id) : undefined,
     },
   );
 }
@@ -23428,14 +23430,18 @@ function orderReceiptModal(id, keepDraft = false) {
   }
   const draft = receiptEditDraftOrder();
   const editable = canEditWorkerOrder(o);
+  const cancellable = canCancelWorkerOrder(o);
   const lockNote = !editable
     ? !orderIsPaid(o)
       ? `<p class="receipt-edit-lock-note">Авлагатай захиалга засах боломжгүй.</p>`
       : `<p class="receipt-edit-lock-note">Энэ захиалгыг засах эрхгүй.</p>`
     : "";
+  const cancelBtn = cancellable
+    ? `<div class="receipt-edit-actions"><button type="button" onclick="confirmCancelWorkerOrder('${esc(o.id)}', true)" class="worker-order-cancel-btn worker-order-cancel-btn--block">Захиалга цуцлах</button></div>`
+    : "";
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal${editable ? "" : " receipt-edit-modal--locked"}"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div>${lockNote}<table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div></div>`,
+    `<div class="receipt-edit-modal${editable ? "" : " receipt-edit-modal--locked"}"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div>${lockNote}<table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div>${cancelBtn}</div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
