@@ -115,9 +115,9 @@ PRODUCT_HEADER_ALIASES: dict[str, str] = {
 }
 
 UNIT_ALIASES: dict[str, str] = {
-    "кг": "KG",
-    "kg": "KG",
-    "KG": "KG",
+    "кг": "кг",
+    "kg": "кг",
+    "KG": "кг",
     "ширхэг": "ширхэг",
     "ш": "ширхэг",
     "ш.": "ширхэг",
@@ -229,7 +229,7 @@ def _normalize_unit(value: str) -> tuple[str | None, str | None]:
     normalized = UNIT_ALIASES.get(key) or UNIT_ALIASES.get(text) or UNIT_ALIASES.get(text.lower())
     if normalized:
         return normalized, None
-    if text in ("ширхэг", "KG", "метр"):
+    if text in ("ширхэг", "кг", "метр"):
         return text, None
     return None, f"Хэмжих нэгж буруу байна ({text})"
 

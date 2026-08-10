@@ -5160,6 +5160,7 @@ function applyPersistentState(data) {
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
   healOrderCustomerNames();
+  normalizeProductUnitsInState();
   return true;
 }
 function applyDeletionLogToCollections() {
@@ -5222,13 +5223,42 @@ function businessEntityDirty() {
   }
 }
 function pendingLocalStockMutation(serverState = {}) {
-  return localOnlyEntityIds(serverState).some(
-    (key) =>
-      key.startsWith("stockInReceipts:") ||
-      key.startsWith("stockOutReceipts:") ||
-      key.startsWith("inventoryLogs:") ||
-      key.startsWith("orders:"),
+  if (
+    localOnlyEntityIds(serverState).some(
+      (key) =>
+        key.startsWith("stockInReceipts:") ||
+        key.startsWith("stockOutReceipts:") ||
+        key.startsWith("inventoryLogs:") ||
+        key.startsWith("orders:"),
+    )
+  ) {
+    return true;
+  }
+  const remoteProducts = new Map(
+    (serverState.products || [])
+      .filter((p) => p?.id != null)
+      .map((p) => [String(p.id), p]),
   );
+  for (const p of state.products || []) {
+    const remote = remoteProducts.get(String(p.id));
+    if (!remote) continue;
+    const localStock = Number(p.stock) || 0;
+    const remoteStock = Number(remote.stock) || 0;
+    if (localStock === remoteStock) continue;
+    const pendingIn = (state.stockInReceipts || []).some((r) =>
+      (r.lines || []).some(
+        (line) => String(line.productId) === String(p.id),
+      ),
+    );
+    const pendingOut = (state.stockOutReceipts || []).some((r) =>
+      (r.lines || []).some(
+        (line) => String(line.productId) === String(p.id),
+      ),
+    );
+    if (pendingIn && localStock > remoteStock) return true;
+    if (pendingOut && localStock < remoteStock) return true;
+  }
+  return false;
 }
 const ENTITY_ID_KEYS = [
   "customers",
@@ -6176,6 +6206,34 @@ function qtyStepperApply(btn) {
   else return;
   if (inPicker) pickerQtyChange(id, q);
   else setWorkerQty(id, q);
+}
+const PRODUCT_UNIT_OPTIONS = ["ширхэг", "кг", "метр"];
+function normalizeProductUnit(unit) {
+  const u = String(unit || "").trim();
+  if (!u) return "ширхэг";
+  const lower = u.toLowerCase();
+  if (lower === "kg" || u === "KG") return "кг";
+  if (lower === "ш" || lower === "ш.") return "ширхэг";
+  if (PRODUCT_UNIT_OPTIONS.includes(u)) return u;
+  return u;
+}
+function productUnitOptionsHtml(selectedUnit) {
+  const sel = normalizeProductUnit(selectedUnit);
+  return PRODUCT_UNIT_OPTIONS.map(
+    (u) => `<option ${sel === u ? "selected" : ""}>${u}</option>`,
+  ).join("");
+}
+function normalizeProductUnitsInState() {
+  let changed = false;
+  state.products = (state.products || []).map((p) => {
+    const unit = normalizeProductUnit(p?.unit);
+    if (p?.unit !== unit) {
+      changed = true;
+      return { ...p, unit };
+    }
+    return p;
+  });
+  return changed;
 }
 function productPackSize(p) {
   const n = Number(p?.boxQuantity);
@@ -7803,7 +7861,11 @@ async function saveBackendState(retry = 0) {
         if (payload?.state) {
           const beforeSnapshot = backendStateSnapshot();
           const session = captureSessionSnapshot();
-          const merged = mergePersistentStates(payload.state, persistentState());
+          const keepStock = pendingLocalStockMutation(payload.state);
+          const merged = mergePersistentStates(payload.state, persistentState(), {
+            pullFromServer: keepStock,
+            keepLocalProductStock: keepStock,
+          });
           applyPersistentState(merged);
           restoreSessionSnapshot(session);
           appliedServerState = backendStateSnapshot() !== beforeSnapshot;
@@ -7825,7 +7887,10 @@ async function saveBackendState(retry = 0) {
         const stockDenied =
           /үлдэгдэл|өртөг|орлого\/зарлага/i.test(msg) && retry < 2;
         if (stockDenied) {
-          await realignLocalProductStockFromServer();
+          const latest = await fetchBackendPayload();
+          if (!pendingLocalStockMutation(latest?.state || {})) {
+            await realignLocalProductStockFromServer();
+          }
           persistOrderSnapshot();
           handoffRetry = true;
           backendSaving = false;
@@ -13253,31 +13318,46 @@ function buildStockInReceiptSnapshot(productIds = null) {
     lines,
   });
 }
+function stockInLineAlreadyApplied(receiptId, line) {
+  const productId = String(line?.productId || "");
+  const qty = Number(line?.quantity) || 0;
+  if (!productId || qty <= 0) return false;
+  return (state.inventoryLogs || []).some(
+    (log) =>
+      String(log.receiptId) === String(receiptId) &&
+      String(log.productId) === productId &&
+      String(log.type) === "in" &&
+      Number(log.quantity) === qty,
+  );
+}
 function applyStockInReceipt(receipt) {
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
   const saved = finalizeStockInReceipt(normalizeStockInReceiptTotals(receipt));
-  if (state.stockInReceipts.some((r) => r.id === saved.id)) return saved;
-  state.stockInReceipts.push({
-    id: saved.id,
-    receiptNumber: saved.receiptNumber,
-    receiptSeq: saved.receiptSeq,
-    monthKey: saved.monthKey,
-    createdAt: saved.createdAt,
-    employeeId: saved.employeeId,
-    employeeName: saved.employeeName,
-    lines: saved.lines,
-    totalAmount: saved.totalAmount,
-  });
-  for (const line of saved.lines) {
-    const p = state.products.find((x) => x.id === line.productId);
+  if (!state.stockInReceipts.some((r) => r.id === saved.id)) {
+    state.stockInReceipts.push({
+      id: saved.id,
+      receiptNumber: saved.receiptNumber,
+      receiptSeq: saved.receiptSeq,
+      monthKey: saved.monthKey,
+      createdAt: saved.createdAt,
+      employeeId: saved.employeeId,
+      employeeName: saved.employeeName,
+      lines: saved.lines,
+      totalAmount: saved.totalAmount,
+    });
+  }
+  for (const line of saved.lines || []) {
+    const productId = String(line?.productId || "");
+    const p = state.products.find((x) => String(x.id) === productId);
     if (!p) continue;
     const qty = Number(line.quantity) || 0;
     if (qty <= 0) continue;
+    if (stockInLineAlreadyApplied(saved.id, line)) continue;
     if (line.costPrice > 0) p.costPrice = line.costPrice;
-    stock(line.productId, qty, "in");
+    stock(p.id, qty, "in");
     state.inventoryLogs.push({
       id: nextInventoryLogId(),
-      productId: line.productId,
+      productId: p.id,
       productName: line.productName,
       type: "in",
       quantity: qty,
@@ -13396,7 +13476,7 @@ function stockOutEmployeeField() {
   );
 }
 function barcodeScannerPanelHtml() {
-  return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
+  return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
 }
 function captureStockInScanFocus() {
   const el = document.getElementById("stockInBarcodeInput");
@@ -13431,7 +13511,7 @@ function restoreStockInScanFocus(snap) {
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
-  return `<div class="stock-in-scan"><div class="stock-in-scan__field"><span class="stock-in-scan__label" id="stockInScanLabel">Баркод / нэр</span><div class="barcode-input-row barcode-input-row--scan"><input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="field-input app-input stock-in-scan__input" placeholder="Баркод эсвэл барааны нэр..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-labelledby="stockInScanLabel"><button type="button" tabindex="-1" onclick="stockInScanSubmit()" class="btn btn--secondary btn--sm stock-in-scan__btn">Хайх</button><button type="button" tabindex="-1" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Scan</button></div></div>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Баркод эсвэл нэрээр хайна. Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
+  return `<div class="stock-in-scan"><div class="stock-in-scan__field"><span class="stock-in-scan__label" id="stockInScanLabel">Баркод / нэр</span><div class="barcode-input-row barcode-input-row--scan"><input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="field-input app-input stock-in-scan__input" placeholder="Баркод эсвэл барааны нэр..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-labelledby="stockInScanLabel"><button type="button" tabindex="-1" onclick="stockInScanSubmit()" class="btn btn--secondary btn--sm stock-in-scan__btn">Хайх</button><button type="button" tabindex="-1" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Скан</button></div></div>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Баркод эсвэл нэрээр хайна. Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
 }
 function stockInScanDraft(el) {
   const value = String(el?.value || "");
@@ -13832,7 +13912,7 @@ function applyStockInEntryModal(e, id) {
   state.stockInReceipt = null;
   closeModal();
   render();
-  showAppToast(`${p.name} · ${qty} ш нэмэгдлээ`, "success");
+  showAppToast(`${p.name} · ${qty} ш жагсаалтад нэмэгдлээ`, "success");
 }
 function stockReceiptQtyParts(line) {
   const p =
@@ -13916,7 +13996,7 @@ function stockInReceiptRow(line) {
 }
 function stockInTableHead(mode = "entry") {
   if (mode === "entry") {
-    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Barcode</span><span>Хайрцаг</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
+    return `<div class="stock-in-table__head stock-in-table__head--entry"><span>Барааны нэр</span><span>Баркод</span><span>Хайрцаг</span><span>Тоо ширхэг</span><span>Өртөг үнэ</span></div>`;
   }
   return "";
 }
@@ -14073,7 +14153,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 <tr><td colspan="9" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
 <tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td colspan="2" class="date-value">${h(receivedDateValue.trim())}</td></tr>
 <tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<tr class="head"><th>Барааны нэр</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
 <tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
@@ -14285,7 +14365,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 <tr><td colspan="9" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
 <tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td colspan="2" class="date-value">${h(receivedDateValue.trim())}</td></tr>
 <tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<tr class="head"><th>Барааны нэр</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
 <tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
@@ -21610,14 +21690,14 @@ function productModal(id) {
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Scan</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо camera-д ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
+    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
       .map(
         (c) =>
           `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${["ширхэг", "KG", "метр"].map((u) => `<option ${p.unit === u ? "selected" : ""}>${u}</option>`).join("")}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -21770,7 +21850,7 @@ function productCountryFromBarcodeData(product) {
 }
 function productUnitFromBarcodeData(product) {
   const quantity = String(product.quantity || "").toLowerCase();
-  if (/\b(kg|g|гр|кг)\b/.test(quantity)) return "KG";
+  if (/\b(kg|g|гр|кг)\b/.test(quantity)) return "кг";
   if (/\b(m|cm|метр)\b/.test(quantity)) return "метр";
   return "ширхэг";
 }
@@ -21821,9 +21901,9 @@ async function fillProductFromBarcode(code) {
     if (status)
       status.textContent = values.name
         ? `${values.name} мэдээлэл автоматаар орлоо`
-        : "Олдсон мэдээллээр input-уудыг бөглөлөө";
+        : "Олдсон мэдээллээр талбаруудыг бөглөлөө";
   } catch (error) {
-    if (status) status.textContent = "Barcode мэдээлэл татаж чадсангүй";
+    if (status) status.textContent = "Баркодын мэдээлэл татаж чадсангүй";
     return;
   }
 }
@@ -21867,6 +21947,7 @@ function buildProductDataFromForm(form) {
     data.largeBoxQuantity = large;
   }
   data.country = String(data.country || "").trim() || "Монгол";
+  data.unit = normalizeProductUnit(data.unit);
   const image = readProductImageFromForm(form);
   if (image) data.image = image;
   else delete data.image;
@@ -23389,9 +23470,9 @@ async function startNativeBarcodeScan(video, status) {
         handleScannedBarcode(codes[0].rawValue);
         return;
       }
-      status.textContent = "Баркодоо camera-д ойртуулна уу";
+      status.textContent = "Баркодоо камер руу ойртуулна уу";
     } catch (e) {
-      status.textContent = "Scan уншиж чадсангүй";
+      status.textContent = "Скан уншиж чадсангүй";
     }
     barcodeScanFrame = requestAnimationFrame(scan);
   };
@@ -23401,7 +23482,7 @@ async function startZxingBarcodeScan(video, status) {
   const { BrowserMultiFormatReader } = await loadZxingBrowser();
   zxingReader = new BrowserMultiFormatReader();
   barcodeScanning = true;
-  status.textContent = "Баркодоо camera-д ойртуулна уу";
+  status.textContent = "Баркодоо камер руу ойртуулна уу";
   zxingControls = await zxingReader.decodeFromVideoDevice(
     undefined,
     video,
@@ -23412,7 +23493,7 @@ async function startZxingBarcodeScan(video, status) {
 }
 async function startBarcodeScan(target = "picker") {
   if (!navigator.mediaDevices?.getUserMedia)
-    return alert("Энэ browser camera scan дэмжихгүй байна.");
+    return alert("Энэ хөтөч баркод скан хийхийг дэмжихгүй.");
   stopBarcodeScan();
   barcodeScanTarget = target;
   const panel = document.getElementById("barcodeScanner");
@@ -23420,7 +23501,7 @@ async function startBarcodeScan(target = "picker") {
   const status = document.getElementById("barcodeStatus");
   if (!panel || !video) return;
   panel.hidden = false;
-  status.textContent = "Camera нээгдэж байна...";
+  status.textContent = "Камер нээгдэж байна...";
   panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   try {
     if ("BarcodeDetector" in window)
@@ -23430,7 +23511,7 @@ async function startBarcodeScan(target = "picker") {
     console.warn("Barcode scan failed", e);
     stopBarcodeScan();
     alert(
-      "Camera нээгдсэнгүй. Browser-д camera зөвшөөрөл өгөөд дахин оролдоно уу.",
+      "Камер нээгдсэнгүй. Хөтөчид камерын зөвшөөрөл өгөөд дахин оролдоно уу.",
     );
   }
 }

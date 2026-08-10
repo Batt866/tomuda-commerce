@@ -661,6 +661,84 @@ class StockInPermissionTests(TestCase):
         ok, message = validate_state_mutation(state, next_state, actor)
         self.assertTrue(ok, message)
 
+    def test_stock_in_allows_unit_and_min_stock_normalization(self):
+        from dashboard.permissions import validate_state_mutation
+
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "prod-1",
+                "barcode": "111",
+                "name": "Test",
+                "category": "Бусад",
+                "unit": "KG",
+                "price": 1000,
+                "costPrice": 0,
+                "stock": 10,
+                "minStock": 0,
+                "country": "Монгол",
+                "boxQuantity": 1,
+                "image": "",
+            }
+        ]
+        state["employees"] = [
+            {
+                "id": "wh-1",
+                "email": "wh@test.mn",
+                "name": "Warehouse",
+                "role": "warehouse",
+                "password": "x",
+            }
+        ]
+        state["stockInReceipts"] = []
+        state["inventoryLogs"] = []
+
+        next_state = json.loads(json.dumps(state))
+        next_state["stockInReceipts"] = [
+            {
+                "id": "sir-1",
+                "receiptNumber": "OR-202607-001",
+                "receiptSeq": 1,
+                "monthKey": "202607",
+                "createdAt": "2026-07-09T00:00:00",
+                "employeeId": "wh-1",
+                "employeeName": "Warehouse",
+                "lines": [
+                    {
+                        "productId": "prod-1",
+                        "productName": "Test",
+                        "quantity": 5,
+                        "costPrice": 800,
+                        "packs": 0,
+                    }
+                ],
+                "totalAmount": 4000,
+            }
+        ]
+        next_state["products"][0]["stock"] = 15
+        next_state["products"][0]["costPrice"] = 800
+        next_state["products"][0]["unit"] = "кг"
+        next_state["products"][0]["minStock"] = 3
+        next_state["inventoryLogs"] = [
+            {
+                "id": "log-1",
+                "productId": "prod-1",
+                "productName": "Test",
+                "type": "in",
+                "quantity": 5,
+                "costPrice": 800,
+                "packs": 0,
+                "date": "2026-07-09T00:00:00",
+                "employeeName": "Warehouse",
+                "receiptId": "sir-1",
+                "receiptNumber": "OR-202607-001",
+            }
+        ]
+
+        actor = {"id": "wh-1", "email": "wh@test.mn"}
+        ok, message = validate_state_mutation(state, next_state, actor)
+        self.assertTrue(ok, message)
+
     def test_stock_in_api_persists_for_warehouse_role(self):
         state = default_state()
         state["products"] = [
