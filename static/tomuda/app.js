@@ -8670,8 +8670,8 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* B fits «Дансны дугаар:»; C = right-flush IBAN only */
-.receipt-grid__a { width: 3.5%; } .receipt-grid__b { width: 18.5%; } .receipt-grid__c { width: 10.5%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 11.0%; }
-.receipt-grid__f { width: 11.0%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
+.receipt-grid__a { width: 3.5%; } .receipt-grid__b { width: 17.0%; } .receipt-grid__c { width: 10.5%; } .receipt-grid__d { width: 3.4%; } .receipt-grid__e { width: 13.5%; }
+.receipt-grid__f { width: 9.5%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.4%; } .receipt-grid__j { width: 10.9%; } .receipt-grid__k { width: 11.2%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -8991,7 +8991,8 @@ td, th { border: none; }
   vertical-align: middle;
   line-height: 1.12;
 }
-.receipt-items__unit { width: 9%; text-align: center; white-space: nowrap; overflow: visible; }
+.receipt-items__unit { width: 12%; text-align: center; white-space: nowrap; overflow: visible; }
+.receipt-items__head .receipt-items__unit { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
 .receipt-items__barcode {
   width: 18%;
   text-align: center;
@@ -9616,8 +9617,9 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 // ҮНДСЭН A–K: B fits «Дансны дугаар:»; C wide enough for right-flush «IBAN:»
+// E wide enough for «Хэмжих нэгж» / «ширхэг» on one line.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 18.5, 11.0, 2.875, 8.25, 9.25, 5.5, 4.875, 3.75, 9.25, 9.5,
+  3.0, 16.75, 11.0, 2.875, 11.5, 7.75, 5.5, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -16525,8 +16527,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ]);
   };
   pushWarehousePrepareSignatureBlock("Хүлээн өгсөн ажилтан:");
-  pushRow(6, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
+  pushRow(15, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
   pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
+  pushRow(15, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
   const lastRow = rowNum;
   const sheetXml = warehousePrepareWorksheetXml(
     rows,
@@ -16641,7 +16644,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .spacer td { height: 18px; border: none !important; }
 .sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
-.sign-gap td { height: 15px; border: none !important; }
+.sign-gap td { height: 18px; border: none !important; }
 </style></head><body><table class="prepare">
 <colgroup><col class="c-name"><col class="c-unit"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-stock"></colgroup>
 <tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
