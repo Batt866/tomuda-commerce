@@ -3780,8 +3780,10 @@ function safeDownloadFileName(name, mime = "") {
   let base = String(name || "download")
     .trim()
     .replace(/[\\/:*?"<>|]+/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+    // Keep spaces between Mongolian words (e.g. «Зарлагын баримт»).
+    .replace(/\s+/g, " ")
+    .replace(/-+/g, "-")
+    .trim();
   if (!base) base = "download";
   const mimeStr = String(mime || "").toLowerCase();
   // Prefer the filename extension — octet-stream downloads must keep .html/.zip
@@ -9311,6 +9313,8 @@ td, th { border: none; }
   white-space: nowrap;
   font-size: 9px !important;
   font-weight: 400;
+  vertical-align: top !important;
+  padding-top: 1px !important;
   background: transparent !important;
 }
 .receipt-grid__iban-c {
@@ -9319,15 +9323,20 @@ td, th { border: none; }
   font-size: 9px;
   white-space: nowrap;
   padding-right: 4px !important;
-  vertical-align: middle;
+  padding-top: 1px !important;
+  vertical-align: top !important;
   background: transparent !important;
 }
 .receipt-grid__iban-c b { font-weight: 700; font-size: 9px; }
+.receipt-grid--sheet .receipt-grid__bank--iban > td {
+  vertical-align: top !important;
+}
 .receipt-grid__iban-nums {
   text-align: left !important;
-  vertical-align: middle !important;
+  vertical-align: top !important;
   line-height: 1.25;
   white-space: nowrap;
+  padding-top: 1px !important;
 }
 .receipt-info__value,
 .receipt-info__address-text,
@@ -9556,9 +9565,9 @@ function receiptExcelFileName(orders) {
       /[^\w.-]+/gu,
       "-",
     );
-    return `Зарлагын-баримт-${no}.xlsx`;
+    return `Зарлагын баримт - ${no}.xlsx`;
   }
-  return `Зарлагын-баримт-${stamp}.xlsx`;
+  return `Зарлагын баримт - ${stamp}.xlsx`;
 }
 function receiptHtmlFileName(orders) {
   return receiptExcelFileName(orders).replace(/\.xlsx$/i, ".html");
@@ -9571,7 +9580,7 @@ function legacyExcelFileName(name) {
 }
 async function downloadReceiptExcelBlob(name, html) {
   // Same print HTML + CSS as on-screen preview so download matches what you see.
-  const fileName = String(name || "Зарлагын-баримт.html").replace(
+  const fileName = String(name || "Зарлагын баримт.html").replace(
     /\.(xlsx|xls|zip)$/i,
     ".html",
   );
@@ -10190,8 +10199,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(perBankH, [
     // Do not merge B:C — C must stay free for right-aligned «IBAN:»
-    xlsxCellXml(`B${bankR4}`, 15, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`C${bankR4}`, 52, si("IBAN:"), "s"),
+    // Style 4/46 = top-aligned (row is tall due to address rowspan; keep col widths).
+    xlsxCellXml(`B${bankR4}`, 4, si("Дансны дугаар:"), "s"),
+    xlsxCellXml(`C${bankR4}`, 46, si("IBAN:"), "s"),
     xlsxCellXml(`D${bankR4}`, 4, si(RECEIPT_BANK_IBAN_SHORT), "s"),
     ...emptyCells(bankR4, "E", "E", 4),
   ]);
@@ -10638,7 +10648,7 @@ function prefersExcelFileShare() {
 }
 async function forceDownloadXlsxFile(blob, filename) {
   // Always deliver a real .xlsx Excel workbook.
-  const name = xlsxFileName(filename || "Зарлагын-баримт.xlsx");
+  const name = xlsxFileName(filename || "Зарлагын баримт.xlsx");
   const buffer = await blob.arrayBuffer();
   const excelBlob = new Blob([buffer], { type: XLSX_MIME });
   const downloadBlob = new Blob([buffer], {
@@ -13166,7 +13176,7 @@ function finalizeStockOutReceipt(receipt) {
 }
 function stockOutReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
-  return no ? `Зарлагын-баримт-${no}.xls` : `Зарлагын-баримт-${todayIso()}.xls`;
+  return no ? `Зарлагын баримт - ${no}.xls` : `Зарлагын баримт - ${todayIso()}.xls`;
 }
 function stockOutReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
