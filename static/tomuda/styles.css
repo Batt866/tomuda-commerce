@@ -6787,6 +6787,82 @@ textarea::placeholder {
   transition: background 0.15s ease;
 }
 
+.stock-swipe {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.stock-swipe__rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 92px;
+  display: flex;
+  z-index: 0;
+}
+
+.stock-swipe__rail--left {
+  left: 0;
+}
+
+.stock-swipe__rail--right {
+  right: 0;
+}
+
+.stock-swipe__delete {
+  flex: 1;
+  border: none;
+  margin: 0;
+  padding: 0 10px;
+  background: var(--hex-danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.stock-swipe__delete:active {
+  background: color-mix(in srgb, var(--hex-danger) 88%, #000);
+}
+
+.stock-swipe__front {
+  position: relative;
+  z-index: 1;
+  background: var(--hex-card, #fff);
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+.stock-swipe .stock-in-entry-row--filled {
+  background: color-mix(in srgb, var(--hex-success) 13%, var(--hex-card));
+}
+
+.stock-in-take__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.stock-in-take__remove {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--hex-danger) 35%, var(--hex-border));
+  border-radius: 12px;
+  background: var(--hex-danger-soft);
+  color: var(--hex-danger-text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stock-in-take__remove:active {
+  background: color-mix(in srgb, var(--hex-danger-soft) 70%, #fff);
+}
+
 .stock-in-entry-row:hover,
 .stock-in-entry-row:focus-visible {
   background: color-mix(in srgb, var(--hex-secondary) 65%, transparent);

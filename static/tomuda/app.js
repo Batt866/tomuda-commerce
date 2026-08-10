@@ -5843,6 +5843,7 @@ function completeBootUiInit(options = {}) {
   initExcelImportHandlers();
   initConfirmCard();
   initConfirmDeleteActions();
+  initStockSwipeRows();
   initImageLightbox();
   initProductImageFallback();
   initPageUnloadPersist();
@@ -9640,6 +9641,56 @@ function receiptXlsxStylesXml() {
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
 }
+/** Light blue for «Нийт тоо/ш» (matches zarlaga sample). */
+const STOCK_RECEIPT_TOTAL_QTY_BLUE = "FFBDD7EE";
+/**
+ * Style ids after stockReceiptPatchStylesXml(receiptXlsxStylesXml()):
+ * base 59 + prepare patch (sign+6 qty+unit) + blue head/cell.
+ */
+const STOCK_RECEIPT_LARGE_HEAD_STYLE = 60;
+const STOCK_RECEIPT_LARGE_CELL_STYLE = 61;
+const STOCK_RECEIPT_SMALL_HEAD_STYLE = 62;
+const STOCK_RECEIPT_SMALL_CELL_STYLE = 63;
+const STOCK_RECEIPT_PIECE_HEAD_STYLE = 64;
+const STOCK_RECEIPT_PIECE_CELL_STYLE = 65;
+const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 67;
+const STOCK_RECEIPT_TOTAL_CELL_STYLE = 68;
+/** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
+const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
+function stockReceiptQtyHeadXf(fillId) {
+  return `<xf numFmtId="0" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
+}
+function stockReceiptQtyCellXf(fillId) {
+  return `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
+}
+function stockReceiptPatchStylesXml(stylesXml) {
+  let out = warehousePreparePatchStylesXml(stylesXml);
+  const blue = STOCK_RECEIPT_TOTAL_QTY_BLUE;
+  if (!out.includes(`rgb="${blue}"`)) {
+    out = out.replace(
+      /(<fills count=")(\d+)(">)([\s\S]*?)(<\/fills>)/,
+      (_, a, count, c, body, end) =>
+        `${a}${Number(count) + 1}${c}${body}${warehousePrepareGrayFillXml(blue)}${end}`,
+    );
+  }
+  const fillId = warehousePrepareFillIdForRgb(out, blue);
+  const appendXfs = [];
+  const head = stockReceiptQtyHeadXf(fillId);
+  const cell = stockReceiptQtyCellXf(fillId);
+  if (!out.includes(head)) appendXfs.push(head);
+  if (!out.includes(cell)) appendXfs.push(cell);
+  if (appendXfs.length) {
+    out = out.replace(
+      /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
+      (_, a, count, c, body, end) =>
+        `${a}${Number(count) + appendXfs.length}${c}${body}${appendXfs.join("")}${end}`,
+    );
+  }
+  return out;
+}
+function stockReceiptStylesXml() {
+  return stockReceiptPatchStylesXml(receiptXlsxStylesXml());
+}
 function receiptDrawingXml() {
   // Fixed ~14mm logo via oneCellAnchor (size does not depend on narrow column A).
   // Brand/address in B share the same left edge (parallel).
@@ -12705,7 +12756,11 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const onsubmit = isOut
     ? `applyStockOutModal(event,'${esc(p.id)}')`
     : `applyStockInEntryModal(event,'${esc(p.id)}')`;
-  return `<form onsubmit="${onsubmit}" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}" data-prior-cost="${priorCost}"><div class="stock-in-take__body"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p>${packRules}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div>${noteHtml}${costBlock}</div><button type="submit" class="${submitClass}">${stockInTakeIcon("save")}<span>${submitLabel}</span></button></form>`;
+  const removeBtn =
+    initialTotal > 0
+      ? `<button type="button" class="stock-in-take__remove" onclick="confirmRemoveStockDraft('${esc(p.id)}','${isOut ? "out" : "in"}')">${isOut ? "Зарлагаас буцаах" : "Орлогоос буцаах"}</button>`
+      : "";
+  return `<form onsubmit="${onsubmit}" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}" data-prior-cost="${priorCost}"><div class="stock-in-take__body"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p>${packRules}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div>${noteHtml}${costBlock}</div><div class="stock-in-take__actions">${removeBtn}<button type="submit" class="${submitClass}">${stockInTakeIcon("save")}<span>${submitLabel}</span></button></div></form>`;
 }
 function stockInEntryModal(id) {
   const p = state.products.find((x) => x.id === id);
@@ -12723,6 +12778,12 @@ function stockInEntryModal(id) {
     if (large && String(large.value || "").trim()) {
       stockInLargePacksInput(large);
     }
+    const focusEl =
+      form?.querySelector('input[name="qty"]') ||
+      form?.querySelector('input[name="packs"]') ||
+      form?.querySelector('input[name="largePacks"]');
+    focusEl?.focus?.();
+    focusEl?.select?.();
   });
 }
 function stockInReceiptLineCostPrice(line) {
@@ -13424,8 +13485,12 @@ function findProductByBarcode(code) {
   const matches = findProductsByQuery(code);
   return matches.length === 1 ? matches[0] : matches[0] || null;
 }
-function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
+function applyStockInBarcode(code) {
   ensureStockInSession();
+  if (!canManageStockIn()) {
+    alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
+    return false;
+  }
   const query = String(code || "").trim();
   const matches = findProductsByQuery(query);
   if (!matches.length) {
@@ -13443,50 +13508,17 @@ function applyStockInBarcode(code, { qtyDelta = 1 } = {}) {
     return false;
   }
   const product = matches[0];
-  const entry = stockInDraftEntry(product.id);
-  const packSize = productPackSize(product);
-  if (packSize) {
-    const pieces = Math.max(0, Math.floor(Number(entry.qty) || 0)) + qtyDelta;
-    if (pieces > 0) entry.qty = String(pieces);
-    else delete entry.qty;
-  } else {
-    const current = Math.max(0, Math.floor(Number(entry.qty) || 0));
-    entry.qty = String(current + qtyDelta);
-  }
-  const cost = productCostPrice(product);
-  if (cost > 0) {
-    entry.costPrice = String(Math.floor(cost));
-  }
   state.stockInDone = false;
   state.stockInReceipt = null;
   state.stockInHighlightId = product.id;
   state.stockInScanQuery = "";
   const input = document.getElementById("stockInBarcodeInput");
   if (input) input.value = "";
-  render();
-  showAppToast(`${product.name} · +${qtyDelta} ш`, "success");
-  requestAnimationFrame(() => {
-    document
-      .querySelector(`[data-stock-in-id="${product.id}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    document.getElementById("stockInBarcodeInput")?.focus();
-  });
-  setTimeout(() => {
-    if (state.stockInHighlightId === product.id) {
-      state.stockInHighlightId = "";
-      if (
-        (state.currentView === "inventory" ||
-          state.currentView === "warehouse") &&
-        (state.filters.inventory === "in" ||
-          state.filters.warehouseTab === "in")
-      ) {
-        render();
-        requestAnimationFrame(() =>
-          document.getElementById("stockInBarcodeInput")?.focus(),
-        );
-      }
-    }
-  }, 1600);
+  if (barcodeScanning && barcodeScanTarget === "stockIn") {
+    stopBarcodeScan();
+  }
+  // Скан/хайсны дараа тоо ширхэгийг автоматаар бүү нэм — хэрэглэгч цонхонд өөрөө оруулна.
+  stockInEntryModal(product.id);
   return true;
 }
 function stockInScanSubmit() {
@@ -13507,7 +13539,203 @@ function stockInEntryRow(p) {
     : `<span class="stock-in-entry-row__hint">Тоо ширхэг оруулах</span>`;
   const salesPrice = productSalesPrice(p);
   const displayStock = (Number(p.stock) || 0) + (hasEntry ? qty : 0);
-  return `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
+  const row = `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
+  return hasEntry ? stockSwipeRowHtml("in", p.id, row) : row;
+}
+function removeStockDraftEntry(id, mode = "in") {
+  const draft = mode === "out" ? state.stockOutDraft : state.stockInDraft;
+  if (!draft || typeof draft !== "object") return;
+  const want = String(id || "");
+  if (!want) return;
+  for (const key of Object.keys(draft)) {
+    if (String(key) === want) delete draft[key];
+  }
+  if (mode === "out") {
+    state.stockOutDone = false;
+    state.stockOutReceipt = null;
+  } else {
+    state.stockInDone = false;
+    state.stockInReceipt = null;
+  }
+  closeModal();
+  render();
+  showAppToast(
+    mode === "out" ? "Зарлагаас буцаалаа" : "Орлогоос буцаалаа",
+    "success",
+  );
+}
+function confirmRemoveStockDraft(id, mode = "in") {
+  const p = state.products.find((x) => String(x.id) === String(id));
+  const name = p?.name || "Бараа";
+  const isOut = mode === "out";
+  const qty = p
+    ? isOut
+      ? stockOutLineQty(p)
+      : stockInLineQty(p)
+    : 0;
+  if (qty <= 0) return;
+  confirmModal(
+    isOut ? "Зарлагаас буцаах уу?" : "Орлогоос буцаах уу?",
+    `<p><b>${esc(name)}</b> · ${qty} ${esc(p?.unit || "ш")}</p><p class="text-sm text-muted-foreground mt-2">${isOut ? "Энэ бараа зарлагын жагсаалтаас хасагдана." : "Энэ бараа орлогын жагсаалтаас хасагдана."}</p>`,
+    {
+      confirmLabel: "Буцаах",
+      cancelLabel: "Болих",
+      danger: true,
+      onConfirm: () => removeStockDraftEntry(id, mode),
+    },
+  );
+}
+const STOCK_SWIPE_ACTION_W = 92;
+let stockSwipeDrag = null;
+function stockSwipeRowHtml(mode, productId, innerHtml) {
+  const del =
+    '<button type="button" class="stock-swipe__delete" data-stock-swipe-delete>Буцаах</button>';
+  return `<div class="stock-swipe" data-stock-swipe="${esc(mode)}" data-product-id="${esc(productId)}"><div class="stock-swipe__rail stock-swipe__rail--left" aria-hidden="true">${del}</div><div class="stock-swipe__rail stock-swipe__rail--right" aria-hidden="true">${del}</div><div class="stock-swipe__front">${innerHtml}</div></div>`;
+}
+function stockSwipeFrontEl(row) {
+  return row?.querySelector?.(".stock-swipe__front") || null;
+}
+function setStockSwipeOffset(row, px, animate) {
+  const front = stockSwipeFrontEl(row);
+  if (!front) return;
+  front.style.transition = animate ? "transform 0.22s ease" : "none";
+  front.style.transform = `translate3d(${px}px,0,0)`;
+  const open = Math.abs(px) >= STOCK_SWIPE_ACTION_W * 0.55;
+  row.classList.toggle("is-open", open);
+  row.dataset.swipeX = String(px);
+}
+function closeStockSwipe(row, animate = true) {
+  if (!row) return;
+  setStockSwipeOffset(row, 0, animate);
+}
+function closeAllStockSwipes(except = null) {
+  document.querySelectorAll(".stock-swipe.is-open").forEach((row) => {
+    if (row !== except) closeStockSwipe(row);
+  });
+}
+function openStockSwipe(row, dir = "left") {
+  closeAllStockSwipes(row);
+  setStockSwipeOffset(
+    row,
+    dir === "right" ? STOCK_SWIPE_ACTION_W : -STOCK_SWIPE_ACTION_W,
+    true,
+  );
+}
+function initStockSwipeRows() {
+  if (initStockSwipeRows._bound) return;
+  initStockSwipeRows._bound = true;
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const deleteBtn = e.target?.closest?.("[data-stock-swipe-delete]");
+      if (deleteBtn) {
+        const row = deleteBtn.closest("[data-stock-swipe]");
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        confirmRemoveStockDraft(
+          row.getAttribute("data-product-id"),
+          row.getAttribute("data-stock-swipe") || "in",
+        );
+        return;
+      }
+      const row = e.target?.closest?.("[data-stock-swipe]");
+      if (!row) {
+        closeAllStockSwipes();
+        return;
+      }
+      const front = stockSwipeFrontEl(row);
+      if (!front || !front.contains(e.target)) return;
+      const startX = Number(row.dataset.swipeX || 0);
+      stockSwipeDrag = {
+        id: e.pointerId,
+        row,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startX,
+        moved: false,
+        axis: null,
+        openedAtStart: row.classList.contains("is-open"),
+      };
+      try {
+        front.setPointerCapture?.(e.pointerId);
+      } catch (_) {}
+    },
+    { capture: true },
+  );
+  document.addEventListener(
+    "pointermove",
+    (e) => {
+      const drag = stockSwipeDrag;
+      if (!drag || drag.id !== e.pointerId) return;
+      const dx = e.clientX - drag.startClientX;
+      const dy = e.clientY - drag.startClientY;
+      if (!drag.axis) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        drag.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (drag.axis === "y") {
+          stockSwipeDrag = null;
+          return;
+        }
+        closeAllStockSwipes(drag.row);
+        e.preventDefault();
+      }
+      if (drag.axis !== "x") return;
+      e.preventDefault();
+      drag.moved = true;
+      const next = Math.max(
+        -STOCK_SWIPE_ACTION_W,
+        Math.min(STOCK_SWIPE_ACTION_W, drag.startX + dx),
+      );
+      setStockSwipeOffset(drag.row, next, false);
+    },
+    { capture: true, passive: false },
+  );
+  const endDrag = (e) => {
+    const drag = stockSwipeDrag;
+    if (!drag || (e && drag.id !== e.pointerId)) return;
+    stockSwipeDrag = null;
+    const row = drag.row;
+    const x = Number(row.dataset.swipeX || 0);
+    if (!drag.moved) {
+      if (drag.openedAtStart) {
+        closeStockSwipe(row);
+        row.dataset.swipeBlockClick = "1";
+        setTimeout(() => {
+          delete row.dataset.swipeBlockClick;
+        }, 280);
+      }
+      return;
+    }
+    if (x <= -STOCK_SWIPE_ACTION_W * 0.4) openStockSwipe(row, "left");
+    else if (x >= STOCK_SWIPE_ACTION_W * 0.4) openStockSwipe(row, "right");
+    else closeStockSwipe(row);
+  };
+  document.addEventListener("pointerup", endDrag, { capture: true });
+  document.addEventListener("pointercancel", endDrag, { capture: true });
+  document.addEventListener(
+    "click",
+    (e) => {
+      const row = e.target?.closest?.("[data-stock-swipe]");
+      if (row?.dataset?.swipeBlockClick === "1") {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (
+        row?.classList.contains("is-open") &&
+        !e.target?.closest?.("[data-stock-swipe-delete]")
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeStockSwipe(row);
+        return;
+      }
+      if (!row) closeAllStockSwipes();
+    },
+    true,
+  );
 }
 function stockInPackDerivedPieces(packs, packSize) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
@@ -13772,26 +14000,28 @@ function exportStockInExcelFallback(receipt) {
   const bodyRows = stockInReceiptGroupedLines(receipt.lines || [])
     .map((item) => {
       if (item.type === "cat") {
-        return `<tr><td colspan="8" class="cat">${h(item.name)}</td></tr>`;
+        return `<tr><td colspan="9" class="cat">${h(item.name)}</td></tr>`;
       }
       if (item.type === "catTotal") {
-        return `<tr class="cat-total"><td colspan="7" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
+        return `<tr class="cat-total"><td colspan="8" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
       }
       const line = item.line;
       const parts = stockReceiptQtyParts(line);
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineCostPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
+      const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num qty-total">${h(prepareQtyDisplay(totalQty))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineCostPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="num">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1180px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
-.stock-in col.c-name { width: 280px; }
-.stock-in col.c-barcode { width: 150px; }
+table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+.stock-in col.c-name { width: 240px; }
+.stock-in col.c-barcode { width: 130px; }
 .stock-in col.c-large { width: 72px; }
-.stock-in col.c-small { width: 84px; }
+.stock-in col.c-small { width: 88px; }
 .stock-in col.c-piece { width: 72px; }
-.stock-in col.c-money { width: 110px; }
-.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
+.stock-in col.c-total { width: 100px; }
+.stock-in col.c-money { width: 100px; }
+.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
@@ -13800,25 +14030,27 @@ table.stock-in { width: 1180px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-large { background: #e4e7eb; }
 .head th.qty-small { background: #c5cad0; }
 .head th.qty-piece { background: #a3aab3; }
+.head th.qty-total { background: #bdd7ee; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #e4e7eb; }
-.num.qty-small { background: #c5cad0; }
-.num.qty-piece { background: #a3aab3; }
+.num.qty-large { background: #e4e7eb; text-align: center; }
+.num.qty-small { background: #c5cad0; text-align: center; }
+.num.qty-piece { background: #a3aab3; text-align: center; }
+.num.qty-total { background: #bdd7ee; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
-<colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
-<tr><td colspan="8" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
-<tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-total"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
+<tr><td colspan="9" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
+<tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td colspan="2" class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="7" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
-<tr class="sign"><td colspan="8">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="8">Хүлээн авсан: ________________________</td></tr>
+<tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
+<tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="9">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -13843,7 +14075,8 @@ function stockOutEntryRow(p) {
   const entryMeta = hasEntry
     ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">−${qty} ${esc(p.unit || "ш")}</span></span>`
     : `<span class="stock-in-entry-row__hint">Зарлага гаргах</span>`;
-  return `<button type="button" onclick="stockOutModal('${esc(p.id)}')" data-stock-out-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockOutHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (−${qty} хүлээгдэж байна)</span>` : ""}</span></div>${entryMeta}</button>`;
+  const row = `<button type="button" onclick="stockOutModal('${esc(p.id)}')" data-stock-out-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockOutHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (−${qty} хүлээгдэж байна)</span>` : ""}</span></div>${entryMeta}</button>`;
+  return hasEntry ? stockSwipeRowHtml("out", p.id, row) : row;
 }
 function stockOutEntryList(list) {
   const filled = list.filter((p) => stockOutLineQty(p) > 0);
@@ -13978,27 +14211,29 @@ function exportStockOutExcelFallback(receipt) {
   const bodyRows = stockInReceiptGroupedLines(receipt.lines || [])
     .map((item) => {
       if (item.type === "cat") {
-        return `<tr><td colspan="8" class="cat">${h(item.name)}</td></tr>`;
+        return `<tr><td colspan="9" class="cat">${h(item.name)}</td></tr>`;
       }
       if (item.type === "catTotal") {
-        return `<tr class="cat-total"><td colspan="7" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
+        return `<tr class="cat-total"><td colspan="8" style="text-align:right">${h(item.name)} нийт</td><td class="num">${fmtExcelMoney(item.amount)}</td></tr>`;
       }
       const line = item.line;
       const unitPrice = Number(line.unitPrice) || 0;
       const parts = stockReceiptQtyParts(line);
-      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
+      const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+      return `<tr><td>${h(line.productName)}</td><td class="barcode">${h(line.barcode || "")}</td><td class="num qty-large">${h(prepareQtyDisplay(parts.largePacks))}</td><td class="num qty-small">${h(prepareQtyDisplay(parts.packs))}</td><td class="num qty-piece">${h(prepareQtyDisplay(parts.pieces))}</td><td class="num qty-total">${h(prepareQtyDisplay(totalQty))}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(unitPrice)}</td><td class="num">${fmtExcelMoney(line.totalPrice || 0)}</td></tr>`;
     })
     .join("");
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1180px; border-collapse: collapse; table-layout: fixed; font-size: 18px; }
-.stock-in col.c-name { width: 280px; }
-.stock-in col.c-barcode { width: 150px; }
+table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+.stock-in col.c-name { width: 240px; }
+.stock-in col.c-barcode { width: 130px; }
 .stock-in col.c-large { width: 72px; }
-.stock-in col.c-small { width: 84px; }
+.stock-in col.c-small { width: 88px; }
 .stock-in col.c-piece { width: 72px; }
-.stock-in col.c-money { width: 110px; }
-.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 6px; vertical-align: middle; }
+.stock-in col.c-total { width: 100px; }
+.stock-in col.c-money { width: 100px; }
+.stock-in td, .stock-in th { border: 1px solid #555; padding: 4px 5px; vertical-align: middle; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
 .meta td { border: none; padding: 4px 0; }
 .date-label { text-align: right; white-space: nowrap; }
@@ -14007,25 +14242,27 @@ table.stock-in { width: 1180px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-large { background: #e4e7eb; }
 .head th.qty-small { background: #c5cad0; }
 .head th.qty-piece { background: #a3aab3; }
+.head th.qty-total { background: #bdd7ee; }
 .cat { text-align: center; font-weight: 800; background: #f7f7f7; }
 .cat-total td { font-weight: 700; background: #f3f4f6; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
-.num.qty-large { background: #e4e7eb; }
-.num.qty-small { background: #c5cad0; }
-.num.qty-piece { background: #a3aab3; }
+.num.qty-large { background: #e4e7eb; text-align: center; }
+.num.qty-small { background: #c5cad0; text-align: center; }
+.num.qty-piece { background: #a3aab3; text-align: center; }
+.num.qty-total { background: #bdd7ee; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
-<colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
-<tr><td colspan="8" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
-<tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td class="date-value">${h(printedDateValue.trim())}</td></tr>
-<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Нэгж үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-total"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
+<tr><td colspan="9" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
+<tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td colspan="2" class="date-value">${h(receivedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="head"><th>Барааны нэр</th><th>Barcode</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="7" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
-<tr class="sign"><td colspan="8">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="8">Хүлээн авсан: ________________________</td></tr>
+<tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
+<tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
+<tr class="sign"><td colspan="9">Хүлээн авсан: ________________________</td></tr>
 </table></body></html>`;
   const blob = new Blob([html], {
     type: "application/vnd.ms-excel;charset=utf-8",
@@ -15189,7 +15426,7 @@ async function exportStockInExcelXlsx(receipt) {
   const zip = await JSZip.loadAsync(tpl);
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", warehousePrepareStylesXml());
+  zip.file("xl/styles.xml", stockReceiptStylesXml());
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
 }
@@ -15216,8 +15453,8 @@ function buildStockOutSheetXmlLegacy(receipt, {
   receivedLabel = "Зарлага гарсан огноо:",
 } = {}) {
   receipt = normalizeStockInReceiptTotals(receipt);
-  const lastCol = "H";
-  const colLetters = "ABCDEFGH";
+  const lastCol = "I";
+  const colLetters = "ABCDEFGHI";
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -15234,7 +15471,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
   const printedDateValue = warehouseSheetDateValue(todayIso());
   const groups = stockInReceiptGroupedLines(receipt.lines);
   const rows = [];
-  const merges = [`A1:${lastCol}1`, `A2:B2`, `C2:E2`, `C3:E3`];
+  const merges = [`A1:${lastCol}1`, `A2:C2`, `D2:F2`, `G2:${lastCol}2`, `D3:F3`, `G3:${lastCol}3`];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(xlsxRowXml(rowNum, height, cells, lastCol));
@@ -15264,49 +15501,57 @@ function buildStockOutSheetXmlLegacy(receipt, {
       "s",
     ),
     xlsxCellXml("B2", 4, null, "empty"),
-    xlsxCellXml("C2", 14, si(receivedLabel), "s"),
-    xlsxCellXml("D2", 14, null, "empty"),
+    xlsxCellXml("C2", 4, null, "empty"),
+    xlsxCellXml("D2", 14, si(receivedLabel), "s"),
     xlsxCellXml("E2", 14, null, "empty"),
-    xlsxCellXml("F2", 14, si(receivedDateValue), "s"),
-    xlsxCellXml("G2", 14, null, "empty"),
+    xlsxCellXml("F2", 14, null, "empty"),
+    xlsxCellXml("G2", 14, si(receivedDateValue), "s"),
     xlsxCellXml("H2", 14, null, "empty"),
+    xlsxCellXml("I2", 14, null, "empty"),
   ]);
   pushRow(20.25, [
     xlsxCellXml("A3", 6, null, "empty"),
     xlsxCellXml("B3", 6, null, "empty"),
-    xlsxCellXml("C3", 14, si("Хэвлэсэн огноо:"), "s"),
-    xlsxCellXml("D3", 14, null, "empty"),
+    xlsxCellXml("C3", 6, null, "empty"),
+    xlsxCellXml("D3", 14, si("Хэвлэсэн огноо:"), "s"),
     xlsxCellXml("E3", 14, null, "empty"),
-    xlsxCellXml("F3", 14, si(printedDateValue), "s"),
-    xlsxCellXml("G3", 14, null, "empty"),
+    xlsxCellXml("F3", 14, null, "empty"),
+    xlsxCellXml("G3", 14, si(printedDateValue), "s"),
     xlsxCellXml("H3", 14, null, "empty"),
+    xlsxCellXml("I3", 14, null, "empty"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   const headerRow = rowNum;
-  pushRow(30.75, [
+  pushRow(18, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
     xlsxCellXml(
       `C${headerRow}`,
-      WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
+      STOCK_RECEIPT_LARGE_HEAD_STYLE,
       si("Том/х"),
       "s",
     ),
     xlsxCellXml(
       `D${headerRow}`,
-      WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
+      STOCK_RECEIPT_SMALL_HEAD_STYLE,
       si("Жижиг/х"),
       "s",
     ),
     xlsxCellXml(
       `E${headerRow}`,
-      WAREHOUSE_PREPARE_PIECE_HEAD_STYLE,
+      STOCK_RECEIPT_PIECE_HEAD_STYLE,
       si("Тоо/ш"),
       "s",
     ),
-    xlsxCellXml(`F${headerRow}`, 7, si("Өртөг үнэ"), "s"),
-    xlsxCellXml(`G${headerRow}`, 7, si("Нэгж үнэ"), "s"),
-    xlsxCellXml(`H${headerRow}`, 7, si("Нийт үнэ"), "s"),
+    xlsxCellXml(
+      `F${headerRow}`,
+      STOCK_RECEIPT_TOTAL_HEAD_STYLE,
+      si("Нийт тоо/ш"),
+      "s",
+    ),
+    xlsxCellXml(`G${headerRow}`, 7, si("Өртөг үнэ"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Нэгж үнэ"), "s"),
+    xlsxCellXml(`I${headerRow}`, 7, si("Нийт үнэ"), "s"),
   ]);
   for (const item of groups) {
     if (item.type === "cat") {
@@ -15320,11 +15565,11 @@ function buildStockOutSheetXmlLegacy(receipt, {
     }
     if (item.type === "catTotal") {
       const r = rowNum;
-      merges.push(`A${r}:G${r}`);
+      merges.push(`A${r}:H${r}`);
       pushRow(16.5, [
         xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
-        ...emptyCells(r, "B", "G", 3),
-        xlsxCellXml(`H${r}`, 10, item.amount, "n"),
+        ...emptyCells(r, "B", "H", 3),
+        xlsxCellXml(`I${r}`, 10, item.amount, "n"),
       ]);
       continue;
     }
@@ -15333,36 +15578,42 @@ function buildStockOutSheetXmlLegacy(receipt, {
     const costPrice = stockInReceiptLineCostPrice(line);
     const salesPrice = stockInReceiptLineSalesPrice(line);
     const parts = stockReceiptQtyParts(line);
+    const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
     pushRow(15, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
       xlsxBarcodeCell(`B${r}`, 9, line.barcode, si),
       xlsxPrepareQtyCell(
         `C${r}`,
-        WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
+        STOCK_RECEIPT_LARGE_CELL_STYLE,
         parts.largePacks,
       ),
       xlsxPrepareQtyCell(
         `D${r}`,
-        WAREHOUSE_PREPARE_SMALL_CELL_STYLE,
+        STOCK_RECEIPT_SMALL_CELL_STYLE,
         parts.packs,
       ),
       xlsxPrepareQtyCell(
         `E${r}`,
-        WAREHOUSE_PREPARE_PIECE_CELL_STYLE,
+        STOCK_RECEIPT_PIECE_CELL_STYLE,
         parts.pieces,
       ),
-      xlsxCellXml(`F${r}`, 10, costPrice, "n"),
-      xlsxCellXml(`G${r}`, 10, salesPrice, "n"),
-      xlsxCellXml(`H${r}`, 10, stockInReceiptLineTotal(line), "n"),
+      xlsxPrepareQtyCell(
+        `F${r}`,
+        STOCK_RECEIPT_TOTAL_CELL_STYLE,
+        totalQty,
+      ),
+      xlsxCellXml(`G${r}`, 10, costPrice, "n"),
+      xlsxCellXml(`H${r}`, 10, salesPrice, "n"),
+      xlsxCellXml(`I${r}`, 10, stockInReceiptLineTotal(line), "n"),
     ]);
   }
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   const totalRow = rowNum;
-  merges.push(`A${totalRow}:G${totalRow}`);
+  merges.push(`A${totalRow}:H${totalRow}`);
   pushRow(16.5, [
     xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
-    ...emptyCells(totalRow, "B", "G", 10),
-    xlsxCellXml(`H${totalRow}`, 10, receipt.totalAmount, "n"),
+    ...emptyCells(totalRow, "B", "H", 10),
+    xlsxCellXml(`I${totalRow}`, 10, receipt.totalAmount, "n"),
   ]);
   pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
   const signDots = "....................................................";
@@ -15389,7 +15640,11 @@ function buildStockOutSheetXmlLegacy(receipt, {
   pushSignatureBlock("Хүлээн авсан:");
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="24" customWidth="1"/><col min="2" max="2" width="14" customWidth="1"/><col min="3" max="3" width="7.5" customWidth="1"/><col min="4" max="4" width="9" customWidth="1"/><col min="5" max="5" width="7.5" customWidth="1"/><col min="6" max="6" width="11" customWidth="1"/><col min="7" max="7" width="11" customWidth="1"/><col min="8" max="8" width="12" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.55" top="1" bottom="0.75" header="0.35" footer="0.35"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  const colsXml = STOCK_RECEIPT_COL_WIDTHS.map(
+    (width, index) =>
+      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+  ).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.55" right="0.45" top="0.7" bottom="0.55" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 
@@ -15405,7 +15660,7 @@ async function exportStockOutExcelXlsx(receipt) {
   const zip = await JSZip.loadAsync(tpl);
   zip.file("xl/sharedStrings.xml", sharedStringsXml);
   zip.file("xl/worksheets/sheet1.xml", sheetXml);
-  zip.file("xl/styles.xml", warehousePrepareStylesXml());
+  zip.file("xl/styles.xml", stockReceiptStylesXml());
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockOutReceiptFileName(receipt));
 }
@@ -24269,6 +24524,7 @@ Object.assign(window, {
   setStockInEmployee,
   setStockOutEmployee,
   stockInEntryModal,
+  confirmRemoveStockDraft,
   applyStockInEntryModal,
   stockInQtyFieldsInput,
   stockInLargePacksInput,
