@@ -625,9 +625,9 @@ textarea.text-sm,
   grid-template-areas:
     "head actions"
     "addr actions";
-  gap: 8px 4px;
+  gap: 6px 8px;
   align-items: center;
-  padding: 10px 4px 10px 0;
+  padding: 10px 8px 10px 0;
   border-radius: 0;
   border: none;
   border-bottom: 1px solid var(--hex-border);
@@ -658,7 +658,7 @@ textarea.text-sm,
 .customer-card__head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   grid-area: head;
 }
@@ -1279,6 +1279,19 @@ textarea.text-sm,
 .customer-card__identity {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.customer-card__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1px;
 }
 
 .customer-card__title-row {
@@ -1293,9 +1306,9 @@ textarea.text-sm,
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.15;
   color: var(--hex-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1303,14 +1316,13 @@ textarea.text-sm,
 }
 
 .customer-card__phones {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px 10px;
+  gap: 4px 8px;
   min-width: 0;
-  max-width: 58%;
 }
 
 .customer-card__phone-link {
@@ -1325,7 +1337,7 @@ textarea.text-sm,
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
   color: var(--hex-primary);
   text-decoration: none;
   white-space: nowrap;
@@ -1345,13 +1357,14 @@ textarea.text-sm,
 }
 
 .customer-card__sub {
-  margin: 3px 0 0;
-  font-size: 13px;
-  line-height: 1.3;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.15;
   color: var(--hex-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .customer-card__phone,
@@ -1722,20 +1735,22 @@ img.worker-pick-card__avatar {
 
 .list-panel--customers .customer-card__avatar,
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 56px;
-  height: 56px;
-  min-width: 56px;
-  border-radius: 0;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 10px;
+  border: 1px solid var(--hex-border);
+  background: #fff;
 }
 
 .list-panel--customers .customer-card__avatar {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .list-panel--customers .customer-card__avatar-img {
   object-fit: contain;
   object-position: center;
-  background: transparent;
+  background: #fff;
 }
 
 .list-action-toolbar {
@@ -3306,7 +3321,7 @@ img[data-product-img],
       );
     gap: 16px;
     align-items: center;
-    padding: 10px 16px;
+    padding: 8px 16px;
     background: var(--hex-secondary);
     color: var(--hex-muted-foreground);
     font-size: 12px;
@@ -3314,7 +3329,7 @@ img[data-product-img],
     letter-spacing: 0.02em;
     text-transform: none;
     border-bottom: 1px solid var(--hex-border);
-    min-height: calc(108px + 20px);
+    min-height: 0;
   }
 
   .customer-list__head-actions {
@@ -3325,9 +3340,9 @@ img[data-product-img],
     display: grid;
     grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) auto;
     grid-template-areas: "head addr actions";
-    gap: 12px 16px;
+    gap: 10px 16px;
     align-items: center;
-    min-height: calc(108px + 20px);
+    min-height: 0;
     padding: 10px 16px;
     border-radius: 0;
     border: none;
@@ -3337,33 +3352,37 @@ img[data-product-img],
 
   .list-panel--customers .customer-card__avatar,
   .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-    width: 108px;
-    height: 108px;
-    min-width: 108px;
-    border-radius: 8px;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    border-radius: 10px;
     border: 1px solid var(--hex-border);
     background: #fff;
   }
 
   .list-panel--customers .customer-card__avatar {
-    font-size: 28px;
+    font-size: 18px;
   }
 
   .customer-card__head {
     grid-area: head;
-    gap: 14px;
+    gap: 12px;
+  }
+
+  .customer-card__text {
+    gap: 1px;
   }
 
   .customer-card__name {
     font-size: 14px;
-    font-weight: 600;
-    line-height: 1.25;
+    font-weight: 700;
+    line-height: 1.15;
   }
 
   .customer-card__sub {
-    margin: 2px 0 0;
+    margin: 0;
     font-size: 12px;
-    line-height: 1.3;
+    line-height: 1.15;
   }
 
   .customer-card__phones {
@@ -3372,7 +3391,7 @@ img[data-product-img],
 
   .customer-card__line {
     font-size: 12px;
-    line-height: 1.35;
+    line-height: 1.3;
   }
 
   .customer-card__addr {
@@ -3389,6 +3408,7 @@ img[data-product-img],
     padding: 0;
     margin: 0;
     border-top: none;
+    gap: 6px;
   }
 
   .customer-card__line span {
