@@ -13587,15 +13587,27 @@ function confirmRemoveStockDraft(id, mode = "in") {
 }
 const STOCK_SWIPE_ACTION_W = 92;
 let stockSwipeDrag = null;
+function stockSwipeUsesTouch() {
+  try {
+    return !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  } catch (_) {
+    return true;
+  }
+}
 function stockSwipeRowHtml(mode, productId, innerHtml) {
   const del =
     '<button type="button" class="stock-swipe__delete" data-stock-swipe-delete>Буцаах</button>';
-  return `<div class="stock-swipe" data-stock-swipe="${esc(mode)}" data-product-id="${esc(productId)}"><div class="stock-swipe__rail stock-swipe__rail--left" aria-hidden="true">${del}</div><div class="stock-swipe__rail stock-swipe__rail--right" aria-hidden="true">${del}</div><div class="stock-swipe__front">${innerHtml}</div></div>`;
+  const desk = `<button type="button" class="stock-entry-return" data-stock-entry-return onclick="event.preventDefault();event.stopPropagation();confirmRemoveStockDraft('${esc(productId)}','${esc(mode)}')">Буцаах</button>`;
+  return `<div class="stock-swipe" data-stock-swipe="${esc(mode)}" data-product-id="${esc(productId)}"><div class="stock-swipe__rail stock-swipe__rail--left" aria-hidden="true">${del}</div><div class="stock-swipe__rail stock-swipe__rail--right" aria-hidden="true">${del}</div><div class="stock-swipe__front"><div class="stock-swipe__main">${innerHtml}</div>${desk}</div></div>`;
 }
 function stockSwipeFrontEl(row) {
   return row?.querySelector?.(".stock-swipe__front") || null;
 }
 function setStockSwipeOffset(row, px, animate) {
+  if (!stockSwipeUsesTouch()) {
+    closeStockSwipe(row, false);
+    return;
+  }
   const front = stockSwipeFrontEl(row);
   if (!front) return;
   front.style.transition = animate ? "transform 0.22s ease" : "none";
@@ -13606,7 +13618,13 @@ function setStockSwipeOffset(row, px, animate) {
 }
 function closeStockSwipe(row, animate = true) {
   if (!row) return;
-  setStockSwipeOffset(row, 0, animate);
+  const front = stockSwipeFrontEl(row);
+  if (front) {
+    front.style.transition = animate ? "transform 0.22s ease" : "none";
+    front.style.transform = "translate3d(0,0,0)";
+  }
+  row.classList.remove("is-open");
+  row.dataset.swipeX = "0";
 }
 function closeAllStockSwipes(except = null) {
   document.querySelectorAll(".stock-swipe.is-open").forEach((row) => {
@@ -13614,6 +13632,7 @@ function closeAllStockSwipes(except = null) {
   });
 }
 function openStockSwipe(row, dir = "left") {
+  if (!stockSwipeUsesTouch()) return;
   closeAllStockSwipes(row);
   setStockSwipeOffset(
     row,
@@ -13627,6 +13646,7 @@ function initStockSwipeRows() {
   document.addEventListener(
     "pointerdown",
     (e) => {
+      if (e.target?.closest?.("[data-stock-entry-return]")) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       const deleteBtn = e.target?.closest?.("[data-stock-swipe-delete]");
       if (deleteBtn) {
@@ -13640,6 +13660,12 @@ function initStockSwipeRows() {
         );
         return;
       }
+      // Desktop/web: no horizontal swipe — use visible «Буцаах» button.
+      if (e.pointerType === "mouse" || !stockSwipeUsesTouch()) {
+        const row = e.target?.closest?.("[data-stock-swipe]");
+        if (!row) closeAllStockSwipes();
+        return;
+      }
       const row = e.target?.closest?.("[data-stock-swipe]");
       if (!row) {
         closeAllStockSwipes();
@@ -13647,6 +13673,7 @@ function initStockSwipeRows() {
       }
       const front = stockSwipeFrontEl(row);
       if (!front || !front.contains(e.target)) return;
+      if (e.target?.closest?.("[data-stock-entry-return]")) return;
       const startX = Number(row.dataset.swipeX || 0);
       stockSwipeDrag = {
         id: e.pointerId,

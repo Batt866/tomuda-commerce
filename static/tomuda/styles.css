@@ -6830,9 +6830,65 @@ textarea::placeholder {
 .stock-swipe__front {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: stretch;
   background: var(--hex-card, #fff);
   will-change: transform;
   touch-action: pan-y;
+}
+
+.stock-swipe__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.stock-entry-return {
+  display: none;
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 12px 0 0;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--hex-danger) 32%, var(--hex-border));
+  border-radius: 8px;
+  background: var(--hex-danger-soft);
+  color: var(--hex-danger-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stock-entry-return:hover,
+.stock-entry-return:focus-visible {
+  background: color-mix(in srgb, var(--hex-danger) 14%, var(--hex-danger-soft));
+  outline: none;
+}
+
+.stock-entry-return:active {
+  background: color-mix(in srgb, var(--hex-danger) 20%, #fff);
+}
+
+/* Desktop/web: visible return button, no swipe rails. */
+@media (hover: hover) and (pointer: fine) {
+  .stock-swipe {
+    overflow: visible;
+  }
+
+  .stock-swipe__rail {
+    display: none;
+  }
+
+  .stock-swipe__front {
+    transform: none !important;
+    will-change: auto;
+  }
+
+  .stock-entry-return {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 .stock-swipe .stock-in-entry-row--filled {
