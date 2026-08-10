@@ -12422,7 +12422,7 @@ function stockInTakeRowHtml({
     hintAttr || hint
       ? `<p class="stock-in-take__hint"${hintAttr ? ` ${hintAttr}` : ""}>${hint}</p>`
       : "";
-  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><span class="stock-in-take__label">${label}</span><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label>${hintHtml}</div>`;
+  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><div class="stock-in-take__text"><span class="stock-in-take__label">${label}</span>${hintHtml}</div><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label></div>`;
 }
 function stockInLargePacksInput(el) {
   stockInQtyFieldsInput(el);
