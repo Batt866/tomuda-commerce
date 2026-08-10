@@ -3081,11 +3081,13 @@ function saveGrantedPermissions() {
   if (!permissions.length) return alert("Дор хаяж нэг эрх сонгоно уу");
   const pctInput = document.querySelector('input[name="allowPercentDiscount"]');
   const allowPct = !!pctInput?.checked;
+  const nowIso = new Date().toISOString();
   ids.forEach((id) => {
     const emp = state.employees.find((e) => e.id === id);
     if (!emp) return;
     emp.permissions = [...permissions];
     if (emp.role === "sales" && pctInput) emp.allowPercentDiscount = allowPct;
+    emp.updatedAt = nowIso;
     if (state.currentEmployee?.id === id) {
       state.currentEmployee = emp;
       if (!allowPct) state.applyPercentDiscount = false;
@@ -4021,7 +4023,10 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   const preferRemote =
     !!opts.preferRemote &&
     (!!opts.pullFromServer || !businessEntityDirty());
-  const useUpdatedAt = opts.entityKind === "customers";
+  // Customers + employees stamp updatedAt on edit so pre-save peer merge
+  // cannot wipe this device's just-saved row with an older server blob.
+  const useUpdatedAt =
+    opts.entityKind === "customers" || opts.entityKind === "employees";
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), { ...item });
@@ -4066,17 +4071,14 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
         merged.minStock = Math.max(0, Number(item.minStock) || 0);
       }
     }
-    // Never let a stale device republish older role/permissions after a pull.
-    if (opts.entityKind === "employees" && prev && opts.pullFromServer) {
-      if (prev.role != null) merged.role = prev.role;
-      if (Array.isArray(prev.permissions)) {
-        merged.permissions = [...prev.permissions];
-      }
-      if (prev.password != null && prev.password !== "") {
-        merged.password = prev.password;
-      }
-      if (prev.percentDiscount != null) {
-        merged.percentDiscount = prev.percentDiscount;
+    // Keep a non-empty password if the winning side omitted it (stripped blob).
+    if (opts.entityKind === "employees" && prev) {
+      const mergedPwd = String(merged.password || "").trim();
+      if (!mergedPwd) {
+        const localPwd = String(item.password || "").trim();
+        const remotePwd = String(prev.password || "").trim();
+        if (localPwd) merged.password = item.password;
+        else if (remotePwd) merged.password = prev.password;
       }
     }
     map.set(id, merged);
@@ -8628,7 +8630,7 @@ function receiptExcelPage(o, logoSrc) {
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 14mm 8mm 12mm 18mm; }
+@page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
 body {
   margin: 0;
   padding: 0;
@@ -8647,7 +8649,7 @@ td, th { border: none; }
   max-width: 184mm;
   margin: 0;
   /* A4: left/top margin via @page; right smaller than left. */
-  padding: 2mm 0 2mm 0;
+  padding: 4mm 0 2mm 0;
   box-sizing: border-box;
   font-size: 9px;
   line-height: 1.15;
@@ -10517,7 +10519,7 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
   // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
   // Fit width to one A4 page, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.4" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.7" bottom="0.4" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -23081,9 +23083,7 @@ function buildEmployeeDataFromForm(form, editId = "") {
       phone: String(f.phone || "").trim(),
       password,
       role: roleValue,
-      ...(readEmployeeImageFromForm(form)
-        ? { image: readEmployeeImageFromForm(form) }
-        : {}),
+      image: readEmployeeImageFromForm(form),
       allowPercentDiscount:
         roleValue === "sales"
           ? existing?.role === "sales"
@@ -23099,24 +23099,23 @@ async function applyEmployeeSave(data, editId = "") {
   if (productMediaPathFromUrl(incomingImage)) {
     data.image = productMediaPathFromUrl(incomingImage);
   }
+  const nowIso = new Date().toISOString();
   let employee = null;
   if (editId) {
     const existing = state.employees.find((e) => e.id === editId);
     if (!existing) return alert("Ажилтан олдсонгүй");
-    const prevImage = storedEntityImage(existing);
     existing.name = data.name;
     existing.email = data.email;
     existing.phone = data.phone;
     existing.role = data.role;
     if (data.image) existing.image = data.image;
-    else if (!storedEntityImage(existing) && prevImage)
-      existing.image = prevImage;
-    else if (!incomingImage) delete existing.image;
+    else delete existing.image;
     existing.allowPercentDiscount = data.allowPercentDiscount;
     existing.permissions = data.permissions;
     if (canSetEmployeePassword() && data.password) {
       existing.password = data.password;
     }
+    existing.updatedAt = nowIso;
     employee = existing;
     if (state.currentEmployee?.id === editId) {
       state.currentEmployee = existing;
@@ -23137,6 +23136,7 @@ async function applyEmployeeSave(data, editId = "") {
       commissionRate: 0,
       allowPercentDiscount: data.allowPercentDiscount,
       permissions: data.permissions,
+      updatedAt: nowIso,
     };
     if (!employee.image) delete employee.image;
     state.employees.push(employee);
@@ -23534,7 +23534,7 @@ function printOrderReceiptsNow(ids) {
     const root = printRootEl();
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
-  @page { size: A4 portrait; margin: 14mm 8mm 12mm 18mm; }
+  @page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
   .receipt-page { width: 184mm; max-width: 184mm; margin: 0; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;

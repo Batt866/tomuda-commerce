@@ -16,7 +16,7 @@ DELETION_TYPE = {
 }
 # Field-level last-writer-wins only for collections that stamp updatedAt on edit.
 # Products keep stock via separate rules — do not use updatedAt for products.
-UPDATED_AT_ENTITY_KEYS = frozenset({"customers"})
+UPDATED_AT_ENTITY_KEYS = frozenset({"customers", "employees"})
 
 
 def _as_list(value: Any) -> list:
