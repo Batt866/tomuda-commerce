@@ -482,8 +482,9 @@ const RECEIPT_COMPANY_ADDRESS = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${R
 const RECEIPT_BORDER = "#666666";
 const RECEIPT_HEADER_BG = "#F3F3F3";
 const RECEIPT_GRAND_BG = "#C5CAD0";
-const RECEIPT_SETTLE_BG = "#FFF2CC";
+const RECEIPT_SETTLE_BG = "#FFF2CC"; // Gold, Accent 4, Lighter 80%
 const RECEIPT_SETTLE_BORDER = "#E6E6A8";
+const RECEIPT_SETTLE_BG_XLSX = "FFFFF2CC";
 const RECEIPT_WARN_BG = RECEIPT_GRAND_BG;
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
@@ -930,6 +931,8 @@ function PaymentNotice(o) {
 function receiptNoticeBoxHtml() {
   return receiptWarningRowsHtml();
 }
+const RECEIPT_SIGN_HANDED_LABEL = "Хүлээлгэн өгсөн ажилтны гарын үсэг:";
+const RECEIPT_SIGN_RECEIVED_LABEL = "Хүлээн авсан ажилтны гарын үсэг:";
 function documentSignatureBlockHtml(opts = {}) {
   const padLeft = opts.padLeft !== false;
   const roleColspan = Number(opts.roleColspan) || 2;
@@ -939,7 +942,8 @@ function documentSignatureBlockHtml(opts = {}) {
   const totalCols = (padLeft ? 1 : 0) + roleColspan + lineColspan;
   const block = (role) =>
     `<tr class="${rowClass}">${padCell}<td colspan="${roleColspan}" class="doc-sign__role">${esc(role)}</td><td colspan="${lineColspan}" class="doc-sign__line"></td></tr>`;
-  return `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>${block("Хүлээлгэн өгсөн:")}${block("Хүлээн авсан:")}`;
+  const gap = `<tr class="doc-sign__gap"><td colspan="${totalCols}"></td></tr>`;
+  return `${gap}${block(RECEIPT_SIGN_HANDED_LABEL)}${gap}${block(RECEIPT_SIGN_RECEIVED_LABEL)}`;
 }
 /** SignatureSection — role + dotted line on same row; both start in same column. */
 function receiptSignatureRowsHtml(opts = {}) {
@@ -950,7 +954,7 @@ function receiptSignatureRowsHtml(opts = {}) {
   const block = (role) =>
     `<tr class="receipt-grid__sign"><td></td><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
-  return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
+  return `${fill}${block(RECEIPT_SIGN_HANDED_LABEL)}${gap}${block(RECEIPT_SIGN_RECEIVED_LABEL)}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -8818,8 +8822,8 @@ td, th { border: none; }
   white-space: nowrap;
   font-size: 11px;
   font-weight: 400;
-  /* Slightly darker than Accent 5 Lighter 40% so promo totals stay readable */
-  color: #5B9BD5 !important;
+  /* Clearer blue than Accent 5 base — promo Нийт үнэ */
+  color: #2E86C1 !important;
 }
 .receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 1px 0 !important; }
 .receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 1px 0 0 !important; }
@@ -9092,7 +9096,7 @@ td, th { border: none; }
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #000 !important; font-weight: 700; }
-.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #5B9BD5 !important; }
+.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #2E86C1 !important; }
 .receipt-grid--sheet .receipt-grid__return td {
   padding: 0;
   height: auto;
@@ -9104,7 +9108,7 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__return .receipt-grid__return-label {
   padding: 3px 6px;
   min-height: 16px;
-  background: #fff2cc !important;
+  background: ${RECEIPT_SETTLE_BG} !important;
   text-align: center;
   white-space: normal;
   word-break: break-word;
@@ -9205,6 +9209,11 @@ td, th { border: none; }
   padding: 3px 6px !important;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
+  background: ${RECEIPT_SETTLE_BG} !important;
+  border: none !important;
+  box-sizing: border-box;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 .receipt-grid--sheet .receipt-grid__sign-line {
   border: none !important;
@@ -9632,6 +9641,8 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
+/** Fixed height for item table header + product/promo lines (no wrap-based sizing). */
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
 // ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» on one line (fitToWidth).
 // Take from B/C so the header never clips.
 const RECEIPT_XLSX_COL_WIDTHS = [
@@ -9744,7 +9755,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="15"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF5B9BD5"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="62"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="15"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF2E86C1"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_SETTLE_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="62"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -9796,6 +9807,8 @@ function stockReceiptQtyStyleIds(stylesXml) {
 }
 /** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
 const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
+/** Uniform row height for header / category / line / subtotal / total on stock receipts. */
+const STOCK_RECEIPT_BODY_ROW_HEIGHT = 16.5;
 function stockReceiptQtyHeadXf(fillId) {
   const fillAttrs =
     Number(fillId) > 0
@@ -10241,7 +10254,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `F${headerRow}:G${headerRow}`,
     `H${headerRow}:I${headerRow}`,
   );
-  pushItemTableRow(12, [
+  pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
     xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
     xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
@@ -10253,13 +10266,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(headerRow, "G", "G", 7),
     ...emptyCells(headerRow, "I", "I", 7),
   ]);
-
-  const nameColWidth =
-    RECEIPT_XLSX_COL_WIDTHS[1] +
-    RECEIPT_XLSX_COL_WIDTHS[2] +
-    RECEIPT_XLSX_COL_WIDTHS[3];
-  const barcodeColWidth =
-    RECEIPT_XLSX_COL_WIDTHS[5] + RECEIPT_XLSX_COL_WIDTHS[6];
 
   items.forEach((item, index) => {
     const p =
@@ -10273,20 +10279,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
     const nameText = String(item.productName || "").trim() || "-";
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
-    const rowH = Math.max(
-      14.25,
-      receiptXlsxWrappedRowHeight(nameText, nameColWidth),
-      barcodeText !== "-"
-        ? receiptXlsxWrappedRowHeight(barcodeText, barcodeColWidth, {
-            min: 14.25,
-            linePt: 11,
-            pad: 2,
-            max: 28,
-          })
-        : 14.25,
-    );
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
-    pushItemTableRow(rowH, [
+    pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, 9, si(String(index + 1)), "s"),
       xlsxCellXml(`B${r}`, 8, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 9, si(unitText), "s"),
@@ -10363,15 +10357,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
     const nameText = String(item.productName || "").trim() || "-";
-    const promoH = Math.max(
-      14.25,
-      receiptXlsxWrappedRowHeight(nameText, 28, {
-        min: 14.25,
-        linePt: 11,
-        pad: 2,
-        max: 36,
-      }),
-    );
     merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
     const clearStyle = 1; // no borders — left of promo name
     // Row lines only (borderId 3 = bottom hair) — no vertical grid inside promo items
@@ -10381,7 +10366,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const unitMoneyStyle = 47; // black — нэгж үнэ
     // Style 59 = pale blue Нийт үнэ (promo only) — see receiptXlsxStylesXml.
     const totalMoneyStyle = 59;
-    pushItemTableRow(promoH, [
+    pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, clearStyle, null, "empty"),
       xlsxCellXml(`B${r}`, clearStyle, null, "empty"),
       idx === 0
@@ -10523,7 +10508,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       ...emptyCells(r, "K", "K", 1),
     ]);
   };
-  pushSignRow("Хүлээлгэн өгсөн ажилтны гарын үсэг:");
+  pushSignRow(RECEIPT_SIGN_HANDED_LABEL);
   {
     const gapR = rowNum;
     pushRow(14.25, [
@@ -10531,7 +10516,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       ...emptyCells(gapR, "B", RECEIPT_XLSX_LAST_COL, 1),
     ]);
   }
-  pushSignRow("Хүлээн авсан ажилтны гарын үсэг:");
+  pushSignRow(RECEIPT_SIGN_RECEIVED_LABEL);
   pushRow(14.25, emptyCells(rowNum));
   return rowNum;
 }
@@ -14247,7 +14232,7 @@ function stockInReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -14347,18 +14332,18 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-piece { width: 72px; }
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
-.stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; }
+.stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; height: 22px; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
-.meta td { border: none; padding: 4px 0; }
+.meta td { border: none; padding: 4px 0; height: auto; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
-.head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
+.head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; height: 22px; }
 .head th.qty-large { background: #f2f2f2; }
 .head th.qty-small { background: #f2f2f2; }
 .head th.qty-piece { background: #bfbfbf; }
 .head th.qty-total { background: #fff; }
-.cat { text-align: center; font-weight: 800; background: #fff; }
-.cat-total td { font-weight: 700; background: #fff; }
+.cat { text-align: center; font-weight: 800; background: #fff; height: 22px; }
+.cat-total td { font-weight: 700; background: #fff; height: 22px; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
 .num.qty-large { background: #f2f2f2; text-align: center; }
@@ -14366,7 +14351,9 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .num.qty-piece { background: #bfbfbf; text-align: center; }
 .num.qty-total { background: #fff; text-align: center; }
 .total td { font-weight: 800; }
-.sign td { border: none; padding-top: 18px; }
+.sign td { border: none; padding-top: 12px; vertical-align: bottom; }
+.sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
+.sign-gap td { height: 14px; border: none !important; }
 </style></head><body><table class="stock-in">
 <colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-total"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
 <tr><td colspan="9" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
@@ -14375,8 +14362,9 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 <tr class="head"><th>Барааны нэр</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
-<tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="9">Хүлээн авсан: ________________________</td></tr>
+<tr class="sign"><td colspan="5">${RECEIPT_SIGN_HANDED_LABEL}</td><td colspan="4" class="sign-line"></td></tr>
+<tr class="sign-gap"><td colspan="9"></td></tr>
+<tr class="sign"><td colspan="5">${RECEIPT_SIGN_RECEIVED_LABEL}</td><td colspan="4" class="sign-line"></td></tr>
 </table></body></html>`;
   const blob = new Blob(["\uFEFF" + html], {
     type: "text/html;charset=utf-8",
@@ -14443,7 +14431,7 @@ function stockOutReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockOutExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockOutExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockOutModal(id) {
   ensureStockOutSession();
@@ -14568,18 +14556,18 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-piece { width: 72px; }
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
-.stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; }
+.stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; height: 22px; }
 .title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
-.meta td { border: none; padding: 4px 0; }
+.meta td { border: none; padding: 4px 0; height: auto; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
-.head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; }
+.head th { text-align: center; font-weight: 800; background: #eef0f2; white-space: nowrap; height: 22px; }
 .head th.qty-large { background: #f2f2f2; }
 .head th.qty-small { background: #f2f2f2; }
 .head th.qty-piece { background: #bfbfbf; }
 .head th.qty-total { background: #fff; }
-.cat { text-align: center; font-weight: 800; background: #fff; }
-.cat-total td { font-weight: 700; background: #fff; }
+.cat { text-align: center; font-weight: 800; background: #fff; height: 22px; }
+.cat-total td { font-weight: 700; background: #fff; height: 22px; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
 .num { text-align: right; }
 .num.qty-large { background: #f2f2f2; text-align: center; }
@@ -14587,7 +14575,9 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .num.qty-piece { background: #bfbfbf; text-align: center; }
 .num.qty-total { background: #fff; text-align: center; }
 .total td { font-weight: 800; }
-.sign td { border: none; padding-top: 18px; }
+.sign td { border: none; padding-top: 12px; vertical-align: bottom; }
+.sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
+.sign-gap td { height: 14px; border: none !important; }
 </style></head><body><table class="stock-in">
 <colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-total"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
 <tr><td colspan="9" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
@@ -14596,8 +14586,9 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 <tr class="head"><th>Барааны нэр</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
-<tr class="sign"><td colspan="9">Хүлээлгэн өгсөн: _____________________</td></tr>
-<tr class="sign"><td colspan="9">Хүлээн авсан: ________________________</td></tr>
+<tr class="sign"><td colspan="5">${RECEIPT_SIGN_HANDED_LABEL}</td><td colspan="4" class="sign-line"></td></tr>
+<tr class="sign-gap"><td colspan="9"></td></tr>
+<tr class="sign"><td colspan="5">${RECEIPT_SIGN_RECEIVED_LABEL}</td><td colspan="4" class="sign-line"></td></tr>
 </table></body></html>`;
   const blob = new Blob(["\uFEFF" + html], {
     type: "text/html;charset=utf-8",
@@ -15686,29 +15677,29 @@ function buildCountSheetXml() {
   ]);
   pushRow(16.5, emptyCells(rowNum));
   const sign1 = rowNum;
-  merges.push(`A${sign1}:B${sign1}`, `C${sign1}:E${sign1}`);
+  merges.push(`A${sign1}:E${sign1}`, `F${sign1}:H${sign1}`);
   pushRow(null, [
-    xlsxCellXml(`A${sign1}`, 17, si("Хүлээлгэн өгсөн ажилтан:"), "s"),
+    xlsxCellXml(`A${sign1}`, 17, si(RECEIPT_SIGN_HANDED_LABEL), "s"),
     xlsxCellXml(`B${sign1}`, 17, null, "empty"),
     xlsxCellXml(`C${sign1}`, 17, null, "empty"),
     xlsxCellXml(`D${sign1}`, 17, null, "empty"),
     xlsxCellXml(`E${sign1}`, 17, null, "empty"),
-    xlsxCellXml(`F${sign1}`, 1, null, "empty"),
-    xlsxCellXml(`G${sign1}`, 1, null, "empty"),
-    xlsxCellXml(`H${sign1}`, 1, null, "empty"),
+    xlsxCellXml(`F${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`G${sign1}`, 18, null, "empty"),
+    xlsxCellXml(`H${sign1}`, 18, null, "empty"),
   ]);
   pushRow(16.5, emptyCells(rowNum));
   const sign3 = rowNum;
-  merges.push(`A${sign3}:B${sign3}`, `C${sign3}:E${sign3}`);
+  merges.push(`A${sign3}:E${sign3}`, `F${sign3}:H${sign3}`);
   pushRow(null, [
-    xlsxCellXml(`A${sign3}`, 17, si("Хүлээн авсан ажилтан:"), "s"),
+    xlsxCellXml(`A${sign3}`, 17, si(RECEIPT_SIGN_RECEIVED_LABEL), "s"),
     xlsxCellXml(`B${sign3}`, 17, null, "empty"),
     xlsxCellXml(`C${sign3}`, 17, null, "empty"),
     xlsxCellXml(`D${sign3}`, 17, null, "empty"),
     xlsxCellXml(`E${sign3}`, 17, null, "empty"),
-    xlsxCellXml(`F${sign3}`, 1, null, "empty"),
-    xlsxCellXml(`G${sign3}`, 1, null, "empty"),
-    xlsxCellXml(`H${sign3}`, 1, null, "empty"),
+    xlsxCellXml(`F${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`G${sign3}`, 18, null, "empty"),
+    xlsxCellXml(`H${sign3}`, 18, null, "empty"),
   ]);
   const lastRow = rowNum;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -15887,9 +15878,9 @@ function buildStockOutSheetXmlLegacy(receipt, {
     xlsxCellXml("H3", 14, null, "empty"),
     xlsxCellXml("I3", 14, null, "empty"),
   ]);
-  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
   const headerRow = rowNum;
-  pushRow(18, [
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`B${headerRow}`, 7, si("Barcode"), "s"),
     xlsxCellXml(`C${headerRow}`, qtyStyles.largeHead, si("Том/х"), "s"),
@@ -15904,7 +15895,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
     if (item.type === "cat") {
       const r = rowNum;
       merges.push(`A${r}:${lastCol}${r}`);
-      pushRow(24, [
+      pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
         xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
         ...emptyCells(r, "B", lastCol, 15),
       ]);
@@ -15913,7 +15904,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
     if (item.type === "catTotal") {
       const r = rowNum;
       merges.push(`A${r}:H${r}`);
-      pushRow(16.5, [
+      pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
         xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
         ...emptyCells(r, "B", "H", 3),
         xlsxCellXml(`I${r}`, 10, item.amount, "n"),
@@ -15926,7 +15917,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
     const salesPrice = stockInReceiptLineSalesPrice(line);
     const parts = stockReceiptQtyParts(line);
     const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
-    pushRow(15, [
+    pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
       xlsxBarcodeCell(`B${r}`, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, line.barcode, si),
       xlsxPrepareQtyCell(`C${r}`, qtyStyles.largeCell, parts.largePacks),
@@ -15938,37 +15929,29 @@ function buildStockOutSheetXmlLegacy(receipt, {
       xlsxCellXml(`I${r}`, 10, stockInReceiptLineTotal(line), "n"),
     ]);
   }
-  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
   const totalRow = rowNum;
   merges.push(`A${totalRow}:H${totalRow}`);
-  pushRow(16.5, [
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
     xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
     ...emptyCells(totalRow, "B", "H", 10),
     xlsxCellXml(`I${totalRow}`, 10, receipt.totalAmount, "n"),
   ]);
-  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
-  const signDots = "....................................................";
-  const pushSignatureBlock = (roleLabel) => {
-    const nameRow = rowNum;
-    merges.push(`C${nameRow}:${lastCol}${nameRow}`);
-    pushRow(null, [
-      xlsxCellXml(`A${nameRow}`, 17, si(roleLabel), "s"),
-      xlsxCellXml(`B${nameRow}`, 18, si("Нэр"), "s"),
-      xlsxCellXml(`C${nameRow}`, 18, si(signDots), "s"),
-      ...emptyCells(nameRow, "D", lastCol, 18),
-    ]);
-    const signRow = rowNum;
-    merges.push(`C${signRow}:${lastCol}${signRow}`);
-    pushRow(null, [
-      xlsxCellXml(`A${signRow}`, 12, null, "empty"),
-      xlsxCellXml(`B${signRow}`, 6, si("Гарын үсэг"), "s"),
-      xlsxCellXml(`C${signRow}`, 18, si(signDots), "s"),
-      ...emptyCells(signRow, "D", lastCol, 18),
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
+  const pushSignatureRow = (roleLabel) => {
+    const r = rowNum;
+    const line = WAREHOUSE_PREPARE_SIGN_LINE_STYLE;
+    merges.push(`A${r}:E${r}`, `F${r}:${lastCol}${r}`);
+    pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
+      xlsxCellXml(`A${r}`, 17, si(roleLabel), "s"),
+      ...emptyCells(r, "B", "E", 17),
+      xlsxCellXml(`F${r}`, line, null, "empty"),
+      ...emptyCells(r, "G", lastCol, line),
     ]);
   };
-  pushSignatureBlock("Хүлээлгэн өгсөн:");
-  pushRow(16.5, emptyCells(rowNum, "A", lastCol, 2));
-  pushSignatureBlock("Хүлээн авсан:");
+  pushSignatureRow(RECEIPT_SIGN_HANDED_LABEL);
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
+  pushSignatureRow(RECEIPT_SIGN_RECEIVED_LABEL);
   const lastRow = Math.max(1, rowNum - 1);
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const colsXml = STOCK_RECEIPT_COL_WIDTHS.map(
@@ -16208,6 +16191,8 @@ function warehousePrepareBarcodeCell(ref, barcode, si) {
   return xlsxCellXml(ref, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
+/** Uniform body row height for prepare sheet (category + product lines). */
+const WAREHOUSE_PREPARE_BODY_ROW_HEIGHT = 15;
 /**
  * A4 sample (Агуулах бэлдэх): fixed widths so «Хэмжих нэгж» / «ширхэг»
  * stay on one line without clipping when fitToWidth scales the sheet.
@@ -16550,10 +16535,10 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       ),
     );
   }
-  pushRow(16.5, warehousePrepareBlankMetaRow(rowNum));
+  pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, warehousePrepareBlankMetaRow(rowNum));
   const headerRow = rowNum;
   // Single-line headers (sample layout + no downward wrap / clipped unit).
-  pushRow(28.5, [
+  pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
     xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(
       `B${headerRow}`,
@@ -16587,13 +16572,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     for (const item of groups) {
       if (item.type === "cat") {
         const r = rowNum;
-        const catHeight =
-          WAREHOUSE_PREPARE_CAT_HEIGHTS[
-            Math.min(catIndex, WAREHOUSE_PREPARE_CAT_HEIGHTS.length - 1)
-          ];
         catIndex += 1;
         merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
-        pushRow(catHeight, [
+        pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
           xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
           ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
         ]);
@@ -16602,7 +16583,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       const p = item.product;
       const parts = warehousePreparePrintParts(item, p);
       const r = rowNum;
-      pushRow(15, [
+      pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
         xlsxCellXml(`A${r}`, textSi, si(p.name || ""), "s"),
         xlsxCellXml(`B${r}`, textSi, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
@@ -16631,7 +16612,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(27.75, [
+    pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
       xlsxCellXml(`A${promoHeadRow}`, 15, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
     ]);
@@ -16641,18 +16622,19 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(10.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:F${r}`);
+    merges.push(`A${r}:C${r}`, `D${r}:F${r}`);
     const line = WAREHOUSE_PREPARE_SIGN_LINE_STYLE;
     pushRow(20, [
       xlsxCellXml(`A${r}`, 3, si(role), "s"),
-      xlsxCellXml(`B${r}`, line, null, "empty"),
-      ...emptyCells(r, "C", "F", line),
+      ...emptyCells(r, "B", "C", 3),
+      xlsxCellXml(`D${r}`, line, null, "empty"),
+      ...emptyCells(r, "E", "F", line),
       xlsxCellXml(`G${r}`, 1, null, "empty"),
     ]);
   };
-  pushWarehousePrepareSignatureBlock("Хүлээн өгсөн ажилтан:");
+  pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_HANDED_LABEL);
   pushRow(15, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
-  pushWarehousePrepareSignatureBlock("Хүлээн авсан ажилтан:");
+  pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_RECEIVED_LABEL);
   pushRow(15, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
   const lastRow = rowNum;
   const sheetXml = warehousePrepareWorksheetXml(
@@ -16739,7 +16721,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .prepare col.c-small { width: 11%; }
 .prepare col.c-piece { width: 9%; }
 .prepare col.c-stock { width: 14%; }
-.prepare td, .prepare th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }
+.prepare td, .prepare th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; height: 20px; }
 .prepare td.name,
 .prepare td.unit,
 .prepare td.barcode { text-align: left; white-space: nowrap; overflow: hidden; font-size: 11px; font-weight: 400; }
@@ -16750,12 +16732,12 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
 .date-value { text-align: left; white-space: nowrap; border: none !important; }
 .blank td { height: 14px; border: none !important; }
-.head th { height: 28px; text-align: center; font-size: 11px; font-weight: 800; border: 1px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
+.head th { height: 20px; text-align: center; font-size: 11px; font-weight: 800; border: 1px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
 .head th.qty-large { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-small { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 28px; white-space: nowrap; }
+.cat { text-align: center; font-weight: 800; height: 20px; white-space: nowrap; }
 .promo-head { border-top: 1px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
@@ -16779,9 +16761,9 @@ ${workerRows}
 <tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
-<tr><td class="sign-label">Хүлээн өгсөн ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
+<tr><td colspan="3" class="sign-label">${RECEIPT_SIGN_HANDED_LABEL}</td><td colspan="3" class="sign-line"></td><td style="border:none"></td></tr>
 <tr class="sign-gap"><td colspan="7"></td></tr>
-<tr><td class="sign-label">Хүлээн авсан ажилтан:</td><td colspan="5" class="sign-line"></td><td style="border:none"></td></tr>
+<tr><td colspan="3" class="sign-label">${RECEIPT_SIGN_RECEIVED_LABEL}</td><td colspan="3" class="sign-line"></td><td style="border:none"></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`Агуулах-бэлдэх-${stamp}.xls`, html);
 }
@@ -22535,7 +22517,7 @@ function productModal(id) {
       )
       .join(
         "",
-      )}<option value="__new__">+ Шинэ төрөл</option></select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+      )}</select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -22750,13 +22732,6 @@ function buildProductDataFromForm(form) {
   data.name = String(data.name || "").trim();
   if (!data.name) return { error: "Барааны нэр оруулна уу" };
   if (!data.category?.trim()) return { error: "Төрөл сонгоно уу" };
-  if (data.category === "__new__") {
-    const custom = prompt("Шинэ төрлийн нэр");
-    if (!custom?.trim()) return { error: "Төрөл сонгоно уу" };
-    data.category = custom.trim();
-    if (!state.extraCategories.includes(data.category))
-      state.extraCategories.push(data.category);
-  }
   data.price = Number(data.price || 0);
   delete data.costPrice;
   const packRaw = String(data.boxQuantity ?? "").trim();

@@ -16483,7 +16483,7 @@ body.image-lightbox-open {
 
 .stock-in-sign {
   display: grid;
-  grid-template-columns: minmax(110px, auto) 1fr;
+  grid-template-columns: minmax(220px, max-content) 1fr;
   align-items: end;
   gap: 10px;
   color: var(--hex-muted-foreground);
@@ -16491,7 +16491,7 @@ body.image-lightbox-open {
 
 .stock-in-sign__line {
   min-height: 1.1em;
-  border-bottom: 1px solid color-mix(in srgb, var(--hex-border) 80%, #94a3b8);
+  border-bottom: 1px dotted #666;
 }
 
 .stock-in-sign--date {
