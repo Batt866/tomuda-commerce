@@ -9641,8 +9641,12 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-/** Fixed height for item table header + product/promo lines (no wrap-based sizing). */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
+/** Uniform body/spacer row height — avoid hairline spacer rows (6–8pt). */
+const RECEIPT_XLSX_ROW_HEIGHT = 15;
+/** Fixed height for item table header + product/promo lines. */
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
+/** Slightly taller title / signature labels only. */
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 18;
 // ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» on one line (fitToWidth).
 // Take from B/C so the header never clips.
 const RECEIPT_XLSX_COL_WIDTHS = [
@@ -10068,7 +10072,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     rowNum += 1;
   };
   for (let i = 0; i < RECEIPT_XLSX_TOP_PAD_ROWS; i += 1) {
-    pushRow(8, emptyCells(rowNum));
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
   }
   const plain = (value) =>
     String(value ?? "")
@@ -10101,7 +10105,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `B${hr3}:J${hr3}`,
     `J${hr1}:K${hr1}`,
   );
-  pushRow(18, [
+  pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
     xlsxCellXml(`J${hr1}`, 3, si("Хүргэлтийн огноо:"), "s"),
@@ -10132,7 +10136,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "C", "I", 41),
   ]);
-  pushRow(31.5, [
+  pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
     xlsxCellXml(`B${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
     ...emptyCells(hr3, "C", "J", 40),
   ]);
@@ -10146,9 +10150,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const bcW = RECEIPT_XLSX_COL_WIDTHS[1] + RECEIPT_XLSX_COL_WIDTHS[2];
     const labelStyle = singleLine ? 56 : 5;
     const labelH = singleLine
-      ? 14.25
+      ? RECEIPT_XLSX_ROW_HEIGHT
       : receiptXlsxWrappedRowHeight(leftLabel, bcW, {
-          min: 14.25,
+          min: RECEIPT_XLSX_ROW_HEIGHT,
           linePt: 11,
           pad: 2,
           max: 28,
@@ -10178,7 +10182,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         ? plain(f.customerEmail)
         : "";
     merges.push(`B${r}:E${r}`, `F${r}:H${r}`, `I${r}:K${r}`);
-    pushRow(14.25, [
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${r}`, 5, null, "empty"),
       xlsxCellXml(`F${r}`, 5, si("И-мэйл:"), "s"),
       xlsxCellXml(`I${r}`, 5, si(emailVal), "s"),
@@ -10208,7 +10212,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
-  pushRow(14.25, [
+  pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
     xlsxCellXml(`B${bankR1}`, 5, si("Дансны нэр:"), "s"),
     xlsxCellXml(`D${bankR1}`, 5, si("ТОМУДА"), "s"),
     xlsxCellXml(`F${bankR1}`, 4, si("Хүргэлтийн хаяг:"), "s"),
@@ -10217,7 +10221,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR1, "G", "H", 4),
   ]);
   const addrH = Math.max(57, Math.ceil(addressText.length / 42) * 12 + 8);
-  const perBankH = Math.max(14.25, Math.ceil(addrH / 4));
+  const perBankH = RECEIPT_XLSX_ROW_HEIGHT;
   pushRow(perBankH, [
     xlsxCellXml(`B${bankR2}`, 5, si("Регистрийн дугаар:"), "s"),
     xlsxCellXml(`D${bankR2}`, 5, si("5397987"), "s"),
@@ -10245,7 +10249,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(bankR5, "E", "E", 4),
   ]);
 
-  pushRow(14.25, emptyCells(rowNum));
+  pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
 
   // Items header
   const headerRow = rowNum;
@@ -10299,7 +10303,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Тэмдэглэл — зөвхөн бичсэн текст (шошгогүй).
   const orderNote = String(o?.settlementText || "").trim();
   if (orderNote) {
-    pushRow(6, emptyCells(rowNum));
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
     const noteRow = rowNum;
     merges.push(`C${noteRow}:J${noteRow}`);
     const noteColW = RECEIPT_XLSX_COL_WIDTHS.slice(2, 10).reduce(
@@ -10307,9 +10311,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
       0,
     );
     const noteH = Math.max(
-      14.25,
+      RECEIPT_XLSX_ROW_HEIGHT,
       receiptXlsxWrappedRowHeight(orderNote, noteColW, {
-        min: 14.25,
+        min: RECEIPT_XLSX_ROW_HEIGHT,
         linePt: 11,
         pad: 2,
         max: 80,
@@ -10326,7 +10330,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Gap before totals — thin spacer (standard-ish row, not a tall blank).
   {
     const spacerR = rowNum;
-    pushRow(8, [
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`A${spacerR}`, 1, si("\u00A0"), "s"),
       ...emptyCells(spacerR, "B", RECEIPT_XLSX_LAST_COL, 1),
     ]);
@@ -10337,7 +10341,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const grossRow = rowNum;
     // Label B→E: gray, no borders. Underline only F→K (nothing from D leftward).
     merges.push(`B${grossRow}:E${grossRow}`);
-    pushRow(14.25, [
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
       xlsxCellXml(`F${grossRow}`, 32, null, "empty"),
       xlsxCellXml(`G${grossRow}`, 32, null, "empty"),
@@ -10385,7 +10389,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Extra gap after promo so summary doesn't sit on the promo border
   if (promoLines.length) {
     const spacerR = rowNum;
-    pushRow(18, [
+    pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
       xlsxCellXml(`A${spacerR}`, 1, si("\u00A0"), "s"),
       ...emptyCells(spacerR, "B", RECEIPT_XLSX_LAST_COL, 1),
     ]);
@@ -10420,13 +10424,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         cells.push(xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"));
         cells.push(...emptyCells(r, "F", "K", valueStyle));
       }
-      pushRow(14.25, cells);
+      pushRow(RECEIPT_XLSX_ROW_HEIGHT, cells);
       return;
     }
     cells.push(...emptyCells(r, "C", "D", labelStyle));
     cells.push(xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"));
     cells.push(...emptyCells(r, "F", "K", valueStyle));
-    pushRow(14.25, cells);
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, cells);
   };
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
   pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
@@ -10440,7 +10444,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   if (receiptShouldShowCashSettleNote(o)) {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    pushRow(16, [
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${r}`, 2, si(receiptCashSettleNoteText()), "s"),
       ...emptyCells(r, "C", "K", 2),
     ]);
@@ -10451,7 +10455,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const r = rowNum;
     const term = receiptPaymentTermDisplay(o);
     merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
-    pushRow(14.25, [
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${r}`, 30, si("Төлбөрийн нөхцөл"), "s"),
       xlsxCellXml(`K${r}`, 46, si(term), "s"),
       ...emptyCells(r, "C", "D", 30),
@@ -10459,7 +10463,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
 
-  pushRow(12, emptyCells(rowNum));
+  pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
 
   [
     [
@@ -10487,7 +10491,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ].forEach(([text, style, richParts], index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    const warnH = index === 0 ? 20 : 11;
+    const warnH = index === 0 ? RECEIPT_XLSX_TITLE_ROW_HEIGHT : RECEIPT_XLSX_ROW_HEIGHT;
     const value = richParts ? siRich(richParts) : si(text);
     pushRow(warnH, [
       xlsxCellXml(`B${r}`, style, value, "s"),
@@ -10495,12 +10499,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   });
 
-  pushRow(6, emptyCells(rowNum));
+  pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
   // Label B:F left-aligned; dotted signature line G→J (sample layout)
   const pushSignRow = (role) => {
     const r = rowNum;
     merges.push(`B${r}:F${r}`, `G${r}:J${r}`);
-    pushRow(18, [
+    pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
       xlsxCellXml(`B${r}`, 61, si(role), "s"),
       ...emptyCells(r, "C", "F", 61),
       xlsxCellXml(`G${r}`, 57, null, "empty"),
@@ -10511,13 +10515,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   pushSignRow(RECEIPT_SIGN_HANDED_LABEL);
   {
     const gapR = rowNum;
-    pushRow(14.25, [
+    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`A${gapR}`, 1, si("\u00A0"), "s"),
       ...emptyCells(gapR, "B", RECEIPT_XLSX_LAST_COL, 1),
     ]);
   }
   pushSignRow(RECEIPT_SIGN_RECEIVED_LABEL);
-  pushRow(14.25, emptyCells(rowNum));
+  pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
   return rowNum;
 }
 function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
@@ -10531,7 +10535,7 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
   // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
   // Fit width to one A4 page, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.7" bottom="0.4" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.7" bottom="0.4" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -10564,7 +10568,7 @@ function buildReceiptsCombinedSheetXml(
   let rowNum = 1;
   orders.forEach((o, index) => {
     if (index > 0) {
-      rows.push(xlsxRowXml(rowNum, 14.25, [], RECEIPT_XLSX_LAST_COL));
+      rows.push(xlsxRowXml(rowNum, RECEIPT_XLSX_ROW_HEIGHT, [], RECEIPT_XLSX_LAST_COL));
       rowNum += 1;
     }
     rowNum = appendReceiptSheetRows(o, ctx, rows, merges, rowNum);
