@@ -9783,26 +9783,25 @@ function stockReceiptQtyStyleIds(stylesXml) {
 /** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
 const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
 function stockReceiptQtyHeadXf(fillId) {
-  return `<xf numFmtId="0" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
+  const fillAttrs =
+    Number(fillId) > 0
+      ? `fillId="${fillId}" applyFill="1"`
+      : `fillId="0"`;
+  return `<xf numFmtId="0" fontId="2" ${fillAttrs} borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
 }
 function stockReceiptQtyCellXf(fillId) {
-  return `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
+  const fillAttrs =
+    Number(fillId) > 0
+      ? `fillId="${fillId}" applyFill="1"`
+      : `fillId="0"`;
+  return `<xf numFmtId="1" fontId="2" ${fillAttrs} borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
 }
 function stockReceiptPatchStylesXml(stylesXml) {
-  // Stock in/out: qty grays only — no category-row fill (зарлага sample is plain).
+  // Stock in/out: qty grays only — no category fill; Нийт тоо/ш has no bg fill.
   let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
-  const blue = STOCK_RECEIPT_TOTAL_QTY_BLUE;
-  if (!out.includes(`rgb="${blue}"`)) {
-    out = out.replace(
-      /(<fills count=")(\d+)(">)([\s\S]*?)(<\/fills>)/,
-      (_, a, count, c, body, end) =>
-        `${a}${Number(count) + 1}${c}${body}${warehousePrepareGrayFillXml(blue)}${end}`,
-    );
-  }
-  const fillId = warehousePrepareFillIdForRgb(out, blue);
   const appendXfs = [];
-  const head = stockReceiptQtyHeadXf(fillId);
-  const cell = stockReceiptQtyCellXf(fillId);
+  const head = stockReceiptQtyHeadXf(0);
+  const cell = stockReceiptQtyCellXf(0);
   if (!out.includes(head)) appendXfs.push(head);
   if (!out.includes(cell)) appendXfs.push(cell);
   if (appendXfs.length) {
@@ -14319,7 +14318,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-large { background: #f2f2f2; }
 .head th.qty-small { background: #d9d9d9; }
 .head th.qty-piece { background: #bfbfbf; }
-.head th.qty-total { background: #bdd7ee; }
+.head th.qty-total { background: #fff; }
 .cat { text-align: center; font-weight: 800; background: #fff; }
 .cat-total td { font-weight: 700; background: #fff; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
@@ -14327,7 +14326,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .num.qty-large { background: #f2f2f2; text-align: center; }
 .num.qty-small { background: #d9d9d9; text-align: center; }
 .num.qty-piece { background: #bfbfbf; text-align: center; }
-.num.qty-total { background: #bdd7ee; text-align: center; }
+.num.qty-total { background: #fff; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
@@ -14540,7 +14539,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .head th.qty-large { background: #f2f2f2; }
 .head th.qty-small { background: #d9d9d9; }
 .head th.qty-piece { background: #bfbfbf; }
-.head th.qty-total { background: #bdd7ee; }
+.head th.qty-total { background: #fff; }
 .cat { text-align: center; font-weight: 800; background: #fff; }
 .cat-total td { font-weight: 700; background: #fff; }
 .barcode { mso-number-format:"\\@"; text-align: center; }
@@ -14548,7 +14547,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .num.qty-large { background: #f2f2f2; text-align: center; }
 .num.qty-small { background: #d9d9d9; text-align: center; }
 .num.qty-piece { background: #bfbfbf; text-align: center; }
-.num.qty-total { background: #bdd7ee; text-align: center; }
+.num.qty-total { background: #fff; text-align: center; }
 .total td { font-weight: 800; }
 .sign td { border: none; padding-top: 18px; }
 </style></head><body><table class="stock-in">
