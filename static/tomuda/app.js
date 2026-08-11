@@ -16363,22 +16363,26 @@ function xlsxBarcodeCell(ref, styleId, barcode, si) {
       : styleId;
   return xlsxCellXml(ref, style, text, "inlineStr");
 }
-function warehousePrepareBarcodeCell(ref, barcode, si) {
+function warehousePrepareBarcodeCell(ref, barcode, si, styleId = null) {
   const text = String(barcode ?? "").trim();
-  // Style 8: single-line shrink-to-fit body text (patched in styles).
-  if (!text) return xlsxCellXml(ref, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, null, "empty");
-  return xlsxCellXml(ref, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, text, "inlineStr");
+  const style =
+    styleId == null || styleId === ""
+      ? WAREHOUSE_PREPARE_TEXT_CELL_STYLE
+      : styleId;
+  if (!text) return xlsxCellXml(ref, style, null, "empty");
+  return xlsxCellXml(ref, style, text, "inlineStr");
 }
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** Uniform body row height for prepare sheet (category + product lines). */
 const WAREHOUSE_PREPARE_BODY_ROW_HEIGHT = 15;
+const WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT = 22;
+const WAREHOUSE_PREPARE_META_ROW_HEIGHT = 16;
+const WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT = 18;
+const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 22;
 /**
- * A4 sample (Агуулах бэлдэх): fixed widths so «Хэмжих нэгж» / «ширхэг»
- * stay on one line without clipping when fitToWidth scales the sheet.
+ * A4 print widths — name widest, barcode full 13 digits, qty cols narrow.
  */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [
-  24.5, 12.5, 13.5, 8.5, 10.5, 8.5, 11.5,
-];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [28, 11, 15, 7.5, 8.5, 7.5, 11];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -16391,6 +16395,138 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
+/** Print-ready B&W pack appended by warehousePreparePrintPatchStylesXml. */
+const WAREHOUSE_PREPARE_PRINT_STYLE_KEYS = [
+  "title",
+  "metaLeft",
+  "metaRight",
+  "spacer",
+  "header",
+  "name",
+  "unit",
+  "barcode",
+  "qty",
+  "stock",
+  "category",
+  "section",
+  "signLabel",
+  "signLine",
+];
+/** Unique border marker so prepare print pack is appended once. */
+const WAREHOUSE_PREPARE_PRINT_BORDER_MARKER = 'rgb="FF9B9B9B"';
+function warehousePreparePrintBorderInnerXml() {
+  return `<border><left style="hair"><color rgb="FF9B9B9B"/></left><right style="hair"><color rgb="FF9B9B9B"/></right><top style="hair"><color rgb="FF9B9B9B"/></top><bottom style="hair"><color rgb="FF9B9B9B"/></bottom><diagonal/></border>`;
+}
+function warehousePreparePrintBorderOuterXml() {
+  return `<border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border>`;
+}
+function warehousePreparePrintBorderSectionXml() {
+  return `<border><left style="thin"><color rgb="FF555555"/></left><right style="thin"><color rgb="FF555555"/></right><top style="thin"><color rgb="FF555555"/></top><bottom style="thin"><color rgb="FF555555"/></bottom><diagonal/></border>`;
+}
+function warehousePreparePrintBorderSignXml() {
+  return `<border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border>`;
+}
+function warehousePreparePrintXfs({
+  fontTitle,
+  fontBody,
+  fontBold,
+  borderInner,
+  borderOuter,
+  borderSection,
+  borderSign,
+}) {
+  return [
+    `<xf numFmtId="0" fontId="${fontTitle}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1"/>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderOuter}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
+    `<xf numFmtId="49" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
+    `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderSection}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderSign}" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf>`,
+  ];
+}
+function warehousePreparePrintStyleIds(stylesXml) {
+  const body = String(stylesXml || "").match(
+    /<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/,
+  );
+  const xfs = body ? body[1].match(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g) || [] : [];
+  const count = xfs.length;
+  const n = WAREHOUSE_PREPARE_PRINT_STYLE_KEYS.length;
+  const fallback = {
+    title: 13,
+    metaLeft: 4,
+    metaRight: 14,
+    spacer: 2,
+    header: 7,
+    name: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
+    unit: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
+    barcode: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
+    qty: WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
+    stock: 10,
+    category: 15,
+    section: 15,
+    signLabel: 3,
+    signLine: WAREHOUSE_PREPARE_SIGN_LINE_STYLE,
+  };
+  if (count < n) return fallback;
+  const start = count - n;
+  const ids = {};
+  WAREHOUSE_PREPARE_PRINT_STYLE_KEYS.forEach((key, index) => {
+    ids[key] = start + index;
+  });
+  return { ...fallback, ...ids };
+}
+function warehousePreparePrintPatchStylesXml(stylesXml) {
+  let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
+  if (out.includes(WAREHOUSE_PREPARE_PRINT_BORDER_MARKER)) return out;
+
+  const titleFont =
+    `<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const bodyFont =
+    `<font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const boldFont =
+    `<font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  out = xlsxStylesAppendPart(out, "fonts", [titleFont, bodyFont, boldFont]);
+  const fontCount = xlsxStylesCountPart(out, "fonts");
+  const fontTitle = Math.max(0, fontCount - 3);
+  const fontBody = Math.max(0, fontCount - 2);
+  const fontBold = Math.max(0, fontCount - 1);
+
+  const borders = [
+    warehousePreparePrintBorderInnerXml(),
+    warehousePreparePrintBorderOuterXml(),
+    warehousePreparePrintBorderSectionXml(),
+    warehousePreparePrintBorderSignXml(),
+  ];
+  out = xlsxStylesAppendPart(out, "borders", borders);
+  const borderCount = xlsxStylesCountPart(out, "borders");
+  const borderSign = Math.max(0, borderCount - 1);
+  const borderSection = Math.max(0, borderCount - 2);
+  const borderOuter = Math.max(0, borderCount - 3);
+  const borderInner = Math.max(0, borderCount - 4);
+
+  out = xlsxStylesAppendPart(
+    out,
+    "cellXfs",
+    warehousePreparePrintXfs({
+      fontTitle,
+      fontBody,
+      fontBold,
+      borderInner,
+      borderOuter,
+      borderSection,
+      borderSign,
+    }),
+  );
+  return out;
+}
 /**
  * Excel theme Accent 3 (#A5A5A5) tints — matches color picker
  * «Gray, Accent 3, Lighter 80% / 60% / 40%» on the sample sheet.
@@ -16592,9 +16728,10 @@ function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const cols = warehousePrepareColsXml(
     colWidths || WAREHOUSE_PREPARE_COL_WIDTHS,
   );
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.28" right="0.28" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${WAREHOUSE_PREPARE_BODY_ROW_HEIGHT}"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.35" right="0.35" top="0.45" bottom="0.4" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1"/></worksheet>`;
 }
-function buildWarehousePrepareSheetXml(orders, workerIds) {
+function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = {}) {
+  const s = styleIds || warehousePreparePrintStyleIds("");
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -16606,20 +16743,23 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     return idx;
   };
   const warehouseEmp = state.currentEmployee?.name || "-";
-  const orderDateLabel = "Захиалгын огноо:";
   const orderDateValue = warehouseSheetDateValue(
     state.filters.warehouseDate || todayIso(),
   );
-  const printedDateLabel = "Хэвлэсэн огноо:";
   const printedDateValue = warehouseSheetDateValue(todayIso());
   const workerNames = state.employees
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
   const sections = warehouseOrderPrepareSections(orders);
   const rows = [];
-  const merges = [`A1:${WAREHOUSE_PREPARE_LAST_COL}1`];
+  const merges = [
+    `A1:${WAREHOUSE_PREPARE_LAST_COL}1`,
+    `A2:C2`,
+    `D2:${WAREHOUSE_PREPARE_LAST_COL}2`,
+    `A3:C3`,
+    `D3:${WAREHOUSE_PREPARE_LAST_COL}3`,
+  ];
   let rowNum = 1;
-  let catIndex = 0;
   const pushRow = (height, cells) => {
     const filtered = filterXlsxCellsOutsideMerges(cells, merges);
     rows.push(
@@ -16627,38 +16767,11 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     );
     rowNum += 1;
   };
-  const warehousePrepareMetaRow = (row, label, value, dateLabel, dateValue) => [
-    xlsxCellXml(`A${row}`, 3, si(label), "s"),
-    xlsxCellXml(`B${row}`, 4, si(value), "s"),
-    xlsxCellXml(`C${row}`, 5, null, "empty"),
-    xlsxCellXml(`D${row}`, 12, si(dateLabel), "s"),
-    xlsxCellXml(`E${row}`, 4, null, "empty"),
-    xlsxCellXml(`F${row}`, 4, si(String(dateValue || "").trim()), "s"),
-    xlsxCellXml(`G${row}`, 4, null, "empty"),
-  ];
-  const warehousePrepareWorkerExtraRow = (row, name) => [
-    xlsxCellXml(`A${row}`, 6, null, "empty"),
-    xlsxCellXml(`B${row}`, 4, si(name), "s"),
-    xlsxCellXml(`C${row}`, 5, null, "empty"),
-    xlsxCellXml(`D${row}`, 6, null, "empty"),
-    xlsxCellXml(`E${row}`, 5, null, "empty"),
-    xlsxCellXml(`F${row}`, 6, null, "empty"),
-    xlsxCellXml(`G${row}`, 6, null, "empty"),
-  ];
-  const warehousePrepareBlankMetaRow = (row) => [
-    xlsxCellXml(`A${row}`, 6, null, "empty"),
-    xlsxCellXml(`B${row}`, 6, null, "empty"),
-    xlsxCellXml(`C${row}`, 5, null, "empty"),
-    xlsxCellXml(`D${row}`, 6, null, "empty"),
-    xlsxCellXml(`E${row}`, 5, null, "empty"),
-    xlsxCellXml(`F${row}`, 6, null, "empty"),
-    xlsxCellXml(`G${row}`, 6, null, "empty"),
-  ];
   const emptyCells = (
     row,
     from = "A",
     to = WAREHOUSE_PREPARE_LAST_COL,
-    style = 1,
+    style = s.spacer,
   ) => {
     const cols = "ABCDEFG".slice(
       "ABCDEFG".indexOf(from),
@@ -16668,120 +16781,90 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
-  pushRow(43.5, [
-    xlsxCellXml("A1", 13, si("Бараа бэлдэж ачуулах хуудас"), "s"),
-    ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, 13),
+  pushRow(WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT, [
+    xlsxCellXml("A1", s.title, si("Бараа бэлдэж ачуулах хуудас"), "s"),
+    ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, s.title),
   ]);
-  const metaRow1 = rowNum;
-  merges.push(`F${metaRow1}:G${metaRow1}`);
-  pushRow(
-    28.5,
-    warehousePrepareMetaRow(
-      metaRow1,
-      "Агуулахын ажилтан:",
-      warehouseEmp,
-      "Захиалгын огноо:",
-      orderDateValue,
+  pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
+    xlsxCellXml(
+      "A2",
+      s.metaLeft,
+      si(`Агуулахын ажилтан: ${warehouseEmp}`),
+      "s",
     ),
-  );
-  if (workerNames.length) {
-    const metaRow2 = rowNum;
-    merges.push(`F${metaRow2}:G${metaRow2}`);
-    pushRow(
-      20.25,
-      warehousePrepareMetaRow(
-        metaRow2,
-        "Захиалга авсан ажилтан:",
-        workerNames[0],
-        "Хэвлэсэн огноо:",
-        printedDateValue,
-      ),
-    );
-    for (let i = 1; i < workerNames.length; i += 1) {
-      pushRow(16.5, warehousePrepareWorkerExtraRow(rowNum, workerNames[i]));
-    }
-  } else {
-    const metaRow2 = rowNum;
-    merges.push(`F${metaRow2}:G${metaRow2}`);
-    pushRow(
-      20.25,
-      warehousePrepareMetaRow(
-        metaRow2,
-        "Захиалга авсан ажилтан:",
-        "-",
-        "Хэвлэсэн огноо:",
-        printedDateValue,
-      ),
-    );
+    ...emptyCells(2, "B", "C", s.metaLeft),
+    xlsxCellXml(
+      "D2",
+      s.metaRight,
+      si(`Захиалгын огноо: ${orderDateValue}`),
+      "s",
+    ),
+    ...emptyCells(2, "E", WAREHOUSE_PREPARE_LAST_COL, s.metaRight),
+  ]);
+  const orderWorkerLabel = workerNames.length
+    ? `Захиалга авсан ажилтан: ${workerNames[0]}`
+    : "Захиалга авсан ажилтан: -";
+  pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
+    xlsxCellXml("A3", s.metaLeft, si(orderWorkerLabel), "s"),
+    ...emptyCells(3, "B", "C", s.metaLeft),
+    xlsxCellXml(
+      "D3",
+      s.metaRight,
+      si(`Хэвлэсэн огноо: ${printedDateValue}`),
+      "s",
+    ),
+    ...emptyCells(3, "E", WAREHOUSE_PREPARE_LAST_COL, s.metaRight),
+  ]);
+  for (let i = 1; i < workerNames.length; i += 1) {
+    const r = rowNum;
+    merges.push(`A${r}:C${r}`);
+    pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
+      xlsxCellXml(`A${r}`, s.metaLeft, si(workerNames[i]), "s"),
+      ...emptyCells(r, "B", "C", s.metaLeft),
+      ...emptyCells(r, "D", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+    ]);
   }
-  pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, warehousePrepareBlankMetaRow(rowNum));
+  pushRow(10, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
   const headerRow = rowNum;
-  // Single-line headers (sample layout + no downward wrap / clipped unit).
-  pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
-    xlsxCellXml(`A${headerRow}`, 7, si("Барааны нэр төрөл"), "s"),
-    xlsxCellXml(
-      `B${headerRow}`,
-      WAREHOUSE_PREPARE_UNIT_HEAD_STYLE,
-      si("Хэмжих нэгж"),
-      "s",
-    ),
-    xlsxCellXml(`C${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(
-      `D${headerRow}`,
-      WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
-      si("Том/х"),
-      "s",
-    ),
-    xlsxCellXml(
-      `E${headerRow}`,
-      WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
-      si("Жижиг/х"),
-      "s",
-    ),
-    xlsxCellXml(
-      `F${headerRow}`,
-      WAREHOUSE_PREPARE_PIECE_HEAD_STYLE,
-      si("Тоо/ш"),
-      "s",
-    ),
-    xlsxCellXml(`G${headerRow}`, 7, si("Үлдэгдэл (ш)"), "s"),
+  pushRow(WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT, [
+    xlsxCellXml(`A${headerRow}`, s.header, si("Барааны нэр төрөл"), "s"),
+    xlsxCellXml(`B${headerRow}`, s.header, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`C${headerRow}`, s.header, si("Баркод"), "s"),
+    xlsxCellXml(`D${headerRow}`, s.header, si("Том/х"), "s"),
+    xlsxCellXml(`E${headerRow}`, s.header, si("Жижиг/х"), "s"),
+    xlsxCellXml(`F${headerRow}`, s.header, si("Тоо/ш"), "s"),
+    xlsxCellXml(`G${headerRow}`, s.header, si("Үлдэгдэл (ш)"), "s"),
   ]);
-  const textSi = WAREHOUSE_PREPARE_TEXT_CELL_STYLE;
+  const nameColWidth = WAREHOUSE_PREPARE_COL_WIDTHS[0];
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
       if (item.type === "cat") {
         const r = rowNum;
-        catIndex += 1;
         merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
         pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
-          xlsxCellXml(`A${r}`, 15, si(item.name), "s"),
-          ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
+          xlsxCellXml(`A${r}`, s.category, si(item.name), "s"),
+          ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, s.category),
         ]);
         continue;
       }
       const p = item.product;
       const parts = warehousePreparePrintParts(item, p);
       const r = rowNum;
-      pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
-        xlsxCellXml(`A${r}`, textSi, si(p.name || ""), "s"),
-        xlsxCellXml(`B${r}`, textSi, si(p.unit || "ширхэг"), "s"),
-        warehousePrepareBarcodeCell(`C${r}`, p.barcode, si),
-        xlsxPrepareQtyCell(
-          `D${r}`,
-          WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
-          parts.largePacks,
-        ),
-        xlsxPrepareQtyCell(
-          `E${r}`,
-          WAREHOUSE_PREPARE_SMALL_CELL_STYLE,
-          parts.packs,
-        ),
-        xlsxPrepareQtyCell(
-          `F${r}`,
-          WAREHOUSE_PREPARE_PIECE_CELL_STYLE,
-          parts.loosePieces,
-        ),
-        xlsxCellXml(`G${r}`, 10, Number(p.stock) || 0, "n"),
+      const name = p.name || "";
+      const rowH = receiptXlsxWrappedRowHeight(name, nameColWidth, {
+        min: WAREHOUSE_PREPARE_BODY_ROW_HEIGHT,
+        linePt: 12,
+        pad: 2,
+        max: 36,
+      });
+      pushRow(rowH, [
+        xlsxCellXml(`A${r}`, s.name, si(name), "s"),
+        xlsxCellXml(`B${r}`, s.unit, si(p.unit || "ширхэг"), "s"),
+        warehousePrepareBarcodeCell(`C${r}`, p.barcode, si, s.barcode),
+        xlsxPrepareQtyCell(`D${r}`, s.qty, parts.largePacks),
+        xlsxPrepareQtyCell(`E${r}`, s.qty, parts.packs),
+        xlsxPrepareQtyCell(`F${r}`, s.qty, parts.loosePieces),
+        xlsxCellXml(`G${r}`, s.stock, Number(p.stock) || 0, "n"),
       ]);
     }
   };
@@ -16791,48 +16874,45 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
-      xlsxCellXml(`A${promoHeadRow}`, 15, si(PROMO_PRODUCT_LABEL), "s"),
-      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, 15),
+    pushRow(WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT, [
+      xlsxCellXml(`A${promoHeadRow}`, s.section, si(PROMO_PRODUCT_LABEL), "s"),
+      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.section),
     ]);
     pushPrepareGroups(sections.promo);
   }
-  pushRow(null, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
-  pushRow(10.5, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 2));
+  pushRow(12, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
-    merges.push(`A${r}:C${r}`, `D${r}:F${r}`);
-    const line = WAREHOUSE_PREPARE_SIGN_LINE_STYLE;
-    pushRow(20, [
-      xlsxCellXml(`A${r}`, 3, si(role), "s"),
-      ...emptyCells(r, "B", "C", 3),
-      xlsxCellXml(`D${r}`, line, null, "empty"),
-      ...emptyCells(r, "E", "F", line),
-      xlsxCellXml(`G${r}`, 1, null, "empty"),
+    merges.push(`A${r}:C${r}`, `D${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
+    pushRow(WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT, [
+      xlsxCellXml(`A${r}`, s.signLabel, si(role), "s"),
+      ...emptyCells(r, "B", "C", s.signLabel),
+      xlsxCellXml(`D${r}`, s.signLine, null, "empty"),
+      ...emptyCells(r, "E", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
     ]);
   };
   pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_HANDED_LABEL);
-  pushRow(15, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
+  pushRow(12, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
   pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_RECEIVED_LABEL);
-  pushRow(15, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, 1));
-  const lastRow = rowNum;
+  const lastRow = Math.max(1, rowNum - 1);
+  const printArea = `$A$1:$${WAREHOUSE_PREPARE_LAST_COL}$${lastRow}`;
   const sheetXml = warehousePrepareWorksheetXml(
     rows,
     merges,
     lastRow,
     warehousePrepareColWidthsFor(),
   );
-  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(strings),
+    sheetXml,
+    printArea,
+  };
 }
 async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
   const stamp = new Date().toISOString().slice(0, 10);
-  const { sharedStringsXml, sheetXml } = buildWarehousePrepareSheetXml(
-    orders,
-    workerIds,
-  );
   const tpl = await fetch(staticAssetUrl(WAREHOUSE_PREPARE_TEMPLATE)).then(
     (r) => {
       if (!r.ok) throw new Error("template missing");
@@ -16840,9 +16920,14 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     },
   );
   const zip = await JSZip.loadAsync(tpl);
-  const stylesXml = warehousePreparePatchStylesXml(
+  const stylesXml = warehousePreparePrintPatchStylesXml(
     await zip.file("xl/styles.xml").async("string"),
-    { fillCategory: false },
+  );
+  const styleIds = warehousePreparePrintStyleIds(stylesXml);
+  const { sharedStringsXml, sheetXml, printArea } = buildWarehousePrepareSheetXml(
+    orders,
+    workerIds,
+    { styleIds },
   );
   const themeFile = zip.file("xl/theme/theme1.xml");
   const themeXml = themeFile ? await themeFile.async("string") : null;
@@ -16851,6 +16936,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     sheetXml,
     stylesXml,
     themeXml,
+    printArea,
   });
   const blob = await zipToExcelBlob(clean);
   await downloadBlobFile(blob, `Агуулах-бэлдэх-${stamp}.xlsx`);
