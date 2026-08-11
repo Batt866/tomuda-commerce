@@ -6949,6 +6949,24 @@ function syncPickerQtySheetUi(id) {
     const parts = pickerQtyToParts(q, p);
     partsWrap.innerHTML = `${prepareQtyColsHtml(parts, { product: p })}<span class="picker-qty-sheet__total-sep">·</span>Нийт <b data-picker-qty-total>${q} ш</b>`;
   }
+  const promoWrap = document.querySelector(".picker-qty-sheet__promo-wrap");
+  if (promoWrap && p) {
+    const next = pickerQtySheetPromoHtml(p);
+    if (next) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = next;
+      const fresh = tmp.firstElementChild;
+      if (fresh) promoWrap.replaceWith(fresh);
+    } else {
+      promoWrap.remove();
+    }
+  } else if (!promoWrap && p) {
+    const next = pickerQtySheetPromoHtml(p);
+    if (next) {
+      const head = document.querySelector(".picker-qty-sheet__head");
+      head?.insertAdjacentHTML("afterend", next);
+    }
+  }
   const workerSum = document.querySelector(
     `[data-worker-pack-edit="${CSS.escape(id)}"] .worker-pack-edit__sum`,
   );
@@ -18689,8 +18707,140 @@ function productQuantityPromoRules(productId) {
     promotionBuyProductIds(rule).some((id) => String(id) === want),
   );
 }
+function quantityPromoProgressMeter(prog, qtyByProduct) {
+  const buyIds = prog?.buyIds || [];
+  const buyQty = Math.max(1, Math.floor(Number(prog?.buyQty) || 0));
+  const sets = Math.max(0, Math.floor(Number(prog?.sets) || 0));
+  const qtyOf = (id) => {
+    const key = Object.keys(qtyByProduct || {}).find(
+      (k) => String(k) === String(id),
+    );
+    return Number(key != null ? qtyByProduct[key] : qtyByProduct?.[id]) || 0;
+  };
+  if (prog.buyMode === "each") {
+    const goal = Math.max(1, buyIds.length);
+    const current = Math.min(goal, Math.max(0, Number(prog.readyTypes) || 0));
+    return {
+      current,
+      goal,
+      pct: Math.min(100, Math.round((current / goal) * 100)),
+      unit: "төрөл",
+    };
+  }
+  if (prog.buyMode === "any") {
+    let bestCur = 0;
+    let bestGoal = buyQty;
+    let bestRatio = -1;
+    buyIds.forEach((id) => {
+      const th = quantityPromoBuyQtyForProduct(prog.rule, id);
+      if (th < 1) return;
+      const have = qtyOf(id);
+      const cur = have <= 0 ? 0 : have % th === 0 ? th : have % th;
+      const ratio = cur / th;
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestCur = cur;
+        bestGoal = th;
+      }
+    });
+    const goal = Math.max(1, bestGoal);
+    const current = Math.min(goal, bestCur);
+    return {
+      current,
+      goal,
+      pct: Math.min(100, Math.round((current / goal) * 100)),
+      unit: "ш",
+    };
+  }
+  const combined = Math.max(0, Math.floor(Number(prog.combinedQty) || 0));
+  const rem = buyQty > 0 ? combined % buyQty : 0;
+  const current =
+    rem === 0 && sets > 0 ? buyQty : rem === 0 ? Math.min(combined, buyQty) : rem;
+  return {
+    current,
+    goal: buyQty,
+    pct: Math.min(100, Math.round((current / buyQty) * 100)),
+    unit: "ш",
+  };
+}
+function quantityPromoOfferText(prog) {
+  const freeNames = promotionProductLabels(prog.freeIds) || "урамшуулал";
+  const freeQty = Math.max(1, Math.floor(Number(prog.freeQty) || 1));
+  if (prog.buyMode === "total") {
+    return `Дурын төрлөөс ${prog.buyQty} ш сонгоод ${freeNames} ${freeQty} ш үнэгүй аваарай!`;
+  }
+  if (prog.buyMode === "each") {
+    return `Сонгосон бүх бараа тус бүртээ босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
+  }
+  return `Сонгосон бараанаас аль нэг нь босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
+}
+function workerQtyPromoProgressCardHtml(prog, qtyByProduct) {
+  const meter = quantityPromoProgressMeter(prog, qtyByProduct);
+  const freeNames = promotionProductLabels(prog.freeIds);
+  const title = freeNames
+    ? `Урамшуулал: ${freeNames}`
+    : "Багц урамшуулал";
+  const isActive = prog.sets > 0;
+  const qtyOf = (id) => {
+    const key = Object.keys(qtyByProduct || {}).find(
+      (k) => String(k) === String(id),
+    );
+    return Number(key != null ? qtyByProduct[key] : qtyByProduct?.[id]) || 0;
+  };
+  const pickRows = prog.buyIds
+    .map((id) => {
+      const q = qtyOf(id);
+      if (q <= 0) return "";
+      const p = findProductByIdLoose(id);
+      const name = p?.name || id;
+      return `<li class="worker-promo-progress__pick"><span class="worker-promo-progress__pick-name">${esc(name)}</span><b>${q}</b></li>`;
+    })
+    .filter(Boolean)
+    .join("");
+  const status = isActive
+    ? `Урамшуулал идэвхтэй · <b>${prog.grantedFree} ш</b> үнэгүй${prog.needForNext > 0 ? ` · дараагийн багц хүртэл <b>${prog.needForNext}</b> ${meter.unit}` : ""}`
+    : `Дараагийн урамшуулал хүртэл <b>${prog.needForNext}</b> ${meter.unit}`;
+  const meterLabel =
+    prog.buyMode === "each"
+      ? `${meter.current} / ${meter.goal} төрөл`
+      : `${meter.current} / ${meter.goal}`;
+  return `<article class="worker-promo-progress${isActive ? " is-active" : ""}" data-promo-progress>
+  <header class="worker-promo-progress__head-block">
+    <h4 class="worker-promo-progress__title">${esc(title)}</h4>
+    <p class="worker-promo-progress__offer">${esc(quantityPromoOfferText(prog))}</p>
+  </header>
+  <div class="worker-promo-progress__meter">
+    <div class="worker-promo-progress__meter-head">
+      <span>Таны сонголт</span>
+      <b class="worker-promo-progress__count">[ ${esc(meterLabel)} ]</b>
+    </div>
+    <div class="worker-promo-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="${meter.goal}" aria-valuenow="${meter.current}" aria-label="Урамшууллын явц">
+      <span style="width:${meter.pct}%"></span>
+    </div>
+    ${pickRows ? `<ul class="worker-promo-progress__picks"><li class="worker-promo-progress__picks-label">Сонгосон:</li>${pickRows}</ul>` : `<p class="worker-promo-progress__empty">Урамшууллын бараанаас сонгоно уу</p>`}
+    <p class="worker-promo-progress__status">${status}</p>
+  </div>
+</article>`;
+}
 function workerQuantityPromoHintsHtml(cart) {
-  return "";
+  const rules = state.promotionRules?.quantity || [];
+  if (!rules.length) return "";
+  const qtyByProduct = workerQtyByProduct();
+  const cards = [];
+  for (const rule of rules) {
+    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+    if (!prog) continue;
+    const touched = prog.buyIds.some((id) => {
+      const key = Object.keys(qtyByProduct).find(
+        (k) => String(k) === String(id),
+      );
+      return (Number(key != null ? qtyByProduct[key] : qtyByProduct[id]) || 0) > 0;
+    });
+    if (!touched && !prog.sets) continue;
+    cards.push(workerQtyPromoProgressCardHtml(prog, qtyByProduct));
+  }
+  if (!cards.length) return "";
+  return `<div class="worker-promo-progress-list">${cards.join("")}</div>`;
 }
 function workerAmountPromoHintsHtml(cart) {
   if (!cart?.paid?.length) return "";
@@ -18742,10 +18892,37 @@ function workerAmountPromoHintsHtml(cart) {
   return parts.join("");
 }
 function pickerProductPromoHintHtml(p) {
-  return "";
+  const rules = productQuantityPromoRules(p?.id);
+  if (!rules.length) return "";
+  const qtyByProduct = workerQtyByProduct();
+  let best = null;
+  for (const rule of rules) {
+    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+    if (!prog) continue;
+    best = prog;
+    if (prog.sets > 0) break;
+  }
+  if (!best) {
+    return `<span class="picker-row__promo">Урамшуулал</span>`;
+  }
+  if (best.sets > 0) {
+    return `<span class="picker-row__promo picker-row__promo--active">✓ ${best.grantedFree} ш</span>`;
+  }
+  const meter = quantityPromoProgressMeter(best, qtyByProduct);
+  return `<span class="picker-row__promo">${meter.current}/${meter.goal}</span>`;
 }
 function pickerQtySheetPromoHtml(p) {
-  return "";
+  const rules = productQuantityPromoRules(p?.id);
+  if (!rules.length) return "";
+  const qtyByProduct = workerQtyByProduct();
+  const cards = [];
+  for (const rule of rules) {
+    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+    if (!prog) continue;
+    cards.push(workerQtyPromoProgressCardHtml(prog, qtyByProduct));
+  }
+  if (!cards.length) return "";
+  return `<div class="picker-qty-sheet__promo-wrap">${cards.join("")}</div>`;
 }
 function promoBuyQtyFieldName(productId) {
   return `buyQty_${productId}`;
@@ -24999,7 +25176,7 @@ function pickerQtySheetHtml(productId) {
   } else {
     qtyBody = `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
   }
-  const promoHtml = "";
+  const promoHtml = pickerQtySheetPromoHtml(p);
   const stockHave = productStockWithEditCredit(p.id);
   return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${stockHave} ${esc(p.unit || "ш")}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
