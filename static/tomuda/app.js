@@ -968,7 +968,7 @@ function receiptUpperFooterRows(o) {
   const note = receiptNoteText(o);
   if (!note) return "";
   const spacer = `<tr class="receipt-grid__spacer receipt-grid__spacer--note"><td colspan="11"></td></tr>`;
-  return `${spacer}<tr class="receipt-grid__return"><td></td><td colspan="10" class="receipt-grid__return-label">${esc(note)}</td></tr>`;
+  return `${spacer}<tr class="receipt-grid__return"><td></td><td></td><td colspan="8" class="receipt-grid__return-label">${esc(note)}</td><td></td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
   const f = receiptPartyFields(o);
@@ -9088,13 +9088,18 @@ td, th { border: none; }
 .receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #000 !important; font-weight: 700; }
 .receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #5B9BD5 !important; }
 .receipt-grid--sheet .receipt-grid__return td {
-  padding: 3px 6px;
+  padding: 0;
   height: auto;
-  min-height: 16px;
+  min-height: 0;
   font-size: 9px;
   border: none !important;
+  background: transparent !important;
+}
+.receipt-grid--sheet .receipt-grid__return .receipt-grid__return-label {
+  padding: 3px 6px;
+  min-height: 16px;
   background: #ffffcc !important;
-  text-align: left;
+  text-align: center;
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -9103,7 +9108,7 @@ td, th { border: none; }
 }
 .receipt-grid__return-label {
   font-weight: 400;
-  text-align: left;
+  text-align: center;
   font-size: 9px;
   line-height: 1.3;
 }
@@ -10294,19 +10299,25 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   if (orderNote) {
     pushRow(6, emptyCells(rowNum));
     const noteRow = rowNum;
-    merges.push(`B${noteRow}:K${noteRow}`);
+    merges.push(`C${noteRow}:J${noteRow}`);
+    const noteColW = RECEIPT_XLSX_COL_WIDTHS.slice(2, 10).reduce(
+      (sum, width) => sum + width,
+      0,
+    );
     const noteH = Math.max(
       14.25,
-      receiptXlsxWrappedRowHeight(orderNote, 70, {
+      receiptXlsxWrappedRowHeight(orderNote, noteColW, {
         min: 14.25,
         linePt: 11,
         pad: 2,
-        max: 42,
+        max: 80,
       }),
     );
     pushRow(noteH, [
-      xlsxCellXml(`B${noteRow}`, 16, si(orderNote), "s"),
-      ...emptyCells(noteRow, "C", "K", 16),
+      ...emptyCells(noteRow, "B", "B", 1),
+      xlsxCellXml(`C${noteRow}`, 16, si(orderNote), "s"),
+      ...emptyCells(noteRow, "D", "J", 16),
+      ...emptyCells(noteRow, "K", "K", 1),
     ]);
   }
 
