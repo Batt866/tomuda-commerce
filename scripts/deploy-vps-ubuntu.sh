@@ -1,21 +1,19 @@
 #!/bin/bash
-# ТОМУДА — Ubuntu 24.04 VPS deploy (tomudagroup.mn)
+# ТОМУДА — Ubuntu 24.04 VPS deploy (jobbox.mn сервер дээр тусдаа домэйн/subdomain)
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/tomuda}"
 APP_USER="${APP_USER:-www-data}"
-DOMAIN="${DOMAIN:-tomudagroup.mn}"
-WWW_DOMAIN="www.${DOMAIN}"
-# Хуучин линкүүд — зэрэгцээ эсвэл redirect-д үлдээнэ
-LEGACY_DOMAINS="${LEGACY_DOMAINS:-tomuda.jobbox.mn,tomuda.mn,www.tomuda.mn}"
+# jobbox.mn дээр Jobbox апп байгаа тул default: дэд домэйн
+DOMAIN="${DOMAIN:-tomuda.jobbox.mn}"
 SERVER_IP="${SERVER_IP:-202.131.1.94}"
 GUNICORN_PORT="${GUNICORN_PORT:-8010}"
 REPO_URL="${REPO_URL:-https://github.com/Batt866/tomuda-commerce.git}"
 BRANCH="${BRANCH:-main}"
 
 echo "=== ТОМУДА VPS deploy ==="
-echo "Domain: $DOMAIN (+ $WWW_DOMAIN)"
-echo "Port:   $GUNICORN_PORT"
+echo "Domain: $DOMAIN"
+echo "Port:   $GUNICORN_PORT (jobbox.mn-тэй зөрчилдөхгүй)"
 echo "App:    $APP_DIR"
 echo ""
 
@@ -58,19 +56,11 @@ curl -fsSL https://cdn.tailwindcss.com -o static/tomuda/vendor/tailwindcdn.js 2>
 SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
 mkdir -p media
 
-ALL_HOSTS="${DOMAIN},${WWW_DOMAIN},${LEGACY_DOMAINS},${SERVER_IP},localhost,127.0.0.1"
-CSRF_ORIGINS="https://${DOMAIN},https://${WWW_DOMAIN}"
-IFS=',' read -r -a _legacy_arr <<< "$LEGACY_DOMAINS"
-for _d in "${_legacy_arr[@]}"; do
-  _d="$(echo "$_d" | tr -d '[:space:]')"
-  [ -n "$_d" ] && CSRF_ORIGINS="${CSRF_ORIGINS},https://${_d}"
-done
-
 cat > "$APP_DIR/.env" <<EOF
 DEBUG=0
 SECRET_KEY=${SECRET_KEY}
-ALLOWED_HOSTS=${ALL_HOSTS}
-CSRF_TRUSTED_ORIGINS=${CSRF_ORIGINS}
+ALLOWED_HOSTS=${DOMAIN},${SERVER_IP},localhost,127.0.0.1
+CSRF_TRUSTED_ORIGINS=https://${DOMAIN}
 DATABASE_URL=postgres://tomuda:${DB_PASS}@127.0.0.1:5432/tomuda
 MEDIA_ROOT=${APP_DIR}/media
 SERVE_MEDIA=1
@@ -113,19 +103,11 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-# nginx server_name: primary + www + legacy (space-separated)
-NGINX_NAMES="${DOMAIN} ${WWW_DOMAIN}"
-IFS=',' read -r -a _legacy_arr <<< "$LEGACY_DOMAINS"
-for _d in "${_legacy_arr[@]}"; do
-  _d="$(echo "$_d" | tr -d '[:space:]')"
-  [ -n "$_d" ] && NGINX_NAMES="${NGINX_NAMES} ${_d}"
-done
-
 cat > /etc/nginx/sites-available/tomuda <<EOF
 server {
     listen 80;
     listen [::]:80;
-    server_name ${NGINX_NAMES};
+    server_name ${DOMAIN};
 
     client_max_body_size 50M;
 
@@ -160,6 +142,7 @@ server {
 EOF
 
 ln -sf /etc/nginx/sites-available/tomuda /etc/nginx/sites-enabled/tomuda
+# jobbox.mn өөр nginx config-ийг УСТГАХГҮЙ
 nginx -t
 systemctl daemon-reload
 systemctl enable tomuda
@@ -173,12 +156,12 @@ curl -sf "http://127.0.0.1:${GUNICORN_PORT}/api/health" && echo "" || echo "⚠ 
 
 echo ""
 echo "=== SSL (Let's Encrypt) ==="
-echo "DNS шалгах: ${DOMAIN} болон ${WWW_DOMAIN} → ${SERVER_IP} A record"
-if certbot --nginx -d "$DOMAIN" -d "$WWW_DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>/dev/null; then
+echo "DNS шалгах: ${DOMAIN} → ${SERVER_IP} A record заасан байх ёстой"
+if certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email --redirect 2>/dev/null; then
   echo "✓ SSL амжилттай"
 else
-  echo "⚠ SSL одоогоор суусангүй. DNS-д A record нэмсний дараа:"
-  echo "  certbot --nginx -d ${DOMAIN} -d ${WWW_DOMAIN}"
+  echo "⚠ SSL одоогоор суусангүй. Datacom DNS-д A record нэмсний дараа:"
+  echo "  certbot --nginx -d ${DOMAIN}"
 fi
 
 echo ""
@@ -186,6 +169,7 @@ echo "============================================"
 echo "  ✓ ТОМУДА deploy дууслаа"
 echo "  URL:  https://${DOMAIN}"
 echo "  API:  https://${DOMAIN}/api/health"
+echo "  jobbox.mn — өөрчлөгдөхгүй (тусдаа subdomain)"
 echo "  Нэвтрэх (seed): admin@tomuda.mn / admin"
 echo "  .env: ${APP_DIR}/.env"
 echo "============================================"
