@@ -482,7 +482,7 @@ const RECEIPT_COMPANY_ADDRESS = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${R
 const RECEIPT_BORDER = "#666666";
 const RECEIPT_HEADER_BG = "#F3F3F3";
 const RECEIPT_GRAND_BG = "#C5CAD0";
-const RECEIPT_SETTLE_BG = "#FFFFCC";
+const RECEIPT_SETTLE_BG = "#FFF2CC";
 const RECEIPT_SETTLE_BORDER = "#E6E6A8";
 const RECEIPT_WARN_BG = RECEIPT_GRAND_BG;
 const RECEIPT_TEXT = "#222222";
@@ -501,7 +501,10 @@ function receiptPartyFields(o) {
   return {
     c,
     salesName: esc(o.employeeName || sales.name || "-"),
-    salesPhone: esc(o.employeePhone || sales.phone || "-"),
+    // Prefer live employee phone so edits show on receipts immediately.
+    salesPhone: esc(
+      (sales.id ? sales.phone || "" : "") || o.employeePhone || "-",
+    ),
     deliveryName: esc(delivery.deliveryName),
     deliveryPhone: esc(delivery.deliveryPhone),
     customerName: esc(orderCustomerName(o)),
@@ -945,7 +948,7 @@ function receiptSignatureRowsHtml(opts = {}) {
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
   const block = (role) =>
-    `<tr class="receipt-grid__sign"><td></td><td colspan="4" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="5" class="receipt-grid__sign-line"></td><td></td></tr>`;
+    `<tr class="receipt-grid__sign"><td></td><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
   return `${fill}${block("Хүлээлгэн өгсөн ажилтны гарын үсэг:")}${gap}${block("Хүлээн авсан ажилтны гарын үсэг:")}`;
 }
@@ -8560,7 +8563,10 @@ function buildOrderReceiptExcelRows(o) {
       ["Захиалгын огноо", dte(orderTakenDay(o))],
       [],
       ["Худалдааны төлөөлөгч", o.employeeName || sales.name || "-"],
-      ["Төлөөлөгчийн утас", o.employeePhone || sales.phone || "-"],
+      [
+        "Төлөөлөгчийн утас",
+        (sales.id ? sales.phone || "" : "") || o.employeePhone || "-",
+      ],
       ["Түгээгч", delivery.deliveryName],
       ["Түгээгчийн утас", delivery.deliveryPhone],
       [],
@@ -9098,7 +9104,7 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__return .receipt-grid__return-label {
   padding: 3px 6px;
   min-height: 16px;
-  background: #ffffcc !important;
+  background: #fff2cc !important;
   text-align: center;
   white-space: normal;
   word-break: break-word;
@@ -9441,9 +9447,9 @@ td, th { border: none; }
   font-size: 11px;
   font-weight: 400;
   font-family: ${RECEIPT_FONT};
-  padding: 2px 2px 1px 0;
+  padding: 2px 4px 1px 0;
   vertical-align: bottom;
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
   overflow: visible;
   color: ${RECEIPT_TEXT};
@@ -9738,7 +9744,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="15"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF5B9BD5"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFFCC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="61"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="15"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF5B9BD5"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2CC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="8"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="62"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -10404,7 +10410,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const r = rowNum;
     // Non-grand: label B:D, amount E:K.
     // Grand: same span B:D / E:K; label right (58), note centered (60), amount (50).
-    // cellXfs are 0..60 (60 = grand note center). Do not invent higher ids without appending xfs.
+    // cellXfs are 0..61 (60 = grand note center, 61 = sign label left). Do not invent higher ids without appending xfs.
     const labelStyle = grand ? 58 : 30;
     const valueStyle = grand ? 50 : decimals ? 29 : 47;
     const midStyle = grand ? 60 : 1;
@@ -10505,15 +10511,15 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(6, emptyCells(rowNum));
-  // Label B:E right-aligned; finest dotted signature line F→J
+  // Label B:F left-aligned; dotted signature line G→J (sample layout)
   const pushSignRow = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:E${r}`, `F${r}:J${r}`);
+    merges.push(`B${r}:F${r}`, `G${r}:J${r}`);
     pushRow(18, [
-      xlsxCellXml(`B${r}`, 30, si(role), "s"),
-      ...emptyCells(r, "C", "E", 30),
-      xlsxCellXml(`F${r}`, 57, null, "empty"),
-      ...emptyCells(r, "G", "J", 57),
+      xlsxCellXml(`B${r}`, 61, si(role), "s"),
+      ...emptyCells(r, "C", "F", 61),
+      xlsxCellXml(`G${r}`, 57, null, "empty"),
+      ...emptyCells(r, "H", "J", 57),
       ...emptyCells(r, "K", "K", 1),
     ]);
   };
@@ -14241,7 +14247,7 @@ function stockInReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockInExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -14278,13 +14284,31 @@ function exportStockInExcel(receipt) {
       }
     });
 }
-function confirmStockInExcel() {
+function confirmStockInExcel(receiptId = "") {
+  const id = String(receiptId || "").trim();
+  if (id) {
+    const fromList = (state.stockInReceipts || []).find((r) => r.id === id);
+    if (fromList) return exportStockInExcel(fromList);
+    if (state.stockInReceipt?.id === id) {
+      return exportStockInExcel(state.stockInReceipt);
+    }
+    return alert("Орлогын баримт олдсонгүй");
+  }
   if (state.stockInDone && state.stockInReceipt) {
     return exportStockInExcel(state.stockInReceipt);
   }
   return alert("Эхлээд орлогоо дуусгана уу");
 }
-function confirmStockOutExcel() {
+function confirmStockOutExcel(receiptId = "") {
+  const id = String(receiptId || "").trim();
+  if (id) {
+    const fromList = (state.stockOutReceipts || []).find((r) => r.id === id);
+    if (fromList) return exportStockOutExcel(fromList);
+    if (state.stockOutReceipt?.id === id) {
+      return exportStockOutExcel(state.stockOutReceipt);
+    }
+    return alert("Зарлагын баримт олдсонгүй");
+  }
   if (state.stockOutDone && state.stockOutReceipt) {
     return exportStockOutExcel(state.stockOutReceipt);
   }
@@ -14419,7 +14443,7 @@ function stockOutReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn("confirmStockOutExcel()", { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>Хүлээлгэн өгсөн</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>Хүлээн авсан</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockOutExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockOutModal(id) {
   ensureStockOutSession();
@@ -16222,7 +16246,7 @@ const WAREHOUSE_PREPARE_FILL_PIECE = {
   theme: 6,
   tint: "0.3999755851924192",
   rgb: "FFBFBFBF",
-}; // Lighter 40% · Тоо/ш + category
+}; // Lighter 40% · Тоо/ш
 /** @deprecated alias — prefer WAREHOUSE_PREPARE_FILL_* */
 const WAREHOUSE_PREPARE_GRAY_LARGE = WAREHOUSE_PREPARE_FILL_LARGE.rgb;
 const WAREHOUSE_PREPARE_GRAY_SMALL = WAREHOUSE_PREPARE_FILL_SMALL.rgb;
@@ -16362,7 +16386,7 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
 
   const signXf =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
-  // Category row (style 15): Accent 3 Lighter 40% only on prepare sheet.
+  // Category row (style 15): no fill — bold centered label only.
   if (fillCategory) {
     const catXfPlain =
       '<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
@@ -16657,6 +16681,7 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
   const zip = await JSZip.loadAsync(tpl);
   const stylesXml = warehousePreparePatchStylesXml(
     await zip.file("xl/styles.xml").async("string"),
+    { fillCategory: false },
   );
   const themeFile = zip.file("xl/theme/theme1.xml");
   const themeXml = themeFile ? await themeFile.async("string") : null;
@@ -16730,7 +16755,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-large { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-small { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 28px; background: #bfbfbf; white-space: nowrap; }
+.cat { text-align: center; font-weight: 800; height: 28px; white-space: nowrap; }
 .promo-head { border-top: 1px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
@@ -17104,9 +17129,17 @@ function salesReportEmployeeBlockHtml(row) {
 }
 function stockReportKindLabel(kind) {
   if (kind === "sales") return "Борлуулалтын тайлан";
-  if (kind === "in") return "Орлогын тайлан";
-  if (kind === "out") return "Зарлагын тайлан";
+  if (kind === "salesInfo") return "Борлуулалтын мэдээ";
+  if (kind === "in") return "Орлогын баримт";
+  if (kind === "inProducts") return "Орлогын барааны тайлан";
+  if (kind === "out") return "Зарлагын баримт";
+  if (kind === "outProducts") return "Зарлагын барааны тайлан";
   return "Тайлан";
+}
+function stockReportFlowKind(kind) {
+  if (kind === "inProducts") return "in";
+  if (kind === "outProducts") return "out";
+  return kind;
 }
 function ensureStockReportDateDefault() {
   if (!normalizeIsoDateInput(state.filters.stockReportDate)) {
@@ -17126,11 +17159,16 @@ function openStockReportsHub() {
   scrollAppMainToTop();
 }
 function openStockReport(kind) {
-  if (kind === "sales") {
+  if (kind === "sales" || kind === "salesInfo") {
     if (!canViewSalesReport()) {
       return alertModal("Эрхгүй", "Борлуулалтын тайлан харах эрхгүй.");
     }
-  } else if (kind === "in" || kind === "out") {
+  } else if (
+    kind === "in" ||
+    kind === "out" ||
+    kind === "inProducts" ||
+    kind === "outProducts"
+  ) {
     if (!canViewStockReports()) {
       return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
     }
@@ -17138,7 +17176,14 @@ function openStockReport(kind) {
     return;
   }
   state.filters.stockReportKind = kind;
-  if (kind === "in" || kind === "out") ensureStockReportDateDefault();
+  if (
+    kind === "in" ||
+    kind === "out" ||
+    kind === "inProducts" ||
+    kind === "outProducts"
+  ) {
+    ensureStockReportDateDefault();
+  }
   if (state.currentView !== "stockReports") {
     go("stockReports");
     return;
@@ -17245,7 +17290,11 @@ function openStockReportReceipt(kind, id) {
     kind === "out"
       ? stockOutReceiptPanel(receipt)
       : stockInReceiptPanel(receipt);
-  box(title, `<div class="p-3">${body}</div>`, "max-w-3xl");
+  box(
+    title,
+    `<div class="modal-scroll stock-report-receipt-modal p-3 pb-5">${body}</div>`,
+    "max-w-3xl",
+  );
 }
 function stockReportReceiptRow(kind, receipt) {
   const lines = receipt.lines || [];
@@ -17261,14 +17310,25 @@ function stockReportAggregateRow(row, index) {
 function stockReportsMenuHtml() {
   const sections = [];
   if (canViewSalesReport()) {
+    const salesItems = [
+      ["sales", "Борлуулалтын тайлан", "reports"],
+      ["salesInfo", "Борлуулалтын мэдээ", "customers"],
+    ];
     sections.push(
-      `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${adminHubActionCard("openStockReport('sales')", "Борлуулалтын тайлан", "reports")}</div>`,
+      `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${salesItems
+        .map(
+          ([kind, label, icon]) =>
+            adminHubActionCard(`openStockReport('${kind}')`, label, icon),
+        )
+        .join("")}</div>`,
     );
   }
   if (canViewStockReports()) {
     const items = [
-      ["in", "Орлогын тайлан", "stock"],
-      ["out", "Зарлагын тайлан", "inventory"],
+      ["in", "Орлогын баримт", "stock"],
+      ["inProducts", "Орлогын барааны тайлан", "inventory"],
+      ["out", "Зарлагын баримт", "inventory"],
+      ["outProducts", "Зарлагын барааны тайлан", "stock"],
     ];
     sections.push(
       `<h3 class="admin-hub__heading">Орлого / Зарлага</h3><div class="admin-hub__settings">${items
@@ -17283,28 +17343,37 @@ function stockReportsMenuHtml() {
 }
 function stockReportDetailView(kind) {
   ensureStockReportDateDefault();
+  const flow = stockReportFlowKind(kind);
   const day = normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
-  const receipts = stockReportReceiptsForDay(kind, day);
-  const products = stockReportAggregateLines(kind, receipts);
+  const receipts = stockReportReceiptsForDay(flow, day);
+  const products = stockReportAggregateLines(flow, receipts);
   const total = receipts.reduce(
-    (sum, r) => sum + stockReportReceiptTotal(kind, r),
+    (sum, r) => sum + stockReportReceiptTotal(flow, r),
     0,
   );
   const emptyDay =
     day === todayIso()
       ? "Өнөөдөр баримт байхгүй"
       : "Сонгосон өдөр баримт байхгүй";
-  return `<div class="space-y-4">${pageHead(stockReportKindLabel(kind))}${pageToolbarHtml({ filters: stockReportDateFiltersHtml() })}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}${card("Бараа", products.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(kind, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div><div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
+  const title = stockReportKindLabel(kind);
+  const filters = pageToolbarHtml({ filters: stockReportDateFiltersHtml() });
+  if (kind === "inProducts" || kind === "outProducts") {
+    return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Бараа", products.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
+  }
+  return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(flow, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div></div>`;
 }
-function salesReportDetailView() {
+function salesReportOrdersFiltered() {
   const orders = reportOrdersFiltered();
   const q = String(state.searches.reports || "").trim().toLowerCase();
-  const filtered = q
-    ? orders.filter((o) => {
-        const hay = `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
-        return hay.includes(q);
-      })
-    : orders;
+  if (!q) return orders;
+  return orders.filter((o) => {
+    const hay = `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
+    return hay.includes(q);
+  });
+}
+function salesReportDetailView() {
+  const filtered = salesReportOrdersFiltered();
+  const q = String(state.searches.reports || "").trim().toLowerCase();
   const orderCount = filtered.length;
   const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
   const receivable = filtered
@@ -17326,20 +17395,35 @@ function salesReportDetailView() {
             : `<div class="line-panel"><p class="line-panel__empty">${q ? "Олдсонгүй" : "Борлуулалт байхгүй"}</p></div>`
         }</div>`;
       })();
-  return `<div class="space-y-4">${pageHead("Борлуулалтын тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}${card("Харилцагч", customers.length)}`, 4)}${body}<div class="line-panel"><div class="line-panel__section-title">Захиалгууд · ${orderCount}</div><div class="line-list">${reportPaymentListHtml(filtered, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Борлуулалтын тайлан")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}${card("Харилцагч", customers.length)}`, 4)}${body}</div>`;
+}
+function salesInfoDetailView() {
+  const filtered = salesReportOrdersFiltered();
+  const q = String(state.searches.reports || "").trim().toLowerCase();
+  const orderCount = filtered.length;
+  const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
+  const receivable = filtered
+    .filter((o) => !orderIsPaid(o))
+    .reduce((s, o) => s + orderAmount(o), 0);
+  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Захиалгууд · ${orderCount}</div><div class="line-list">${reportPaymentListHtml(filtered, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div></div>`;
 }
 function stockReportsView() {
   if (!canViewReportsHub()) {
     return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
   }
   const kind = state.filters.stockReportKind;
-  if (kind === "sales") {
+  if (kind === "sales" || kind === "salesInfo") {
     if (!canViewSalesReport()) {
       return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын тайлан харах эрхгүй.</p></div>`;
     }
-    return salesReportDetailView();
+    return kind === "salesInfo" ? salesInfoDetailView() : salesReportDetailView();
   }
-  if (kind === "in" || kind === "out") {
+  if (
+    kind === "in" ||
+    kind === "out" ||
+    kind === "inProducts" ||
+    kind === "outProducts"
+  ) {
     if (!canViewStockReports()) {
       return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
     }
@@ -23199,6 +23283,22 @@ function buildEmployeeDataFromForm(form, editId = "") {
     },
   };
 }
+/** Keep order snapshots in sync when an employee phone/name is edited. */
+function syncEmployeeContactOnOrders(employee) {
+  if (!employee?.id) return;
+  const phone = String(employee.phone || "").trim();
+  const name = String(employee.name || "").trim();
+  for (const o of state.orders || []) {
+    if (o.employeeId === employee.id) {
+      o.employeePhone = phone;
+      if (name) o.employeeName = name;
+    }
+    if (o.deliveryEmployeeId === employee.id) {
+      o.deliveryPhone = phone;
+      if (name) o.deliveryName = name;
+    }
+  }
+}
 async function applyEmployeeSave(data, editId = "") {
   const incomingImage = String(data.image || "").trim();
   if (productMediaPathFromUrl(incomingImage)) {
@@ -23222,6 +23322,11 @@ async function applyEmployeeSave(data, editId = "") {
     }
     existing.updatedAt = nowIso;
     employee = existing;
+    syncEmployeeContactOnOrders(employee);
+    if (state.selectedDeliveryId === editId) {
+      state.deliveryName = employee.name || "";
+      state.deliveryPhone = employee.phone || "";
+    }
     if (state.currentEmployee?.id === editId) {
       state.currentEmployee = existing;
       applyLoginRoleDefaults(existing);
@@ -25396,6 +25501,7 @@ Object.assign(window, {
   confirmFinishStockIn,
   confirmNewStockIn,
   confirmStockInExcel,
+  confirmStockOutExcel,
   setStockInEmployee,
   setStockOutEmployee,
   stockInEntryModal,

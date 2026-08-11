@@ -1363,7 +1363,7 @@ textarea.text-sm,
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  gap: 1px;
+  gap: 4px;
 }
 
 .customer-card__title-row {
@@ -1380,7 +1380,7 @@ textarea.text-sm,
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.25;
   color: var(--hex-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1396,7 +1396,7 @@ textarea.text-sm,
   gap: 2px 10px;
   min-width: 0;
   max-width: 100%;
-  margin-top: 1px;
+  margin-top: 0;
 }
 
 .customer-card__phone-link {
@@ -1433,7 +1433,7 @@ textarea.text-sm,
 .customer-card__sub {
   margin: 0;
   font-size: 12px;
-  line-height: 1.15;
+  line-height: 1.3;
   color: var(--hex-muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3451,19 +3451,19 @@ img[data-product-img],
   }
 
   .customer-card__text {
-    gap: 1px;
+    gap: 4px;
   }
 
   .customer-card__name {
     font-size: 14px;
     font-weight: 700;
-    line-height: 1.15;
+    line-height: 1.25;
   }
 
   .customer-card__sub {
     margin: 0;
     font-size: 12px;
-    line-height: 1.15;
+    line-height: 1.3;
   }
 
   .customer-card__phones {
@@ -6243,6 +6243,10 @@ textarea::placeholder {
 
 .modal-scroll {
   max-height: calc(90vh - 120px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .customer-map-head {
   display: flex;
@@ -13348,7 +13352,7 @@ textarea::placeholder {
     white-space: nowrap;
   }
   .receipt-gross-note {
-    background: #fff3cd;
+    background: #fff2cc;
     color: #7a5b00;
     text-align: center;
     padding: 2.5mm 3mm;
@@ -13360,7 +13364,7 @@ textarea::placeholder {
     -webkit-print-color-adjust: exact;
   }
   .receipt-settlement-note {
-    background: #fff3cd;
+    background: #fff2cc;
     text-align: center;
     padding: 2.5mm 3mm;
     font-weight: 700;
@@ -16207,13 +16211,14 @@ body.image-lightbox-open {
 }
 
 .stock-in-take__total-label {
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
   color: var(--hex-foreground);
 }
 
 .stock-in-take__total-value {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--hex-primary);
   font-variant-numeric: tabular-nums;
@@ -16471,8 +16476,9 @@ body.image-lightbox-open {
 }
 
 .stock-in-receipt-panel__foot {
-  padding: 14px 16px 16px;
+  padding: 14px 16px max(20px, calc(12px + env(safe-area-inset-bottom, 0px)));
   border-top: 1px solid var(--hex-border);
+  background: var(--hex-card);
 }
 
 .stock-in-sign {
