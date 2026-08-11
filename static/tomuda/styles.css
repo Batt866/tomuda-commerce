@@ -15879,6 +15879,44 @@ body.image-lightbox-open {
   color: var(--hex-muted-foreground);
 }
 
+.stock-in-employee--readonly .stock-in-employee__value {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--hex-border);
+  border-radius: 10px;
+  background: var(--hex-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hex-foreground);
+}
+
+.line-list__row--stock-report {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.line-list__row--stock-report .line-list__row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 4px 12px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.line-list__row--stock-report > .btn {
+  align-self: center;
+  flex-shrink: 0;
+}
+
 .stock-in-scan {
   display: flex;
   flex-direction: column;

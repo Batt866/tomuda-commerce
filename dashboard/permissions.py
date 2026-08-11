@@ -30,6 +30,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
             {"id": "products", "label": "Бараа", "actions": CRUD},
             {"id": "warehouse", "label": "Агуулах", "actions": CRUD},
             {"id": "employees", "label": "Ажилтан", "actions": CRUD},
+            {"id": "suppliers", "label": "Нийлүүлэгч", "actions": CRUD},
         ],
     },
     {
@@ -226,8 +227,10 @@ def expand_legacy_permissions(raw: list[str]) -> list[str]:
     if "warehouse.edit" in keys:
         if "warehouse.view" in ALL_PERMISSION_KEY_SET:
             keys.add("warehouse.view")
-        for module_id in ("count", "stockIn", "stockOut"):
+        for module_id in ("count", "stockIn", "stockOut", "suppliers"):
             _add_crud(keys, module_id)
+    if "warehouse.view" in keys and "suppliers.view" in ALL_PERMISSION_KEY_SET:
+        keys.add("suppliers.view")
     if "warehouse.view" in keys or "warehouse.edit" in keys:
         _add_crud(keys, "receipts")
     if "customers.create" in keys:
@@ -274,6 +277,9 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "stockOut.view",
         "stockOut.create",
         "stockOut.edit",
+        "suppliers.view",
+        "suppliers.create",
+        "suppliers.edit",
         "count.view",
         "count.create",
         "count.edit",
@@ -637,6 +643,11 @@ def validate_state_mutation(
             ("employees.create", "employeeAdd.create", "employeeAdd.view"),
             ("employees.edit", "employees.delete", "employeeAdd.edit"),
             ("employees.delete", "employees.edit", "employeeAdd.delete"),
+        ),
+        "suppliers": (
+            ("suppliers.create", "suppliers.edit", "warehouse.edit"),
+            ("suppliers.edit", "suppliers.create", "warehouse.edit"),
+            ("suppliers.delete", "suppliers.edit", "warehouse.edit"),
         ),
         "products": (
             ("products.create", "productAdd.create", "productAdd.view"),

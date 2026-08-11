@@ -20,6 +20,7 @@
         { id: "products", label: "Бараа", actions: CRUD },
         { id: "warehouse", label: "Нярав", actions: CRUD },
         { id: "employees", label: "Ажилтан", actions: CRUD },
+        { id: "suppliers", label: "Нийлүүлэгч", actions: CRUD },
       ],
     },
     {
@@ -205,7 +206,10 @@
     }
     if (set.has("warehouse.edit")) {
       if (ALL_KEY_SET.has("warehouse.view")) set.add("warehouse.view");
-      ["count", "stockIn", "stockOut"].forEach(addCrud);
+      ["count", "stockIn", "stockOut", "suppliers"].forEach(addCrud);
+    }
+    if (set.has("warehouse.view") && ALL_KEY_SET.has("suppliers.view")) {
+      set.add("suppliers.view");
     }
     if (set.has("warehouse.view") || set.has("warehouse.edit")) addCrud("receipts");
     if (set.has("customers.create")) addCrud("customerAdd");
@@ -250,6 +254,9 @@
       "stockOut.view",
       "stockOut.create",
       "stockOut.edit",
+      "suppliers.view",
+      "suppliers.create",
+      "suppliers.edit",
       "count.view",
       "count.create",
       "count.edit",
@@ -267,6 +274,7 @@
     products: "products.view",
     customers: "customers.view",
     employees: "employees.view",
+    suppliers: "suppliers.view",
     employeePermissions: "permissions.view",
     stockReports: "warehouse.view",
     reports: "reports.view",
@@ -283,6 +291,7 @@
     ["inventory", "Нярав", "warehouse.view"],
     ["warehouse", "Агуулах", "warehouse.view"],
     ["employees", "Ажилтан", "employees.view"],
+    ["suppliers", "Нийлүүлэгч", "suppliers.view"],
     ["stockReports", "Тайлан", "reports.view"],
     ["promotions", "Урамшуулал", "promotions.view"],
     ["admin", "Админ", "dashboard.view"],

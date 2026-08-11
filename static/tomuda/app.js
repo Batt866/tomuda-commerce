@@ -85,7 +85,9 @@ const state = {
   countDone: false,
   countOpeningStock: {},
   countSessionStartedAt: null,
+  suppliers: [],
   stockInEmployeeId: "",
+  stockInSupplierId: "",
   stockInDraft: {},
   stockInDone: false,
   stockInReceipt: null,
@@ -96,6 +98,7 @@ const state = {
   customerHighlightId: "",
   productHighlightId: "",
   stockOutEmployeeId: "",
+  stockOutRecipientNote: "",
   stockOutDraft: {},
   stockOutDone: false,
   stockOutReceipt: null,
@@ -262,6 +265,7 @@ const persistKeys = [
   "customers",
   "products",
   "employees",
+  "suppliers",
   "orders",
   "extraCategories",
   "inventoryLogs",
@@ -289,6 +293,7 @@ const SYNC_ENTITY_KEYS = [
   "customers",
   "products",
   "employees",
+  "suppliers",
   "orders",
   "extraCategories",
   "inventoryLogs",
@@ -308,6 +313,7 @@ const BUSINESS_ENTITY_KEYS = [
   "customers",
   "products",
   "employees",
+  "suppliers",
   "orders",
   "extraCategories",
   "inventoryLogs",
@@ -2719,6 +2725,35 @@ function canManageEmployees() {
     hasPermission("employeeAdd.view")
   );
 }
+function canManageSuppliers() {
+  return (
+    hasPermission("suppliers.create") ||
+    hasPermission("suppliers.edit") ||
+    hasPermission("warehouse.edit")
+  );
+}
+function canViewSuppliers() {
+  return (
+    hasPermission("suppliers.view") ||
+    hasPermission("suppliers.create") ||
+    hasPermission("suppliers.edit") ||
+    hasPermission("warehouse.view") ||
+    hasPermission("warehouse.edit")
+  );
+}
+const SUPPLIER_COUNTRIES = ["Хятад", "Солонгос", "Бусад"];
+function supplierCountryLabel(value) {
+  const v = String(value || "").trim();
+  return SUPPLIER_COUNTRIES.includes(v) ? v : "Бусад";
+}
+function suppliersSorted() {
+  return [...(state.suppliers || [])].sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+  );
+}
+function supplierById(id) {
+  return (state.suppliers || []).find((s) => String(s.id) === String(id || ""));
+}
 function canCreateCustomer() {
   return (
     hasPermission("customers.create") ||
@@ -2835,6 +2870,8 @@ function canDelete() {
     hasPermission("products.edit") ||
     hasPermission("employees.delete") ||
     hasPermission("employees.edit") ||
+    hasPermission("suppliers.delete") ||
+    hasPermission("suppliers.edit") ||
     hasPermission("customers.delete") ||
     hasPermission("customers.edit") ||
     hasPermission("customers.create") ||
@@ -5164,8 +5201,11 @@ function applyPersistentState(data) {
     state.workerQtyParts = {};
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
   if (!Array.isArray(state.stockOutReceipts)) state.stockOutReceipts = [];
+  if (!Array.isArray(state.suppliers)) state.suppliers = [];
   if (!state.stockOutDraft || typeof state.stockOutDraft !== "object")
     state.stockOutDraft = {};
+  if (state.stockOutRecipientNote == null) state.stockOutRecipientNote = "";
+  if (state.stockInSupplierId == null) state.stockInSupplierId = "";
   state.deletionLog = normalizeDeletionLog(state.deletionLog);
   state.promotionDeletionLog = normalizePromotionDeletionLog(
     state.promotionDeletionLog,
@@ -5199,6 +5239,9 @@ function applyDeletionLogToCollections() {
   );
   state.employees = (state.employees || []).filter(
     (e) => !deletionLogHas(log, "employee", e.id),
+  );
+  state.suppliers = (state.suppliers || []).filter(
+    (s) => !deletionLogHas(log, "supplier", s.id),
   );
   state.orders = retainedOrders(
     (state.orders || []).filter((o) => !deletionLogHas(log, "order", o.id)),
@@ -8239,6 +8282,7 @@ function adminHubActionCard(action, label, iconKey) {
 function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
+    ["suppliers", "Нийлүүлэгч", "inventory", "suppliers.view"],
     ["warehouse", "Агуулах", "warehouse", "warehouse.view"],
     ["inventory", "Нярав", "inventory", "warehouse.view"],
     ["stockReports", "Тайлан", "reports", "__stock_reports__"],
@@ -8250,6 +8294,7 @@ function adminHubHtml() {
   ].filter(([id, , , perm]) => {
     if (id === "employeePermissions") return canManageEmployeePermissions();
     if (id === "stockReports") return canViewReportsHub();
+    if (id === "suppliers") return canViewSuppliers();
     if (id === "inventory")
       return (
         canAccessView("inventory") ||
@@ -12752,7 +12797,10 @@ function ensureStockInSession() {
     state.stockInDone = false;
     state.stockInReceipt = null;
   }
-  if (!state.stockInEmployeeId) {
+  // Always bind to the logged-in employee for stock-in.
+  if (state.currentEmployee?.id) {
+    state.stockInEmployeeId = state.currentEmployee.id;
+  } else if (!state.stockInEmployeeId) {
     state.stockInEmployeeId = defaultInventoryEmployeeId();
   } else {
     state.stockInEmployeeId = normalizeInventoryEmployeeId(
@@ -12767,13 +12815,16 @@ function ensureStockOutSession() {
     state.stockOutDone = false;
     state.stockOutReceipt = null;
   }
-  if (!state.stockOutEmployeeId) {
+  if (state.currentEmployee?.id) {
+    state.stockOutEmployeeId = state.currentEmployee.id;
+  } else if (!state.stockOutEmployeeId) {
     state.stockOutEmployeeId = defaultInventoryEmployeeId();
   } else {
     state.stockOutEmployeeId = normalizeInventoryEmployeeId(
       state.stockOutEmployeeId,
     );
   }
+  if (state.stockOutRecipientNote == null) state.stockOutRecipientNote = "";
 }
 function stockInSessionActive() {
   return !!state.stockInSessionStartedAt && !state.stockInDone;
@@ -13230,6 +13281,7 @@ function stockInHasEntries() {
 function stockInCanFinish() {
   if (stockInSaveLock) return false;
   if (!state.stockInEmployeeId) return false;
+  if (!String(state.stockInSupplierId || "").trim()) return false;
   return stockInHasEntries();
 }
 function stockInEntryProducts(list) {
@@ -13240,7 +13292,10 @@ function startStockInSession() {
   state.stockInDone = false;
   state.stockInReceipt = null;
   state.stockInSessionStartedAt = new Date().toISOString();
-  if (!state.stockInEmployeeId) {
+  state.stockInSupplierId = "";
+  if (state.currentEmployee?.id) {
+    state.stockInEmployeeId = state.currentEmployee.id;
+  } else if (!state.stockInEmployeeId) {
     state.stockInEmployeeId = defaultInventoryEmployeeId();
   }
 }
@@ -13253,16 +13308,31 @@ function setStockInEmployee(id) {
   state.stockInEmployeeId = id || "";
   render();
 }
+function setStockInSupplier(id) {
+  ensureStockInSession();
+  state.stockInSupplierId = id || "";
+  render();
+}
 function setStockOutEmployee(id) {
   ensureStockOutSession();
   state.stockOutEmployeeId = id || "";
   render();
 }
+function setStockOutRecipientNote(value) {
+  ensureStockOutSession();
+  state.stockOutRecipientNote = String(value || "");
+}
 function stockInEmployeeName() {
+  if (state.currentEmployee?.name) return state.currentEmployee.name;
   return inventoryEmployeeName(state.stockInEmployeeId);
 }
 function stockOutEmployeeName() {
+  if (state.currentEmployee?.name) return state.currentEmployee.name;
   return inventoryEmployeeName(state.stockOutEmployeeId);
+}
+function stockInSupplierName() {
+  const s = supplierById(state.stockInSupplierId);
+  return s?.name || "";
 }
 function stockOutDraftEntry(id) {
   if (!state.stockOutDraft[id]) state.stockOutDraft[id] = {};
@@ -13289,7 +13359,10 @@ function startStockOutSession() {
   state.stockOutReceipt = null;
   state.stockOutSessionStartedAt = new Date().toISOString();
   state.stockOutHighlightId = "";
-  if (!state.stockOutEmployeeId) {
+  state.stockOutRecipientNote = "";
+  if (state.currentEmployee?.id) {
+    state.stockOutEmployeeId = state.currentEmployee.id;
+  } else if (!state.stockOutEmployeeId) {
     state.stockOutEmployeeId = defaultInventoryEmployeeId();
   }
 }
@@ -13369,6 +13442,7 @@ function buildStockOutReceiptSnapshot(productIds = null) {
     createdAt: new Date().toISOString(),
     employeeId: state.stockOutEmployeeId,
     employeeName: stockOutEmployeeName(),
+    recipientNote: String(state.stockOutRecipientNote || "").trim(),
     lines,
     totalAmount: lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0),
   };
@@ -13397,6 +13471,7 @@ function applyStockOutReceipt(receipt) {
     createdAt: saved.createdAt,
     employeeId: saved.employeeId,
     employeeName: saved.employeeName,
+    recipientNote: saved.recipientNote || "",
     lines: saved.lines,
     totalAmount: saved.totalAmount,
   });
@@ -13440,19 +13515,17 @@ function confirmFinishStockOut() {
       );
     }
   }
-  const summary = `<p>Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Тийм дарвал Excel татагдаж, зарлагын баримт харагдана. Үгүй дарвал зөвхөн зарлага хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(receipt.employeeName)}</b> · ${receipt.lines.length} бараа · ${receipt.lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)} ш</p>`;
-  confirmModal("Зарлагын баримт", summary, {
+  const note = receipt.recipientNote
+    ? ` · Хэнд: <b>${esc(receipt.recipientNote)}</b>`
+    : "";
+  const summary = `<p>Зарлагыг баталгаажуулах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(receipt.employeeName)}</b>${note} · ${receipt.lines.length} бараа · ${receipt.lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)} ш</p>`;
+  confirmModal("Зарлага баталгаажуулах", summary, {
     confirmLabel: "Тийм",
     cancelLabel: "Үгүй",
     onConfirm: () =>
       void finishStockOutReceipt(receipt, {
-        downloadExcel: true,
-        showReceipt: true,
-      }),
-    onCancel: () =>
-      void finishStockOutReceipt(receipt, {
         downloadExcel: false,
-        showReceipt: false,
+        showReceipt: true,
       }),
   });
 }
@@ -13630,6 +13703,8 @@ function buildStockInReceiptSnapshot(productIds = null) {
     createdAt: new Date().toISOString(),
     employeeId: state.stockInEmployeeId,
     employeeName: stockInEmployeeName(),
+    supplierId: state.stockInSupplierId || "",
+    supplierName: stockInSupplierName() || "",
     lines,
   });
 }
@@ -13657,6 +13732,8 @@ function applyStockInReceipt(receipt) {
       createdAt: saved.createdAt,
       employeeId: saved.employeeId,
       employeeName: saved.employeeName,
+      supplierId: saved.supplierId || "",
+      supplierName: saved.supplierName || "",
       lines: saved.lines,
       totalAmount: saved.totalAmount,
     });
@@ -13694,26 +13771,34 @@ function confirmFinishStockIn() {
   }
   if (!stockInCanFinish()) {
     if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
+    if (!String(state.stockInSupplierId || "").trim())
+      return alert("Нийлүүлэгч сонгоно уу");
     return alert("Орлого оруулна уу");
   }
   const receipt = buildStockInReceiptSnapshot();
   if (!receipt?.lines?.length) return;
   const normalized = normalizeStockInReceiptTotals(receipt);
-  const summary = `<p>Excel файл татах уу?</p><p class="text-sm text-muted-foreground mt-2">Тийм дарвал Excel татагдаж, орлогын баримт харагдана. Үгүй дарвал зөвхөн орлого хадгалагдана.</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
-  confirmModal("Орлогын баримт", summary, {
+  const supplierLabel = normalized.supplierName || "-";
+  const summary = `<p>Орлогыг баталгаажуулах уу?</p><p class="text-sm text-muted-foreground mt-2">Ажилтан: <b>${esc(normalized.employeeName)}</b> · Нийлүүлэгч: <b>${esc(supplierLabel)}</b> · ${normalized.lines.length} бараа · ${fmtExcelMoney(normalized.totalAmount)}</p>`;
+  confirmModal("Орлого баталгаажуулах", summary, {
     confirmLabel: "Тийм",
     cancelLabel: "Үгүй",
     onConfirm: () =>
       void finishStockInReceipt(receipt, {
-        downloadExcel: true,
+        downloadExcel: false,
         showReceipt: true,
       }),
-    onCancel: () =>
-      void finishStockInReceipt(receipt, {
-        downloadExcel: false,
-        showReceipt: false,
-      }),
   });
+}
+function saveStockInDraftToast() {
+  ensureStockInSession();
+  if (!stockInHasEntries()) return alert("Орлого оруулна уу");
+  showAppToast("Түр хадгаллаа", "success");
+}
+function saveStockOutDraftToast() {
+  ensureStockOutSession();
+  if (!stockOutHasEntries()) return alert("Зарлага гаргах бараа сонгоно уу");
+  showAppToast("Түр хадгаллаа", "success");
 }
 async function finishStockInReceipt(
   receipt,
@@ -13781,14 +13866,32 @@ function confirmNewStockIn() {
 }
 function stockInEmployeeField() {
   ensureStockInSession();
-  return inventoryEmployeeField(state.stockInEmployeeId, "setStockInEmployee");
+  const name = stockInEmployeeName() || "-";
+  return `<div class="stock-in-employee stock-in-employee--readonly"><span class="stock-in-employee__label">Ажилтан</span><p class="stock-in-employee__value">${esc(name)}</p></div>`;
+}
+function stockInSupplierField() {
+  ensureStockInSession();
+  const options = [
+    `<option value="">Нийлүүлэгч сонгох</option>`,
+    ...suppliersSorted().map(
+      (s) =>
+        `<option value="${esc(s.id)}" ${String(state.stockInSupplierId) === String(s.id) ? "selected" : ""}>${esc(s.name)}${s.country ? ` · ${esc(supplierCountryLabel(s.country))}` : ""}</option>`,
+    ),
+  ].join("");
+  const emptyHint = !(state.suppliers || []).length
+    ? `<p class="text-xs text-muted-foreground mt-1">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
+    : "";
+  return `<label class="stock-in-employee"><span class="stock-in-employee__label">Нийлүүлэгч</span><select class="field-input app-input" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
 }
 function stockOutEmployeeField() {
   ensureStockOutSession();
-  return inventoryEmployeeField(
-    state.stockOutEmployeeId,
-    "setStockOutEmployee",
-  );
+  const name = stockOutEmployeeName() || "-";
+  return `<div class="stock-in-employee stock-in-employee--readonly"><span class="stock-in-employee__label">Ажилтан</span><p class="stock-in-employee__value">${esc(name)}</p></div>`;
+}
+function stockOutRecipientField() {
+  ensureStockOutSession();
+  const note = esc(state.stockOutRecipientNote || "");
+  return `<label class="stock-in-employee"><span class="stock-in-employee__label">Хэнд</span><input type="text" class="field-input app-input" placeholder="Жишээ: дэлгүүр / ажилтан / бусад" value="${note}" oninput="setStockOutRecipientNote(this.value)"></label>`;
 }
 function barcodeScannerPanelHtml() {
   return `<div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="btn btn--secondary btn--sm">Хаах</button></div></div>`;
@@ -14371,7 +14474,10 @@ function stockInReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  const supplierLine = receipt.supplierName
+    ? `<p class="stock-in-receipt-panel__sub">Нийлүүлэгч: ${esc(receipt.supplierName)}</p>`
+    : "";
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p>${supplierLine}</div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
@@ -14379,8 +14485,8 @@ function stockInPanel(list) {
     return `<div class="space-y-4 stock-in-view">${stockInReceiptPanel(state.stockInReceipt)}<button type="button" onclick="confirmNewStockIn()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ орлого</button></div>`;
   }
   const canFinish = stockInCanFinish();
-  const actions = `<div class="grid grid-cols-2 gap-2 stock-in-actions"><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
-  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInScanToolbarHtml()}${actions}${stockInEntryList(list)}</div>`;
+  const actions = `<div class="grid grid-cols-3 gap-2 stock-in-actions"><button type="button" onclick="saveStockInDraftToast()" class="py-3 bg-secondary rounded font-medium">Түр хадгалах</button><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Орлого баталгаажуулах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
+  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInSupplierField()}${stockInScanToolbarHtml()}${actions}${stockInEntryList(list)}</div>`;
 }
 function stockOutPanel(list) {
   ensureStockOutSession();
@@ -14388,8 +14494,8 @@ function stockOutPanel(list) {
     return `<div class="space-y-4 stock-out-view">${stockOutReceiptPanel(state.stockOutReceipt)}<button type="button" onclick="confirmNewStockOut()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ зарлага</button></div>`;
   }
   const canFinish = stockOutCanFinish();
-  const actions = `<div class="grid grid-cols-2 gap-2 stock-out-actions"><button type="button" onclick="confirmFinishStockOut()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Дуусгах</button><button type="button" onclick="confirmNewStockOut()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
-  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${actions}${stockOutEntryList(list)}</div>`;
+  const actions = `<div class="grid grid-cols-3 gap-2 stock-out-actions"><button type="button" onclick="saveStockOutDraftToast()" class="py-3 bg-secondary rounded font-medium">Түр хадгалах</button><button type="button" onclick="confirmFinishStockOut()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Зарлага баталгаажуулах</button><button type="button" onclick="confirmNewStockOut()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
+  return `<div class="space-y-4 stock-out-view">${stockOutEmployeeField()}${stockOutRecipientField()}${actions}${stockOutEntryList(list)}</div>`;
 }
 function exportStockInExcel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
@@ -14497,7 +14603,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 <colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-total"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
 <tr><td colspan="9" class="title">${h(stockInReceiptTitle(receipt))}</td></tr>
 <tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Орлого авсан огноо:</td><td colspan="2" class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="5">${receipt.supplierName ? `Нийлүүлэгч: ${h(receipt.supplierName)}` : ""}</td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
 <tr class="head"><th>Барааны нэр</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
@@ -14570,7 +14676,10 @@ function stockOutReceiptPanel(receipt) {
     })
     .join("");
   const date = stockInReceiptDateParts(receipt.createdAt);
-  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p></div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockOutExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  const recipientLine = receipt.recipientNote
+    ? `<p class="stock-in-receipt-panel__sub">Хэнд: ${esc(receipt.recipientNote)}</p>`
+    : "";
+  return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockOutReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</p>${recipientLine}</div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount || 0)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockOutExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockOutModal(id) {
   ensureStockOutSession();
@@ -14721,7 +14830,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 <colgroup><col class="c-name"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-total"><col class="c-money"><col class="c-money"><col class="c-money"></colgroup>
 <tr><td colspan="9" class="title">${h(stockOutReceiptTitle(receipt))}</td></tr>
 <tr class="meta"><td colspan="5">Ажилтан: ${h(receipt.employeeName)} · ${(receipt.lines || []).length} бараа</td><td colspan="2" class="date-label">Зарлага гарсан огноо:</td><td colspan="2" class="date-value">${h(receivedDateValue.trim())}</td></tr>
-<tr class="meta"><td colspan="5"></td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
+<tr class="meta"><td colspan="5">${receipt.recipientNote ? `Хэнд: ${h(receipt.recipientNote)}` : ""}</td><td colspan="2" class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue.trim())}</td></tr>
 <tr class="head"><th>Барааны нэр</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th class="qty-total">Нийт тоо/ш</th><th>Өртөг үнэ</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
 ${bodyRows}
 <tr class="total"><td colspan="8" style="text-align:right">Нийт дүн</td><td class="num">${fmtExcelMoney(receipt.totalAmount || 0)}</td></tr>
@@ -15994,6 +16103,13 @@ function buildStockOutSheetXmlLegacy(receipt, {
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
   const sheetTitle = titleText || stockOutReceiptTitle(receipt);
+  const partyLabel = receivedLabel.includes("Орлого")
+    ? receipt.supplierName
+      ? `Нийлүүлэгч: ${receipt.supplierName}`
+      : ""
+    : receipt.recipientNote
+      ? `Хэнд: ${receipt.recipientNote}`
+      : "";
   pushRow(STOCK_RECEIPT_TITLE_ROW_HEIGHT, [
     xlsxCellXml("A1", s.title, si(sheetTitle), "s"),
     ...emptyCells(1, "B", lastCol, s.title),
@@ -16017,7 +16133,12 @@ function buildStockOutSheetXmlLegacy(receipt, {
     ...emptyCells(2, "F", lastCol, s.metaRight),
   ]);
   pushRow(STOCK_RECEIPT_META_ROW_HEIGHT, [
-    ...emptyCells(3, "A", "D", s.spacer),
+    ...(partyLabel
+      ? [
+          xlsxCellXml("A3", s.metaLeft, si(partyLabel), "s"),
+          ...emptyCells(3, "B", "D", s.metaLeft),
+        ]
+      : emptyCells(3, "A", "D", s.spacer)),
     xlsxCellXml(
       "E3",
       s.metaRight,
@@ -17549,7 +17670,25 @@ function stockReportReceiptRow(kind, receipt) {
   const no = receipt.receiptNumber
     ? `#${esc(receipt.receiptNumber)}`
     : "Дугааргүй";
-  return `<button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="line-list__row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${esc(receipt.employeeName || "-")} · ${lines.length} бараа · ${dteAt(receipt.createdAt)}</p></div><b class="line-list__amount">${fmt(total)}</b></button>`;
+  const party =
+    kind === "out"
+      ? receipt.recipientNote
+        ? `Хэнд: ${receipt.recipientNote}`
+        : ""
+      : receipt.supplierName
+        ? `Нийлүүлэгч: ${receipt.supplierName}`
+        : "";
+  const metaParts = [
+    receipt.employeeName || "-",
+    party,
+    `${lines.length} бараа`,
+    dteAt(receipt.createdAt),
+  ].filter(Boolean);
+  const excelFn =
+    kind === "out"
+      ? `confirmStockOutExcel('${esc(receipt.id)}')`
+      : `confirmStockInExcel('${esc(receipt.id)}')`;
+  return `<div class="line-list__row line-list__row--stock-report"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="line-list__row-main"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${metaParts.map((p) => esc(p)).join(" · ")}</p></div><b class="line-list__amount">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
 }
 function stockReportAggregateRow(row, index) {
   return `<div class="line-list__row line-list__row--static"><span>${index + 1}. ${esc(row.productName)}${row.barcode ? ` <span class="text-muted-foreground">· ${esc(row.barcode)}</span>` : ""}</span><span class="text-sm text-muted-foreground">${row.quantity} ш</span><b>${fmt(row.amount)}</b></div>`;
@@ -17607,7 +17746,7 @@ function stockReportDetailView(kind) {
   if (kind === "inProducts" || kind === "outProducts") {
     return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Бараа", products.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
   }
-  return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(flow, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><p class="text-xs text-muted-foreground px-1">Баримт дээр дарж харна. Excel товчоор татна.</p><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(flow, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div></div>`;
 }
 function salesReportOrdersFiltered() {
   const orders = reportOrdersFiltered();
@@ -19932,6 +20071,116 @@ function employeesView() {
   const headActions = addBtn;
   return `<div class="space-y-4">${pageHead("Ажилтан", headActions)}<div class="line-panel"><div class="employee-list">${employeeListHead()}${state.employees.map(employeeRow).join("")}</div></div></div>`;
 }
+function supplierListHead() {
+  return `<div class="employee-list__head" aria-hidden="true"><span>Нийлүүлэгч</span><span>Улс / утас</span><span class="employee-list__head-actions">Үйлдэл</span></div>`;
+}
+function supplierRow(s) {
+  const canEdit = hasPermission("suppliers.edit") || canManageSuppliers();
+  const editBtn = canEdit
+    ? editIconButton({
+        className: "employee-card__btn employee-card__btn--ghost",
+        attrs: `onclick="confirmEditSupplier('${esc(s.id)}')"`,
+        label: "Нийлүүлэгч засах",
+      })
+    : "";
+  const deleteBtn =
+    hasPermission("suppliers.delete") || hasPermission("suppliers.edit")
+      ? deleteIconButton({
+          className: "employee-card__btn employee-card__btn--danger",
+          attrs: `data-confirm-delete="supplier" data-id="${esc(s.id)}"`,
+          label: "Нийлүүлэгч устгах",
+        })
+      : "";
+  const meta = `${supplierCountryLabel(s.country)} · ${s.phone || "-"}`;
+  return `<article class="employee-card"><header class="employee-card__head"><div class="employee-card__identity"><h3 class="employee-card__name">${esc(s.name)}</h3><p class="employee-card__sub">${esc(meta)}</p></div></header><p class="employee-card__meta">${esc(meta)}</p><footer class="employee-card__actions">${editBtn}${deleteBtn}</footer></article>`;
+}
+function suppliersView() {
+  if (!canViewSuppliers()) {
+    return `<div class="space-y-4">${pageHead("Нийлүүлэгч")}<p class="text-sm text-muted-foreground">Нийлүүлэгч харах эрхгүй.</p></div>`;
+  }
+  const addBtn = canManageSuppliers()
+    ? `<button onclick="supplierModal()" class="px-3 py-2 bg-primary text-primary-foreground rounded text-sm shrink-0">+ Нэмэх</button>`
+    : "";
+  const list = suppliersSorted();
+  return `<div class="space-y-4">${pageHead("Нийлүүлэгч", addBtn)}<div class="line-panel"><div class="employee-list">${supplierListHead()}${list.length ? list.map(supplierRow).join("") : `<p class="line-panel__empty">Нийлүүлэгч бүртгэгдээгүй</p>`}</div></div></div>`;
+}
+function supplierModal(id) {
+  const editId = id ? String(id) : "";
+  if (editId) {
+    if (!hasPermission("suppliers.edit") && !canManageSuppliers()) {
+      return alertModal("Эрхгүй", "Нийлүүлэгч засах эрхгүй.");
+    }
+  } else if (!hasPermission("suppliers.create") && !canManageSuppliers()) {
+    return alertModal("Эрхгүй", "Нийлүүлэгч нэмэх эрхгүй.");
+  }
+  const s = editId ? supplierById(editId) : null;
+  if (editId && !s) return alert("Нийлүүлэгч олдсонгүй");
+  const selectedCountry = supplierCountryLabel(s?.country || "Хятад");
+  const countryOptions = SUPPLIER_COUNTRIES.map(
+    (c) =>
+      `<option value="${esc(c)}" ${selectedCountry === c ? "selected" : ""}>${esc(c)}</option>`,
+  ).join("");
+  box(
+    editId ? "Нийлүүлэгч засах" : "Нийлүүлэгч нэмэх",
+    `<form data-supplier-form data-supplier-id="${esc(editId)}" onsubmit="saveSupplier(event)" class="p-5 space-y-3"><input name="name" required placeholder="Нэр" value="${esc(s?.name || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><select name="country" class="w-full px-3 py-3 bg-secondary rounded app-input">${countryOptions}</select><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Утас (заавал биш)" value="${esc(s?.phone || "")}" class="w-full px-3 py-3 bg-secondary rounded app-input"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">${editId ? "Хадгалах" : "Нэмэх"}</button></form>`,
+    "max-w-lg",
+  );
+}
+function confirmEditSupplier(id) {
+  if (!hasPermission("suppliers.edit") && !canManageSuppliers()) return;
+  const s = supplierById(id);
+  if (!s) return alert("Нийлүүлэгч олдсонгүй");
+  confirmModal(
+    "Нийлүүлэгч засах",
+    `<p><b>${esc(s.name || "Нийлүүлэгч")}</b> засах уу?</p>`,
+    {
+      confirmLabel: "Тийм",
+      closable: true,
+      onConfirm: () => supplierModal(id),
+    },
+  );
+}
+async function saveSupplier(e) {
+  e.preventDefault();
+  const form = e.target?.closest?.("[data-supplier-form]");
+  if (!form) return;
+  const editId = form.getAttribute("data-supplier-id") || "";
+  if (editId) {
+    if (!hasPermission("suppliers.edit") && !canManageSuppliers()) {
+      return alertModal("Эрхгүй", "Нийлүүлэгч засах эрхгүй.");
+    }
+  } else if (!hasPermission("suppliers.create") && !canManageSuppliers()) {
+    return alertModal("Эрхгүй", "Нийлүүлэгч нэмэх эрхгүй.");
+  }
+  const f = Object.fromEntries(new FormData(form));
+  const name = String(f.name || "").trim();
+  if (!name) return alert("Нэр оруулна уу");
+  const country = supplierCountryLabel(f.country);
+  const phone = String(f.phone || "").trim();
+  const nowIso = new Date().toISOString();
+  if (!Array.isArray(state.suppliers)) state.suppliers = [];
+  if (editId) {
+    const existing = supplierById(editId);
+    if (!existing) return alert("Нийлүүлэгч олдсонгүй");
+    existing.name = name;
+    existing.country = country;
+    existing.phone = phone;
+    existing.updatedAt = nowIso;
+    showInstallToast("Нийлүүлэгч шинэчлэгдлээ");
+  } else {
+    state.suppliers.push({
+      id: newEntityId("sup"),
+      name,
+      country,
+      phone,
+      updatedAt: nowIso,
+    });
+    showInstallToast("Нийлүүлэгч нэмэгдлээ");
+  }
+  closeModal();
+  render();
+  await criticalBackendSave();
+}
 function getSavedLogin() {
   try {
     const raw = localStorage.getItem("tomuda-login");
@@ -21284,6 +21533,7 @@ function render() {
     products: productsView,
     inventory: inventoryView,
     employees: employeesView,
+    suppliers: suppliersView,
     employeePermissions: employeePermissionsView,
     reports: reportsView,
     stockReports: stockReportsView,
@@ -25397,9 +25647,11 @@ function confirmDelete(type, id) {
       ? state.products.find((p) => p.id === id)
       : type === "employee"
         ? state.employees.find((e) => e.id === id)
-        : type === "customer"
-          ? state.customers.find((c) => c.id === id)
-          : null;
+        : type === "supplier"
+          ? (state.suppliers || []).find((s) => s.id === id)
+          : type === "customer"
+            ? state.customers.find((c) => c.id === id)
+            : null;
   const name =
     item?.name || (type === "customer" ? item?.companyName : null) || "энэ мөр";
   const finalMessage = `<strong>${esc(name)}</strong>-г бүрмөсөн устгахдаа итгэлтэй байна уу? Энэ үйлдлийг буцаах боломжгүй.`;
@@ -25513,9 +25765,11 @@ function deleteNow(type, id) {
       ? "Бараа"
       : type === "employee"
         ? "Ажилтан"
-        : type === "customer"
-          ? "Харилцагч"
-          : "Мөр";
+        : type === "supplier"
+          ? "Нийлүүлэгч"
+          : type === "customer"
+            ? "Харилцагч"
+            : "Мөр";
   if (type === "product") {
     recordDeletion("product", id);
     state.products = state.products.filter((p) => String(p.id) !== String(id));
@@ -25528,6 +25782,15 @@ function deleteNow(type, id) {
     if (String(state.currentEmployee?.id) === String(id)) {
       state.currentEmployee = null;
       state.isLoggedIn = false;
+    }
+  }
+  if (type === "supplier") {
+    recordDeletion("supplier", id);
+    state.suppliers = (state.suppliers || []).filter(
+      (s) => String(s.id) !== String(id),
+    );
+    if (String(state.stockInSupplierId) === String(id)) {
+      state.stockInSupplierId = "";
     }
   }
   if (type === "customer") {
@@ -25740,10 +26003,19 @@ Object.assign(window, {
   confirmInventoryExport,
   confirmFinishStockIn,
   confirmNewStockIn,
+  confirmFinishStockOut,
+  confirmNewStockOut,
+  saveStockInDraftToast,
+  saveStockOutDraftToast,
   confirmStockInExcel,
   confirmStockOutExcel,
   setStockInEmployee,
+  setStockInSupplier,
   setStockOutEmployee,
+  setStockOutRecipientNote,
+  supplierModal,
+  confirmEditSupplier,
+  saveSupplier,
   stockInEntryModal,
   confirmRemoveStockDraft,
   applyStockInEntryModal,

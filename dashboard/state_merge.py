@@ -6,17 +6,18 @@ import json
 from datetime import datetime
 from typing import Any
 
-ENTITY_KEYS = ("customers", "products", "employees", "orders")
+ENTITY_KEYS = ("customers", "products", "employees", "suppliers", "orders")
 ARRAY_BY_ID_KEYS = ("inventoryLogs", "stockInReceipts", "stockOutReceipts")
 DELETION_TYPE = {
     "customers": "customer",
     "products": "product",
     "employees": "employee",
+    "suppliers": "supplier",
     "orders": "order",
 }
 # Field-level last-writer-wins only for collections that stamp updatedAt on edit.
 # Products keep stock via separate rules — do not use updatedAt for products.
-UPDATED_AT_ENTITY_KEYS = frozenset({"customers", "employees"})
+UPDATED_AT_ENTITY_KEYS = frozenset({"customers", "employees", "suppliers"})
 
 
 def _as_list(value: Any) -> list:
