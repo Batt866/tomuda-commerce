@@ -9779,12 +9779,15 @@ const STOCK_RECEIPT_PIECE_HEAD_STYLE = 24;
 const STOCK_RECEIPT_PIECE_CELL_STYLE = 25;
 const STOCK_RECEIPT_TOTAL_HEAD_STYLE = 7;
 const STOCK_RECEIPT_TOTAL_CELL_STYLE = 26;
+/** Fallback barcode @ text style when patch did not append one. */
+const STOCK_RECEIPT_BARCODE_CELL_STYLE = 8;
 /** Resolve qty style ids from the patched styles.xml tail (never hardcode past EOF). */
 function stockReceiptQtyStyleIds(stylesXml) {
   const body = String(stylesXml || "").match(
     /<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/,
   );
-  const count = body ? (body[1].match(/<xf\b/g) || []).length : 0;
+  const xfs = body ? body[1].match(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g) || [] : [];
+  const count = xfs.length;
   if (count < 9) {
     return {
       largeHead: STOCK_RECEIPT_LARGE_HEAD_STYLE,
@@ -9795,24 +9798,35 @@ function stockReceiptQtyStyleIds(stylesXml) {
       pieceCell: STOCK_RECEIPT_PIECE_CELL_STYLE,
       totalHead: STOCK_RECEIPT_TOTAL_HEAD_STYLE,
       totalCell: STOCK_RECEIPT_TOTAL_CELL_STYLE,
+      barcodeCell: STOCK_RECEIPT_BARCODE_CELL_STYLE,
     };
   }
-  // Tail: sign · large · small · piece (head+cell each) · total cell.
+  let barcodeCell = -1;
+  for (let i = count - 1; i >= 0; i -= 1) {
+    if (String(xfs[i]).includes('numFmtId="49"')) {
+      barcodeCell = i;
+      break;
+    }
+  }
+  // Tail before optional barcode @: large · small · piece (head+cell) · total cell.
+  const base = barcodeCell === count - 1 ? count - 1 : count;
   return {
-    largeHead: count - 7,
-    largeCell: count - 6,
-    smallHead: count - 5,
-    smallCell: count - 4,
-    pieceHead: count - 3,
-    pieceCell: count - 2,
+    largeHead: base - 7,
+    largeCell: base - 6,
+    smallHead: base - 5,
+    smallCell: base - 4,
+    pieceHead: base - 3,
+    pieceCell: base - 2,
     totalHead: STOCK_RECEIPT_TOTAL_HEAD_STYLE,
-    totalCell: count - 1,
+    totalCell: base - 1,
+    barcodeCell:
+      barcodeCell >= 0 ? barcodeCell : STOCK_RECEIPT_BARCODE_CELL_STYLE,
   };
 }
-/** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — sample proportions. */
-const STOCK_RECEIPT_COL_WIDTHS = [22, 13, 8.5, 10.5, 8.5, 11.5, 11, 11, 12];
+/** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ — barcode wide enough for 13 digits. */
+const STOCK_RECEIPT_COL_WIDTHS = [22, 15.5, 8.5, 10.5, 8.5, 11.5, 11, 11, 13];
 /** Uniform row height for header / category / line / subtotal / total on stock receipts. */
-const STOCK_RECEIPT_BODY_ROW_HEIGHT = 16.5;
+const STOCK_RECEIPT_BODY_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
 function stockReceiptQtyHeadXf(fillId) {
   const fillAttrs =
     Number(fillId) > 0
@@ -9827,14 +9841,20 @@ function stockReceiptQtyCellXf(fillId) {
       : `fillId="0"`;
   return `<xf numFmtId="1" fontId="2" ${fillAttrs} borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`;
 }
+function stockReceiptBarcodeCellXf() {
+  // numFmtId 49 = @ text — barcodes stay text (leading zeros preserved).
+  return `<xf numFmtId="49" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>`;
+}
 function stockReceiptPatchStylesXml(stylesXml) {
   // Stock in/out: qty grays only — no category fill; Нийт тоо/ш has no bg fill.
   let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
   const appendXfs = [];
   const head = stockReceiptQtyHeadXf(0);
   const cell = stockReceiptQtyCellXf(0);
+  const barcode = stockReceiptBarcodeCellXf();
   if (!out.includes(head)) appendXfs.push(head);
   if (!out.includes(cell)) appendXfs.push(cell);
+  if (!out.includes(barcode)) appendXfs.push(barcode);
   if (appendXfs.length) {
     out = out.replace(
       /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
@@ -9882,9 +9902,15 @@ async function sanitizeWarehouseXlsxZip(zip) {
   }
   return zip;
 }
-function stockReceiptWorkbookXml(sheetName = "Sheet1") {
+function stockReceiptWorkbookXml(
+  sheetName = "Sheet1",
+  { printArea = null } = {},
+) {
   const name = xlsxSafeSheetName(sheetName, "Sheet1");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="22228"/><workbookPr/><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="15000"/></bookViews><sheets><sheet name="${xlsxXmlEsc(name)}" sheetId="1" r:id="rId1"/></sheets><calcPr calcId="191029"/></workbook>`;
+  const definedNames = printArea
+    ? `<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">'${xlsxXmlEsc(name)}'!${printArea}</definedName></definedNames>`
+    : "";
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="22228"/><workbookPr/><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="15000"/></bookViews><sheets><sheet name="${xlsxXmlEsc(name)}" sheetId="1" r:id="rId1"/></sheets>${definedNames}<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`;
 }
 function stockReceiptWorkbookRelsXml({ hasTheme = false } = {}) {
   const rels = [
@@ -9932,6 +9958,8 @@ async function assembleStockReceiptXlsxZip({
   sheetXml,
   stylesXml,
   themeXml = null,
+  printArea = null,
+  sheetName = "Sheet1",
 }) {
   const zip = new JSZip();
   const hasTheme = !!themeXml;
@@ -9943,7 +9971,11 @@ async function assembleStockReceiptXlsxZip({
   xlsxZipWriteUtf8(zip, "_rels/.rels", xlsxPackageRootRelsXml());
   xlsxZipWriteUtf8(zip, "docProps/core.xml", xlsxPackageCoreXml());
   xlsxZipWriteUtf8(zip, "docProps/app.xml", xlsxPackageAppXml(1));
-  xlsxZipWriteUtf8(zip, "xl/workbook.xml", stockReceiptWorkbookXml());
+  xlsxZipWriteUtf8(
+    zip,
+    "xl/workbook.xml",
+    stockReceiptWorkbookXml(sheetName, { printArea }),
+  );
   xlsxZipWriteUtf8(
     zip,
     "xl/_rels/workbook.xml.rels",
@@ -15415,6 +15447,18 @@ function xlsxCellXml(ref, styleId, value, kind) {
   if (kind === "inlineStr") {
     return `<c r="${ref}" s="${styleId}" t="inlineStr"><is><t xml:space="preserve">${xlsxEscapeText(value)}</t></is></c>`;
   }
+  // Excel formula with optional cached value (opens correctly before recalc).
+  if (kind === "f") {
+    const formula =
+      value && typeof value === "object" ? value.f : value;
+    const cached =
+      value && typeof value === "object" && value.v != null ? value.v : null;
+    const vXml =
+      cached != null && cached !== ""
+        ? `<v>${xlsxSafeNumber(cached)}</v>`
+        : "";
+    return `<c r="${ref}" s="${styleId}"><f>${xlsxEscapeText(formula)}</f>${vXml}</c>`;
+  }
   return `<c r="${ref}" s="${styleId}"/>`;
 }
 function xlsxRowXml(rowNum, height, cells, lastCol = "J") {
@@ -15759,7 +15803,7 @@ async function exportStockInExcelXlsx(receipt) {
     await tplZip.file("xl/styles.xml").async("string"),
   );
   const styleIds = stockReceiptQtyStyleIds(stylesXml);
-  const { sharedStringsXml, sheetXml } = buildStockInSheetXml(receipt, {
+  const { sharedStringsXml, sheetXml, printArea } = buildStockInSheetXml(receipt, {
     styleIds,
   });
   const themeFile = tplZip.file("xl/theme/theme1.xml");
@@ -15769,6 +15813,7 @@ async function exportStockInExcelXlsx(receipt) {
     sheetXml,
     stylesXml,
     themeXml,
+    printArea,
   });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
@@ -15807,6 +15852,7 @@ function buildStockOutSheetXmlLegacy(receipt, {
     pieceCell: STOCK_RECEIPT_PIECE_CELL_STYLE,
     totalHead: STOCK_RECEIPT_TOTAL_HEAD_STYLE,
     totalCell: STOCK_RECEIPT_TOTAL_CELL_STYLE,
+    barcodeCell: STOCK_RECEIPT_BARCODE_CELL_STYLE,
   };
   const lastCol = "I";
   const colLetters = "ABCDEFGHI";
@@ -15826,7 +15872,15 @@ function buildStockOutSheetXmlLegacy(receipt, {
   const printedDateValue = warehouseSheetDateValue(todayIso());
   const groups = stockInReceiptGroupedLines(receipt.lines);
   const rows = [];
-  const merges = [`A1:${lastCol}1`, `A2:C2`, `D2:F2`, `G2:${lastCol}2`, `D3:F3`, `G3:${lastCol}3`];
+  // Title centered; employee left; date labels E–G; date values H–I (no overlap).
+  const merges = [
+    `A1:${lastCol}1`,
+    `A2:C2`,
+    `E2:G2`,
+    `H2:${lastCol}2`,
+    `E3:G3`,
+    `H3:${lastCol}3`,
+  ];
   let rowNum = 1;
   const pushRow = (height, cells) => {
     rows.push(
@@ -15849,11 +15903,11 @@ function buildStockOutSheetXmlLegacy(receipt, {
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
   const sheetTitle = titleText || stockOutReceiptTitle(receipt);
-  pushRow(43.5, [
+  pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
     xlsxCellXml("A1", 13, si(sheetTitle), "s"),
     ...emptyCells(1, "B", lastCol, 13),
   ]);
-  pushRow(20.25, [
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
     xlsxCellXml(
       "A2",
       4,
@@ -15864,22 +15918,22 @@ function buildStockOutSheetXmlLegacy(receipt, {
     ),
     xlsxCellXml("B2", 4, null, "empty"),
     xlsxCellXml("C2", 4, null, "empty"),
-    xlsxCellXml("D2", 14, si(receivedLabel), "s"),
-    xlsxCellXml("E2", 14, null, "empty"),
+    xlsxCellXml("D2", 2, null, "empty"),
+    xlsxCellXml("E2", 14, si(receivedLabel), "s"),
     xlsxCellXml("F2", 14, null, "empty"),
-    xlsxCellXml("G2", 14, si(receivedDateValue), "s"),
-    xlsxCellXml("H2", 14, null, "empty"),
+    xlsxCellXml("G2", 14, null, "empty"),
+    xlsxCellXml("H2", 14, si(receivedDateValue), "s"),
     xlsxCellXml("I2", 14, null, "empty"),
   ]);
-  pushRow(20.25, [
-    xlsxCellXml("A3", 6, null, "empty"),
-    xlsxCellXml("B3", 6, null, "empty"),
-    xlsxCellXml("C3", 6, null, "empty"),
-    xlsxCellXml("D3", 14, si("Хэвлэсэн огноо:"), "s"),
-    xlsxCellXml("E3", 14, null, "empty"),
+  pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
+    xlsxCellXml("A3", 2, null, "empty"),
+    xlsxCellXml("B3", 2, null, "empty"),
+    xlsxCellXml("C3", 2, null, "empty"),
+    xlsxCellXml("D3", 2, null, "empty"),
+    xlsxCellXml("E3", 14, si("Хэвлэсэн огноо:"), "s"),
     xlsxCellXml("F3", 14, null, "empty"),
-    xlsxCellXml("G3", 14, si(printedDateValue), "s"),
-    xlsxCellXml("H3", 14, null, "empty"),
+    xlsxCellXml("G3", 14, null, "empty"),
+    xlsxCellXml("H3", 14, si(printedDateValue), "s"),
     xlsxCellXml("I3", 14, null, "empty"),
   ]);
   pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
@@ -15895,8 +15949,15 @@ function buildStockOutSheetXmlLegacy(receipt, {
     xlsxCellXml(`H${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`I${headerRow}`, 7, si("Нийт үнэ"), "s"),
   ]);
+  const catTotalRows = [];
+  let catLineRows = [];
+  const barcodeStyle =
+    qtyStyles.barcodeCell != null
+      ? qtyStyles.barcodeCell
+      : STOCK_RECEIPT_BARCODE_CELL_STYLE;
   for (const item of groups) {
     if (item.type === "cat") {
+      catLineRows = [];
       const r = rowNum;
       merges.push(`A${r}:${lastCol}${r}`);
       pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
@@ -15907,12 +15968,22 @@ function buildStockOutSheetXmlLegacy(receipt, {
     }
     if (item.type === "catTotal") {
       const r = rowNum;
+      const amount = Number(item.amount) || 0;
+      let formula = "0";
+      if (catLineRows.length === 1) {
+        formula = `I${catLineRows[0]}`;
+      } else if (catLineRows.length > 1) {
+        formula = `SUM(I${catLineRows[0]}:I${catLineRows[catLineRows.length - 1]})`;
+      }
+      // Right-aligned label across A:H (reads next to I); amount is formula.
       merges.push(`A${r}:H${r}`);
       pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
         xlsxCellXml(`A${r}`, 3, si(`${item.name} нийт`), "s"),
         ...emptyCells(r, "B", "H", 3),
-        xlsxCellXml(`I${r}`, 10, item.amount, "n"),
+        xlsxCellXml(`I${r}`, 10, { f: formula, v: amount }, "f"),
       ]);
+      catTotalRows.push(r);
+      catLineRows = [];
       continue;
     }
     const line = item.line;
@@ -15921,25 +15992,44 @@ function buildStockOutSheetXmlLegacy(receipt, {
     const salesPrice = stockInReceiptLineSalesPrice(line);
     const parts = stockReceiptQtyParts(line);
     const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+    const lineTotal = stockInReceiptLineTotal(line);
+    catLineRows.push(r);
     pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, 8, si(line.productName || ""), "s"),
-      xlsxBarcodeCell(`B${r}`, WAREHOUSE_PREPARE_TEXT_CELL_STYLE, line.barcode, si),
+      xlsxBarcodeCell(`B${r}`, barcodeStyle, line.barcode, si),
       xlsxPrepareQtyCell(`C${r}`, qtyStyles.largeCell, parts.largePacks),
       xlsxPrepareQtyCell(`D${r}`, qtyStyles.smallCell, parts.packs),
       xlsxPrepareQtyCell(`E${r}`, qtyStyles.pieceCell, parts.pieces),
       xlsxPrepareQtyCell(`F${r}`, qtyStyles.totalCell, totalQty),
       xlsxCellXml(`G${r}`, 10, costPrice, "n"),
       xlsxCellXml(`H${r}`, 10, salesPrice, "n"),
-      xlsxCellXml(`I${r}`, 10, stockInReceiptLineTotal(line), "n"),
+      xlsxCellXml(
+        `I${r}`,
+        10,
+        { f: `F${r}*H${r}`, v: lineTotal },
+        "f",
+      ),
     ]);
   }
   pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
   const totalRow = rowNum;
+  const grandAmount = Number(receipt.totalAmount) || 0;
+  let grandFormula = "0";
+  if (catTotalRows.length === 1) {
+    grandFormula = `I${catTotalRows[0]}`;
+  } else if (catTotalRows.length > 1) {
+    grandFormula = catTotalRows.map((r) => `I${r}`).join("+");
+  }
   merges.push(`A${totalRow}:H${totalRow}`);
   pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, [
     xlsxCellXml(`A${totalRow}`, 10, si("Нийт дүн"), "s"),
     ...emptyCells(totalRow, "B", "H", 10),
-    xlsxCellXml(`I${totalRow}`, 10, receipt.totalAmount, "n"),
+    xlsxCellXml(
+      `I${totalRow}`,
+      10,
+      { f: grandFormula, v: grandAmount },
+      "f",
+    ),
   ]);
   pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
   const pushSignatureRow = (roleLabel) => {
@@ -15957,13 +16047,18 @@ function buildStockOutSheetXmlLegacy(receipt, {
   pushRow(STOCK_RECEIPT_BODY_ROW_HEIGHT, emptyCells(rowNum, "A", lastCol, 2));
   pushSignatureRow(RECEIPT_SIGN_RECEIVED_LABEL);
   const lastRow = Math.max(1, rowNum - 1);
+  const printArea = `$A$1:$${lastCol}$${lastRow}`;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const colsXml = STOCK_RECEIPT_COL_WIDTHS.map(
     (width, index) =>
       `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
   ).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.55" right="0.45" top="0.7" bottom="0.55" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
-  return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${STOCK_RECEIPT_BODY_ROW_HEIGHT}"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="1"/><pageMargins left="0.5" right="0.45" top="0.55" bottom="0.45" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1" scale="100"/></worksheet>`;
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(strings),
+    sheetXml,
+    printArea,
+  };
 }
 
 async function exportStockOutExcelXlsx(receipt) {
@@ -15979,7 +16074,7 @@ async function exportStockOutExcelXlsx(receipt) {
     await tplZip.file("xl/styles.xml").async("string"),
   );
   const styleIds = stockReceiptQtyStyleIds(stylesXml);
-  const { sharedStringsXml, sheetXml } = buildStockOutSheetXml(receipt, {
+  const { sharedStringsXml, sheetXml, printArea } = buildStockOutSheetXml(receipt, {
     styleIds,
   });
   const themeFile = tplZip.file("xl/theme/theme1.xml");
@@ -15989,6 +16084,7 @@ async function exportStockOutExcelXlsx(receipt) {
     sheetXml,
     stylesXml,
     themeXml,
+    printArea,
   });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockOutReceiptFileName(receipt));
@@ -16010,10 +16106,10 @@ function warehouseSheetDateValue(raw = todayIso()) {
     const m = Number(parts[1]);
     const d = Number(parts[2]);
     if (y && m && d) {
-      return ` ${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+      return `${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
     }
   }
-  return ` ${raw}`;
+  return String(raw || "").trim();
 }
 function warehouseSheetDateLabel() {
   return warehouseDateLabel("Огноо", state.filters.warehouseDate || todayIso());
