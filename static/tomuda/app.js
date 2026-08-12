@@ -15342,8 +15342,8 @@ body { font-family: Arial, sans-serif; color: #1e293b; max-width: 720px; margin:
 .title { font-size: 16px; font-weight: 800; margin: 0 0 12px; padding: 10px 8px; text-align: center; letter-spacing: 0.02em; color: #1e3a5f; background: #e8eef4; }
 .meta { width: 100%; border-collapse: collapse; margin: 0 0 12px; font-size: 11px; }
 .meta td { border: 0; padding: 3px 0; vertical-align: top; }
-.meta-label { width: 34%; text-align: right; padding-right: 8px !important; color: #64748b; white-space: nowrap; }
-.meta-value { width: 16%; font-weight: 700; text-align: left; }
+.meta-label { text-align: left; padding-right: 6px !important; color: #64748b; white-space: nowrap; }
+.meta-value { font-weight: 700; text-align: left; }
 table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .stock-in col.c-no { width: 36px; }
 .stock-in col.c-name { width: 220px; }
@@ -15363,8 +15363,8 @@ table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; fo
 </style></head><body>
 <h1 class="title">${STOCK_IN_RECEIPT_TITLE}</h1>
 <table class="meta">
-<tr><td class="meta-label">Нийлүүлэгч:</td><td class="meta-value">${h(receipt.supplierName || "—")}</td><td class="meta-label">Баримт №:</td><td class="meta-value">${h(receiptNoDisplay)}</td></tr>
-<tr><td class="meta-label">Бүртгэсэн ажилтан:</td><td class="meta-value">${h(receipt.employeeName || "—")}</td><td class="meta-label">Огноо:</td><td class="meta-value">${h(dateText)}</td></tr>
+<tr><td class="meta-label" colspan="2">Нийлүүлэгч:</td><td class="meta-value" colspan="2">${h(receipt.supplierName || "—")}</td><td class="meta-label">Баримт №:</td><td class="meta-value">${h(receiptNoDisplay)}</td></tr>
+<tr><td class="meta-label" colspan="2">Бүртгэсэн ажилтан:</td><td class="meta-value" colspan="2">${h(receipt.employeeName || "—")}</td><td class="meta-label">Огноо:</td><td class="meta-value">${h(dateText)}</td></tr>
 </table>
 <table class="stock-in">
 <colgroup><col class="c-no"><col class="c-name"><col class="c-barcode"><col class="c-qty"><col class="c-money"><col class="c-money"></colgroup>
@@ -16807,7 +16807,7 @@ const STOCK_IN_REPORT_COL_WIDTHS = [
   10.5, 10, 10, 14, 14, 24, 8, 8, 7.5, 8, 9.5, 10.5, 10.5, 11.5,
 ];
 const STOCK_IN_SIMPLE_REPORT_LAST_COL = "F";
-const STOCK_IN_SIMPLE_REPORT_COL_WIDTHS = [5.5, 30, 15, 10, 12, 14];
+const STOCK_IN_SIMPLE_REPORT_COL_WIDTHS = [6, 24, 13, 10, 11, 13];
 const STOCK_IN_RECEIPT_TITLE = "БАРААНЫ ОРЛОГЫН БАРИМТ";
 const STOCK_IN_SIGN_HANDED_LABEL = "Баримт хүлээлгэн өгсөн:";
 const STOCK_IN_SIGN_RECEIVED_LABEL = "Баримт хүлээн авсан:";
@@ -16830,7 +16830,7 @@ const STOCK_IN_REPORT_STYLES = {
   signLine: 14,
 };
 function stockInReportStylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="6"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF1E3A5F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFE2E8F0"/></left><right style="thin"><color rgb="FFE2E8F0"/></right><top style="thin"><color rgb="FFE2E8F0"/></top><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FFE2E8F0"/></left><right style="thin"><color rgb="FFE2E8F0"/></right><top style="medium"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF64748B"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="6"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF1E3A5F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFE2E8F0"/></left><right style="thin"><color rgb="FFE2E8F0"/></right><top style="thin"><color rgb="FFE2E8F0"/></top><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FFE2E8F0"/></left><right style="thin"><color rgb="FFE2E8F0"/></right><top style="medium"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF64748B"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function stockInReportWorksheetXml(rows, merges, lastRow) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -16852,7 +16852,7 @@ function stockInSimpleReportWorksheetXml(rows, merges, lastRow) {
     (width, index) =>
       `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
   ).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_SIMPLE_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.45" right="0.45" top="0.55" bottom="0.5" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_SIMPLE_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.45" right="0.45" top="0.55" bottom="0.5" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function buildStockInSimpleReportSheetXml(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
@@ -16907,12 +16907,12 @@ function buildStockInSimpleReportSheetXml(receipt) {
   };
   const pushMetaGridRow = (leftLabel, leftValue, rightLabel, rightValue) => {
     const r = rowNum;
-    merges.push(`B${r}:C${r}`, `E${r}:F${r}`);
-    pushRow(16, [
+    merges.push(`A${r}:B${r}`, `C${r}:D${r}`);
+    pushRow(18, [
       xlsxCellXml(`A${r}`, s.metaLabel, si(`${leftLabel}:`), "s"),
-      xlsxCellXml(`B${r}`, s.metaValue, si(String(leftValue ?? "—")), "s"),
-      xlsxCellXml(`D${r}`, s.metaLabel, si(`${rightLabel}:`), "s"),
-      xlsxCellXml(`E${r}`, s.metaValue, si(String(rightValue ?? "—")), "s"),
+      xlsxCellXml(`C${r}`, s.metaValue, si(String(leftValue ?? "—")), "s"),
+      xlsxCellXml(`E${r}`, s.metaLabel, si(`${rightLabel}:`), "s"),
+      xlsxCellXml(`F${r}`, s.metaValue, si(String(rightValue ?? "—")), "s"),
     ]);
   };
   const pushSpacerRow = (height = 6) => {
@@ -16922,10 +16922,10 @@ function buildStockInSimpleReportSheetXml(receipt) {
   };
   const pushSignRow = (label) => {
     const r = rowNum;
-    merges.push(`A${r}:B${r}`, `C${r}:F${r}`);
-    pushRow(22, [
+    merges.push(`A${r}:D${r}`, `E${r}:F${r}`);
+    pushRow(24, [
       xlsxCellXml(`A${r}`, s.signLabel, si(label), "s"),
-      xlsxCellXml(`C${r}`, s.signLine, null, "empty"),
+      xlsxCellXml(`E${r}`, s.signLine, null, "empty"),
     ]);
   };
   pushRow(26, [

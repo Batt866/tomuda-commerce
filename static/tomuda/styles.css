@@ -19802,7 +19802,7 @@ input.stock-in-sheet__input::placeholder {
 
 .stock-in-receipt-doc__meta-pair {
   display: grid;
-  grid-template-columns: minmax(5.5rem, auto) 1fr;
+  grid-template-columns: minmax(7.5rem, auto) 1fr;
   gap: 8px;
   align-items: baseline;
   min-width: 0;
@@ -19812,7 +19812,8 @@ input.stock-in-sheet__input::placeholder {
   margin: 0;
   font-size: 12px;
   line-height: 1.35;
-  text-align: right;
+  text-align: left;
+  white-space: nowrap;
   color: #64748b;
 }
 
