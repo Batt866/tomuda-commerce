@@ -19770,6 +19770,32 @@ input.stock-in-sheet__input::placeholder {
   background: var(--hex-card);
 }
 
+.stock-in-receipt-doc--bm2 {
+  border: 1px solid var(--hex-border);
+}
+
+.stock-in-receipt-doc__form-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 0;
+  align-items: flex-start;
+}
+
+.stock-in-receipt-doc__form-code {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stock-in-receipt-doc__form-legal {
+  font-size: 9px;
+  line-height: 1.35;
+  color: #64748b;
+  text-align: right;
+  max-width: 68%;
+}
+
 .stock-in-receipt-doc__head {
   padding: 0;
   border-bottom: 1px solid var(--hex-border);
@@ -19777,53 +19803,47 @@ input.stock-in-sheet__input::placeholder {
 
 .stock-in-receipt-doc__title {
   margin: 0;
-  padding: 12px 16px;
-  font-size: 16px;
+  padding: 8px 16px 4px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1.25;
   text-align: center;
-  color: #1e3a5f;
-  background: #e8eef4;
-}
-
-.stock-in-receipt-doc__meta {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 12px 16px 14px;
-}
-
-.stock-in-receipt-doc__meta-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px 16px;
-}
-
-.stock-in-receipt-doc__meta-pair {
-  display: grid;
-  grid-template-columns: minmax(7.5rem, auto) 1fr;
-  gap: 8px;
-  align-items: baseline;
-  min-width: 0;
-}
-
-.stock-in-receipt-doc__meta-label {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  text-align: left;
-  white-space: nowrap;
-  color: #64748b;
-}
-
-.stock-in-receipt-doc__meta-value {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.35;
-  font-weight: 700;
   color: var(--hex-foreground);
-  overflow-wrap: anywhere;
+  background: transparent;
+}
+
+.stock-in-receipt-doc__date {
+  margin: 0;
+  padding: 0 16px 10px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.stock-in-receipt-doc__party-block {
+  padding: 0 16px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.stock-in-receipt-doc__party-line {
+  margin: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--hex-foreground) 55%, var(--hex-border));
+  padding-bottom: 4px;
+}
+
+.stock-in-receipt-doc__party-value {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.stock-in-receipt-doc__party-caption {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--hex-muted-foreground);
 }
 
 .stock-in-receipt-doc__table-wrap {
@@ -19891,11 +19911,32 @@ input.stock-in-sheet__input::placeholder {
   background: color-mix(in srgb, var(--hex-secondary) 25%, var(--hex-card));
 }
 
-.stock-in-receipt-doc__signatures {
+.stock-in-receipt-table--bm2 th,
+.stock-in-receipt-table--bm2 td {
+  border: 1px solid color-mix(in srgb, var(--hex-foreground) 35%, var(--hex-border));
+}
+
+.stock-in-receipt-table__measure {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stock-in-receipt-doc__signatures--bm2 {
   padding: 16px 16px 12px;
   border-top: 1px solid var(--hex-border);
   display: grid;
-  gap: 12px;
+  gap: 10px;
+}
+
+.stock-in-sign--bm2 {
+  grid-template-columns: minmax(7rem, max-content) 1fr;
+}
+
+.stock-in-sign--bm2 .stock-in-sign__line {
+  border-bottom: 0;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: var(--hex-foreground);
 }
 
 .stock-in-report-list-wrap {

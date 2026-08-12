@@ -657,7 +657,7 @@ function receiptInfoRows(o) {
   }
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА», «Регистрийн».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label receipt-grid__iban-b">Дансны дугаар:</td><td class="receipt-grid__iban-c"><b>IBAN:</b></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td></td><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label receipt-grid__iban-b">Дансны дугаар:</td><td class="receipt-grid__iban-c">IBAN:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td></td><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -9499,7 +9499,7 @@ td, th { border: none; }
   line-height: 1.2;
   box-sizing: border-box;
 }
-.receipt-grid__header--title td { padding-top: 1px !important; padding-bottom: 1px !important; }
+.receipt-grid__header--title td { padding-top: 3px !important; padding-bottom: 3px !important; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
 .receipt-grid__meta td { font-size: 9px; line-height: 1.15; padding: 1px 2px !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
@@ -9523,7 +9523,7 @@ td, th { border: none; }
 }
 .receipt-grid__iban-c {
   text-align: right !important;
-  font-weight: 700;
+  font-weight: 400;
   font-size: 9px;
   white-space: nowrap;
   padding-right: 0 !important;
@@ -9532,7 +9532,6 @@ td, th { border: none; }
   vertical-align: top !important;
   background: transparent !important;
 }
-.receipt-grid__iban-c b { font-weight: 700; font-size: 9px; }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
   vertical-align: top !important;
 }
@@ -9826,6 +9825,8 @@ const RECEIPT_XLSX_ROW_HEIGHT = 15;
 const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
 /** Slightly taller title / signature labels only. */
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
+/** «ЗАРЛАГЫН БАРИМТ» row — a bit taller than brand row. */
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 20;
 /** First payment-warning row — taller for wrapped text. */
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
 /** Item styles without bottom border (last row before promo). Max valid s= index is 67. */
@@ -9842,7 +9843,7 @@ const RECEIPT_XLSX_STYLE = {
   metaBold: 4,
   metaBoldRight: 20,
   metaNormalRight: 56,
-  ibanLabel: 58,
+  ibanLabel: 3,
   signLabel: 61,
   signLine: 57,
 };
@@ -10470,7 +10471,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "C", "I", 41),
   ]);
-  pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
+  pushRow(RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT, [
     xlsxCellXml(`B${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
     ...emptyCells(hr3, "C", "J", 40),
   ]);
@@ -15192,6 +15193,31 @@ function stockInReceiptLineStats(receipt) {
     totalAmount: Number(receipt.totalAmount) || 0,
   };
 }
+function stockInReceiptLineUnit(line) {
+  const p = (state.products || []).find(
+    (x) => String(x.id) === String(line?.productId),
+  );
+  return String(line?.unit || p?.unit || "ш").trim() || "ш";
+}
+function stockInReceiptLongDate(raw) {
+  const parts = String(raw || "").split("-");
+  if (parts.length === 3) {
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    if (y && m && d) {
+      return `${y} оны ${String(m).padStart(2, "0")} сарын ${String(d).padStart(2, "0")} өдөр`;
+    }
+  }
+  return warehouseDateDisplayText(raw);
+}
+function stockInReceiptOrgName(receipt) {
+  return (
+    String(receipt?.warehouseName || "").trim() ||
+    String(state.stockInWarehouseName || "").trim() ||
+    "ТОМУДА"
+  );
+}
 function stockInReceiptMetaGridRow(leftLabel, leftValue, rightLabel, rightValue) {
   return `<div class="stock-in-receipt-doc__meta-row"><div class="stock-in-receipt-doc__meta-pair"><dt class="stock-in-receipt-doc__meta-label">${esc(leftLabel)}</dt><dd class="stock-in-receipt-doc__meta-value">${esc(leftValue)}</dd></div><div class="stock-in-receipt-doc__meta-pair"><dt class="stock-in-receipt-doc__meta-label">${esc(rightLabel)}</dt><dd class="stock-in-receipt-doc__meta-value">${esc(rightValue)}</dd></div></div>`;
 }
@@ -15199,14 +15225,17 @@ function stockInReceiptSimpleTableRow(line, index) {
   const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
   const unitPrice = stockInReceiptLineSalesPrice(line);
   const totalPrice = stockInReceiptLineTotal(line);
-  return `<tr class="stock-in-receipt-table__row"><td class="stock-in-receipt-table__no">${index}</td><td class="stock-in-receipt-table__name">${esc(receiptProductNameText(line.productName))}</td><td class="stock-in-receipt-table__barcode">${esc(line.barcode || "—")}</td><td class="stock-in-receipt-table__qty">${qty.toLocaleString()} ш</td><td class="stock-in-receipt-table__unit">${fmt(unitPrice)}</td><td class="stock-in-receipt-table__total">${fmt(totalPrice)}</td></tr>`;
+  const unit = stockInReceiptLineUnit(line);
+  return `<tr class="stock-in-receipt-table__row"><td class="stock-in-receipt-table__no">${index}</td><td class="stock-in-receipt-table__name">${esc(receiptProductNameText(line.productName))}</td><td class="stock-in-receipt-table__barcode">${esc(line.barcode || "—")}</td><td class="stock-in-receipt-table__measure">${esc(unit)}</td><td class="stock-in-receipt-table__qty">${qty.toLocaleString()}</td><td class="stock-in-receipt-table__unit">${fmt(unitPrice)}</td><td class="stock-in-receipt-table__total">${fmt(totalPrice)}</td></tr>`;
 }
 function stockInReceiptPanel(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   const day = receipt.createdAt
     ? isoDay(receipt.createdAt) || todayIso()
     : todayIso();
-  const dateText = warehouseDateDisplayText(day);
+  const dateLong = stockInReceiptLongDate(day);
+  const orgName = stockInReceiptOrgName(receipt);
+  const supplier = receipt.supplierName || "—";
   const { pieceQty, totalAmount } = stockInReceiptLineStats(receipt);
   let rowIndex = 0;
   const tableRows = (receipt.lines || [])
@@ -15221,24 +15250,10 @@ function stockInReceiptPanel(receipt) {
   const receiptNoRaw = receipt.receiptNumber ? String(receipt.receiptNumber) : "";
   const receiptNoDisplay = receiptNoRaw
     ? receiptNoRaw.startsWith("#")
-      ? receiptNoRaw
-      : `#${receiptNoRaw}`
+      ? receiptNoRaw.slice(1)
+      : receiptNoRaw
     : "—";
-  const metaGrid = [
-    stockInReceiptMetaGridRow(
-      "Нийлүүлэгч",
-      receipt.supplierName || "—",
-      "Баримт №",
-      receiptNoDisplay,
-    ),
-    stockInReceiptMetaGridRow(
-      "Бүртгэсэн ажилтан",
-      receipt.employeeName || "—",
-      "Огноо",
-      dateText,
-    ),
-  ].join("");
-  return `<section class="stock-in-receipt-panel stock-in-receipt-doc"><header class="stock-in-receipt-doc__head"><h2 class="stock-in-receipt-doc__title">${STOCK_IN_RECEIPT_TITLE}</h2><dl class="stock-in-receipt-doc__meta">${metaGrid}</dl></header><div class="stock-in-receipt-doc__table-wrap"><table class="stock-in-receipt-table"><thead><tr><th>№</th><th>Барааны нэр</th><th>Баркод</th><th>Орсон тоо</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr></thead><tbody>${tableRows}<tr class="stock-in-receipt-table__total-row"><td colspan="3"><b>НИЙТ</b></td><td class="stock-in-receipt-table__qty"><b>${pieceQty.toLocaleString()} ш</b></td><td></td><td class="stock-in-receipt-table__total"><b>${fmt(totalAmount)}</b></td></tr></tbody></table></div><footer class="stock-in-receipt-doc__signatures"><div class="stock-in-sign"><span>${STOCK_IN_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${STOCK_IN_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
+  return `<section class="stock-in-receipt-panel stock-in-receipt-doc stock-in-receipt-doc--bm2"><header class="stock-in-receipt-doc__head"><div class="stock-in-receipt-doc__form-top"><span class="stock-in-receipt-doc__form-code">${STOCK_IN_FORM_CODE}</span><span class="stock-in-receipt-doc__form-legal">${STOCK_IN_FORM_LEGAL}</span></div><h2 class="stock-in-receipt-doc__title">${STOCK_IN_RECEIPT_TITLE} № <span>${esc(receiptNoDisplay)}</span></h2><p class="stock-in-receipt-doc__date">${esc(dateLong)}</p><div class="stock-in-receipt-doc__party-block"><p class="stock-in-receipt-doc__party-line"><span class="stock-in-receipt-doc__party-caption">(байгууллагын нэр)</span><span class="stock-in-receipt-doc__party-value">${esc(orgName)}</span></p><p class="stock-in-receipt-doc__party-line"><span class="stock-in-receipt-doc__party-caption">(бэлтгэн нийлүүлэгчийн нэр)</span><span class="stock-in-receipt-doc__party-value">${esc(supplier)}</span></p></div></header><div class="stock-in-receipt-doc__table-wrap"><table class="stock-in-receipt-table stock-in-receipt-table--bm2"><thead><tr><th rowspan="2">№</th><th rowspan="2">Материалын үнэт зүйлийн нэр, зэрэг, дугаар</th><th rowspan="2">Код</th><th rowspan="2">Хэмжих нэгж</th><th colspan="3">Худалдах</th></tr><tr><th>Тоо</th><th>Нэгжийн үнэ</th><th>Нийт дүн</th></tr></thead><tbody>${tableRows}<tr class="stock-in-receipt-table__total-row"><td colspan="4"><b>Дүн</b></td><td class="stock-in-receipt-table__qty"><b>${pieceQty.toLocaleString()}</b></td><td></td><td class="stock-in-receipt-table__total"><b>${fmt(totalAmount)}</b></td></tr></tbody></table></div><footer class="stock-in-receipt-doc__signatures stock-in-receipt-doc__signatures--bm2"><div class="stock-in-sign stock-in-sign--bm2"><span>${STOCK_IN_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line">................../................/</span></div><div class="stock-in-sign stock-in-sign--bm2"><span>${STOCK_IN_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line">................../................/</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
 }
 function stockOutPanel(list) {
   ensureStockOutSession();
@@ -15321,60 +15336,64 @@ function exportStockInExcelFallback(receipt) {
   const day = receipt.createdAt
     ? isoDay(receipt.createdAt) || todayIso()
     : todayIso();
-  const dateText = warehouseDateDisplayText(day);
+  const dateLong = stockInReceiptLongDate(day);
+  const orgName = stockInReceiptOrgName(receipt);
+  const supplier = receipt.supplierName || "—";
   const { activeLines, pieceQty, totalAmount } =
     stockInReceiptLineStats(receipt);
   const h = (value) => xlsxXmlEsc(value ?? "");
   const bodyRows = activeLines
     .map((line, index) => {
       const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
-      return `<tr><td class="c">${index + 1}</td><td>${h(receiptProductNameText(line.productName))}</td><td class="barcode c">${h(line.barcode || "—")}</td><td class="c">${h(totalQty.toLocaleString())} ш</td><td class="r">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="r">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
+      const unit = stockInReceiptLineUnit(line);
+      return `<tr><td class="c">${index + 1}</td><td>${h(receiptProductNameText(line.productName))}</td><td class="barcode c">${h(line.barcode || "—")}</td><td class="c">${h(unit)}</td><td class="c">${h(totalQty.toLocaleString())}</td><td class="r">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="r">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
     })
     .join("");
   const receiptNoRaw = receipt.receiptNumber ? String(receipt.receiptNumber) : "";
   const receiptNoDisplay = receiptNoRaw
     ? receiptNoRaw.startsWith("#")
-      ? receiptNoRaw
-      : `#${receiptNoRaw}`
+      ? receiptNoRaw.slice(1)
+      : receiptNoRaw
     : "—";
-  const html = `<!doctype html><!-- tomuda-stock-xls-v809 --><html><head><meta charset="utf-8"><style>
-body { font-family: Arial, sans-serif; color: #1e293b; max-width: 720px; margin: 0 auto; }
-.title { font-size: 16px; font-weight: 800; margin: 0 0 12px; padding: 10px 8px; text-align: center; letter-spacing: 0.02em; color: #1e3a5f; background: #e8eef4; }
-.meta { width: 100%; border-collapse: collapse; margin: 0 0 12px; font-size: 11px; }
-.meta td { border: 0; padding: 3px 0; vertical-align: top; }
-.meta-label { text-align: left; padding-right: 6px !important; color: #64748b; white-space: nowrap; }
-.meta-value { font-weight: 700; text-align: left; }
-table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
-.stock-in col.c-no { width: 36px; }
-.stock-in col.c-name { width: 220px; }
-.stock-in col.c-barcode { width: 110px; }
-.stock-in col.c-qty { width: 80px; }
-.stock-in col.c-money { width: 90px; }
-.stock-in td, .stock-in th { border: 1px solid #e2e8f0; padding: 5px 7px; vertical-align: middle; height: 22px; }
-.head th { text-align: center; font-weight: 800; background: #e2e8f0; white-space: nowrap; }
-.total td { font-weight: 800; border-top: 1px solid #94a3b8; }
-.sign { margin-top: 18px; font-size: 11px; }
-.sign-row { display: flex; align-items: flex-end; gap: 8px; margin: 10px 0; }
+  const html = `<!doctype html><!-- tomuda-stock-xls-v811 --><html><head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; color: #000; max-width: 780px; margin: 0 auto; font-size: 11px; }
+.form-top { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.form-code { font-size: 10px; font-weight: 700; white-space: nowrap; }
+.form-legal { font-size: 8px; color: #444; text-align: right; max-width: 62%; line-height: 1.35; }
+.title { font-size: 14px; font-weight: 800; margin: 0 0 8px; text-align: center; letter-spacing: 0.02em; }
+.date { margin: 0 0 10px; text-align: right; font-size: 11px; }
+.party { margin: 0 0 12px; }
+.party-line { margin: 0 0 8px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+.party-caption { display: block; font-size: 9px; color: #555; margin-top: 2px; }
+table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+.stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; }
+.head th { text-align: center; font-weight: 700; background: #f3f3f3; }
+.head-sub th { font-weight: 700; background: #f3f3f3; }
+.total td { font-weight: 800; border-top: 1px solid #000; }
+.sign { margin-top: 16px; font-size: 11px; }
+.sign-row { display: flex; align-items: flex-end; gap: 8px; margin: 8px 0; }
 .sign-row span:first-child { white-space: nowrap; }
-.sign-line { flex: 1; border-bottom: 1px dotted #64748b; min-width: 120px; height: 14px; }
+.sign-line { flex: 1; letter-spacing: 1px; }
 .barcode { mso-number-format:"\\@"; }
 .c { text-align: center; }
 .r { text-align: right; }
 </style></head><body>
-<h1 class="title">${STOCK_IN_RECEIPT_TITLE}</h1>
-<table class="meta">
-<tr><td class="meta-label" colspan="2">Нийлүүлэгч:</td><td class="meta-value" colspan="2">${h(receipt.supplierName || "—")}</td><td class="meta-label">Баримт №:</td><td class="meta-value">${h(receiptNoDisplay)}</td></tr>
-<tr><td class="meta-label" colspan="2">Бүртгэсэн ажилтан:</td><td class="meta-value" colspan="2">${h(receipt.employeeName || "—")}</td><td class="meta-label">Огноо:</td><td class="meta-value">${h(dateText)}</td></tr>
-</table>
+<div class="form-top"><span class="form-code">${STOCK_IN_FORM_CODE}</span><span class="form-legal">${STOCK_IN_FORM_LEGAL}</span></div>
+<h1 class="title">${STOCK_IN_RECEIPT_TITLE} № ${h(receiptNoDisplay)}</h1>
+<p class="date">${h(dateLong)}</p>
+<div class="party">
+  <p class="party-line">${h(orgName)}<span class="party-caption">(байгууллагын нэр)</span></p>
+  <p class="party-line">${h(supplier)}<span class="party-caption">(бэлтгэн нийлүүлэгчийн нэр)</span></p>
+</div>
 <table class="stock-in">
-<colgroup><col class="c-no"><col class="c-name"><col class="c-barcode"><col class="c-qty"><col class="c-money"><col class="c-money"></colgroup>
-<tr class="head"><th>№</th><th>Барааны нэр</th><th>Баркод</th><th>Орсон тоо</th><th>Нэгж үнэ</th><th>Нийт үнэ</th></tr>
+<tr class="head"><th rowspan="2">№</th><th rowspan="2">Материалын үнэт зүйлийн нэр, зэрэг, дугаар</th><th rowspan="2">Код</th><th rowspan="2">Хэмжих нэгж</th><th colspan="3">Худалдах</th></tr>
+<tr class="head-sub"><th>Тоо</th><th>Нэгжийн үнэ</th><th>Нийт дүн</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="3">НИЙТ</td><td class="c">${h(pieceQty.toLocaleString())} ш</td><td></td><td class="r">${fmtExcelMoney(totalAmount)}</td></tr>
+<tr class="total"><td colspan="4">Дүн</td><td class="c">${h(pieceQty.toLocaleString())}</td><td></td><td class="r">${fmtExcelMoney(totalAmount)}</td></tr>
 </table>
 <div class="sign">
-  <div class="sign-row"><span>${STOCK_IN_SIGN_HANDED_LABEL}</span><span class="sign-line"></span></div>
-  <div class="sign-row"><span>${STOCK_IN_SIGN_RECEIVED_LABEL}</span><span class="sign-line"></span></div>
+  <div class="sign-row"><span>${STOCK_IN_SIGN_RECEIVED_LABEL}</span><span class="sign-line">${STOCK_IN_SIGN_LINE_TEXT.trim()}</span></div>
+  <div class="sign-row"><span>${STOCK_IN_SIGN_HANDED_LABEL}</span><span class="sign-line">${STOCK_IN_SIGN_LINE_TEXT.trim()}</span></div>
 </div>
 </body></html>`;
   const blob = new Blob(["\uFEFF" + html], {
@@ -16806,11 +16825,15 @@ const STOCK_IN_REPORT_LAST_COL = "N";
 const STOCK_IN_REPORT_COL_WIDTHS = [
   10.5, 10, 10, 14, 14, 24, 8, 8, 7.5, 8, 9.5, 10.5, 10.5, 11.5,
 ];
-const STOCK_IN_SIMPLE_REPORT_LAST_COL = "F";
-const STOCK_IN_SIMPLE_REPORT_COL_WIDTHS = [6, 24, 13, 10, 11, 13];
-const STOCK_IN_RECEIPT_TITLE = "БАРААНЫ ОРЛОГЫН БАРИМТ";
-const STOCK_IN_SIGN_HANDED_LABEL = "Баримт хүлээлгэн өгсөн:";
-const STOCK_IN_SIGN_RECEIVED_LABEL = "Баримт хүлээн авсан:";
+const STOCK_IN_SIMPLE_REPORT_LAST_COL = "G";
+const STOCK_IN_SIMPLE_REPORT_COL_WIDTHS = [4.5, 24, 11, 8, 7, 10, 11];
+const STOCK_IN_FORM_CODE = "НХМаягт БМ-2";
+const STOCK_IN_FORM_LEGAL =
+  "Сангийн сайдын 2017 оны 12 дугаар сарын 5-ны өдрийн 347 тоот тушаалын хавсралт";
+const STOCK_IN_RECEIPT_TITLE = "ОРЛОГЫН БАРИМТ";
+const STOCK_IN_SIGN_HANDED_LABEL = "Хүлээлгэн өгсөн:";
+const STOCK_IN_SIGN_RECEIVED_LABEL = "Хүлээн авсан:";
+const STOCK_IN_SIGN_LINE_TEXT = " ................../................/";
 const STOCK_IN_REPORT_TABLE_ROW_HEIGHT = 20;
 const STOCK_IN_REPORT_STYLES = {
   title: 1,
@@ -16828,9 +16851,10 @@ const STOCK_IN_REPORT_STYLES = {
   totalMoney: 11,
   signLabel: 13,
   signLine: 14,
+  formLegal: 16,
 };
 function stockInReportStylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="6"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF1E3A5F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFE2E8F0"/></left><right style="thin"><color rgb="FFE2E8F0"/></right><top style="thin"><color rgb="FFE2E8F0"/></top><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FFE2E8F0"/></left><right style="thin"><color rgb="FFE2E8F0"/></right><top style="medium"><color rgb="FF94A3B8"/></top><bottom style="thin"><color rgb="FFE2E8F0"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF64748B"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="7"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF64748B"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="4"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="medium"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF64748B"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="17"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function stockInReportWorksheetXml(rows, merges, lastRow) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -16872,26 +16896,18 @@ function buildStockInSimpleReportSheetXml(receipt) {
   const day = receipt.createdAt
     ? isoDay(receipt.createdAt) || todayIso()
     : todayIso();
-  const dateText = warehouseDateDisplayText(day);
+  const dateLong = stockInReceiptLongDate(day);
   const supplier = String(receipt.supplierName || "").trim() || "—";
+  const orgName = stockInReceiptOrgName(receipt);
   const receiptNoRaw = receipt.receiptNumber
     ? String(receipt.receiptNumber)
     : "";
   const receiptNoDisplay = receiptNoRaw
     ? receiptNoRaw.startsWith("#")
-      ? receiptNoRaw
-      : `#${receiptNoRaw}`
+      ? receiptNoRaw.slice(1)
+      : receiptNoRaw
     : "—";
-  const employee = String(receipt.employeeName || "").trim() || "—";
-  const headers = [
-    "№",
-    "Барааны нэр",
-    "Баркод",
-    "Орсон тоо",
-    "Нэгж үнэ",
-    "Нийт үнэ",
-  ];
-  const merges = ["A1:F1"];
+  const merges = ["B1:G1", "A2:G2", "E3:G3", "A4:G4", "A5:G5"];
   const rows = [];
   let rowNum = 1;
   const pushRow = (height, cells) => {
@@ -16905,41 +16921,67 @@ function buildStockInSimpleReportSheetXml(receipt) {
     );
     rowNum += 1;
   };
-  const pushMetaGridRow = (leftLabel, leftValue, rightLabel, rightValue) => {
-    const r = rowNum;
-    merges.push(`A${r}:B${r}`, `C${r}:D${r}`);
-    pushRow(18, [
-      xlsxCellXml(`A${r}`, s.metaLabel, si(`${leftLabel}:`), "s"),
-      xlsxCellXml(`C${r}`, s.metaValue, si(String(leftValue ?? "—")), "s"),
-      xlsxCellXml(`E${r}`, s.metaLabel, si(`${rightLabel}:`), "s"),
-      xlsxCellXml(`F${r}`, s.metaValue, si(String(rightValue ?? "—")), "s"),
-    ]);
-  };
   const pushSpacerRow = (height = 6) => {
     const r = rowNum;
-    merges.push(`A${r}:F${r}`);
+    merges.push(`A${r}:G${r}`);
     pushRow(height, [xlsxCellXml(`A${r}`, 0, null, "empty")]);
   };
   const pushSignRow = (label) => {
     const r = rowNum;
-    merges.push(`A${r}:D${r}`, `E${r}:F${r}`);
+    merges.push(`A${r}:C${r}`, `D${r}:G${r}`);
     pushRow(24, [
       xlsxCellXml(`A${r}`, s.signLabel, si(label), "s"),
-      xlsxCellXml(`E${r}`, s.signLine, null, "empty"),
+      xlsxCellXml(`D${r}`, s.signLine, si(STOCK_IN_SIGN_LINE_TEXT), "s"),
     ]);
   };
-  pushRow(26, [
-    xlsxCellXml("A1", s.title, si(STOCK_IN_RECEIPT_TITLE), "s"),
+  pushRow(14, [
+    xlsxCellXml("A1", s.metaLabel, si(STOCK_IN_FORM_CODE), "s"),
+    xlsxCellXml("B1", s.formLegal, si(STOCK_IN_FORM_LEGAL), "s"),
   ]);
-  pushSpacerRow(6);
-  pushMetaGridRow("Нийлүүлэгч", supplier, "Баримт №", receiptNoDisplay);
-  pushMetaGridRow("Бүртгэсэн ажилтан", employee, "Огноо", dateText);
-  pushSpacerRow(10);
-  const headerRow = rowNum;
-  pushRow(STOCK_IN_REPORT_TABLE_ROW_HEIGHT, headers.map((label, index) => {
-    const col = "ABCDEF"[index];
-    return xlsxCellXml(`${col}${headerRow}`, s.tableHeader, si(label), "s");
-  }));
+  pushRow(24, [
+    xlsxCellXml(
+      "A2",
+      s.title,
+      si(`${STOCK_IN_RECEIPT_TITLE} № ${receiptNoDisplay}`),
+      "s",
+    ),
+  ]);
+  pushRow(16, [
+    xlsxCellXml(`E3`, s.metaValue, si(dateLong), "s"),
+  ]);
+  pushRow(18, [
+    xlsxCellXml(`A4`, s.metaValue, si(orgName), "s"),
+  ]);
+  pushRow(18, [
+    xlsxCellXml(`A5`, s.metaValue, si(supplier), "s"),
+  ]);
+  pushSpacerRow(8);
+  const headerTop = rowNum;
+  const headerSub = rowNum + 1;
+  merges.push(
+    `A${headerTop}:A${headerSub}`,
+    `B${headerTop}:B${headerSub}`,
+    `C${headerTop}:C${headerSub}`,
+    `D${headerTop}:D${headerSub}`,
+    `E${headerTop}:G${headerTop}`,
+  );
+  pushRow(28, [
+    xlsxCellXml(`A${headerTop}`, s.tableHeader, si("№"), "s"),
+    xlsxCellXml(
+      `B${headerTop}`,
+      s.tableHeader,
+      si("Материалын үнэт зүйлийн нэр, зэрэг, дугаар"),
+      "s",
+    ),
+    xlsxCellXml(`C${headerTop}`, s.tableHeader, si("Код"), "s"),
+    xlsxCellXml(`D${headerTop}`, s.tableHeader, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`E${headerTop}`, s.tableHeader, si("Худалдах"), "s"),
+  ]);
+  pushRow(22, [
+    xlsxCellXml(`E${headerSub}`, s.tableHeader, si("Тоо"), "s"),
+    xlsxCellXml(`F${headerSub}`, s.tableHeader, si("Нэгжийн үнэ"), "s"),
+    xlsxCellXml(`G${headerSub}`, s.tableHeader, si("Нийт дүн"), "s"),
+  ]);
   const dataRows = [];
   activeLines.forEach((line, index) => {
     const r = rowNum;
@@ -16948,15 +16990,22 @@ function buildStockInSimpleReportSheetXml(receipt) {
     const salesPrice = stockInReceiptLineSalesPrice(line);
     const salesTotal = stockInReceiptLineTotal(line);
     const sku = String(line.barcode || "").trim();
+    const unit = stockInReceiptLineUnit(line);
     pushRow(STOCK_IN_REPORT_TABLE_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, s.no, index + 1, "n"),
-      xlsxCellXml(`B${r}`, s.textLeft, si(receiptProductNameText(line.productName || "")), "s"),
+      xlsxCellXml(
+        `B${r}`,
+        s.textLeft,
+        si(receiptProductNameText(line.productName || "")),
+        "s",
+      ),
       sku
         ? xlsxBarcodeCell(`C${r}`, s.sku, sku, si)
         : xlsxCellXml(`C${r}`, s.qty, si("—"), "s"),
-      xlsxCellXml(`D${r}`, s.qty, si(`${totalQty.toLocaleString()} ш`), "s"),
-      xlsxCellXml(`E${r}`, s.money, salesPrice, "n"),
-      xlsxCellXml(`F${r}`, s.money, salesTotal, "n"),
+      xlsxCellXml(`D${r}`, s.qty, si(unit), "s"),
+      xlsxCellXml(`E${r}`, s.qty, totalQty, "n"),
+      xlsxCellXml(`F${r}`, s.money, salesPrice, "n"),
+      xlsxCellXml(`G${r}`, s.money, salesTotal, "n"),
     ]);
   });
   const totalRow = rowNum;
@@ -16964,27 +17013,27 @@ function buildStockInSimpleReportSheetXml(receipt) {
   const lastDataRow = dataRows[dataRows.length - 1] || firstDataRow;
   const sumRange = (col) =>
     dataRows.length ? `SUM(${col}${firstDataRow}:${col}${lastDataRow})` : "0";
-  merges.push(`A${totalRow}:C${totalRow}`);
+  merges.push(`A${totalRow}:D${totalRow}`);
   pushRow(STOCK_IN_REPORT_TABLE_ROW_HEIGHT, [
-    xlsxCellXml(`A${totalRow}`, s.totalLabel, si("НИЙТ"), "s"),
+    xlsxCellXml(`A${totalRow}`, s.totalLabel, si("Дүн"), "s"),
     xlsxCellXml(
-      `D${totalRow}`,
+      `E${totalRow}`,
       s.totalQty,
-      si(`${pieceQty.toLocaleString()} ш`),
-      "s",
+      { f: sumRange("E"), v: pieceQty },
+      "f",
     ),
-    xlsxCellXml(`E${totalRow}`, s.totalLabel, null, "empty"),
+    xlsxCellXml(`F${totalRow}`, s.totalLabel, null, "empty"),
     xlsxCellXml(
-      `F${totalRow}`,
+      `G${totalRow}`,
       s.totalMoney,
-      { f: sumRange("F"), v: totalAmount },
+      { f: sumRange("G"), v: totalAmount },
       "f",
     ),
   ]);
-  pushSpacerRow(16);
-  pushSignRow(STOCK_IN_SIGN_HANDED_LABEL);
-  pushSpacerRow(10);
+  pushSpacerRow(14);
   pushSignRow(STOCK_IN_SIGN_RECEIVED_LABEL);
+  pushSpacerRow(8);
+  pushSignRow(STOCK_IN_SIGN_HANDED_LABEL);
   const lastRow = Math.max(1, rowNum - 1);
   const printArea = `$A$1:$${lastCol}$${lastRow}`;
   return {
