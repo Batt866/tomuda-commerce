@@ -8468,14 +8468,15 @@ function deletionLogModal() {
         .map((entry) => {
           const meta = deletionLogLabel(entry);
           const when = entry.deletedAt ? dteAt(entry.deletedAt) : "-";
-          return `<tr><td class="px-3 py-2 text-sm">${esc(meta.type)}</td><td class="px-3 py-2 text-sm font-mono">${esc(String(entry.id || "-"))}</td><td class="px-3 py-2 text-sm">${esc(meta.actor)}</td><td class="px-3 py-2 text-sm text-muted-foreground">${esc(when)}</td></tr>`;
+          return `<tr><td class="px-3 py-2 text-sm">${esc(meta.type)}</td><td class="px-3 py-2 text-sm font-mono break-all">${esc(String(entry.id || "-"))}</td><td class="px-3 py-2 text-sm">${esc(meta.actor)}</td><td class="px-3 py-2 text-sm text-muted-foreground whitespace-nowrap">${esc(when)}</td></tr>`;
         })
         .join("")
     : `<tr><td colspan="4" class="px-3 py-6 text-center text-sm text-muted-foreground">Устгасан бүртгэл байхгүй</td></tr>`;
   box(
     "Устгасан бүртгэл",
-    `<div class="p-4 space-y-3"><p class="text-sm text-muted-foreground">Бараа эсвэл харилцагч устгагдсаны дараа ID энд бүртгэгдэнэ. Бусад төхөөрөмж sync хийхэд эдгээр ID дахин гарч ирэхгүй.</p><div class="overflow-x-auto rounded border border-border"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-3 py-2 text-left text-xs font-semibold">Төрөл</th><th class="px-3 py-2 text-left text-xs font-semibold">ID</th><th class="px-3 py-2 text-left text-xs font-semibold">Ажилтан</th><th class="px-3 py-2 text-left text-xs font-semibold">Огноо</th></tr></thead><tbody class="divide-y divide-border">${rows}</tbody></table></div><button type="button" onclick="closeModal()" class="w-full py-2.5 bg-secondary rounded font-medium text-sm">Хаах</button></div>`,
+    `<div class="deletion-log-modal"><p class="deletion-log-modal__hint">Бараа эсвэл харилцагч устгагдсаны дараа ID энд бүртгэгдэнэ. Бусад төхөөрөмж sync хийхэд эдгээр ID дахин гарч ирэхгүй.</p><div class="deletion-log-modal__scroll modal-scroll"><div class="deletion-log-modal__table-wrap"><table class="deletion-log-modal__table"><thead><tr><th>Төрөл</th><th>ID</th><th>Ажилтан</th><th>Огноо</th></tr></thead><tbody>${rows}</tbody></table></div></div><button type="button" onclick="closeModal()" class="deletion-log-modal__close">Хаах</button></div>`,
     "max-w-2xl",
+    { panelClass: "modal-panel--deletion-log" },
   );
 }
 function stockAlertModal() {
@@ -13296,11 +13297,26 @@ function normalizeStockInReceiptTotals(receipt) {
 function stockInHasEntries() {
   return state.products.some((p) => stockInLineQty(p) > 0);
 }
+function stockInHasSupplier() {
+  if (String(state.stockInSupplierId || "").trim()) return true;
+  // Нийлүүлэгчийн жагсаалт хоосон бол шалгалтыг блоклохгүй (давхардсан бүртгэл хүлээхгүй).
+  return !(state.suppliers || []).length;
+}
 function stockInCanFinish() {
   if (stockInSaveLock) return false;
   if (!state.stockInEmployeeId) return false;
-  if (!String(state.stockInSupplierId || "").trim()) return false;
+  if ((state.suppliers || []).length && !String(state.stockInSupplierId || "").trim())
+    return false;
   return stockInHasEntries();
+}
+function stockInFinishBlockReason() {
+  if (stockInSaveLock) return "Хадгалж байна. Түр хүлээнэ үү.";
+  if (!state.stockInEmployeeId) return "Ажилтан сонгоно уу.";
+  if ((state.suppliers || []).length && !String(state.stockInSupplierId || "").trim()) {
+    return "Нийлүүлэгч сонгоод дахин оролдоно уу.";
+  }
+  if (!stockInHasEntries()) return "Орлого оруулна уу.";
+  return "";
 }
 function stockInEntryProducts(list) {
   return list.filter((p) => stockInLineQty(p) > 0);
@@ -13782,16 +13798,31 @@ function applyStockInReceipt(receipt) {
   }
   return saved;
 }
+function focusStockInSupplierField() {
+  requestAnimationFrame(() => {
+    const el = document.getElementById("stockInSupplierSelect");
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (_) {
+      el.scrollIntoView();
+    }
+    try {
+      el.focus({ preventScroll: true });
+    } catch (_) {
+      el.focus();
+    }
+  });
+}
 function confirmFinishStockIn() {
   ensureStockInSession();
   if (!canManageStockIn()) {
     return alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
   }
-  if (!stockInCanFinish()) {
-    if (!state.stockInEmployeeId) return alert("Ажилтан сонгоно уу");
-    if (!String(state.stockInSupplierId || "").trim())
-      return alert("Нийлүүлэгч сонгоно уу");
-    return alert("Орлого оруулна уу");
+  const blockReason = stockInFinishBlockReason();
+  if (blockReason) {
+    if (!stockInHasSupplier()) focusStockInSupplierField();
+    return alertModal("Орлого баталгаажуулах боломжгүй", esc(blockReason));
   }
   const receipt = buildStockInReceiptSnapshot();
   if (!receipt?.lines?.length) return;
@@ -13887,19 +13918,22 @@ function stockInEmployeeField() {
   const name = stockInEmployeeName() || "-";
   return `<div class="stock-in-employee stock-in-employee--readonly"><span class="stock-in-employee__label">Ажилтан</span><p class="stock-in-employee__value">${esc(name)}</p></div>`;
 }
-function stockInSupplierField() {
+function stockInSupplierField({ emphasize = false } = {}) {
   ensureStockInSession();
+  const missing = emphasize && !stockInHasSupplier();
   const options = [
-    `<option value="">Нийлүүлэгч сонгох</option>`,
+    `<option value="">Нийлүүлэгч сонгох *</option>`,
     ...suppliersSorted().map(
       (s) =>
         `<option value="${esc(s.id)}" ${String(state.stockInSupplierId) === String(s.id) ? "selected" : ""}>${esc(s.name)}${s.country ? ` · ${esc(supplierCountryLabel(s.country))}` : ""}</option>`,
     ),
   ].join("");
   const emptyHint = !(state.suppliers || []).length
-    ? `<p class="text-xs text-muted-foreground mt-1">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
-    : "";
-  return `<label class="stock-in-employee"><span class="stock-in-employee__label">Нийлүүлэгч</span><select class="field-input app-input" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
+    ? `<p class="stock-in-supplier__hint">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
+    : missing
+      ? `<p class="stock-in-supplier__hint stock-in-supplier__hint--warn">Баталгаажуулахад нийлүүлэгч заавал сонгоно.</p>`
+      : "";
+  return `<label class="stock-in-employee stock-in-supplier${missing ? " is-missing" : ""}"><span class="stock-in-employee__label">Нийлүүлэгч <span class="stock-in-supplier__req">*</span></span><select id="stockInSupplierSelect" class="field-input app-input${missing ? " is-invalid" : ""}" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
 }
 function stockOutEmployeeField() {
   ensureStockOutSession();
@@ -14483,10 +14517,86 @@ function stockInTableHead(mode = "entry") {
   }
   return "";
 }
+function stockInDraftStats(list = state.products) {
+  const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
+  const pieceQty = filled.reduce((sum, p) => sum + stockInLineQty(p), 0);
+  const totalCost = filled.reduce(
+    (sum, p) => sum + stockInLineQty(p) * stockInLineCost(p),
+    0,
+  );
+  return { filled, skuCount: filled.length, pieceQty, totalCost };
+}
+function stockInHeroHtml() {
+  return `<header class="stock-in-hero">
+  <p class="stock-in-hero__eyebrow">Агуулах</p>
+  <h2 class="stock-in-hero__title">Орлого авах</h2>
+  <p class="stock-in-hero__banner">Бараагаа нэмээд нийлүүлэгчээ сонгоод орлогыг баталгаажуулна.</p>
+</header>`;
+}
+function stockInMetaCardHtml() {
+  return `<section class="stock-in-meta-card">${stockInEmployeeField()}</section>`;
+}
+function stockInProgressCardHtml(list) {
+  const { filled, skuCount, pieceQty, totalCost } = stockInDraftStats(list);
+  const hasSupplier = stockInHasSupplier();
+  const ready = stockInCanFinish();
+  let pct = 0;
+  if (skuCount > 0) pct += 45;
+  if (hasSupplier) pct += 35;
+  if (ready) pct = 100;
+  else if (skuCount > 0 && hasSupplier) pct = 80;
+  const picks = filled
+    .slice(0, 10)
+    .map((p) => {
+      const qty = stockInLineQty(p);
+      return `<li class="stock-in-summary__pick"><span class="stock-in-summary__pick-name">${esc(p.name)}</span><b>${qty} ${esc(p.unit || "ш")}</b></li>`;
+    })
+    .join("");
+  const more =
+    filled.length > 10
+      ? `<li class="stock-in-summary__more">+${filled.length - 10} бараа</li>`
+      : "";
+  const status = ready
+    ? "Баталгаажуулахад бэлэн"
+    : !hasSupplier
+      ? "Нийлүүлэгч сонгоно уу"
+      : skuCount
+        ? "Бараа нэмсээр байна · дараа нь баталгаажуулна"
+        : "Баркод эсвэл нэрээр бараа нэмнэ үү";
+  return `<section class="stock-in-summary${ready ? " is-ready" : skuCount ? " is-active" : ""}" data-stock-in-summary>
+  <div class="stock-in-summary__head">
+    <span>Таны сонголт</span>
+    <b class="stock-in-summary__count">[ ${skuCount} бараа · ${pieceQty} ш ]</b>
+  </div>
+  <div class="stock-in-summary__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Орлогын бэлэн байдал">
+    <span style="width:${pct}%"></span>
+  </div>
+  ${
+    picks
+      ? `<ul class="stock-in-summary__picks"><li class="stock-in-summary__picks-label">Сонгосон:</li>${picks}${more}</ul>`
+      : `<p class="stock-in-summary__empty">Сонгосон бараа байхгүй</p>`
+  }
+  ${totalCost > 0 ? `<p class="stock-in-summary__cost">Нийт өртөг · <b>${fmt(totalCost)}</b></p>` : ""}
+  <p class="stock-in-summary__status">${esc(status)}</p>
+</section>`;
+}
+function stockInActionsHtml() {
+  const canFinish = stockInCanFinish();
+  const needSupplier = stockInHasEntries() && !stockInHasSupplier();
+  return `<div class="stock-in-cta${needSupplier ? " is-blocked" : ""}">
+  ${stockInSupplierField({ emphasize: needSupplier })}
+  <button type="button" onclick="confirmFinishStockIn()" class="stock-in-cta__primary${canFinish ? "" : " is-disabled"}" aria-disabled="${canFinish ? "false" : "true"}">Орлого баталгаажуулах</button>
+  <div class="stock-in-cta__row">
+    <button type="button" onclick="saveStockInDraftToast()" class="stock-in-cta__ghost">Түр хадгалах</button>
+    <button type="button" onclick="confirmNewStockIn()" class="stock-in-cta__ghost">Шинэ</button>
+  </div>
+  <p class="stock-in-cta__note">Нийлүүлэгч сонгосны дараа баталгаажуулна. Түр хадгалах үед үлдэгдэл өөрчлөгдөхгүй.</p>
+</div>`;
+}
 function stockInEntryList(list) {
   const filled = list.filter((p) => stockInLineQty(p) > 0);
   const others = list.filter((p) => stockInLineQty(p) <= 0);
-  const section = (title, products, emptyText) => {
+  const section = (title, products, emptyText, variant = "") => {
     const groups = stockInProductsGrouped(products);
     const rows = groups
       .map((item) =>
@@ -14495,9 +14605,16 @@ function stockInEntryList(list) {
           : stockInEntryRow(item.product),
       )
       .join("");
-    return `<div class="stock-in-entry-section"><div class="stock-in-entry-section__title">${esc(title)}${products.length ? ` · ${products.length}` : ""}</div><div class="divide-y divide-border">${rows || `<div class="p-6 text-center text-sm text-muted-foreground">${esc(emptyText)}</div>`}</div></div>`;
+    return `<div class="stock-in-entry-section${variant ? ` stock-in-entry-section--${variant}` : ""}"><div class="stock-in-entry-section__title">${esc(title)}${products.length ? ` · ${products.length}` : ""}</div><div class="stock-in-entry-section__list">${rows || `<div class="stock-in-entry-empty">${esc(emptyText)}</div>`}</div></div>`;
   };
-  return `<div class="space-y-3">${section("Орлого авсан бараанууд", filled, "Сонгосон бараа байхгүй")}${section("Бусад бараанууд", others, "Бараа олдсонгүй")}</div>`;
+  return `<div class="stock-in-entry-board">${section("Сонгосон бараа", filled, "Одоогоор хоосон", "selected")}${section("Бусад бараа", others, "Бараа олдсонгүй", "catalog")}</div>`;
+}
+function stockInPanel(list) {
+  ensureStockInSession();
+  if (state.stockInDone && state.stockInReceipt) {
+    return `<div class="space-y-4 stock-in-view">${stockInReceiptPanel(state.stockInReceipt)}<button type="button" onclick="confirmNewStockIn()" class="stock-in-cta__ghost stock-in-cta__ghost--block">Шинэ орлого</button></div>`;
+  }
+  return `<div class="stock-in-view stock-in-view--compose">${stockInHeroHtml()}${stockInMetaCardHtml()}${stockInScanToolbarHtml()}${stockInProgressCardHtml(list)}${stockInActionsHtml()}${stockInEntryList(list)}</div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -14543,15 +14660,6 @@ function stockInReceiptPanel(receipt) {
     ? `<p class="stock-in-receipt-panel__sub">Нийлүүлэгч: ${esc(receipt.supplierName)}</p>`
     : "";
   return `<section class="stock-in-receipt-panel"><header class="stock-in-receipt-panel__head"><div><p class="stock-in-receipt-panel__title">${esc(stockInReceiptTitle(receipt))}</p><p class="stock-in-receipt-panel__sub">Ажилтан: ${esc(receipt.employeeName)} · ${receipt.lines.length} бараа</p>${supplierLine}</div></header><div class="stock-in-receipt-list">${rows}<div class="stock-in-receipt-total"><span class="stock-in-receipt-total__label">Нийт дүн</span><span class="stock-in-receipt-total__value">${fmt(receipt.totalAmount)}</span></div></div><footer class="stock-in-receipt-panel__signatures"><div class="stock-in-sign"><span>${RECEIPT_SIGN_HANDED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign"><span>${RECEIPT_SIGN_RECEIVED_LABEL}</span><span class="stock-in-sign__line"></span></div><div class="stock-in-sign stock-in-sign--date"><span>Баримтын огноо</span><span>${date.day} / ${date.month} / ${date.year}</span></div></footer><footer class="stock-in-receipt-panel__foot">${excelDownloadBtn(`confirmStockInExcel('${esc(receipt.id || "")}')`, { extraClass: "btn--toolbar-block" })}</footer></section>`;
-}
-function stockInPanel(list) {
-  ensureStockInSession();
-  if (state.stockInDone && state.stockInReceipt) {
-    return `<div class="space-y-4 stock-in-view">${stockInReceiptPanel(state.stockInReceipt)}<button type="button" onclick="confirmNewStockIn()" class="w-full py-3 bg-secondary rounded font-medium">Шинэ орлого</button></div>`;
-  }
-  const canFinish = stockInCanFinish();
-  const actions = `<div class="grid grid-cols-3 gap-2 stock-in-actions"><button type="button" onclick="saveStockInDraftToast()" class="py-3 bg-secondary rounded font-medium">Түр хадгалах</button><button type="button" onclick="confirmFinishStockIn()" class="py-3 bg-primary text-primary-foreground rounded font-medium${canFinish ? "" : " opacity-50 cursor-not-allowed"}"${canFinish ? "" : " disabled"}>Орлого баталгаажуулах</button><button type="button" onclick="confirmNewStockIn()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>`;
-  return `<div class="space-y-4 stock-in-view">${stockInEmployeeField()}${stockInSupplierField()}${stockInScanToolbarHtml()}${actions}${stockInEntryList(list)}</div>`;
 }
 function stockOutPanel(list) {
   ensureStockOutSession();
