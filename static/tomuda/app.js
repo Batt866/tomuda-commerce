@@ -3501,6 +3501,7 @@ function sidebarNavForRole(role) {
       ["worker", "+ Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
+      ["warehouse", "Агуулах"],
       ["employees", "Ажилтан"],
       ["stockReports", "Тайлан"],
       ["promotions", "Урамшуулал"],
@@ -3527,9 +3528,18 @@ function sidebarNavForRole(role) {
     if (id === "inventory") return ["inventory", "Нярав"];
     return [id, label];
   });
-  // Admin: Нярав, Агуулах — Админ hub-аас нээгдэнэ.
+  // Admin: Нярав (үлдэгдэл) is under Админ hub — keep Агуулах on menu.
   if (nav.some(([id]) => id === "admin")) {
-    nav = nav.filter(([id]) => id !== "inventory" && id !== "warehouse");
+    nav = nav.filter(([id]) => id !== "inventory");
+    if (
+      canAccessView("warehouse") &&
+      !nav.some(([id]) => id === "warehouse")
+    ) {
+      const adminIdx = nav.findIndex(([id]) => id === "admin");
+      const item = ["warehouse", "Агуулах"];
+      if (adminIdx >= 0) nav.splice(adminIdx, 0, item);
+      else nav.push(item);
+    }
   }
   return nav;
 }
@@ -3543,6 +3553,7 @@ function bottomNavForRole(role) {
       ["worker", "Захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
+      ["warehouse", "Агуулах"],
       ["admin", "Админ"],
     ],
     sales: [
