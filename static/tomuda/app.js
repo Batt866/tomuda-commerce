@@ -18426,7 +18426,7 @@ function confirmSetPaid(id) {
     onConfirm: () => setPaid(id, true),
   });
 }
-const PROMO_PRODUCT_LABEL = "Урамшуулалд олгох бараа";
+const PROMO_PRODUCT_LABEL = "Урамшууллын бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
 const PROMO_PAYMENT_LABEL = "Шууд төлөлтийн урамшуулал";
 const PROMO_QUANTITY_LABEL = "Багц урамшуулал";
@@ -18726,7 +18726,7 @@ function promoBundleConditionFormulaHtml(buyDefault = "8", freeDefault = "1") {
   );
   const freeField = promotionQtyField(
     "freeQty",
-    "Үнэгүй (ш)",
+    "Урамшуулал (ш)",
     freeDefault,
     "formula",
   );
@@ -19678,7 +19678,7 @@ function workerAmountPromoHintsHtml(cart) {
   const describeFree = (rule) => {
     const names = promotionProductLabels(promotionFreeProductIds(rule));
     const qty = Math.max(1, Math.floor(Number(rule.freeQty) || 1));
-    return names ? `${names} × ${qty} ш үнэгүй` : `${qty} ш үнэгүй бараа`;
+    return names ? `${names} × ${qty} ш` : `${qty} ш урамшууллын бараа`;
   };
   if (priceRule && promotionFreeProductIds(priceRule).length) {
     const active = pricePromotionAmountInRange(gross, priceRule);
@@ -20216,14 +20216,14 @@ function promotionQtyModal() {
     fieldName: "freeProductIds",
     selectedIds: freeIds,
     excludeIds: [],
-    title: "Үнэгүй бараа",
+    title: PROMO_PRODUCT_LABEL,
     hint: "",
     placeholder: "Бараа хайх...",
     badge: "",
     qty:
       buyMode === "total"
         ? null
-        : { name: "freeQty", label: "Үнэгүй (ш)", defaultValue: "1" },
+        : { name: "freeQty", label: "Урамшуулал (ш)", defaultValue: "1" },
     compact: true,
   });
   let bodyHtml;
@@ -20291,7 +20291,7 @@ function promotionPriceModal() {
             pickKey: "priceFreeProductIds",
             fieldName: "priceFreeProductIds",
             selectedIds: freeIds,
-            title: "Урамшуулал",
+            title: PROMO_PRODUCT_LABEL,
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайж нэмэх...",
             badge: "2",
@@ -20381,7 +20381,7 @@ function promotionPaymentModal() {
             pickKey: "paymentFreeProductIds",
             fieldName: "paymentFreeProductIds",
             selectedIds: freeIds,
-            title: "Урамшуулал",
+            title: PROMO_PRODUCT_LABEL,
             hint: "Олон бараа сонгож болно",
             placeholder: "Бараа хайх...",
             badge: "2",
