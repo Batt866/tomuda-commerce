@@ -718,7 +718,7 @@ function receiptTableRowsHtml(o, items = receiptPaidItems(o), startIndex = 0) {
   return (items || [])
     .map((i, n) => {
       const p = productForReceiptLine(i);
-      return `<tr class="receipt-items__row"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(i.productName)}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__row"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(receiptProductNameText(i.productName))}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
 }
@@ -759,6 +759,14 @@ function productForReceiptLine(i) {
     if (loose) return loose;
   }
   return {};
+}
+function receiptProductNameText(value) {
+  return (
+    String(value ?? "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "-"
+  );
 }
 function orderItemCatalogUnitPrice(item) {
   if (!item || item.isPromoFree) return 0;
@@ -857,7 +865,7 @@ function receiptPromoRowsHtml(o) {
   return (
     promoItems
       .map((i, idx) => {
-        const name = esc(i.productName);
+        const name = esc(receiptProductNameText(i.productName));
         const qty = i.quantity;
         const price = receiptMoney(receiptPromoDisplayPrice(i));
         const total = receiptMoney(receiptPromoDisplayTotal(i));
@@ -8737,7 +8745,7 @@ function buildOrderReceiptExcelRows(o) {
       const p = state.products.find((x) => x.id === i.productId) || {};
       rows.push([
         n + 1,
-        i.productName,
+        receiptProductNameText(i.productName),
         p.unit || "ш",
         p.barcode || "-",
         orderLineQtyLabel(i, p),
@@ -8749,7 +8757,7 @@ function buildOrderReceiptExcelRows(o) {
   if (promoItems.length) {
     rows.push([]);
     rows.push(["Урамшуулал", "Бараа", "Тоо", "Дүн"]);
-    promoItems.forEach((i) => rows.push(["", i.productName, i.quantity, 0]));
+    promoItems.forEach((i) => rows.push(["", receiptProductNameText(i.productName), i.quantity, 0]));
   }
   rows.push([]);
   if (receiptShouldShowGross(o)) {
@@ -10562,7 +10570,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const lineTotal = resolveOrderItemLineTotal(item);
     const qty = Number(item.quantity) || 0;
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
-    const nameText = String(item.productName || "").trim() || "-";
+    const nameText = receiptProductNameText(item.productName);
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
@@ -10641,7 +10649,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const unitPrice = receiptPromoDisplayPrice(item);
     const lineTotal = receiptPromoDisplayTotal(item);
     const qty = Number(item.quantity) || 0;
-    const nameText = String(item.productName || "").trim() || "-";
+    const nameText = receiptProductNameText(item.productName);
     merges.push(`C${r}:D${r}`, `E${r}:G${r}`, `H${r}:I${r}`);
     const clearStyle = 1; // no borders — left of promo name
     // Row lines only (borderId 3 = bottom hair) — no vertical grid inside promo items
