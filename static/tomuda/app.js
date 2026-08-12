@@ -16881,11 +16881,11 @@ function stockInReportWorksheetXml(rows, merges, lastRow) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 const STOCK_IN_LIST_REPORT_LAST_COL = "K";
-const STOCK_IN_LIST_REPORT_COL_WIDTHS = [4, 11, 12, 16, 14, 22, 14, 9, 8, 12, 13];
-const STOCK_IN_LIST_REPORT_TITLE_ROW_H = 18;
-const STOCK_IN_LIST_REPORT_META_ROW_H = 15;
-const STOCK_IN_LIST_REPORT_HEADER_ROW_H = 15;
-const STOCK_IN_LIST_REPORT_DATA_ROW_H = 15;
+const STOCK_IN_LIST_REPORT_COL_WIDTHS = [5, 12, 12, 16, 18, 22, 16, 12, 8, 12, 13];
+const STOCK_IN_LIST_REPORT_TITLE_ROW_H = 24;
+const STOCK_IN_LIST_REPORT_META_ROW_H = 20;
+const STOCK_IN_LIST_REPORT_HEADER_ROW_H = 20;
+const STOCK_IN_LIST_REPORT_DATA_ROW_H = 20;
 const STOCK_IN_LIST_REPORT_SPACER_ROW_H = 6;
 const STOCK_IN_LIST_REPORT_STYLES = {
   title: 1,
@@ -16967,13 +16967,12 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   ]);
   pushSpacerRow();
   const metaRow = rowNum;
-  merges.push(`B${metaRow}:${lastCol}${metaRow}`);
+  merges.push(`A${metaRow}:${lastCol}${metaRow}`);
   pushRow(STOCK_IN_LIST_REPORT_META_ROW_H, [
-    xlsxCellXml(`A${metaRow}`, s.metaLabel, si("Хугацаа:"), "s"),
     xlsxCellXml(
-      `B${metaRow}`,
+      `A${metaRow}`,
       s.metaValue,
-      si(stockInReportPeriodText(receipts, reportDay)),
+      si(`Хугацаа: ${stockInReportPeriodText(receipts, reportDay)}`),
       "s",
     ),
   ]);
