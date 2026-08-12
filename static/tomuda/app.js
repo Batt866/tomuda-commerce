@@ -5175,24 +5175,6 @@ function protectAccidentalDeletions(data) {
     }
   }
   if (baseline.orders && protectedData.orders) {
-    const baseMap = Object.fromEntries(
-      baseline.orders
-        .filter((o) => o?.id != null)
-        .map((o) => [String(o.id), o]),
-    );
-    protectedData.orders = protectedData.orders.map((o) => {
-      const base = baseMap[String(o.id)];
-      // Do not undo intentional cancels that are already tombstoned/deleted.
-      if (
-        base &&
-        base.status !== "cancelled" &&
-        o.status === "cancelled" &&
-        !deletionLogHas(deletionLog, "order", o.id)
-      ) {
-        return { ...o, status: base.status };
-      }
-      return o;
-    });
     const currentOrderIds = new Set(
       protectedData.orders.map((o) => String(o?.id ?? "")).filter(Boolean),
     );
@@ -9971,9 +9953,9 @@ function xlsxStylesAppendPart(stylesXml, tag, xmlChunks) {
   const chunks = (xmlChunks || []).filter(Boolean);
   if (!chunks.length) return String(stylesXml || "");
   return String(stylesXml || "").replace(
-    new RegExp(`(<${tag} count=")(\\d+)(">)([\\s\\S]*?)(<\\/${tag}>)`),
-    (_, a, count, c, body, end) =>
-      `${a}${Number(count) + chunks.length}${c}${body}${chunks.join("")}${end}`,
+    new RegExp(`(<${tag} count=")(\\d+)([^>]*>)([\\s\\S]*?)(<\\/${tag}>)`),
+    (_, a, count, openRest, body, end) =>
+      `${a}${Number(count) + chunks.length}${openRest}${body}${chunks.join("")}${end}`,
   );
 }
 /** Resolve print style ids from the patched styles.xml tail. */
@@ -15191,7 +15173,7 @@ function exportStockInExcelFallback(receipt) {
     .join("");
   const html = `<!doctype html><!-- tomuda-stock-xls-v678 --><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .stock-in col.c-name { width: 240px; }
 .stock-in col.c-barcode { width: 130px; }
 .stock-in col.c-large { width: 72px; }
@@ -15200,7 +15182,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
 .stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; height: 22px; }
-.title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
+.title { text-align: center; font-size: 20px; font-weight: 800; height: 44px; }
 .meta td { border: none; padding: 4px 0; height: auto; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
@@ -15462,7 +15444,7 @@ function exportStockOutExcelFallback(receipt) {
     .join("");
   const html = `<!doctype html><!-- tomuda-stock-xls-v678 --><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; }
-table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .stock-in col.c-name { width: 240px; }
 .stock-in col.c-barcode { width: 130px; }
 .stock-in col.c-large { width: 72px; }
@@ -15471,7 +15453,7 @@ table.stock-in { width: 1240px; border-collapse: collapse; table-layout: fixed; 
 .stock-in col.c-total { width: 100px; }
 .stock-in col.c-money { width: 100px; }
 .stock-in td, .stock-in th { border: 1px solid #000; padding: 4px 5px; vertical-align: middle; height: 22px; }
-.title { text-align: center; font-size: 28px; font-weight: 800; height: 56px; }
+.title { text-align: center; font-size: 20px; font-weight: 800; height: 44px; }
 .meta td { border: none; padding: 4px 0; height: auto; }
 .date-label { text-align: right; white-space: nowrap; }
 .date-value { text-align: left; white-space: nowrap; }
@@ -18407,8 +18389,13 @@ function stockReportReceiptRow(kind, receipt) {
       : `confirmStockInExcel('${esc(receipt.id)}')`;
   return `<div class="line-list__row line-list__row--stock-report"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="line-list__row-main"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${metaParts.map((p) => esc(p)).join(" · ")}</p></div><b class="line-list__amount">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
 }
+function stockReportAggregateHeadRow() {
+  return `<div class="stock-report-products-head" aria-hidden="true"><span class="stock-report-products-head__name">Бараа</span><span class="stock-report-products-head__qty">Тоо</span><span class="stock-report-products-head__amount">Дүн</span></div>`;
+}
 function stockReportAggregateRow(row, index) {
-  return `<div class="line-list__row line-list__row--static"><span>${index + 1}. ${esc(row.productName)}${row.barcode ? ` <span class="text-muted-foreground">· ${esc(row.barcode)}</span>` : ""}</span><span class="text-sm text-muted-foreground">${row.quantity} ш</span><b>${fmt(row.amount)}</b></div>`;
+  const qty = Math.max(0, Math.floor(Number(row.quantity) || 0));
+  const barcode = String(row.barcode || "").trim();
+  return `<div class="line-list__row line-list__row--static stock-report-product-row"><div class="stock-report-product-row__main"><span class="stock-report-product-row__index">${index + 1}</span><div class="stock-report-product-row__copy"><span class="stock-report-product-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-product-row__barcode">${esc(barcode)}</span>` : ""}</div></div><span class="stock-report-product-row__qty" aria-label="Тоо ширхэг">${qty.toLocaleString()}<span class="stock-report-product-row__unit">ш</span></span><b class="stock-report-product-row__amount">${fmt(row.amount)}</b></div>`;
 }
 function stockReportsMenuHtml() {
   const sections = [];
@@ -18461,7 +18448,7 @@ function stockReportDetailView(kind) {
   const title = stockReportKindLabel(kind);
   const filters = pageToolbarHtml({ filters: stockReportDateFiltersHtml() });
   if (kind === "inProducts" || kind === "outProducts") {
-    return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Бараа", products.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Барааны нэгдсэн тайлан · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list">${products.length ? products.map(stockReportAggregateRow).join("") : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
+    return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Бараа", products.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`, 3)}<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">Барааны нэгдсэн тайлан · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list line-list--stock-products stock-report-products-table">${products.length ? `${stockReportAggregateHeadRow()}${products.map(stockReportAggregateRow).join("")}` : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
   }
   return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><p class="text-xs text-muted-foreground px-1">Баримт дээр дарж харна. Excel товчоор татна.</p><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(flow, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div></div>`;
 }

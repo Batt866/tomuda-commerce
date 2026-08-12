@@ -18552,6 +18552,149 @@ input.stock-in-sheet__input::placeholder {
   flex-shrink: 0;
 }
 
+.line-list--stock-products {
+  padding-top: 0;
+}
+
+.line-panel--stock-products .line-panel__section-title {
+  margin-bottom: 0;
+}
+
+.stock-report-products-table {
+  --stock-report-col-qty: 4.75rem;
+  --stock-report-col-amount: 6.75rem;
+}
+
+.stock-report-products-head,
+.stock-report-product-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--stock-report-col-qty) var(--stock-report-col-amount);
+  align-items: center;
+  column-gap: 12px;
+}
+
+.stock-report-products-head {
+  padding: 6px 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.stock-report-products-head__qty,
+.stock-report-products-head__amount {
+  text-align: right;
+}
+
+.stock-report-product-row {
+  padding: 11px 0;
+  cursor: default;
+}
+
+.stock-report-product-row:hover {
+  background: color-mix(in srgb, var(--hex-secondary) 45%, transparent);
+}
+
+.stock-report-product-row__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stock-report-product-row__index {
+  flex-shrink: 0;
+  min-width: 1.35rem;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--hex-muted-foreground) 70%, var(--hex-foreground));
+  line-height: 1.35;
+  padding-top: 1px;
+  text-align: right;
+}
+
+.stock-report-product-row__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stock-report-product-row__name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--hex-foreground);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.stock-report-product-row__barcode {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--hex-muted-foreground);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-report-product-row__qty {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.stock-report-product-row__unit {
+  margin-left: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hex-muted-foreground);
+}
+
+.stock-report-product-row__amount {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+@media (min-width: 640px) {
+  .stock-report-products-table {
+    --stock-report-col-qty: 5.25rem;
+    --stock-report-col-amount: 7.25rem;
+  }
+
+  .stock-report-product-row {
+    padding: 12px 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .stock-report-products-table {
+    --stock-report-col-qty: 4.25rem;
+    --stock-report-col-amount: 5.75rem;
+  }
+
+  .stock-report-product-row__amount {
+    font-size: 13px;
+  }
+}
+
 .stock-in-scan {
   display: flex;
   flex-direction: column;
