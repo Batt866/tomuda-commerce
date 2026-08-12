@@ -9522,11 +9522,12 @@ td, th { border: none; }
   background: transparent !important;
 }
 .receipt-grid__iban-c {
-  text-align: left !important;
+  text-align: right !important;
   font-weight: 700;
   font-size: 9px;
   white-space: nowrap;
-  padding-right: 4px !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
   padding-top: 1px !important;
   vertical-align: top !important;
   background: transparent !important;
@@ -16801,7 +16802,7 @@ const STOCK_IN_REPORT_COL_WIDTHS = [
   10.5, 10, 10, 14, 14, 24, 8, 8, 7.5, 8, 9.5, 10.5, 10.5, 11.5,
 ];
 const STOCK_IN_SIMPLE_REPORT_LAST_COL = "F";
-const STOCK_IN_SIMPLE_REPORT_COL_WIDTHS = [5.5, 30, 14, 11, 12, 13];
+const STOCK_IN_SIMPLE_REPORT_COL_WIDTHS = [6, 34, 16, 12, 12, 14];
 const STOCK_IN_REPORT_TABLE_ROW_HEIGHT = 20;
 const STOCK_IN_REPORT_STYLES = {
   title: 1,
@@ -16887,36 +16888,28 @@ function buildStockInSimpleReportSheetXml(receipt) {
     );
     rowNum += 1;
   };
+  const pushMetaLine = (text) => {
+    const r = rowNum;
+    merges.push(`A${r}:F${r}`);
+    pushRow(16, [xlsxCellXml(`A${r}`, s.meta, si(text), "s")]);
+  };
+  const pushSpacerRow = (height = 6) => {
+    const r = rowNum;
+    merges.push(`A${r}:F${r}`);
+    pushRow(height, [xlsxCellXml(`A${r}`, 0, null, "empty")]);
+  };
   pushRow(20, [xlsxCellXml("A1", s.title, si("БАРААНЫ ОРЛОГЫН ТАЙЛАН"), "s")]);
-  pushRow(16, [
-    xlsxCellXml("A2", s.meta, si(`Огноо: ${dateText}`), "s"),
-  ]);
-  pushRow(16, [
-    xlsxCellXml("A3", s.meta, si(`Нийлүүлэгч: ${supplier}`), "s"),
-  ]);
-  pushRow(16, [
-    xlsxCellXml("A4", s.meta, si(`Нийт төрөл: ${skuCount}`), "s"),
-  ]);
-  pushRow(16, [
-    xlsxCellXml("A5", s.meta, si(`Нийт тоо: ${pieceQty.toLocaleString()} ш`), "s"),
-  ]);
+  pushMetaLine(`Огноо: ${dateText}`);
+  pushMetaLine(`Нийлүүлэгч: ${supplier}`);
+  pushMetaLine(`Нийт төрөл: ${skuCount}`);
+  pushMetaLine(`Нийт тоо: ${pieceQty.toLocaleString()} ш`);
   if (receiptNo !== "Дугааргүй") {
-    pushRow(16, [
-      xlsxCellXml("A6", s.meta, si(`Баримт №: ${receiptNo}`), "s"),
-    ]);
+    pushMetaLine(`Баримт №: ${receiptNo}`);
   }
   if (employee) {
-    const metaRow = rowNum;
-    pushRow(16, [
-      xlsxCellXml(
-        `A${metaRow}`,
-        s.meta,
-        si(`Бүртгэсэн ажилтан: ${employee}`),
-        "s",
-      ),
-    ]);
+    pushMetaLine(`Бүртгэсэн ажилтан: ${employee}`);
   }
-  pushRow(6, [xlsxCellXml(`A${rowNum}`, 0, null, "empty")]);
+  pushSpacerRow();
   const headerRow = rowNum;
   pushRow(STOCK_IN_REPORT_TABLE_ROW_HEIGHT, headers.map((label, index) => {
     const col = "ABCDEF"[index];
@@ -16964,26 +16957,10 @@ function buildStockInSimpleReportSheetXml(receipt) {
       "f",
     ),
   ]);
-  pushRow(8, [xlsxCellXml(`A${rowNum}`, 0, null, "empty")]);
-  pushRow(16, [
-    xlsxCellXml("A" + rowNum, s.meta, si(`Нийт барааны төрөл: ${skuCount}`), "s"),
-  ]);
-  pushRow(16, [
-    xlsxCellXml(
-      "A" + rowNum,
-      s.meta,
-      si(`Нийт орсон бараа: ${pieceQty.toLocaleString()} ш`),
-      "s",
-    ),
-  ]);
-  pushRow(16, [
-    xlsxCellXml(
-      "A" + rowNum,
-      s.meta,
-      si(`Нийт үнийн дүн: ${fmtExcelMoney(totalAmount)}`),
-      "s",
-    ),
-  ]);
+  pushSpacerRow(8);
+  pushMetaLine(`Нийт барааны төрөл: ${skuCount}`);
+  pushMetaLine(`Нийт орсон бараа: ${pieceQty.toLocaleString()} ш`);
+  pushMetaLine(`Нийт үнийн дүн: ${fmtExcelMoney(totalAmount)}`);
   const lastRow = Math.max(1, rowNum - 1);
   const printArea = `$A$1:$${lastCol}$${lastRow}`;
   return {
