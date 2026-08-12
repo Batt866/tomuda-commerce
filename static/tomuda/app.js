@@ -4092,15 +4092,16 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
     const image = preferredEntityImage(item.image, prev?.image);
     if (image) merged.image = image;
     else delete merged.image;
-    // Product stock: remote wins on peer pull UNLESS this device has pending
-    // stock-in/out/order mutations (keepLocalProductStock). preferRemote spread
-    // already copied remote.stock — restore local stock in that case.
+    // Product stock: remote wins on peer pull UNLESS this product has a
+    // pending local stock-in/out/order mutation. A global keep-all flag used
+    // to block every peer stock update while any one receipt was unsynced.
     if (opts.entityKind === "products" && prev) {
-      if (opts.pullFromServer && opts.keepLocalProductStock) {
+      const keepLocalStock = shouldKeepLocalProductStock(id, opts);
+      if (opts.pullFromServer && keepLocalStock) {
         if (item.stock != null) merged.stock = Number(item.stock) || 0;
         if (item.costPrice != null) merged.costPrice = item.costPrice;
       } else if (
-        (opts.pullFromServer && !opts.keepLocalProductStock) ||
+        (opts.pullFromServer && !keepLocalStock) ||
         (!opts.pullFromServer && !businessEntityDirty())
       ) {
         merged.stock = Number(prev.stock) || 0;
@@ -5016,6 +5017,10 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       preferRemote: key !== "orders",
       pullFromServer,
       keepLocalProductStock: !!opts.keepLocalProductStock,
+      keepLocalProductStockIds:
+        opts.keepLocalProductStockIds instanceof Set
+          ? opts.keepLocalProductStockIds
+          : undefined,
     });
     if (key === "orders") merged[key] = retainedOrders(merged[key]);
   }
@@ -5290,43 +5295,65 @@ function businessEntityDirty() {
     return localStateDirty();
   }
 }
-function pendingLocalStockMutation(serverState = {}) {
-  if (
-    localOnlyEntityIds(serverState).some(
-      (key) =>
-        key.startsWith("stockInReceipts:") ||
-        key.startsWith("stockOutReceipts:") ||
-        key.startsWith("inventoryLogs:") ||
-        key.startsWith("orders:"),
-    )
-  ) {
-    return true;
-  }
-  const remoteProducts = new Map(
-    (serverState.products || [])
-      .filter((p) => p?.id != null)
-      .map((p) => [String(p.id), p]),
+function shouldKeepLocalProductStock(productId, opts = {}) {
+  const id = String(productId || "");
+  if (!id) return false;
+  const keepIds = opts.keepLocalProductStockIds;
+  if (keepIds instanceof Set) return keepIds.has(id);
+  // Legacy boolean: treat as keep-all (old call sites / tests).
+  return !!opts.keepLocalProductStock;
+}
+/** Product ids whose local stock must survive a peer pull (unsynced mutations). */
+function pendingLocalStockProductIds(serverState = {}) {
+  const ids = new Set();
+  const remoteInIds = new Set(
+    (serverState.stockInReceipts || [])
+      .map((r) => String(r?.id ?? ""))
+      .filter(Boolean),
   );
-  for (const p of state.products || []) {
-    const remote = remoteProducts.get(String(p.id));
-    if (!remote) continue;
-    const localStock = Number(p.stock) || 0;
-    const remoteStock = Number(remote.stock) || 0;
-    if (localStock === remoteStock) continue;
-    const pendingIn = (state.stockInReceipts || []).some((r) =>
-      (r.lines || []).some(
-        (line) => String(line.productId) === String(p.id),
-      ),
-    );
-    const pendingOut = (state.stockOutReceipts || []).some((r) =>
-      (r.lines || []).some(
-        (line) => String(line.productId) === String(p.id),
-      ),
-    );
-    if (pendingIn && localStock > remoteStock) return true;
-    if (pendingOut && localStock < remoteStock) return true;
+  const remoteOutIds = new Set(
+    (serverState.stockOutReceipts || [])
+      .map((r) => String(r?.id ?? ""))
+      .filter(Boolean),
+  );
+  const remoteOrderIds = new Set(
+    (serverState.orders || [])
+      .map((r) => String(r?.id ?? ""))
+      .filter(Boolean),
+  );
+  const remoteLogIds = new Set(
+    (serverState.inventoryLogs || [])
+      .map((r) => String(r?.id ?? ""))
+      .filter(Boolean),
+  );
+  const addLineProducts = (lines) => {
+    for (const line of lines || []) {
+      const pid = String(line?.productId || "");
+      if (pid) ids.add(pid);
+    }
+  };
+  for (const receipt of state.stockInReceipts || []) {
+    if (remoteInIds.has(String(receipt?.id ?? ""))) continue;
+    addLineProducts(receipt?.lines);
   }
-  return false;
+  for (const receipt of state.stockOutReceipts || []) {
+    if (remoteOutIds.has(String(receipt?.id ?? ""))) continue;
+    addLineProducts(receipt?.lines);
+  }
+  for (const order of state.orders || []) {
+    if (remoteOrderIds.has(String(order?.id ?? ""))) continue;
+    if (String(order?.status || "") === "cancelled") continue;
+    addLineProducts(order?.items);
+  }
+  for (const log of state.inventoryLogs || []) {
+    if (remoteLogIds.has(String(log?.id ?? ""))) continue;
+    const pid = String(log?.productId || "");
+    if (pid) ids.add(pid);
+  }
+  return ids;
+}
+function pendingLocalStockMutation(serverState = {}) {
+  return pendingLocalStockProductIds(serverState).size > 0;
 }
 const ENTITY_ID_KEYS = [
   "customers",
@@ -5787,7 +5814,7 @@ function applyRemoteState(payload, opts = {}) {
   const merged = protectAccidentalDeletions(
     mergePersistentStates(payload.state, persistentState(), {
       pullFromServer: true,
-      keepLocalProductStock: pendingLocalStockMutation(payload.state),
+      keepLocalProductStockIds: pendingLocalStockProductIds(payload.state),
     }),
   );
   if (JSON.stringify(merged) === JSON.stringify(persistentState())) {
@@ -7780,10 +7807,10 @@ async function mergeServerStateBeforeSave() {
     const latest = await fetchBackendPayload();
     if (!latest?.state) return false;
     const session = captureSessionSnapshot();
-    const keepLocalProductStock = pendingLocalStockMutation(latest.state);
+    const keepLocalProductStockIds = pendingLocalStockProductIds(latest.state);
     const merged = mergePersistentStates(latest.state, persistentState(), {
       pullFromServer: true,
-      keepLocalProductStock,
+      keepLocalProductStockIds,
     });
     if (JSON.stringify(merged) !== JSON.stringify(persistentState())) {
       applyPersistentState(merged);
@@ -7947,10 +7974,10 @@ async function saveBackendState(retry = 0) {
         if (payload?.state) {
           const beforeSnapshot = backendStateSnapshot();
           const session = captureSessionSnapshot();
-          const keepStock = pendingLocalStockMutation(payload.state);
+          const keepStockIds = pendingLocalStockProductIds(payload.state);
           const merged = mergePersistentStates(payload.state, persistentState(), {
-            pullFromServer: keepStock,
-            keepLocalProductStock: keepStock,
+            pullFromServer: keepStockIds.size > 0,
+            keepLocalProductStockIds: keepStockIds,
           });
           applyPersistentState(merged);
           restoreSessionSnapshot(session);
@@ -12712,7 +12739,11 @@ function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
           .includes(q.toLowerCase()) ||
           String(p.barcode || "").includes(q)),
     );
-  return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: tab === "in" || tab === "out" ? "" : excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${tab === "stock" ? stockGrid(list) : tab === "in" ? stockInPanel(list) : stockOutPanel(list)}`;
+  if (tab === "in") return stockInPanel(list);
+  if (tab === "out") {
+    return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: "" })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${stockOutPanel(list)}`;
+  }
+  return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${stockGrid(list)}`;
 }
 function inventoryView() {
   // Нярав = үлдэгдэл + орлого + зарлага. Бараа бэлдэх = Агуулах.
@@ -12731,6 +12762,8 @@ function inventoryView() {
   if (canStockMove) {
     tabs.push(["in", "Орлого"], ["out", "Зарлага"]);
   }
+  // Орлого = dedicated sheet (mock layout); hide hub chrome.
+  if (tab === "in") return inventoryRegisterBody(tab);
   const tabClass = tabs.length > 2 ? "seg-tabs seg-tabs--3" : "seg-tabs";
   return `<div class="space-y-4">${pageHead("Нярав")}${
     tabs.length > 1
@@ -13922,18 +13955,37 @@ function stockInSupplierField({ emphasize = false } = {}) {
   ensureStockInSession();
   const missing = emphasize && !stockInHasSupplier();
   const options = [
-    `<option value="">Нийлүүлэгч сонгох *</option>`,
+    `<option value="">[Сонгох]</option>`,
     ...suppliersSorted().map(
       (s) =>
         `<option value="${esc(s.id)}" ${String(state.stockInSupplierId) === String(s.id) ? "selected" : ""}>${esc(s.name)}${s.country ? ` · ${esc(supplierCountryLabel(s.country))}` : ""}</option>`,
     ),
   ].join("");
   const emptyHint = !(state.suppliers || []).length
-    ? `<p class="stock-in-supplier__hint">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
+    ? `<p class="stock-in-sheet__hint">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
     : missing
-      ? `<p class="stock-in-supplier__hint stock-in-supplier__hint--warn">Баталгаажуулахад нийлүүлэгч заавал сонгоно.</p>`
+      ? `<p class="stock-in-sheet__hint stock-in-sheet__hint--warn">Баталгаажуулахад нийлүүлэгч заавал сонгоно.</p>`
       : "";
-  return `<label class="stock-in-employee stock-in-supplier${missing ? " is-missing" : ""}"><span class="stock-in-employee__label">Нийлүүлэгч <span class="stock-in-supplier__req">*</span></span><select id="stockInSupplierSelect" class="field-input app-input${missing ? " is-invalid" : ""}" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
+  return `<label class="stock-in-sheet__field${missing ? " is-missing" : ""}"><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><select id="stockInSupplierSelect" class="stock-in-sheet__select${missing ? " is-invalid" : ""}" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
+}
+function stockInWarehouseField() {
+  return `<label class="stock-in-sheet__field"><span class="stock-in-sheet__field-label">Агуулах:</span><select class="stock-in-sheet__select" disabled aria-label="Агуулах"><option selected>[Үндсэн агуулах]</option></select></label>`;
+}
+function stockInScanToolbarHtml() {
+  const q = esc(state.stockInScanQuery || "");
+  return `<div class="stock-in-sheet__scan-wrap">
+  <div class="stock-in-sheet__scan">
+    <button type="button" class="stock-in-sheet__scan-main" onclick="document.getElementById('stockInBarcodeInput')?.focus()">
+      <span class="stock-in-sheet__scan-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><path d="M7 8h2v8H7zm4 0h1v8h-1zm3 0h3v8h-3z"/></svg></span>
+      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__scan-input" placeholder="Бараа хайх / Уншуулах" value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Бараа хайх / Уншуулах">
+    </button>
+    <button type="button" class="stock-in-sheet__scan-cam" tabindex="-1" onclick="startBarcodeScan('stockIn')" aria-label="Скан">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M20 8V6a2 2 0 0 0-2-2h-2M20 16v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/><path d="M16 4h2a1 1 0 0 1 1 1v2"/></svg>
+    </button>
+    <button type="button" class="stock-in-sheet__scan-go" tabindex="-1" onclick="stockInScanSubmit()" aria-label="Хайх">Хайх</button>
+  </div>
+  ${barcodeScannerPanelHtml()}
+</div>`;
 }
 function stockOutEmployeeField() {
   ensureStockOutSession();
@@ -13978,10 +14030,6 @@ function restoreStockInScanFocus(snap) {
       input.setSelectionRange(start, end);
     } catch (_) {}
   });
-}
-function stockInScanToolbarHtml() {
-  const q = esc(state.stockInScanQuery || "");
-  return `<div class="stock-in-scan"><div class="stock-in-scan__field"><span class="stock-in-scan__label" id="stockInScanLabel">Баркод / нэр</span><div class="barcode-input-row barcode-input-row--scan"><input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="field-input app-input stock-in-scan__input" placeholder="Баркод эсвэл барааны нэр..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-labelledby="stockInScanLabel"><button type="button" tabindex="-1" onclick="stockInScanSubmit()" class="btn btn--secondary btn--sm stock-in-scan__btn">Хайх</button><button type="button" tabindex="-1" onclick="startBarcodeScan('stockIn')" class="btn btn--primary btn--sm stock-in-scan__btn">Скан</button></div></div>${barcodeScannerPanelHtml()}<p class="stock-in-scan__hint">Баркод эсвэл нэрээр хайна. Scan хийхэд бараа олж тоо, өртөг үнийг автоматаар нэмнэ.</p></div>`;
 }
 function stockInScanDraft(el) {
   const value = String(el?.value || "");
@@ -14082,15 +14130,55 @@ function stockInBarcodeKeydown(e) {
 }
 function stockInEntryRow(p) {
   const qty = stockInLineQty(p);
-  const cost = stockInLineCost(p);
-  const hasEntry = qty > 0;
-  const entryMeta = hasEntry
-    ? `<span class="stock-in-entry-row__meta"><span class="stock-in-entry-row__meta-qty">${qty} ${esc(p.unit || "ш")}</span>${cost ? `<span class="stock-in-entry-row__meta-cost">Өртөг ${fmt(cost)}</span>` : ""}</span>`
-    : `<span class="stock-in-entry-row__hint">Тоо ширхэг оруулах</span>`;
-  const salesPrice = productSalesPrice(p);
-  const displayStock = (Number(p.stock) || 0) + (hasEntry ? qty : 0);
-  const row = `<button type="button" onclick="stockInEntryModal('${esc(p.id)}')" data-stock-in-id="${esc(p.id)}" class="stock-in-entry-row${hasEntry ? " stock-in-entry-row--filled" : ""}${state.stockInHighlightId === p.id ? " stock-in-entry-row--scan" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="${esc(p.name)}" class="stock-in-entry-row__img" width="56" height="56" loading="lazy" decoding="async"><div class="inventory-stock-row__info min-w-0"><p class="inventory-stock-row__name">${esc(p.name)}</p><p class="inventory-stock-row__barcode">${esc(p.barcode || "-")}</p><span class="inventory-stock-row__stock">Үлдэгдэл: <b>${displayStock} ${esc(p.unit || "ш")}</b>${hasEntry && qty ? `<span class="inventory-stock-row__pending"> (+${qty} хүлээгдэж байна)</span>` : ""}</span><span class="inventory-stock-row__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></span></div>${entryMeta}</button>`;
-  return hasEntry ? stockSwipeRowHtml("in", p.id, row) : row;
+  const cost = stockInLineCost(p) || productCostPrice(p) || 0;
+  const lineTotal = qty * cost;
+  const sku = p.barcode || p.sku || p.id || "";
+  const highlight =
+    state.stockInHighlightId === p.id ? " stock-in-line--scan" : "";
+  return `<article class="stock-in-line${highlight}" data-stock-in-id="${esc(p.id)}">
+  <button type="button" class="stock-in-line__delete" onclick="confirmRemoveStockDraft('${esc(p.id)}','in')" aria-label="Устгах">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>
+  </button>
+  <div class="stock-in-line__main">
+    <button type="button" class="stock-in-line__open" onclick="stockInEntryModal('${esc(p.id)}')" aria-label="${esc(p.name)} засах">
+      <img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-in-line__img" width="56" height="56" loading="lazy" decoding="async">
+      <p class="stock-in-line__name">${esc(p.name)} <span class="stock-in-line__sku">(${esc(sku)})</span></p>
+    </button>
+    <div class="stock-in-line__math">
+      <span class="stock-in-line__unit">${fmt(cost)} x</span>
+      <span class="stock-in-line__stepper">
+        <button type="button" class="stock-in-line__step" onclick="bumpStockInLineQty('${esc(p.id)}',-1)" aria-label="Багасгах">−</button>
+        <b class="stock-in-line__qty">${qty}</b>
+        <button type="button" class="stock-in-line__step stock-in-line__step--plus" onclick="bumpStockInLineQty('${esc(p.id)}',1)" aria-label="Нэмэх">+</button>
+      </span>
+      <span class="stock-in-line__eq">= ${fmt(lineTotal)}</span>
+    </div>
+  </div>
+</article>`;
+}
+function bumpStockInLineQty(id, delta) {
+  ensureStockInSession();
+  if (!canManageStockIn()) {
+    return alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
+  }
+  const p = state.products.find((x) => String(x.id) === String(id));
+  if (!p) return;
+  const current = stockInLineQty(p);
+  const next = Math.max(0, current + Number(delta || 0));
+  if (next <= 0) {
+    confirmRemoveStockDraft(id, "in");
+    return;
+  }
+  const entry = stockInDraftEntry(id);
+  entry.qty = String(next);
+  delete entry.packs;
+  delete entry.largePacks;
+  if (!entry.costPrice && productCostPrice(p)) {
+    entry.costPrice = String(Math.floor(productCostPrice(p)));
+  }
+  state.stockInDone = false;
+  state.stockInReceipt = null;
+  render();
 }
 function removeStockDraftEntry(id, mode = "in") {
   const draft = mode === "out" ? state.stockOutDraft : state.stockInDraft;
@@ -14526,95 +14614,90 @@ function stockInDraftStats(list = state.products) {
   );
   return { filled, skuCount: filled.length, pieceQty, totalCost };
 }
-function stockInHeroHtml() {
-  return `<header class="stock-in-hero">
-  <p class="stock-in-hero__eyebrow">Агуулах</p>
-  <h2 class="stock-in-hero__title">Орлого авах</h2>
-  <p class="stock-in-hero__banner">Бараагаа нэмээд нийлүүлэгчээ сонгоод орлогыг баталгаажуулна.</p>
-</header>`;
-}
-function stockInMetaCardHtml() {
-  return `<section class="stock-in-meta-card">${stockInEmployeeField()}</section>`;
-}
-function stockInProgressCardHtml(list) {
-  const { filled, skuCount, pieceQty, totalCost } = stockInDraftStats(list);
-  const hasSupplier = stockInHasSupplier();
-  const ready = stockInCanFinish();
-  let pct = 0;
-  if (skuCount > 0) pct += 45;
-  if (hasSupplier) pct += 35;
-  if (ready) pct = 100;
-  else if (skuCount > 0 && hasSupplier) pct = 80;
-  const picks = filled
-    .slice(0, 10)
-    .map((p) => {
-      const qty = stockInLineQty(p);
-      return `<li class="stock-in-summary__pick"><span class="stock-in-summary__pick-name">${esc(p.name)}</span><b>${qty} ${esc(p.unit || "ш")}</b></li>`;
-    })
+function stockInSearchHitsHtml(list) {
+  const q = String(state.stockInScanQuery || "").trim();
+  if (!q) return "";
+  const hits = (list || [])
+    .filter((p) => stockInLineQty(p) <= 0)
+    .slice(0, 8);
+  if (!hits.length) return "";
+  const rows = hits
+    .map(
+      (p) =>
+        `<button type="button" class="stock-in-sheet__hit" onclick="stockInEntryModal('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="40" height="40" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}</small></span></button>`,
+    )
     .join("");
-  const more =
-    filled.length > 10
-      ? `<li class="stock-in-summary__more">+${filled.length - 10} бараа</li>`
-      : "";
-  const status = ready
-    ? "Баталгаажуулахад бэлэн"
-    : !hasSupplier
-      ? "Нийлүүлэгч сонгоно уу"
-      : skuCount
-        ? "Бараа нэмсээр байна · дараа нь баталгаажуулна"
-        : "Баркод эсвэл нэрээр бараа нэмнэ үү";
-  return `<section class="stock-in-summary${ready ? " is-ready" : skuCount ? " is-active" : ""}" data-stock-in-summary>
-  <div class="stock-in-summary__head">
-    <span>Таны сонголт</span>
-    <b class="stock-in-summary__count">[ ${skuCount} бараа · ${pieceQty} ш ]</b>
-  </div>
-  <div class="stock-in-summary__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="Орлогын бэлэн байдал">
-    <span style="width:${pct}%"></span>
-  </div>
-  ${
-    picks
-      ? `<ul class="stock-in-summary__picks"><li class="stock-in-summary__picks-label">Сонгосон:</li>${picks}${more}</ul>`
-      : `<p class="stock-in-summary__empty">Сонгосон бараа байхгүй</p>`
+  return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа</p>${rows}</div>`;
+}
+function stockInLinesHtml(list) {
+  const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
+  if (!filled.length) {
+    return `<div class="stock-in-sheet__empty">Бараа нэмэхийн тулд дээрээс хайж уншуулна уу.</div>`;
   }
-  ${totalCost > 0 ? `<p class="stock-in-summary__cost">Нийт өртөг · <b>${fmt(totalCost)}</b></p>` : ""}
-  <p class="stock-in-summary__status">${esc(status)}</p>
-</section>`;
+  return `<div class="stock-in-sheet__lines">${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
 }
-function stockInActionsHtml() {
+function stockInFooterHtml(list) {
+  const { skuCount, pieceQty, totalCost } = stockInDraftStats(list);
   const canFinish = stockInCanFinish();
-  const needSupplier = stockInHasEntries() && !stockInHasSupplier();
-  return `<div class="stock-in-cta${needSupplier ? " is-blocked" : ""}">
-  ${stockInSupplierField({ emphasize: needSupplier })}
-  <button type="button" onclick="confirmFinishStockIn()" class="stock-in-cta__primary${canFinish ? "" : " is-disabled"}" aria-disabled="${canFinish ? "false" : "true"}">Орлого баталгаажуулах</button>
-  <div class="stock-in-cta__row">
-    <button type="button" onclick="saveStockInDraftToast()" class="stock-in-cta__ghost">Түр хадгалах</button>
-    <button type="button" onclick="confirmNewStockIn()" class="stock-in-cta__ghost">Шинэ</button>
+  return `<footer class="stock-in-sheet__footer">
+  <div class="stock-in-sheet__totals">
+    <div class="stock-in-sheet__totals-left">
+      <p>Нийт төрөл: <b>${skuCount}</b></p>
+      <p>Нийт тоо: <b>${pieceQty} ш</b></p>
+    </div>
+    <div class="stock-in-sheet__totals-right">
+      <span>НИЙТ ДҮН:</span>
+      <strong>${fmt(totalCost)}</strong>
+    </div>
   </div>
-  <p class="stock-in-cta__note">Нийлүүлэгч сонгосны дараа баталгаажуулна. Түр хадгалах үед үлдэгдэл өөрчлөгдөхгүй.</p>
-</div>`;
-}
-function stockInEntryList(list) {
-  const filled = list.filter((p) => stockInLineQty(p) > 0);
-  const others = list.filter((p) => stockInLineQty(p) <= 0);
-  const section = (title, products, emptyText, variant = "") => {
-    const groups = stockInProductsGrouped(products);
-    const rows = groups
-      .map((item) =>
-        item.type === "cat"
-          ? `<div class="stock-in-entry-cat">${esc(item.name)}</div>`
-          : stockInEntryRow(item.product),
-      )
-      .join("");
-    return `<div class="stock-in-entry-section${variant ? ` stock-in-entry-section--${variant}` : ""}"><div class="stock-in-entry-section__title">${esc(title)}${products.length ? ` · ${products.length}` : ""}</div><div class="stock-in-entry-section__list">${rows || `<div class="stock-in-entry-empty">${esc(emptyText)}</div>`}</div></div>`;
-  };
-  return `<div class="stock-in-entry-board">${section("Сонгосон бараа", filled, "Одоогоор хоосон", "selected")}${section("Бусад бараа", others, "Бараа олдсонгүй", "catalog")}</div>`;
+  <div class="stock-in-sheet__actions">
+    <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--ghost" onclick="saveStockInDraftToast()">Түр хадгалах</button>
+    <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary${canFinish ? "" : " is-disabled"}" onclick="confirmFinishStockIn()" aria-disabled="${canFinish ? "false" : "true"}">Орлого баталгаажуулах</button>
+  </div>
+</footer>`;
 }
 function stockInPanel(list) {
   ensureStockInSession();
   if (state.stockInDone && state.stockInReceipt) {
-    return `<div class="space-y-4 stock-in-view">${stockInReceiptPanel(state.stockInReceipt)}<button type="button" onclick="confirmNewStockIn()" class="stock-in-cta__ghost stock-in-cta__ghost--block">Шинэ орлого</button></div>`;
+    return `<div class="stock-in-sheet stock-in-sheet--done">
+  <header class="stock-in-sheet__head">
+    <div class="stock-in-sheet__nav">
+      <button type="button" class="stock-in-sheet__back" onclick="setInventoryTab('stock')" aria-label="Буцах">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
+      </button>
+      <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
+    </div>
+  </header>
+  <div class="stock-in-sheet__body stock-in-sheet__body--receipt">${stockInReceiptPanel(state.stockInReceipt)}
+    <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary stock-in-sheet__btn--block" onclick="confirmNewStockIn()">Шинэ орлого</button>
+  </div>
+</div>`;
   }
-  return `<div class="stock-in-view stock-in-view--compose">${stockInHeroHtml()}${stockInMetaCardHtml()}${stockInScanToolbarHtml()}${stockInProgressCardHtml(list)}${stockInActionsHtml()}${stockInEntryList(list)}</div>`;
+  const needSupplier = stockInHasEntries() && !stockInHasSupplier();
+  const allProducts = state.products || [];
+  return `<div class="stock-in-sheet">
+  <header class="stock-in-sheet__head">
+    <div class="stock-in-sheet__nav">
+      <button type="button" class="stock-in-sheet__back" onclick="setInventoryTab('stock')" aria-label="Буцах">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
+      </button>
+      <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
+    </div>
+    <p class="stock-in-sheet__section">ЕРӨНХИЙ МЭДЭЭЛЭЛ</p>
+    <div class="stock-in-sheet__meta${needSupplier ? " is-blocked" : ""}">
+      ${stockInSupplierField({ emphasize: needSupplier })}
+      ${stockInWarehouseField()}
+    </div>
+  </header>
+  <div class="stock-in-sheet__body">
+    <div class="stock-in-sheet__card">
+      ${stockInScanToolbarHtml()}
+      ${stockInSearchHitsHtml(list)}
+      ${stockInLinesHtml(allProducts)}
+      ${stockInFooterHtml(allProducts)}
+    </div>
+  </div>
+</div>`;
 }
 function stockInReceiptGroupedLines(lines) {
   const byCat = {};
@@ -26446,6 +26529,7 @@ Object.assign(window, {
   confirmInventoryExport,
   confirmFinishStockIn,
   confirmNewStockIn,
+  bumpStockInLineQty,
   confirmFinishStockOut,
   confirmNewStockOut,
   saveStockInDraftToast,
