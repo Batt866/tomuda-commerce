@@ -8310,6 +8310,7 @@ function shell(content) {
     workerOrdersList =
       state.currentView === "worker" && state.filters.worker === "orders",
     workerOrdersArrived = workerOrdersList && state.workerOrdersArrived;
+  if (stockInFocus && state.mobileOpen) state.mobileOpen = false;
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
@@ -13891,6 +13892,7 @@ async function finishStockInReceipt(
   stockInSaveLock = true;
   try {
     const saved = applyStockInReceipt(receipt);
+    const fullFinish = !clearDraftOnly?.length;
     if (clearDraftOnly?.length) {
       for (const id of clearDraftOnly) delete state.stockInDraft[id];
       state.stockInDone = false;
@@ -13919,7 +13921,17 @@ async function finishStockInReceipt(
       if (downloadExcel) exportStockInExcel(saved);
       return;
     }
-    showAppToast("Орлого хадгалагдлаа. Орлогын тайлангаас харна уу.", "success");
+    if (fullFinish) {
+      // Modal (not toast) so the hint is clearly visible after confirm closes.
+      setTimeout(() => {
+        alertModal(
+          "Орлого хадгалагдлаа",
+          "<p>Баримтыг харахыг хүсвэл <b>Админ → Тайлан</b> хэсгээс харна уу.</p>",
+        );
+      }, 0);
+    } else {
+      showAppToast("Орлого хадгалагдлаа", "success");
+    }
     if (downloadExcel) exportStockInExcel(saved);
   } finally {
     stockInSaveLock = false;
@@ -21999,7 +22011,7 @@ function workerOrderStatsHtml(cart) {
 function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = "", hasItems = false } = {}) {
   const stats = hasItems ? workerOrderStatsHtml(cart) : "";
   if (!stats && !agentMetaHtml && !receivableHtml) return "";
-  return `<div class="worker-order-summary">${stats}${receivableHtml}${agentMetaHtml}</div>`;
+  return `<div class="worker-order-summary">${stats}${agentMetaHtml}${receivableHtml}</div>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;

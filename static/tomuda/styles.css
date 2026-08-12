@@ -5795,8 +5795,13 @@ button:focus-visible,
     overflow: hidden;
   }
 
+  .app-shell--stock-in .mobile-menu-button,
+  .app-shell--stock-in .mobile-top-bar {
+    display: none !important;
+  }
+
   .app-shell--stock-in .app-main {
-    padding-top: var(--mobile-top-bar-offset) !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
     overflow: hidden;
   }
@@ -7354,7 +7359,7 @@ textarea::placeholder {
 .worker-order-summary {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   padding: 12px;
   border: 1px solid var(--hex-border);
   border-radius: 14px;
@@ -7372,10 +7377,6 @@ textarea::placeholder {
 
 .worker-order-summary .worker-order-meta {
   display: block;
-}
-
-.worker-order-summary .worker-receivable + .worker-order-meta {
-  margin-top: -2px;
 }
 
 .worker-order-lines-wrap {
@@ -16468,14 +16469,8 @@ body.image-lightbox-open {
   --si-line: var(--hex-border, #d8dee6);
   --si-pad: clamp(10px, 2.4vw, 16px);
   margin: 0;
-  height: calc(
-    100dvh - var(--mobile-top-bar-offset, 3.5rem) - env(safe-area-inset-bottom, 0px) -
-      4px
-  );
-  max-height: calc(
-    100dvh - var(--mobile-top-bar-offset, 3.5rem) - env(safe-area-inset-bottom, 0px) -
-      4px
-  );
+  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 4px);
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 4px);
   display: flex;
   flex-direction: column;
   background: var(--si-page);
@@ -16484,11 +16479,11 @@ body.image-lightbox-open {
 
 .app-shell--bottom-nav .stock-in-sheet {
   height: calc(
-    100dvh - var(--mobile-top-bar-offset, 3.5rem) - var(--mobile-nav-h, 4.5rem) -
+    100dvh - env(safe-area-inset-top, 0px) - var(--mobile-nav-h, 4.5rem) -
       env(safe-area-inset-bottom, 0px) - 4px
   );
   max-height: calc(
-    100dvh - var(--mobile-top-bar-offset, 3.5rem) - var(--mobile-nav-h, 4.5rem) -
+    100dvh - env(safe-area-inset-top, 0px) - var(--mobile-nav-h, 4.5rem) -
       env(safe-area-inset-bottom, 0px) - 4px
   );
 }
@@ -17075,7 +17070,7 @@ body.image-lightbox-open {
     max-width: none;
     margin: 0;
     border-radius: 14px;
-    height: calc(100dvh - var(--mobile-top-bar-offset, 3.5rem) - 1rem);
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - 1rem);
     max-height: none;
     box-shadow: none;
     border: 1px solid var(--si-line);
