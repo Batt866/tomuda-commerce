@@ -370,6 +370,7 @@ let settlementBlurTimer = null;
 let stockInScanRenderPending = false;
 let stockInScanBlurTimer = null;
 let stockInScanForceRender = false;
+let barcodeScanRenderPending = false;
 let loginFormActiveUntil = 0;
 let loginFormGuardBound = false;
 let tombudaHistoryDepth = 0;
@@ -3500,7 +3501,6 @@ function sidebarNavForRole(role) {
       ["worker", "+ Шинэ захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
       ["employees", "Ажилтан"],
       ["stockReports", "Тайлан"],
       ["promotions", "Урамшуулал"],
@@ -3527,18 +3527,9 @@ function sidebarNavForRole(role) {
     if (id === "inventory") return ["inventory", "Нярав"];
     return [id, label];
   });
-  // Admin: Нярав (үлдэгдэл) is under Админ hub — keep Агуулах on menu.
+  // Admin: Нярав, Агуулах — Админ hub-аас нээгдэнэ.
   if (nav.some(([id]) => id === "admin")) {
-    nav = nav.filter(([id]) => id !== "inventory");
-    if (
-      canAccessView("warehouse") &&
-      !nav.some(([id]) => id === "warehouse")
-    ) {
-      const adminIdx = nav.findIndex(([id]) => id === "admin");
-      const item = ["warehouse", "Агуулах"];
-      if (adminIdx >= 0) nav.splice(adminIdx, 0, item);
-      else nav.push(item);
-    }
+    nav = nav.filter(([id]) => id !== "inventory" && id !== "warehouse");
   }
   return nav;
 }
@@ -3552,7 +3543,6 @@ function bottomNavForRole(role) {
       ["worker", "Захиалга"],
       ["customers", "Харилцагч"],
       ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
       ["admin", "Админ"],
     ],
     sales: [
@@ -5580,7 +5570,18 @@ function stockInScanBlur() {
 }
 function flushPendingStockInScanRender() {
   if (isEditingStockInScan()) return;
+  if (barcodeScanning) {
+    stockInScanRenderPending = true;
+    return;
+  }
   if (!stockInScanRenderPending) return;
+  stockInScanRenderPending = false;
+  render();
+}
+function flushPendingBarcodeScanRender() {
+  if (barcodeScanning) return;
+  if (!barcodeScanRenderPending && !stockInScanRenderPending) return;
+  barcodeScanRenderPending = false;
   stockInScanRenderPending = false;
   render();
 }
@@ -5798,6 +5799,10 @@ function safeRender() {
   if (isEditingSettlementText()) return;
   if (isEditingStockInScan() && !stockInScanForceRender) {
     stockInScanRenderPending = true;
+    return;
+  }
+  if (barcodeScanning) {
+    barcodeScanRenderPending = true;
     return;
   }
   countRenderPending = false;
@@ -7730,7 +7735,7 @@ async function revertBackendStateFromServer() {
     return false;
   }
 }
-async function flushBackendSave() {
+async function flushBackendSave(opts = {}) {
   if (!backendReady) {
     markBackendSaveFailed(
       "Сервертэй холбогдоогүй байна. Хуудсыг дахин ачаална уу.",
@@ -7741,9 +7746,12 @@ async function flushBackendSave() {
   backendSaveTimer = null;
   persistOrderSnapshot();
   await waitForBackendSaveIdle();
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const maxAttempts = opts.fast ? 2 : 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (!localStateDirty()) return true;
-    await saveBackendState();
+    await saveBackendState(0, {
+      skipPreMerge: !!opts.fast && attempt === 0,
+    });
     await waitForBackendSaveIdle();
     if (!localStateDirty()) return true;
   }
@@ -7766,7 +7774,7 @@ function hasUnsavedLocalData() {
   if (localStateDirty()) return true;
   return !!readLocalPendingState();
 }
-function criticalBackendSave() {
+function criticalBackendSave(opts = {}) {
   persistOrderSnapshot();
   if (!backendReady) {
     markBackendSaveFailed(
@@ -7774,11 +7782,23 @@ function criticalBackendSave() {
     );
     return Promise.resolve(false);
   }
-  return flushBackendSave().catch((error) => {
+  const fast = opts.fast !== false;
+  return flushBackendSave({ fast }).catch((error) => {
     console.warn("Backend save failed", error);
     markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
     return false;
   });
+}
+async function pushCriticalBackendSave({
+  failMessage = "Серверт хадгалахад алдаа гарлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+} = {}) {
+  let ok = await criticalBackendSave({ fast: true });
+  if (!ok) {
+    await sleep(300);
+    ok = await criticalBackendSave({ fast: true });
+  }
+  if (!ok) showAppToast(failMessage, "error");
+  return ok;
 }
 async function retryPendingBackendSave() {
   clearBackendSaveFailed();
@@ -7886,7 +7906,7 @@ function pendingOrderDeletionsWithoutLog(data = persistentState()) {
     return [];
   }
 }
-async function saveBackendState(retry = 0) {
+async function saveBackendState(retry = 0, opts = {}) {
   backendSaveTimer = null;
   if (!state.isLoggedIn || !state.currentEmployee?.id) {
     markBackendSaveFailed("Нэвтэрсэн ажилтан олдсонгүй. Дахин нэвтэрнэ үү.");
@@ -7915,19 +7935,21 @@ async function saveBackendState(retry = 0) {
       restoreSessionSnapshot(session);
       if (!shouldDeferBackendSync()) safeRender();
     }
-    const mergedOk = await mergeServerStateBeforeSave();
-    if (!mergedOk) {
-      persistOrderSnapshot();
-      markBackendSaveFailed(
-        "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
-      );
-      if (retry < 2) {
-        handoffRetry = true;
-        backendSaving = false;
-        await sleep(900 * (retry + 1));
-        return saveBackendState(retry + 1);
+    if (!opts.skipPreMerge) {
+      const mergedOk = await mergeServerStateBeforeSave();
+      if (!mergedOk) {
+        persistOrderSnapshot();
+        markBackendSaveFailed(
+          "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
+        );
+        if (retry < 2) {
+          handoffRetry = true;
+          backendSaving = false;
+          await sleep(900 * (retry + 1));
+          return saveBackendState(retry + 1, opts);
+        }
+        return;
       }
-      return;
     }
     let payloadState = stateForBackendSave();
     let unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
@@ -8020,7 +8042,7 @@ async function saveBackendState(retry = 0) {
           handoffRetry = true;
           backendSaving = false;
           await sleep(400);
-          return saveBackendState(retry + 1);
+          return saveBackendState(retry + 1, { ...opts, skipPreMerge: false });
         }
         persistOrderSnapshot();
         markBackendSaveFailed(msg);
@@ -8037,7 +8059,7 @@ async function saveBackendState(retry = 0) {
           handoffRetry = true;
           backendSaving = false;
           await sleep(900 * (retry + 1));
-          return saveBackendState(retry + 1);
+          return saveBackendState(retry + 1, { ...opts, skipPreMerge: false });
         }
       }
     } catch (error) {
@@ -8053,7 +8075,7 @@ async function saveBackendState(retry = 0) {
         handoffRetry = true;
         backendSaving = false;
         await sleep(900 * (retry + 1));
-        return saveBackendState(retry + 1);
+        return saveBackendState(retry + 1, { ...opts, skipPreMerge: false });
       }
     }
   } finally {
@@ -8344,7 +8366,6 @@ function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
     ["suppliers", "Нийлүүлэгч", "inventory", "suppliers.view"],
-    ["warehouse", "Агуулах", "warehouse", "warehouse.view"],
     ["inventory", "Нярав", "inventory", "warehouse.view"],
     ["stockReports", "Тайлан", "reports", "__stock_reports__"],
     ["promotions", "Урамшуулал", "promotions", "promotions.view"],
@@ -8397,9 +8418,6 @@ function adminHubHtml() {
   return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => {
     if (id === "stockReports") {
       return adminHubActionCard("openStockReportsHub()", label, icon);
-    }
-    if (id === "warehouse") {
-      return adminHubActionCard("openWarehousePrepare()", label, icon);
     }
     return adminHubCard(id, label, icon);
   }).join("")}</div>` : ""}${settingsHtml}</section>`;
@@ -13722,44 +13740,26 @@ async function finishStockOutReceipt(
 ) {
   if (!receipt?.lines?.length || stockOutSaveLock) return;
   stockOutSaveLock = true;
+  let saved;
   try {
-    let saved;
     try {
       saved = applyStockOutReceipt(receipt);
     } catch (err) {
       alert(err?.message || "Зарлага хадгалж чадсангүй");
       return;
     }
-    // Stay on зарлага screen: clear lines and keep composing next receipt.
     startStockOutSession();
     render();
     persistOrderSnapshot();
-    await waitForBackendSaveIdle();
-    let ok = await criticalBackendSave();
-    if (!ok) {
-      await sleep(500);
-      await waitForBackendSaveIdle();
-      ok = await criticalBackendSave();
-    }
-    if (!ok) {
-      const msg =
-        backendSaveFailedMessage ||
-        "Зарлага түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
-      showAppToast(msg, "error");
-      alertModal("Хадгалах амжилтгүй", esc(msg));
-      if (downloadExcel) exportStockOutExcel(saved);
-      return;
-    }
-    setTimeout(() => {
-      alertModal(
-        "Зарлага хадгалагдлаа",
-        "<p>Баримтыг харахыг хүсвэл <b>Админ → Тайлан</b> хэсгээс харна уу.</p>",
-      );
-    }, 0);
+    showAppToast("Зарлага хадгалагдлаа", "success");
     if (downloadExcel) exportStockOutExcel(saved);
   } finally {
     stockOutSaveLock = false;
   }
+  void pushCriticalBackendSave({
+    failMessage:
+      "Зарлага түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+  });
 }
 function confirmNewStockOut() {
   const hasData = stockOutHasEntries() || (state.stockOutDone && state.stockOutReceipt);
@@ -14006,9 +14006,9 @@ async function finishStockInReceipt(
 ) {
   if (!receipt?.lines?.length || stockInSaveLock) return;
   stockInSaveLock = true;
+  let saved;
   try {
-    const saved = applyStockInReceipt(receipt);
-    const fullFinish = !clearDraftOnly?.length;
+    saved = applyStockInReceipt(receipt);
     if (clearDraftOnly?.length) {
       for (const id of clearDraftOnly) delete state.stockInDraft[id];
       state.stockInDone = false;
@@ -14020,38 +14020,15 @@ async function finishStockInReceipt(
     }
     render();
     persistOrderSnapshot();
-    await waitForBackendSaveIdle();
-    let ok = await criticalBackendSave();
-    if (!ok) {
-      await sleep(500);
-      await waitForBackendSaveIdle();
-      ok = await criticalBackendSave();
-    }
-    if (!ok) {
-      const msg =
-        backendSaveFailedMessage ||
-        "Орлого түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.";
-      showAppToast(msg, "error");
-      alertModal("Хадгалах амжилтгүй", esc(msg));
-      // Local receipt already applied — still offer Excel so work is not lost.
-      if (downloadExcel) exportStockInExcel(saved);
-      return;
-    }
-    if (fullFinish) {
-      // Modal (not toast) so the hint is clearly visible after confirm closes.
-      setTimeout(() => {
-        alertModal(
-          "Орлого хадгалагдлаа",
-          "<p>Баримтыг харахыг хүсвэл <b>Админ → Тайлан</b> хэсгээс харна уу.</p>",
-        );
-      }, 0);
-    } else {
-      showAppToast("Орлого хадгалагдлаа", "success");
-    }
+    showAppToast("Орлого хадгалагдлаа", "success");
     if (downloadExcel) exportStockInExcel(saved);
   } finally {
     stockInSaveLock = false;
   }
+  void pushCriticalBackendSave({
+    failMessage:
+      "Орлого түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
+  });
 }
 function confirmNewStockIn() {
   const hasData =
@@ -17167,6 +17144,20 @@ const WAREHOUSE_PREPARE_PIECE_CELL_STYLE = 25;
 /** Patched template styles: single-line header (shrink) / body text (fixed size). */
 const WAREHOUSE_PREPARE_UNIT_HEAD_STYLE = 7;
 const WAREHOUSE_PREPARE_TEXT_CELL_STYLE = 8;
+/** Template cellXfs indices for warehouse prepare (Roboto/Arial 11pt layout). */
+const WAREHOUSE_PREPARE_SHEET_STYLES = {
+  title: 13,
+  metaLeft: 3,
+  metaRight: 12,
+  spacer: 2,
+  header: 7,
+  unitHead: WAREHOUSE_PREPARE_UNIT_HEAD_STYLE,
+  text: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
+  category: 11,
+  stock: 10,
+  signLabel: 3,
+  signLine: WAREHOUSE_PREPARE_SIGN_LINE_STYLE,
+};
 /** Print-ready B&W pack appended by warehousePreparePrintPatchStylesXml. */
 const WAREHOUSE_PREPARE_PRINT_STYLE_KEYS = [
   "title",
@@ -17516,10 +17507,10 @@ function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const cols = warehousePrepareColsXml(
     colWidths || WAREHOUSE_PREPARE_COL_WIDTHS,
   );
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${WAREHOUSE_PREPARE_BODY_ROW_HEIGHT}"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.35" right="0.35" top="0.45" bottom="0.4" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="1"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${WAREHOUSE_PREPARE_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${WAREHOUSE_PREPARE_BODY_ROW_HEIGHT}"/><cols>${cols}</cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.35" right="0.35" top="0.45" bottom="0.4" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
-function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = {}) {
-  const s = styleIds || warehousePreparePrintStyleIds("");
+function buildWarehousePrepareSheetXml(orders, workerIds) {
+  const s = WAREHOUSE_PREPARE_SHEET_STYLES;
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -17616,7 +17607,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = 
   const headerRow = rowNum;
   pushRow(WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT, [
     xlsxCellXml(`A${headerRow}`, s.header, si("Барааны нэр төрөл"), "s"),
-    xlsxCellXml(`B${headerRow}`, s.header, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`B${headerRow}`, s.unitHead, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, s.header, si("Баркод"), "s"),
     xlsxCellXml(
       `D${headerRow}`,
@@ -17639,9 +17630,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = 
     xlsxCellXml(`G${headerRow}`, s.header, si("Үлдэгдэл (ш)"), "s"),
   ]);
   const nameColWidth = WAREHOUSE_PREPARE_COL_WIDTHS[0];
-  const qtyLarge = s.qtyLarge ?? WAREHOUSE_PREPARE_LARGE_CELL_STYLE;
-  const qtySmall = s.qtySmall ?? WAREHOUSE_PREPARE_SMALL_CELL_STYLE;
-  const qtyPiece = s.qtyPiece ?? WAREHOUSE_PREPARE_PIECE_CELL_STYLE;
+  const qtyLarge = WAREHOUSE_PREPARE_LARGE_CELL_STYLE;
+  const qtySmall = WAREHOUSE_PREPARE_SMALL_CELL_STYLE;
+  const qtyPiece = WAREHOUSE_PREPARE_PIECE_CELL_STYLE;
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
       if (item.type === "cat") {
@@ -17664,9 +17655,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = 
         max: 36,
       });
       pushRow(rowH, [
-        xlsxCellXml(`A${r}`, s.name, si(name), "s"),
-        xlsxCellXml(`B${r}`, s.unit, si(p.unit || "ширхэг"), "s"),
-        warehousePrepareBarcodeCell(`C${r}`, p.barcode, si, s.barcode),
+        xlsxCellXml(`A${r}`, s.text, si(name), "s"),
+        xlsxCellXml(`B${r}`, s.text, si(p.unit || "ширхэг"), "s"),
+        warehousePrepareBarcodeCell(`C${r}`, p.barcode, si, s.text),
         xlsxPrepareQtyCell(`D${r}`, qtyLarge, parts.largePacks),
         xlsxPrepareQtyCell(`E${r}`, qtySmall, parts.packs),
         xlsxPrepareQtyCell(`F${r}`, qtyPiece, parts.loosePieces),
@@ -17681,8 +17672,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = 
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
     pushRow(WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT, [
-      xlsxCellXml(`A${promoHeadRow}`, s.section, si(PROMO_PRODUCT_LABEL), "s"),
-      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.section),
+      xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
+      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.category),
     ]);
     pushPrepareGroups(sections.promo);
   }
@@ -17719,6 +17710,10 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     throw new Error("JSZip missing");
   }
   const stamp = new Date().toISOString().slice(0, 10);
+  const { sharedStringsXml, sheetXml, printArea } = buildWarehousePrepareSheetXml(
+    orders,
+    workerIds,
+  );
   const tpl = await fetch(staticAssetUrl(WAREHOUSE_PREPARE_TEMPLATE)).then(
     (r) => {
       if (!r.ok) throw new Error("template missing");
@@ -17726,14 +17721,9 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     },
   );
   const zip = await JSZip.loadAsync(tpl);
-  const stylesXml = warehousePreparePrintPatchStylesXml(
+  const stylesXml = warehousePreparePatchStylesXml(
     await zip.file("xl/styles.xml").async("string"),
-  );
-  const styleIds = warehousePreparePrintStyleIds(stylesXml);
-  const { sharedStringsXml, sheetXml, printArea } = buildWarehousePrepareSheetXml(
-    orders,
-    workerIds,
-    { styleIds },
+    { fillCategory: false },
   );
   const themeFile = zip.file("xl/theme/theme1.xml");
   const themeXml = themeFile ? await themeFile.async("string") : null;
@@ -22374,9 +22364,9 @@ function cancelWorkerOrderNow(id) {
   if (state.selectedWarehouseOrderId === id) {
     state.selectedWarehouseOrderId = "";
   }
-  render();
   showAppToast("Захиалга цуцлагдлаа", "success");
-  criticalBackendSave();
+  requestAnimationFrame(() => render());
+  void criticalBackendSave({ fast: true });
 }
 function confirmCancelWorkerOrder(id, returnToReceipt = false) {
   const order = state.orders.find((x) => String(x.id) === String(id));
@@ -22652,11 +22642,17 @@ function render() {
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
+  if (barcodeScanning) {
+    barcodeScanRenderPending = true;
+    if (localStateDirty()) scheduleBackendSave();
+    return;
+  }
   if (!state.isLoggedIn && isLoginFormActive()) return;
   countRenderPending = false;
   warehouseDateRenderPending = false;
   settlementRenderPending = false;
   stockInScanRenderPending = false;
+  barcodeScanRenderPending = false;
   if (!state.isLoggedIn) {
     mountLoginView();
     return;
@@ -26002,7 +25998,9 @@ async function startZxingBarcodeScan(video, status) {
 async function startBarcodeScan(target = "picker") {
   if (!navigator.mediaDevices?.getUserMedia)
     return alert("Энэ хөтөч баркод скан хийхийг дэмжихгүй.");
-  stopBarcodeScan();
+  clearTimeout(stockInScanBlurTimer);
+  stockInScanRenderPending = false;
+  stopBarcodeScan({ skipFlush: true });
   barcodeScanTarget = target;
   const panel = document.getElementById("barcodeScanner");
   const video = document.getElementById("barcodeVideo");
@@ -26023,7 +26021,8 @@ async function startBarcodeScan(target = "picker") {
     );
   }
 }
-function stopBarcodeScan() {
+function stopBarcodeScan(opts = {}) {
+  const wasScanning = barcodeScanning;
   barcodeScanning = false;
   if (barcodeScanFrame) cancelAnimationFrame(barcodeScanFrame);
   barcodeScanFrame = 0;
@@ -26050,6 +26049,7 @@ function stopBarcodeScan() {
     video.srcObject = null;
   }
   if (panel) panel.hidden = true;
+  if (!opts.skipFlush && wasScanning) flushPendingBarcodeScanRender();
 }
 function openPickerModal() {
   stopBarcodeScan();
@@ -26883,9 +26883,9 @@ function deleteReceiptNow(id) {
   );
   if (state.receiptEditOrderId === id) clearReceiptEdit();
   closeModal();
-  render();
   showAppToast(`Баримт ${receiptLabel} устгагдлаа`, "success");
-  return criticalBackendSave();
+  requestAnimationFrame(() => render());
+  return criticalBackendSave({ fast: true });
 }
 function recordDeletion(type, id) {
   if (!["product", "customer", "employee", "order"].includes(type) || !id)
@@ -26976,8 +26976,8 @@ function setOrder(id, s) {
     });
   }
   o.status = s;
-  render();
-  criticalBackendSave();
+  requestAnimationFrame(() => render());
+  void criticalBackendSave({ fast: true });
 }
 function setPaid(id, isPaid) {
   const o = state.orders.find((order) => order.id === id);
