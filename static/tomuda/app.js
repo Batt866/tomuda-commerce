@@ -9827,23 +9827,23 @@ const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
 /** First payment-warning row — taller for wrapped text. */
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
-/** Item styles without bottom border (last row before promo). */
+/** Item styles without bottom border (last row before promo). Max valid s= index is 67. */
 const RECEIPT_XLSX_ITEM_LAST_ROW_STYLES = {
-  8: 64,
-  9: 65,
-  10: 66,
-  11: 67,
-  34: 68,
+  8: 63,
+  9: 64,
+  10: 65,
+  11: 66,
+  34: 67,
 };
-/** Resolved from receiptXlsxStylesXml() — do not reuse legacy 4/5/57/61/62 ids blindly. */
+/** Resolved from receiptXlsxStylesXml() cellXfs (count 68 → indices 0–67). */
 const RECEIPT_XLSX_STYLE = {
-  metaNormal: 6,
-  metaBold: 16,
+  metaNormal: 5,
+  metaBold: 4,
   metaBoldRight: 20,
   metaNormalRight: 56,
-  ibanLabel: 63,
-  signLabel: 62,
-  signLine: 58,
+  ibanLabel: 62,
+  signLabel: 61,
+  signLine: 57,
 };
 // ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» on one line (fitToWidth).
 // Take from B/C so the header never clips.
