@@ -14672,8 +14672,10 @@ function stockInSearchHitsHtml(list) {
 }
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
-  if (!filled.length) return "";
-  return `<div class="stock-in-sheet__lines">${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
+  if (!filled.length) {
+    return `<div class="stock-in-sheet__empty"><p class="stock-in-sheet__empty-title">Сонгосон бараа алга</p><p>Хайлт эсвэл scan хийж бараа нэмнэ үү.</p></div>`;
+  }
+  return `<div class="stock-in-sheet__lines"><p class="stock-in-sheet__lines-label">Сонгосон бараа · ${filled.length}</p>${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
 }
 function stockInUserChipHtml() {
   const emp =
@@ -14711,7 +14713,7 @@ function stockInPanel(list) {
       <button type="button" class="stock-in-sheet__back" onclick="setInventoryTab('stock')" aria-label="Буцах">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
       </button>
-      <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
+      <h1 class="stock-in-sheet__title">Барааны орлого</h1>
       ${stockInUserChipHtml()}
     </div>
     <div class="stock-in-sheet__meta${needSupplier ? " is-blocked" : ""}">
