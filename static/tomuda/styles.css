@@ -19938,6 +19938,11 @@ input.stock-in-sheet__input::placeholder {
     box-shadow: none;
   }
 
+  .stock-in-receipt-doc__party-value-line,
+  .stock-in-sign--bm2 .stock-in-sign__line {
+    border-bottom: 1px solid #000 !important;
+  }
+
   .stock-in-receipt-panel__foot {
     display: none !important;
   }
@@ -19960,10 +19965,8 @@ input.stock-in-sheet__input::placeholder {
 }
 
 .stock-in-sign--bm2 .stock-in-sign__line {
-  border-bottom: 0;
-  letter-spacing: 0.08em;
-  font-size: 12px;
-  color: var(--hex-foreground);
+  min-height: 1.1em;
+  border-bottom: 1px solid #000;
 }
 
 .stock-in-report-list-wrap {
