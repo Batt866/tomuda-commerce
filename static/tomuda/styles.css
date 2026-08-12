@@ -19771,33 +19771,58 @@ input.stock-in-sheet__input::placeholder {
 }
 
 .stock-in-receipt-doc__head {
-  padding: 14px 16px 10px;
+  padding: 0;
   border-bottom: 1px solid var(--hex-border);
 }
 
 .stock-in-receipt-doc__title {
-  margin: 0 0 8px;
+  margin: 0;
+  padding: 12px 16px;
   font-size: 16px;
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1.25;
-  color: var(--hex-foreground);
+  text-align: center;
+  color: #1e3a5f;
+  background: #e8eef4;
 }
 
 .stock-in-receipt-doc__meta {
   display: grid;
-  gap: 2px;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 16px 14px;
 }
 
-.stock-in-receipt-doc__meta-line {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.35;
-  color: var(--hex-foreground);
+.stock-in-receipt-doc__meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.stock-in-receipt-doc__meta-pair {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, auto) 1fr;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
 }
 
 .stock-in-receipt-doc__meta-label {
-  color: var(--hex-muted-foreground);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+  color: #64748b;
+}
+
+.stock-in-receipt-doc__meta-value {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--hex-foreground);
+  overflow-wrap: anywhere;
 }
 
 .stock-in-receipt-doc__table-wrap {
@@ -19821,10 +19846,11 @@ input.stock-in-sheet__input::placeholder {
 .stock-in-receipt-table th {
   font-size: 12px;
   font-weight: 700;
-  text-align: left;
-  color: var(--hex-muted-foreground);
-  background: color-mix(in srgb, var(--hex-secondary) 45%, var(--hex-card));
+  text-align: center;
+  color: #475569;
+  background: #e2e8f0;
   white-space: nowrap;
+  border-color: #e2e8f0;
 }
 
 .stock-in-receipt-table__no {
@@ -19843,9 +19869,15 @@ input.stock-in-sheet__input::placeholder {
   font-variant-numeric: tabular-nums;
   color: var(--hex-muted-foreground);
   white-space: nowrap;
+  text-align: center;
 }
 
-.stock-in-receipt-table__qty,
+.stock-in-receipt-table__qty {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .stock-in-receipt-table__unit,
 .stock-in-receipt-table__total {
   text-align: right;
@@ -19854,26 +19886,15 @@ input.stock-in-sheet__input::placeholder {
 }
 
 .stock-in-receipt-table__total-row td {
-  border-top: 1px solid color-mix(in srgb, var(--hex-foreground) 25%, var(--hex-border));
-  background: color-mix(in srgb, var(--hex-secondary) 35%, var(--hex-card));
+  border-top: 1px solid #94a3b8;
+  background: color-mix(in srgb, var(--hex-secondary) 25%, var(--hex-card));
 }
 
-.stock-in-receipt-doc__summary {
-  padding: 12px 16px 14px;
+.stock-in-receipt-doc__signatures {
+  padding: 16px 16px 12px;
   border-top: 1px solid var(--hex-border);
   display: grid;
-  gap: 4px;
-}
-
-.stock-in-receipt-doc__summary-line {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--hex-foreground);
-}
-
-.stock-in-receipt-doc__summary-line span {
-  color: var(--hex-muted-foreground);
+  gap: 12px;
 }
 
 .stock-in-report-list-wrap {
