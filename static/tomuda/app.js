@@ -689,7 +689,7 @@ function receiptPaymentTermDisplay(o) {
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="9" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td><td></td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -9028,7 +9028,7 @@ td, th { border: none; }
 .receipt-info__party { width: 100%; margin: 0 0 4px; }
 .receipt-info__pair {
   display: grid;
-  grid-template-columns: 30% 20% 22% 28%;
+  grid-template-columns: 34% 16% 22% 28%;
   column-gap: 4px;
   align-items: start;
   margin: 0 0 3px;
@@ -9331,7 +9331,6 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
   text-align: right;
   border: none !important;
-  border-bottom: 0.4pt solid #777 !important;
   background: #d9d9d9 !important;
 }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
@@ -9706,8 +9705,7 @@ td, th { border: none; }
   }
   .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-rule,
   .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
-    border-top: none !important;
-    border-bottom: 0.5pt solid #000 !important;
+    border: none !important;
   }
   .receipt-grid__summary-note {
     border-top: 0.5pt solid #000 !important;
@@ -9837,8 +9835,8 @@ const RECEIPT_XLSX_ROW_HEIGHT = 15;
 const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
 /** Slightly taller title / signature labels only. */
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
-/** «ЗАРЛАГЫН БАРИМТ» row — a bit taller than brand row. */
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 20;
+/** «ЗАРЛАГЫН БАРИМТ» row — tall enough for 14pt title without clipping. */
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 22;
 /** First payment-warning row — taller for wrapped text. */
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
 /** Item styles without bottom border (last row before promo). Max valid s= index is 67. */
@@ -9859,10 +9857,9 @@ const RECEIPT_XLSX_STYLE = {
   signLabel: 61,
   signLine: 57,
 };
-// ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» on one line (fitToWidth).
-// Take from B/C so the header never clips.
+// ҮНДСЭН A–K: C wider for «Худалдааны төлөөлөгчийн утас:»; title row uses B→K.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 12.5, 6.5, 3.875, 15.25, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
+  3.0, 13.0, 9.0, 2.875, 15.25, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -10449,7 +10446,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `A${hr1}:A${hr2}`,
     `B${hr1}:F${hr1}`,
     `B${hr2}:I${hr2}`,
-    `B${hr3}:J${hr3}`,
+    `B${hr3}:K${hr3}`,
     `J${hr1}:K${hr1}`,
   );
   pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
@@ -10485,7 +10482,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   ]);
   pushRow(RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT, [
     xlsxCellXml(`B${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr3, "C", "J", 40),
+    ...emptyCells(hr3, "C", "K", 40),
   ]);
 
   const pushMetaPairRow = (leftLabel, leftValue, rightLabel, rightValue, { rightBold = false, singleLine = false } = {}) => {
@@ -10528,9 +10525,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   };
   pushMetaPairRow("Худалдааны төлөөлөгч:", f.salesName, "Харилцагч:", f.customerName, { rightBold: true });
-  pushMetaPairRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg, {
-    singleLine: true,
-  });
+  pushMetaPairRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg);
   pushMetaPairRow("Түгээгчийн нэр:", f.deliveryName, "Компаний нэр:", f.companyName);
   pushMetaPairRow("Түгээгчийн утас:", f.deliveryPhone, "Утасны дугаар:", f.customerPhone);
   // Always show И-мэйл row (blank when no customer email)
@@ -10728,16 +10723,16 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   // Хувь хасагдаагүй нийт үнийн дүн — зөвхөн Шууд төлөх
   if (receiptShouldShowGross(o)) {
     const grossRow = rowNum;
-    // Label B→E: gray, no borders. Underline only F→K (nothing from D leftward).
+    // Label B→E: gray, no borders. F→K: gray amount area, no underline.
     merges.push(`B${grossRow}:E${grossRow}`);
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
-      xlsxCellXml(`F${grossRow}`, 32, null, "empty"),
-      xlsxCellXml(`G${grossRow}`, 32, null, "empty"),
-      xlsxCellXml(`H${grossRow}`, 32, null, "empty"),
-      xlsxCellXml(`I${grossRow}`, 32, null, "empty"),
-      xlsxCellXml(`J${grossRow}`, 32, null, "empty"),
-      xlsxCellXml(`K${grossRow}`, 32, Number(gross) || 0, "n"),
+      xlsxCellXml(`F${grossRow}`, 31, null, "empty"),
+      xlsxCellXml(`G${grossRow}`, 31, null, "empty"),
+      xlsxCellXml(`H${grossRow}`, 31, null, "empty"),
+      xlsxCellXml(`I${grossRow}`, 31, null, "empty"),
+      xlsxCellXml(`J${grossRow}`, 31, null, "empty"),
+      xlsxCellXml(`K${grossRow}`, 20, Number(gross) || 0, "n"),
       ...emptyCells(grossRow, "C", "E", 19),
       ...emptyCells(grossRow, "A", "A", 1),
     ]);
@@ -16884,7 +16879,7 @@ const STOCK_IN_REPORT_STYLES = {
   totalMoneyPadded: 23,
 };
 function stockInReportStylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="7"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF64748B"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="5"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="medium"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF64748B"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="24"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="5" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" wrapText="1"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="7"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF64748B"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF64748B"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF4"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="5"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="medium"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF64748B"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="24"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="4" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" wrapText="1"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf><xf numFmtId="164" fontId="3" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" indent="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function stockInReportWorksheetXml(rows, merges, lastRow) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
