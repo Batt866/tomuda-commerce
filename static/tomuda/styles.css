@@ -19824,28 +19824,25 @@ input.stock-in-sheet__input::placeholder {
 .stock-in-receipt-doc__party-block {
   padding: 0 16px 12px;
   display: grid;
-  gap: 10px;
+  gap: 0;
 }
 
-.stock-in-receipt-doc__party-line {
+.stock-in-receipt-doc__party-value-line {
   margin: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--hex-foreground) 55%, var(--hex-border));
-  padding-bottom: 4px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .stock-in-receipt-doc__party-caption {
   display: block;
-  margin-top: 2px;
+  margin: 2px 0 10px;
   font-size: 10px;
   color: var(--hex-muted-foreground);
   font-weight: 400;
-}
-
-.stock-in-receipt-doc__party-value {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
+  text-align: center;
 }
 
 .stock-in-receipt-doc__table-wrap {
