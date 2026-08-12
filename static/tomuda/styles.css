@@ -16671,6 +16671,10 @@ textarea::placeholder {
   align-items: flex-end;
 }
 
+.sales-report-filters--compact .page-toolbar__select {
+  min-width: 6.5rem;
+}
+
 .sales-report-filters__field {
   display: flex;
   flex-direction: column;
@@ -16689,11 +16693,71 @@ textarea::placeholder {
   min-width: 7.5rem;
 }
 
+.sales-report-summary {
+  padding: 12px 14px;
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  background: var(--hex-card);
+}
+
+.sales-report-summary__period {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+}
+
+.sales-report-summary__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.sales-report-summary__stat {
+  min-width: 0;
+}
+
+.sales-report-summary__stat dt {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--hex-muted-foreground);
+}
+
+.sales-report-summary__stat dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+}
+
+.sales-report-summary__value--debt {
+  color: var(--hex-destructive, #dc2626);
+}
+
 .sales-report-customer {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.sales-report-customer__name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--hex-foreground);
+}
+
+.sales-report-customer__meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--hex-muted-foreground);
 }
 
 .sales-report-customer__main {
@@ -16709,9 +16773,27 @@ textarea::placeholder {
   flex-shrink: 0;
 }
 
+.sales-report-customer__sales {
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+}
+
 .sales-report-customer__debt {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .sales-report-summary__stats {
+    gap: 6px;
+  }
+
+  .sales-report-summary__stat dd {
+    font-size: 14px;
+  }
 }
 
 .sales-report-emp {
@@ -19686,6 +19768,190 @@ input.stock-in-sheet__input::placeholder {
   padding: 14px 16px max(20px, calc(12px + env(safe-area-inset-bottom, 0px)));
   border-top: 1px solid var(--hex-border);
   background: var(--hex-card);
+}
+
+.stock-in-receipt-doc__head {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.stock-in-receipt-doc__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  color: var(--hex-foreground);
+}
+
+.stock-in-receipt-doc__meta {
+  display: grid;
+  gap: 2px;
+}
+
+.stock-in-receipt-doc__meta-line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--hex-foreground);
+}
+
+.stock-in-receipt-doc__meta-label {
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-receipt-doc__table-wrap {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.stock-in-receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.stock-in-receipt-table th,
+.stock-in-receipt-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hex-border);
+  vertical-align: middle;
+}
+
+.stock-in-receipt-table th {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--hex-muted-foreground);
+  background: color-mix(in srgb, var(--hex-secondary) 45%, var(--hex-card));
+  white-space: nowrap;
+}
+
+.stock-in-receipt-table__no {
+  width: 2.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-receipt-table__name {
+  min-width: 8rem;
+  font-weight: 600;
+}
+
+.stock-in-receipt-table__barcode {
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-muted-foreground);
+  white-space: nowrap;
+}
+
+.stock-in-receipt-table__qty,
+.stock-in-receipt-table__unit,
+.stock-in-receipt-table__total {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-in-receipt-table__total-row td {
+  border-top: 1px solid color-mix(in srgb, var(--hex-foreground) 25%, var(--hex-border));
+  background: color-mix(in srgb, var(--hex-secondary) 35%, var(--hex-card));
+}
+
+.stock-in-receipt-doc__summary {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--hex-border);
+  display: grid;
+  gap: 4px;
+}
+
+.stock-in-receipt-doc__summary-line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--hex-foreground);
+}
+
+.stock-in-receipt-doc__summary-line span {
+  color: var(--hex-muted-foreground);
+}
+
+.stock-in-report-list-wrap {
+  overflow-x: auto;
+}
+
+.stock-in-report-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.stock-in-report-list th,
+.stock-in-report-list td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hex-border);
+  vertical-align: middle;
+  text-align: left;
+}
+
+.stock-in-report-list th {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hex-muted-foreground);
+  background: color-mix(in srgb, var(--hex-secondary) 45%, var(--hex-card));
+  white-space: nowrap;
+}
+
+.stock-in-report-list__row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.stock-in-report-list__row:hover,
+.stock-in-report-list__row:focus-visible {
+  background: color-mix(in srgb, var(--hex-primary) 6%, var(--hex-card));
+  outline: none;
+}
+
+.stock-in-report-list__num,
+.stock-in-report-list__amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stock-in-report-list__amount {
+  font-weight: 700;
+}
+
+.stock-in-report-list__summary {
+  padding: 14px 4px 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.stock-in-report-list__summary p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.stock-in-report-list__summary span {
+  color: var(--hex-muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .stock-in-receipt-table,
+  .stock-in-report-list {
+    font-size: 12px;
+  }
+
+  .stock-in-receipt-table th,
+  .stock-in-receipt-table td,
+  .stock-in-report-list th,
+  .stock-in-report-list td {
+    padding: 7px 8px;
+  }
 }
 
 .stock-in-sign {
