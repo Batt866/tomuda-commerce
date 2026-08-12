@@ -18566,9 +18566,11 @@ function promoProductRowHtml(p, { onclick, active = false, selected = false, qty
     .filter(Boolean)
     .join(" ");
   const meta = selected
-    ? `<p class="promo-product-row__meta">${esc(p.category)}</p>`
-    : `<p class="promo-product-row__meta">${esc(p.category)} · ${esc(p.barcode)}</p><p class="promo-product-row__stock"><span class="promo-product-row__price">${fmt(p.price)}</span><span class="promo-product-row__sep" aria-hidden="true">·</span><span class="promo-product-row__remain">үлд ${p.stock} ${esc(p.unit || "ш")}</span></p>`;
-  const body = `<span class="promo-product-row__media"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-product-row__img product-thumb" width="48" height="48" loading="lazy" decoding="async" alt=""></span><span class="promo-product-row__text"><span class="promo-product-row__name">${esc(p.name)}</span>${meta}</span>${qtyHtml}${removeHtml}`;
+    ? ""
+    : p.category
+      ? `<p class="promo-product-row__meta">${esc(p.category)}</p>`
+      : "";
+  const body = `<span class="promo-product-row__media"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-product-row__img product-thumb" width="40" height="40" loading="lazy" decoding="async" alt=""></span><span class="promo-product-row__text"><span class="promo-product-row__name">${esc(p.name)}</span>${meta}</span>${qtyHtml}${removeHtml}`;
   if (onclick) {
     return `<button type="button" onclick="${onclick}" class="${cls}">${body}</button>`;
   }
@@ -19731,12 +19733,7 @@ function promotionSelectedProductRowHtml(p, pickKey, { perProductQty = false } =
     short: true,
   });
   const qtyHtml = perProductQty
-    ? promotionQtyField(
-        promoBuyQtyFieldName(p.id),
-        `Босго (${unit})`,
-        "1",
-        true,
-      )
+    ? promotionQtyField(promoBuyQtyFieldName(p.id), unit, "1", true)
     : "";
   const removeHtml = `<button type="button" onclick="removePromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})" class="promo-product-row__remove" aria-label="Хасах">×</button>`;
   return promoProductRowHtml(p, {
@@ -19768,10 +19765,10 @@ function promotionMultiProductPickerBlock({
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
     selectedHtml = selectedProducts.length
-      ? `<div class="promo-product-list promo-product-list--selected"><div class="promo-selected-head"><span>Сонгосон</span><b>${selectedProducts.length}</b></div>${selectedProducts.map((p) => promotionSelectedProductRowHtml(p, pickKey, { perProductQty })).join("")}</div>`
+      ? `<div class="promo-product-list promo-product-list--selected"><div class="promo-selected-head">Сонгосон <b>${selectedProducts.length}</b></div>${selectedProducts.map((p) => promotionSelectedProductRowHtml(p, pickKey, { perProductQty })).join("")}</div>`
       : compact
         ? `<p class="promo-product-empty">Бараа нэмээгүй</p>`
-        : `<div class="promo-product-empty-card"><p class="promo-product-empty-card__title">Бараа сонгоогүй</p><p class="promo-product-empty-card__hint">Хайлт эсвэл төрлөөр шүүгээд нэмнэ үү</p></div>`,
+        : `<p class="promo-product-empty">Бараа нэмээгүй</p>`,
     searchHtml = promoProductSearchListHtml({
       pickKey,
       selectedIds: ids,
