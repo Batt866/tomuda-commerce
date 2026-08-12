@@ -16917,7 +16917,7 @@ function stockInListReportWorksheetXml(rows, merges, lastRow, { autoFilter = nul
     (width, index) =>
       `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
   ).join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_LIST_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}${autoFilterXml}<printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_LIST_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${autoFilterXml}${mergeCellsXml}<printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 function stockInReportPeriodText(receipts, fallbackDay) {
   const days = (receipts || [])
@@ -16934,7 +16934,6 @@ function stockInReportPeriodText(receipts, fallbackDay) {
 function buildStockInReportListSheetXml(receipts, { day } = {}) {
   const s = STOCK_IN_LIST_REPORT_STYLES;
   const lastCol = STOCK_IN_LIST_REPORT_LAST_COL;
-  const colLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const reportDay = normalizeIsoDateInput(day) || todayIso();
   const strings = [];
   const strIndex = new Map();
@@ -16947,15 +16946,6 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
     return idx;
   };
   const merges = [`A1:${lastCol}1`];
-  const emptyCells = (row, from = "A", to = lastCol, style = 0) => {
-    const cols = colLetters.slice(
-      colLetters.indexOf(from),
-      colLetters.indexOf(to) + 1,
-    );
-    return cols
-      .split("")
-      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
-  };
   const rows = [];
   let rowNum = 1;
   const pushRow = (height, cells) => {
@@ -17077,9 +17067,6 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   pushSpacerRow();
   const firstDataRow = dataRows[0];
   const lastDataRow = dataRows[dataRows.length - 1];
-  const receiptCountFormula = dataRows.length
-    ? `SUMPRODUCT((C${firstDataRow}:C${lastDataRow}<>"")/COUNTIF(C${firstDataRow}:C${lastDataRow},C${firstDataRow}:C${lastDataRow}&""))`
-    : "0";
   const qtyFormula = dataRows.length
     ? `SUM(I${firstDataRow}:I${lastDataRow})`
     : "0";
@@ -17090,7 +17077,7 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   const summaryRows = [
     {
       label: "Нийт орлогын баримт:",
-      formula: receiptCountFormula,
+      formula: null,
       cached: receiptCount,
       style: s.summaryInt,
     },
@@ -17112,10 +17099,9 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
     merges.push(`A${r}:J${r}`);
     pushRow(STOCK_IN_LIST_REPORT_META_ROW_H, [
       xlsxCellXml(`A${r}`, s.summaryText, si(label), "s"),
-      ...emptyCells(r, "B", "J", s.summaryText),
-      dataRows.length
+      formula
         ? xlsxCellXml(`K${r}`, style, { f: formula, v: cached }, "f")
-        : xlsxCellXml(`K${r}`, style, 0, "n"),
+        : xlsxCellXml(`K${r}`, style, Number(cached) || 0, "n"),
     ]);
   });
   const lastRow = Math.max(1, rowNum - 1);
