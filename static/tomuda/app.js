@@ -16672,7 +16672,14 @@ function stockInReportWorksheetXml(rows, merges, lastRow) {
   ).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
-function buildStockInReportSheetXml(receipt) {
+function buildStockMovementReportSheetXml(
+  receipt,
+  {
+    titleText = "Барааны орлогын тайлан",
+    partyHeader = "Нийлүүлэгч",
+    getPartyValue = (r) => String(r.supplierName || "").trim() || "—",
+  } = {},
+) {
   receipt = normalizeStockInReceiptTotals(receipt);
   const s = STOCK_IN_REPORT_STYLES;
   const lastCol = STOCK_IN_REPORT_LAST_COL;
@@ -16692,13 +16699,13 @@ function buildStockInReportSheetXml(receipt) {
   const receiptNo = receipt.receiptNumber
     ? `#${receipt.receiptNumber}`
     : "Дугааргүй";
-  const supplier = String(receipt.supplierName || "").trim() || "—";
+  const party = getPartyValue(receipt);
   const warehouse = String(receipt.warehouseName || "").trim() || "Үндсэн Агуулах";
   const employee = String(receipt.employeeName || "").trim() || "—";
   const headers = [
     "Огноо",
     "Баримт №",
-    "Нийлүүлэгч",
+    partyHeader,
     "Агуулах",
     "SKU",
     "Барааны нэр",
@@ -16735,7 +16742,7 @@ function buildStockInReportSheetXml(receipt) {
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
   pushRow(20, [
-    xlsxCellXml("A1", s.title, si("Барааны орлогын тайлан"), "s"),
+    xlsxCellXml("A1", s.title, si(titleText), "s"),
   ]);
   pushRow(18, [
     xlsxCellXml(
@@ -16768,7 +16775,7 @@ function buildStockInReportSheetXml(receipt) {
     pushRow(STOCK_IN_REPORT_TABLE_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, s.textLeft, si(dateText), "s"),
       xlsxCellXml(`B${r}`, s.textLeft, si(receiptNo), "s"),
-      xlsxCellXml(`C${r}`, s.textLeft, si(supplier), "s"),
+      xlsxCellXml(`C${r}`, s.textLeft, si(party), "s"),
       xlsxCellXml(`D${r}`, s.textLeft, si(warehouse), "s"),
       sku
         ? xlsxBarcodeCell(`E${r}`, s.sku, sku, si)
@@ -16842,6 +16849,38 @@ function buildStockInReportSheetXml(receipt) {
     sheetXml: stockInReportWorksheetXml(rows, merges, lastRow),
     printArea,
   };
+}
+function buildStockInReportSheetXml(receipt) {
+  return buildStockMovementReportSheetXml(receipt, {
+    titleText: "Барааны орлогын тайлан",
+    partyHeader: "Нийлүүлэгч",
+    getPartyValue: (r) => String(r.supplierName || "").trim() || "—",
+  });
+}
+function normalizeStockOutReceiptForReport(receipt) {
+  return normalizeStockInReceiptTotals({
+    ...receipt,
+    lines: (receipt?.lines || []).map((line) => {
+      const p =
+        state.products.find((x) => String(x.id) === String(line?.productId)) ||
+        null;
+      const costPrice =
+        Number(line?.costPrice) > 0
+          ? Math.floor(Number(line.costPrice))
+          : Math.floor(productCostPrice(p) || 0);
+      return { ...line, costPrice };
+    }),
+  });
+}
+function buildStockOutReportSheetXml(receipt) {
+  return buildStockMovementReportSheetXml(
+    normalizeStockOutReceiptForReport(receipt),
+    {
+      titleText: "Барааны зарлагын тайлан",
+      partyHeader: "Хэнд",
+      getPartyValue: (r) => String(r.recipientNote || "").trim() || "—",
+    },
+  );
 }
 async function assembleStockInReportXlsxZip({
   sharedStringsXml,
@@ -17135,26 +17174,13 @@ async function exportStockOutExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
-  const tpl = await fetch(staticAssetUrl(STOCK_IN_XLSX_TEMPLATE)).then((r) => {
-    if (!r.ok) throw new Error("template missing");
-    return r.arrayBuffer();
-  });
-  const tplZip = await JSZip.loadAsync(tpl);
-  const stylesXml = stockReceiptPatchStylesXml(
-    await tplZip.file("xl/styles.xml").async("string"),
-  );
-  const styleIds = stockReceiptQtyStyleIds(stylesXml);
-  const { sharedStringsXml, sheetXml, printArea } = buildStockOutSheetXml(receipt, {
-    styleIds,
-  });
-  const themeFile = tplZip.file("xl/theme/theme1.xml");
-  const themeXml = themeFile ? await themeFile.async("string") : null;
-  const zip = await assembleStockReceiptXlsxZip({
+  const { sharedStringsXml, sheetXml, printArea } =
+    buildStockOutReportSheetXml(receipt);
+  const zip = await assembleStockInReportXlsxZip({
     sharedStringsXml,
     sheetXml,
-    stylesXml,
-    themeXml,
     printArea,
+    sheetName: "Зарлагын тайлан",
   });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockOutReceiptFileName(receipt));
