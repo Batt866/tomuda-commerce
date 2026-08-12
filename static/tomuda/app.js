@@ -13628,8 +13628,8 @@ function finalizeStockOutReceipt(receipt) {
 function stockOutReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
   return no
-    ? `Зарлагын баримт - ${no}.xlsx`
-    : `Зарлагын баримт - ${todayIso()}.xlsx`;
+    ? `Барааны зарлагын тайлан - ${no}.xlsx`
+    : `Барааны зарлагын тайлан - ${todayIso()}.xlsx`;
 }
 function stockOutReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -13868,8 +13868,8 @@ function finalizeStockInReceipt(receipt) {
 function stockInReceiptFileName(receipt) {
   const no = receipt?.receiptNumber;
   return no
-    ? `Орлогын-баримт-${no}.xlsx`
-    : `Орлогын-баримт-${todayIso()}.xlsx`;
+    ? `Барааны орлогын тайлан - ${no}.xlsx`
+    : `Барааны орлогын тайлан - ${todayIso()}.xlsx`;
 }
 function stockInReceiptTitle(receipt) {
   const no = receipt?.receiptNumber;
@@ -20171,24 +20171,8 @@ function workerPromoMixEntriesHtml() {
   return `<div class="promo-mix-entries" aria-label="Багц урамшуулал">${cards.join("")}</div>`;
 }
 function workerQuantityPromoHintsHtml(cart) {
-  const rules = state.promotionRules?.quantity || [];
-  if (!rules.length) return "";
-  const qtyByProduct = workerQtyByProduct();
-  const cards = [];
-  for (const rule of rules) {
-    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
-    if (!prog) continue;
-    const touched = prog.buyIds.some((id) => {
-      const key = Object.keys(qtyByProduct).find(
-        (k) => String(k) === String(id),
-      );
-      return (Number(key != null ? qtyByProduct[key] : qtyByProduct[id]) || 0) > 0;
-    });
-    if (!touched && !prog.sets) continue;
-    cards.push(workerQtyPromoProgressCardHtml(prog, qtyByProduct));
-  }
-  if (!cards.length) return "";
-  return `<div class="worker-promo-progress-list">${cards.join("")}</div>`;
+  // Hide promo progress cards on the worker order screen.
+  return "";
 }
 function workerAmountPromoHintsHtml(cart) {
   if (!cart?.paid?.length) return "";
@@ -21970,7 +21954,8 @@ function workerView() {
     orders = workerOrdersList(),
     inActiveOrder =
       tab === "new" && state.workerStoreReady && !!state.workerCustomer;
-  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
+  const orderFoot = inActiveOrder ? workerOrderFootHtml(cart) : "";
+  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${orderFoot}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
 }
 function clearWorkerOrderHighlight() {
   state.workerOrdersArrived = false;
@@ -22970,12 +22955,6 @@ function workerNewOrderStep(cart) {
   const headExtra = editing
     ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")}</p>`
     : "";
-  const saveAction = editing ? "saveWorkerOrderEdit()" : "saveWorker()";
-  const saveLabel = saving
-    ? "Хадгалж байна..."
-    : editing
-      ? "Өөрчлөлт хадгалах"
-      : "Хадгалах";
   const addBtn = `<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${editing ? "Бараа нэмэх" : "Бараа сонгох"}</span></button></div>`;
   const promoHints = workerQuantityPromoHintsHtml(cart);
   const lines = `<div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div>`;
@@ -22983,7 +22962,19 @@ function workerNewOrderStep(cart) {
   const bodyMain = editing
     ? `${lines}${addBtn}${promoHints}`
     : `${addBtn}${lines}${promoHints}`;
-  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>${promoMixSheetHtml()}`;
+  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div></section>${promoMixSheetHtml()}`;
+}
+function workerOrderFootHtml(cart) {
+  const editing = !!state.editingOrderId;
+  const hasItems = workerPaidProductsInCart().length > 0;
+  const saving = orderSubmitLock;
+  const saveAction = editing ? "saveWorkerOrderEdit()" : "saveWorker()";
+  const saveLabel = saving
+    ? "Хадгалж байна..."
+    : editing
+      ? "Өөрчлөлт хадгалах"
+      : "Хадгалах";
+  return `<footer class="worker-order-card__foot worker-order-card__foot--below-tabs">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer>`;
 }
 function workerPromoRow(line) {
   const p = findProductByIdLoose(line.productId) || {};

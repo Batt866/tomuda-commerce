@@ -7737,6 +7737,12 @@ textarea::placeholder {
   flex-shrink: 0;
 }
 
+.worker-order-card__foot--below-tabs {
+  margin: 0;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--hex-border);
+}
+
 .worker-order-options {
   display: flex;
   flex-direction: column;
@@ -11829,8 +11835,7 @@ textarea::placeholder {
     flex: none;
     min-height: 0;
     overflow: visible;
-    /* Fixed footer + bottom nav-ийн доор бараа нуугдахгүй зай */
-    padding-bottom: calc(240px + var(--mobile-nav-offset));
+    padding-bottom: 0;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__head {
@@ -11865,17 +11870,16 @@ textarea::placeholder {
     max-height: none;
   }
 
-  /* Доод панел навигацийн дээр бэхлэгдэнэ — товч бүрэн харагдана. */
-  .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: var(--mobile-nav-offset);
-    z-index: 40;
-    margin: 0;
-    padding: 10px var(--app-gutter) 12px;
+  .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot--below-tabs {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    z-index: 12;
+    margin: 0 0 8px;
+    padding: 0 0 10px;
     background: var(--hex-background);
-    box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
+    box-shadow: none;
   }
 
   .worker-selected-row {
