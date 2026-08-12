@@ -14143,9 +14143,11 @@ function closeStockSwipe(row, animate = true) {
   row.dataset.swipeX = "0";
 }
 function closeAllStockSwipes(except = null) {
-  document.querySelectorAll(".stock-swipe.is-open").forEach((row) => {
-    if (row !== except) closeStockSwipe(row);
-  });
+  document
+    .querySelectorAll(".stock-swipe.is-open, [data-worker-swipe].is-open")
+    .forEach((row) => {
+      if (row !== except) closeStockSwipe(row);
+    });
 }
 function openStockSwipe(row, dir = "left") {
   if (!stockSwipeUsesTouch()) return;
@@ -14156,17 +14158,46 @@ function openStockSwipe(row, dir = "left") {
     true,
   );
 }
+function findSwipeRow(el) {
+  return el?.closest?.("[data-stock-swipe], [data-worker-swipe]") || null;
+}
+function confirmRemoveWorkerCartItem(id) {
+  const productId = String(id || "");
+  if (!productId) return;
+  const p = findProductByIdLoose(productId);
+  const name = p?.name || "энэ бараа";
+  confirmModal(
+    "Болих уу?",
+    `<p><b>${esc(name)}</b>-г захиалгаас хасахдаа итгэлтэй байна уу?</p>`,
+    {
+      confirmLabel: "Тийм",
+      cancelLabel: "Үгүй",
+      danger: true,
+      onConfirm: () => {
+        setWorkerQty(productId, 0);
+        render();
+      },
+    },
+  );
+}
+function workerSwipeRowHtml(productId, innerHtml) {
+  const del =
+    '<button type="button" class="stock-swipe__delete" data-worker-swipe-delete>Болих</button>';
+  const desk = `<button type="button" class="stock-entry-return" data-worker-entry-return onclick="event.preventDefault();event.stopPropagation();confirmRemoveWorkerCartItem('${esc(productId)}')">Болих</button>`;
+  return `<div class="stock-swipe worker-swipe" data-worker-swipe data-product-id="${esc(productId)}"><div class="stock-swipe__rail stock-swipe__rail--left" aria-hidden="true">${del}</div><div class="stock-swipe__rail stock-swipe__rail--right" aria-hidden="true">${del}</div><div class="stock-swipe__front"><div class="stock-swipe__main">${innerHtml}</div>${desk}</div></div>`;
+}
 function initStockSwipeRows() {
   if (initStockSwipeRows._bound) return;
   initStockSwipeRows._bound = true;
   document.addEventListener(
     "pointerdown",
     (e) => {
-      if (e.target?.closest?.("[data-stock-entry-return]")) return;
+      if (e.target?.closest?.("[data-stock-entry-return], [data-worker-entry-return]"))
+        return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      const deleteBtn = e.target?.closest?.("[data-stock-swipe-delete]");
-      if (deleteBtn) {
-        const row = deleteBtn.closest("[data-stock-swipe]");
+      const stockDelete = e.target?.closest?.("[data-stock-swipe-delete]");
+      if (stockDelete) {
+        const row = stockDelete.closest("[data-stock-swipe]");
         if (!row) return;
         e.preventDefault();
         e.stopPropagation();
@@ -14176,20 +14207,34 @@ function initStockSwipeRows() {
         );
         return;
       }
-      // Desktop/web: no horizontal swipe — use visible «Буцаах» button.
+      const workerDelete = e.target?.closest?.("[data-worker-swipe-delete]");
+      if (workerDelete) {
+        const row = workerDelete.closest("[data-worker-swipe]");
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        confirmRemoveWorkerCartItem(row.getAttribute("data-product-id"));
+        return;
+      }
+      // Desktop/web: no horizontal swipe — use visible «Буцаах/Болих» button.
       if (e.pointerType === "mouse" || !stockSwipeUsesTouch()) {
-        const row = e.target?.closest?.("[data-stock-swipe]");
+        const row = findSwipeRow(e.target);
         if (!row) closeAllStockSwipes();
         return;
       }
-      const row = e.target?.closest?.("[data-stock-swipe]");
+      const row = findSwipeRow(e.target);
       if (!row) {
         closeAllStockSwipes();
         return;
       }
       const front = stockSwipeFrontEl(row);
       if (!front || !front.contains(e.target)) return;
-      if (e.target?.closest?.("[data-stock-entry-return]")) return;
+      if (
+        e.target?.closest?.(
+          "[data-stock-entry-return], [data-worker-entry-return]",
+        )
+      )
+        return;
       const startX = Number(row.dataset.swipeX || 0);
       stockSwipeDrag = {
         id: e.pointerId,
@@ -14260,7 +14305,7 @@ function initStockSwipeRows() {
   document.addEventListener(
     "click",
     (e) => {
-      const row = e.target?.closest?.("[data-stock-swipe]");
+      const row = findSwipeRow(e.target);
       if (row?.dataset?.swipeBlockClick === "1") {
         e.preventDefault();
         e.stopPropagation();
@@ -14268,7 +14313,9 @@ function initStockSwipeRows() {
       }
       if (
         row?.classList.contains("is-open") &&
-        !e.target?.closest?.("[data-stock-swipe-delete]")
+        !e.target?.closest?.(
+          "[data-stock-swipe-delete], [data-worker-swipe-delete]",
+        )
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -16608,6 +16655,12 @@ function warehousePreparePrintStyleIds(stylesXml) {
     unit: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
     barcode: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
     qty: WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
+    qtyLargeHead: WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
+    qtyLarge: WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
+    qtySmallHead: WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
+    qtySmall: WAREHOUSE_PREPARE_SMALL_CELL_STYLE,
+    qtyPieceHead: WAREHOUSE_PREPARE_PIECE_HEAD_STYLE,
+    qtyPiece: WAREHOUSE_PREPARE_PIECE_CELL_STYLE,
     stock: 10,
     category: 15,
     section: 15,
@@ -16620,7 +16673,17 @@ function warehousePreparePrintStyleIds(stylesXml) {
   WAREHOUSE_PREPARE_PRINT_STYLE_KEYS.forEach((key, index) => {
     ids[key] = start + index;
   });
-  return { ...fallback, ...ids };
+  // Qty column grays come from warehousePreparePatchStylesXml (indices 20–25).
+  return {
+    ...fallback,
+    ...ids,
+    qtyLargeHead: WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
+    qtyLarge: WAREHOUSE_PREPARE_LARGE_CELL_STYLE,
+    qtySmallHead: WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
+    qtySmall: WAREHOUSE_PREPARE_SMALL_CELL_STYLE,
+    qtyPieceHead: WAREHOUSE_PREPARE_PIECE_HEAD_STYLE,
+    qtyPiece: WAREHOUSE_PREPARE_PIECE_CELL_STYLE,
+  };
 }
 function warehousePreparePrintPatchStylesXml(stylesXml) {
   let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
@@ -16678,9 +16741,9 @@ const WAREHOUSE_PREPARE_FILL_LARGE = {
 }; // Lighter 80% · Том/х
 const WAREHOUSE_PREPARE_FILL_SMALL = {
   theme: 6,
-  tint: "0.79998168889431442",
-  rgb: "FFF2F2F2",
-}; // Lighter 80% · Жижиг/х (same as Том/х)
+  tint: "0.59999389629810485",
+  rgb: "FFD9D9D9",
+}; // Lighter 60% · Жижиг/х (Том/х-ээс бараан)
 const WAREHOUSE_PREPARE_FILL_PIECE = {
   theme: 6,
   tint: "0.3999755851924192",
@@ -16969,12 +17032,30 @@ function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = 
     xlsxCellXml(`A${headerRow}`, s.header, si("Барааны нэр төрөл"), "s"),
     xlsxCellXml(`B${headerRow}`, s.header, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`C${headerRow}`, s.header, si("Баркод"), "s"),
-    xlsxCellXml(`D${headerRow}`, s.header, si("Том/х"), "s"),
-    xlsxCellXml(`E${headerRow}`, s.header, si("Жижиг/х"), "s"),
-    xlsxCellXml(`F${headerRow}`, s.header, si("Тоо/ш"), "s"),
+    xlsxCellXml(
+      `D${headerRow}`,
+      s.qtyLargeHead ?? WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
+      si("Том/х"),
+      "s",
+    ),
+    xlsxCellXml(
+      `E${headerRow}`,
+      s.qtySmallHead ?? WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
+      si("Жижиг/х"),
+      "s",
+    ),
+    xlsxCellXml(
+      `F${headerRow}`,
+      s.qtyPieceHead ?? WAREHOUSE_PREPARE_PIECE_HEAD_STYLE,
+      si("Тоо/ш"),
+      "s",
+    ),
     xlsxCellXml(`G${headerRow}`, s.header, si("Үлдэгдэл (ш)"), "s"),
   ]);
   const nameColWidth = WAREHOUSE_PREPARE_COL_WIDTHS[0];
+  const qtyLarge = s.qtyLarge ?? WAREHOUSE_PREPARE_LARGE_CELL_STYLE;
+  const qtySmall = s.qtySmall ?? WAREHOUSE_PREPARE_SMALL_CELL_STYLE;
+  const qtyPiece = s.qtyPiece ?? WAREHOUSE_PREPARE_PIECE_CELL_STYLE;
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
       if (item.type === "cat") {
@@ -17000,9 +17081,9 @@ function buildWarehousePrepareSheetXml(orders, workerIds, { styleIds = null } = 
         xlsxCellXml(`A${r}`, s.name, si(name), "s"),
         xlsxCellXml(`B${r}`, s.unit, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si, s.barcode),
-        xlsxPrepareQtyCell(`D${r}`, s.qty, parts.largePacks),
-        xlsxPrepareQtyCell(`E${r}`, s.qty, parts.packs),
-        xlsxPrepareQtyCell(`F${r}`, s.qty, parts.loosePieces),
+        xlsxPrepareQtyCell(`D${r}`, qtyLarge, parts.largePacks),
+        xlsxPrepareQtyCell(`E${r}`, qtySmall, parts.packs),
+        xlsxPrepareQtyCell(`F${r}`, qtyPiece, parts.loosePieces),
         xlsxCellXml(`G${r}`, s.stock, Number(p.stock) || 0, "n"),
       ]);
     }
@@ -17139,14 +17220,14 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th { height: 20px; text-align: center; font-size: 11px; font-weight: 800; border: 1px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
 .head th.qty-large { background: #f2f2f2; white-space: nowrap; }
-.head th.qty-small { background: #f2f2f2; white-space: nowrap; }
+.head th.qty-small { background: #d9d9d9; white-space: nowrap; }
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 800; height: 20px; white-space: nowrap; }
 .promo-head { border-top: 1px solid #000 !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
-.num.qty-small { background: #f2f2f2; }
+.num.qty-small { background: #d9d9d9; }
 .num.qty-piece { background: #bfbfbf; }
 .num.qty-large:empty,
 .num.qty-small:empty,
@@ -21719,7 +21800,8 @@ function workerSelectedRow(p) {
   ]
     .filter(Boolean)
     .join('<span class="worker-selected-row__dot" aria-hidden="true">·</span>');
-  return `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb worker-selected-row__thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
+  const row = `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb worker-selected-row__thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
+  return workerSwipeRowHtml(p.id, row);
 }
 function workerOrders(orders) {
   healOrderCustomerNames();
@@ -26271,6 +26353,7 @@ Object.assign(window, {
   saveSupplier,
   stockInEntryModal,
   confirmRemoveStockDraft,
+  confirmRemoveWorkerCartItem,
   applyStockInEntryModal,
   stockInQtyFieldsInput,
   stockInLargePacksInput,
