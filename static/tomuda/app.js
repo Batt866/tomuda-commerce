@@ -88,6 +88,7 @@ const state = {
   suppliers: [],
   stockInEmployeeId: "",
   stockInSupplierId: "",
+  stockInWarehouseName: "",
   stockInDraft: {},
   stockInDone: false,
   stockInReceipt: null,
@@ -5211,6 +5212,7 @@ function applyPersistentState(data) {
     state.stockOutDraft = {};
   if (state.stockOutRecipientNote == null) state.stockOutRecipientNote = "";
   if (state.stockInSupplierId == null) state.stockInSupplierId = "";
+  if (state.stockInWarehouseName == null) state.stockInWarehouseName = "";
   state.deletionLog = normalizeDeletionLog(state.deletionLog);
   state.promotionDeletionLog = normalizePromotionDeletionLog(
     state.promotionDeletionLog,
@@ -13334,23 +13336,16 @@ function stockInHasEntries() {
   return state.products.some((p) => stockInLineQty(p) > 0);
 }
 function stockInHasSupplier() {
-  if (String(state.stockInSupplierId || "").trim()) return true;
-  // Нийлүүлэгчийн жагсаалт хоосон бол шалгалтыг блоклохгүй (давхардсан бүртгэл хүлээхгүй).
-  return !(state.suppliers || []).length;
+  return !!String(state.stockInSupplierId || "").trim();
 }
 function stockInCanFinish() {
   if (stockInSaveLock) return false;
   if (!state.stockInEmployeeId) return false;
-  if ((state.suppliers || []).length && !String(state.stockInSupplierId || "").trim())
-    return false;
   return stockInHasEntries();
 }
 function stockInFinishBlockReason() {
   if (stockInSaveLock) return "Хадгалж байна. Түр хүлээнэ үү.";
   if (!state.stockInEmployeeId) return "Ажилтан сонгоно уу.";
-  if ((state.suppliers || []).length && !String(state.stockInSupplierId || "").trim()) {
-    return "Нийлүүлэгч сонгоод дахин оролдоно уу.";
-  }
   if (!stockInHasEntries()) return "Орлого оруулна уу.";
   return "";
 }
@@ -13363,6 +13358,7 @@ function startStockInSession() {
   state.stockInReceipt = null;
   state.stockInSessionStartedAt = new Date().toISOString();
   state.stockInSupplierId = "";
+  state.stockInWarehouseName = "";
   if (state.currentEmployee?.id) {
     state.stockInEmployeeId = state.currentEmployee.id;
   } else if (!state.stockInEmployeeId) {
@@ -13382,6 +13378,10 @@ function setStockInSupplier(id) {
   ensureStockInSession();
   state.stockInSupplierId = id || "";
   render();
+}
+function setStockInWarehouseName(value) {
+  ensureStockInSession();
+  state.stockInWarehouseName = String(value || "");
 }
 function setStockOutEmployee(id) {
   ensureStockOutSession();
@@ -13775,6 +13775,7 @@ function buildStockInReceiptSnapshot(productIds = null) {
     employeeName: stockInEmployeeName(),
     supplierId: state.stockInSupplierId || "",
     supplierName: stockInSupplierName() || "",
+    warehouseName: String(state.stockInWarehouseName || "").trim(),
     lines,
   });
 }
@@ -13804,6 +13805,7 @@ function applyStockInReceipt(receipt) {
       employeeName: saved.employeeName,
       supplierId: saved.supplierId || "",
       supplierName: saved.supplierName || "",
+      warehouseName: saved.warehouseName || "",
       lines: saved.lines,
       totalAmount: saved.totalAmount,
     });
@@ -13857,7 +13859,6 @@ function confirmFinishStockIn() {
   }
   const blockReason = stockInFinishBlockReason();
   if (blockReason) {
-    if (!stockInHasSupplier()) focusStockInSupplierField();
     return alertModal("Орлого баталгаажуулах боломжгүй", esc(blockReason));
   }
   const receipt = buildStockInReceiptSnapshot();
@@ -13959,9 +13960,8 @@ function stockInEmployeeField() {
   const name = stockInEmployeeName() || "-";
   return `<div class="stock-in-employee stock-in-employee--readonly"><span class="stock-in-employee__label">Ажилтан</span><p class="stock-in-employee__value">${esc(name)}</p></div>`;
 }
-function stockInSupplierField({ emphasize = false } = {}) {
+function stockInSupplierField() {
   ensureStockInSession();
-  const missing = emphasize && !stockInHasSupplier();
   const options = [
     `<option value="">[Сонгох]</option>`,
     ...suppliersSorted().map(
@@ -13971,13 +13971,13 @@ function stockInSupplierField({ emphasize = false } = {}) {
   ].join("");
   const emptyHint = !(state.suppliers || []).length
     ? `<p class="stock-in-sheet__hint">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
-    : missing
-      ? `<p class="stock-in-sheet__hint stock-in-sheet__hint--warn">Баталгаажуулахад нийлүүлэгч заавал сонгоно.</p>`
-      : "";
-  return `<label class="stock-in-sheet__field stock-in-sheet__field--half${missing ? " is-missing" : ""}"><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><select id="stockInSupplierSelect" class="stock-in-sheet__select${missing ? " is-invalid" : ""}" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
+    : "";
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><select id="stockInSupplierSelect" class="stock-in-sheet__select" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
 }
 function stockInWarehouseField() {
-  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><select class="stock-in-sheet__select" disabled aria-label="Агуулах"><option selected>Үндсэн Агуулах</option></select></label>`;
+  ensureStockInSession();
+  const value = esc(state.stockInWarehouseName || "");
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><input type="text" class="stock-in-sheet__select stock-in-sheet__input" value="${value}" placeholder="Агуулахын нэр..." autocomplete="off" oninput="setStockInWarehouseName(this.value)" aria-label="Агуулах"></label>`;
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
@@ -14705,7 +14705,6 @@ function stockInFooterHtml(list) {
 }
 function stockInPanel(list) {
   ensureStockInSession();
-  const needSupplier = stockInHasEntries() && !stockInHasSupplier();
   const allProducts = state.products || [];
   return `<div class="stock-in-sheet">
   <header class="stock-in-sheet__head">
@@ -14716,8 +14715,8 @@ function stockInPanel(list) {
       <h1 class="stock-in-sheet__title">Барааны орлого</h1>
       ${stockInUserChipHtml()}
     </div>
-    <div class="stock-in-sheet__meta${needSupplier ? " is-blocked" : ""}">
-      ${stockInSupplierField({ emphasize: needSupplier })}
+    <div class="stock-in-sheet__meta">
+      ${stockInSupplierField()}
       ${stockInWarehouseField()}
     </div>
   </header>
@@ -19266,37 +19265,12 @@ function workerAmountPromoHintsHtml(cart) {
   return parts.join("");
 }
 function pickerProductPromoHintHtml(p) {
-  const rules = productQuantityPromoRules(p?.id);
-  if (!rules.length) return "";
-  const qtyByProduct = workerQtyByProduct();
-  let best = null;
-  for (const rule of rules) {
-    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
-    if (!prog) continue;
-    best = prog;
-    if (prog.sets > 0) break;
-  }
-  if (!best) {
-    return `<span class="picker-row__promo">Урамшуулал</span>`;
-  }
-  if (best.sets > 0) {
-    return `<span class="picker-row__promo picker-row__promo--active">✓ ${best.grantedFree} ш</span>`;
-  }
-  const meter = quantityPromoProgressMeter(best, qtyByProduct);
-  return `<span class="picker-row__promo">${meter.current}/${meter.goal}</span>`;
+  // Hide promo badges in the order picker — keep the screen uncluttered.
+  return "";
 }
 function pickerQtySheetPromoHtml(p) {
-  const rules = productQuantityPromoRules(p?.id);
-  if (!rules.length) return "";
-  const qtyByProduct = workerQtyByProduct();
-  const cards = [];
-  for (const rule of rules) {
-    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
-    if (!prog) continue;
-    cards.push(workerQtyPromoProgressCardHtml(prog, qtyByProduct));
-  }
-  if (!cards.length) return "";
-  return `<div class="picker-qty-sheet__promo-wrap">${cards.join("")}</div>`;
+  // Keep qty sheet focused on quantity entry — no promo progress cards.
+  return "";
 }
 function promoBuyQtyFieldName(productId) {
   return `buyQty_${productId}`;
@@ -22006,9 +21980,7 @@ function setPaymentTerm(term) {
 }
 function workerOrderStatsHtml(cart) {
   if (!cart.skuCount) return "";
-  const promoHints =
-    workerQuantityPromoHintsHtml(cart) + workerAmountPromoHintsHtml(cart);
-  return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${promoHints}${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
+  return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
 }
 function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = "", hasItems = false } = {}) {
   const stats = hasItems ? workerOrderStatsHtml(cart) : "";
@@ -26572,6 +26544,7 @@ Object.assign(window, {
   confirmStockOutExcel,
   setStockInEmployee,
   setStockInSupplier,
+  setStockInWarehouseName,
   setStockOutEmployee,
   setStockOutRecipientNote,
   supplierModal,

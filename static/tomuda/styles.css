@@ -16611,6 +16611,13 @@ body.image-lightbox-open {
   background-repeat: no-repeat;
 }
 
+input.stock-in-sheet__input.stock-in-sheet__select,
+.stock-in-sheet__input {
+  padding-right: 10px;
+  background-image: none;
+  font-weight: 600;
+}
+
 .stock-in-sheet__select:disabled {
   color: #334155;
   opacity: 0.98;
