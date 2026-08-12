@@ -18530,8 +18530,8 @@ function promoFormGroupHtml(body, { step = "", title = "" } = {}) {
       : "";
   return `<section class="promo-form-group">${head}<div class="promo-form-group__body">${body}</div></section>`;
 }
-function promoFormSaveBtn() {
-  return `<button type="submit" class="promo-form__save"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Хадгалах</span></button>`;
+function promoFormSaveBtn(label = "Хадгалах") {
+  return `<button type="submit" class="promo-form__save"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(label)}</span></button>`;
 }
 function promoFormShell(attrs, bodyHtml) {
   return `<form ${attrs} class="promo-form"><div class="modal-scroll promo-form__body">${bodyHtml}</div><div class="promo-form__foot">${promoFormSaveBtn()}</div></form>`;
@@ -18599,7 +18599,7 @@ function promoQtyModeMeta(mode) {
       id: "each",
       title: "Бүгд хамт",
       desc: "Бараа бүр өөрийн босгоо хангана",
-      example: "Лимон 2 + Энгийн 1 + Гүзээлзгэнэ 3",
+      example: "Жишээ: Лимон 2 + Энгийн 1",
     };
   }
   if (mode === "total") {
@@ -18607,14 +18607,14 @@ function promoQtyModeMeta(mode) {
       id: "total",
       title: "Нийт тоо",
       desc: "Сонгосон барааны нийлбэр босгод хүрнэ",
-      example: "Алим 3 + Лаванда 2 + Лимон 3 = 8",
+      example: "Жишээ: 3+2+3 = 8 ш",
     };
   }
   return {
     id: "any",
     title: "Аль нэг",
-    desc: "Аль нэг бараа босгонд хүрвэл хангалттай",
-    example: "Лимон 2 ш эсвэл Энгийн 2 ш",
+    desc: "Аль нэг бараа босгонд хүрвэл болно",
+    example: "Жишээ: Лимон 2 ш эсвэл Энгийн 2 ш",
   };
 }
 function promoQtyModeCardsHtml(buyMode) {
@@ -19599,8 +19599,8 @@ function promotionMultiProductPickerBlock({
 function promotionMultiBuyPickerBlock(selectedIds, buyMode = "any") {
   const hint =
     buyMode === "each"
-      ? "Бараа бүрт босго тоо оруулна. Бүгд хангагдахад урамшуулал олгоно."
-      : "Бараа бүрт босго тоо оруулна. Аль нэг нь хангагдвал урамшуулал олгоно.";
+      ? "Бараа бүрт босго оруулна · бүгд хангагдахад урамшуулал олгоно"
+      : "Бараа бүрт босго оруулна · аль нэг хангагдвал урамшуулал олгоно";
   return promotionMultiProductPickerBlock({
     pickKey: "buyProductIds",
     fieldName: "buyProductIds",
@@ -20001,7 +20001,7 @@ function promotionQtyModal() {
     selectedIds: freeIds,
     excludeIds: [],
     title: "Өгөх урамшуулал",
-    hint: "Үнэгүй өгөх барааг сонгоно (захиалгын бараа биш)",
+    hint: "Үнэгүй өгөх барааг сонгоно",
     placeholder: "Урамшууллын бараа хайж нэмэх...",
     badge: buyMode === "total" ? "3" : "2",
     qty:
@@ -20027,8 +20027,7 @@ function promotionQtyModal() {
     bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}">${modeBlock}${livePreview}${promoFormGroupHtml(`${promoBundleConditionFormulaHtml(buyQtyDefault, freeQtyDefault)}<p class="promo-step-note">Жишээ: Алим 3 + Лаванда 2 + Лимон 3 = 8 ш бол урамшуулал нээгдэнэ.</p>`, { step: "1", title: "Босго тохируулах" })}${buyProducts}${freePicker}`;
   } else {
     const buyBlock = promotionMultiBuyPickerBlock(buyIds, buyMode);
-    const joinWord = buyMode === "each" ? "БҮГД" : "ЭСВЭЛ";
-    bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}">${modeBlock}${livePreview}${buyBlock}${promoSectionArrow(`бараанууд ${joinWord} босгонд хүрвэл → урамшуулал`)}${freePicker}`;
+    bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}">${modeBlock}${livePreview}${buyBlock}${freePicker}`;
   }
   box(
     promotionPageTitle("quantity"),
@@ -20037,7 +20036,7 @@ function promotionQtyModal() {
       bodyHtml,
     ),
     "max-w-2xl",
-    { panelClass: "modal-panel--promo" },
+    { panelClass: "modal-panel--promo modal-panel--promo-qty" },
   );
 }
 function openPromotionPriceModal() {
