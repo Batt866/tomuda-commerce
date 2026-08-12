@@ -108,6 +108,7 @@ const state = {
   stockOutReceipts: [],
   stockOutHighlightId: "",
   stockOutScanQuery: "",
+  promoMixRuleIndex: null,
   settings: {
     stockAlertEnabled: true,
     stockAlertMin: 10,
@@ -6037,6 +6038,8 @@ async function boot() {
 function canAppBack() {
   if (!state.isLoggedIn) return false;
   if (imageLightboxOpen()) return true;
+  if (state.promoMixRuleIndex != null && state.promoMixRuleIndex !== "")
+    return true;
   const confirmOverlay = document.getElementById("confirm-card-overlay");
   if (confirmOverlay && !confirmOverlay.hidden) return true;
   if (barcodeScanning) return true;
@@ -6123,6 +6126,11 @@ function handleAppBack() {
 
   if (imageLightboxOpen()) {
     closeImageLightbox();
+    return true;
+  }
+
+  if (state.promoMixRuleIndex != null && state.promoMixRuleIndex !== "") {
+    closePromoMixSheet();
     return true;
   }
 
@@ -19406,19 +19414,57 @@ function quantityPromoOfferText(prog) {
   const freeNames = promotionProductLabels(prog.freeIds) || "урамшуулал";
   const freeQty = Math.max(1, Math.floor(Number(prog.freeQty) || 1));
   if (prog.buyMode === "total") {
-    return `Дурын төрлөөс ${prog.buyQty} ш сонгоод ${freeNames} ${freeQty} ш үнэгүй аваарай!`;
+    return `Дурын төрлөөс ${prog.buyQty} ширхэгийг сонгоод ${freeNames} ${freeQty} ш үнэгүй аваарай!`;
   }
   if (prog.buyMode === "each") {
     return `Сонгосон бүх бараа тус бүртээ босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
   }
   return `Сонгосон бараанаас аль нэг нь босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
 }
+function quantityPromoDisplayTitle(prog) {
+  const freeNames = promotionProductLabels(prog.freeIds);
+  return freeNames ? `Урамшуулал: ${freeNames}` : "Багц урамшуулал";
+}
+function openPromoMixSheet(ruleIndex) {
+  const idx = Math.floor(Number(ruleIndex));
+  const rules = state.promotionRules?.quantity || [];
+  if (!Number.isFinite(idx) || idx < 0 || idx >= rules.length) return;
+  state.promoMixRuleIndex = idx;
+  if (pickerOpen()) closeModal();
+  render();
+}
+function closePromoMixSheet() {
+  state.promoMixRuleIndex = null;
+  render();
+}
+function bumpPromoMixQty(productId, delta) {
+  const id = String(productId || "");
+  if (!id) return;
+  const cur = getWorkerQty(id);
+  setWorkerQty(id, Math.max(0, cur + (Number(delta) || 0)));
+}
+function promoMixProductTileHtml(p, qty, { threshold = 0 } = {}) {
+  const maxOk = maxWorkerPaidQty(p.id);
+  const decDisabled = qty <= 0;
+  const incDisabled = qty >= maxOk;
+  const thHint =
+    threshold > 0
+      ? `<span class="promo-mix-tile__th">Босго ${threshold} ш</span>`
+      : "";
+  return `<article class="promo-mix-tile" data-promo-mix-id="${esc(p.id)}">
+  <img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="promo-mix-tile__img" width="72" height="72" loading="lazy" decoding="async">
+  <p class="promo-mix-tile__name">${esc(p.name)}</p>
+  ${thHint}
+  <div class="promo-mix-stepper" role="group" aria-label="${esc(p.name)} тоо">
+    <button type="button" class="promo-mix-stepper__btn" onclick="bumpPromoMixQty(${jsStringArg(p.id)},-1)" ${decDisabled ? "disabled" : ""} aria-label="Багасгах">−</button>
+    <span class="promo-mix-stepper__val">${qty}</span>
+    <button type="button" class="promo-mix-stepper__btn" onclick="bumpPromoMixQty(${jsStringArg(p.id)},1)" ${incDisabled ? "disabled" : ""} aria-label="Нэмэх">+</button>
+  </div>
+</article>`;
+}
 function workerQtyPromoProgressCardHtml(prog, qtyByProduct) {
   const meter = quantityPromoProgressMeter(prog, qtyByProduct);
-  const freeNames = promotionProductLabels(prog.freeIds);
-  const title = freeNames
-    ? `Урамшуулал: ${freeNames}`
-    : "Багц урамшуулал";
+  const title = quantityPromoDisplayTitle(prog);
   const isActive = prog.sets > 0;
   const qtyOf = (id) => {
     const key = Object.keys(qtyByProduct || {}).find(
@@ -19460,6 +19506,109 @@ function workerQtyPromoProgressCardHtml(prog, qtyByProduct) {
     <p class="worker-promo-progress__status">${status}</p>
   </div>
 </article>`;
+}
+function promoMixSheetHtml() {
+  const idx = state.promoMixRuleIndex;
+  if (idx == null || idx === "") return "";
+  const rules = state.promotionRules?.quantity || [];
+  const rule = rules[idx];
+  if (!rule) return "";
+  const qtyByProduct = workerQtyByProduct();
+  const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+  if (!prog) return "";
+  const meter = quantityPromoProgressMeter(prog, qtyByProduct);
+  const title = quantityPromoDisplayTitle(prog);
+  const ready = prog.sets > 0;
+  const meterLabel =
+    prog.buyMode === "each"
+      ? `${meter.current} / ${meter.goal} төрөл`
+      : `${meter.current} / ${meter.goal}`;
+  const tiles = prog.buyIds
+    .map((id) => {
+      const p = findProductByIdLoose(id);
+      if (!p) return "";
+      const q =
+        Number(
+          qtyByProduct[
+            Object.keys(qtyByProduct).find((k) => String(k) === String(id))
+          ] ?? qtyByProduct[id],
+        ) || 0;
+      const threshold =
+        prog.buyMode === "each" || prog.buyMode === "any"
+          ? quantityPromoBuyQtyForProduct(rule, id)
+          : 0;
+      return promoMixProductTileHtml(p, q, { threshold });
+    })
+    .filter(Boolean)
+    .join("");
+  const pickRows = prog.buyIds
+    .map((id) => {
+      const q =
+        Number(
+          qtyByProduct[
+            Object.keys(qtyByProduct).find((k) => String(k) === String(id))
+          ] ?? qtyByProduct[id],
+        ) || 0;
+      if (q <= 0) return "";
+      const p = findProductByIdLoose(id);
+      return `<li><span>${esc(p?.name || id)}</span><b>${q}</b></li>`;
+    })
+    .filter(Boolean)
+    .join("");
+  const bundleName = `${promotionProductLabels(prog.freeIds) || "Урамшуулал"}${prog.buyMode === "total" && prog.buyQty ? ` - ${prog.buyQty} ш` : ""}`;
+  const ctaLabel = ready
+    ? "Урамшуулалтай сагсанд нэмэх"
+    : "Сонголтоо үргэлжлүүлэх";
+  return `<div class="promo-mix-sheet" data-promo-mix-sheet role="dialog" aria-modal="true" aria-labelledby="promo-mix-title">
+  <button type="button" class="promo-mix-sheet__backdrop" onclick="closePromoMixSheet()" aria-label="Хаах"></button>
+  <div class="promo-mix-sheet__panel">
+    <header class="promo-mix-sheet__head">
+      <h3 id="promo-mix-title" class="promo-mix-sheet__title">${esc(title)}</h3>
+      <button type="button" class="promo-mix-sheet__close" onclick="closePromoMixSheet()" aria-label="Хаах">✕</button>
+    </header>
+    <p class="promo-mix-sheet__offer">${esc(quantityPromoOfferText(prog))}</p>
+    <div class="promo-mix-sheet__tiles">${tiles || `<p class="promo-mix-sheet__empty">Бараа олдсонгүй</p>`}</div>
+    <section class="promo-mix-sheet__summary${ready ? " is-ready" : ""}">
+      <div class="promo-mix-sheet__meter-head">
+        <span>Таны сонголт:</span>
+        <b>[ ${esc(meterLabel)} ]</b>
+      </div>
+      <div class="promo-mix-sheet__bar" role="progressbar" aria-valuemin="0" aria-valuemax="${meter.goal}" aria-valuenow="${meter.current}">
+        <span style="width:${meter.pct}%"></span>
+      </div>
+      ${pickRows ? `<ul class="promo-mix-sheet__picks"><li class="promo-mix-sheet__picks-label">Сонгосон:</li>${pickRows}</ul>` : `<p class="promo-mix-sheet__hint">Дээрх бараанаас тоо сонгоно уу</p>`}
+    </section>
+    <button type="button" class="promo-mix-sheet__cta${ready ? "" : " is-soft"}" onclick="closePromoMixSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M12 2v10"/><path d="m8 8 4 4 4-4"/><path d="M4 7h16v3H4z"/></svg>
+      <span>${esc(ctaLabel)}</span>
+    </button>
+    <p class="promo-mix-sheet__foot-note">${esc(bundleName)}</p>
+  </div>
+</div>`;
+}
+function workerPromoMixEntriesHtml() {
+  const rules = state.promotionRules?.quantity || [];
+  if (!rules.length) return "";
+  const qtyByProduct = workerQtyByProduct();
+  const cards = [];
+  rules.forEach((rule, i) => {
+    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+    if (!prog?.buyIds?.length) return;
+    const title = quantityPromoDisplayTitle(prog);
+    const ready = prog.sets > 0;
+    cards.push(
+      `<button type="button" class="promo-mix-entry${ready ? " is-ready" : ""}" onclick="openPromoMixSheet(${i})">
+  <span class="promo-mix-entry__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M4 7h16v3H4z"/><path d="M12 2v8"/></svg></span>
+  <span class="promo-mix-entry__body">
+    <span class="promo-mix-entry__title">${esc(title)}</span>
+    <span class="promo-mix-entry__offer">${esc(quantityPromoOfferText(prog))}</span>
+  </span>
+  <span class="promo-mix-entry__go">${ready ? "Идэвхтэй" : "Сонгох"}</span>
+</button>`,
+    );
+  });
+  if (!cards.length) return "";
+  return `<div class="promo-mix-entries" aria-label="Багц урамшуулал">${cards.join("")}</div>`;
 }
 function workerQuantityPromoHintsHtml(cart) {
   const rules = state.promotionRules?.quantity || [];
@@ -22219,10 +22368,14 @@ function workerNewOrderStep(cart) {
       ? "Өөрчлөлт хадгалах"
       : "Хадгалах";
   const addBtn = `<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${editing ? "Бараа нэмэх" : "Бараа сонгох"}</span></button></div>`;
+  const promoEntries = workerPromoMixEntriesHtml();
+  const promoHints = workerQuantityPromoHintsHtml(cart);
   const lines = `<div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div>`;
   // Edit: show lines first so existing items aren't hidden under controls.
-  const bodyMain = editing ? `${lines}${addBtn}` : `${addBtn}${lines}`;
-  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>`;
+  const bodyMain = editing
+    ? `${lines}${addBtn}${promoEntries}${promoHints}`
+    : `${addBtn}${promoEntries}${lines}${promoHints}`;
+  return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>${promoMixSheetHtml()}`;
 }
 function workerPromoRow(line) {
   const p = findProductByIdLoose(line.productId) || {};
@@ -26926,6 +27079,9 @@ Object.assign(window, {
   qtyDraft,
   qtyCommit,
   openPickerModal,
+  openPromoMixSheet,
+  closePromoMixSheet,
+  bumpPromoMixQty,
   pickerModal,
   pickerSearch,
   backToPickerCategories,
