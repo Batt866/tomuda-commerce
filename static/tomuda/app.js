@@ -22135,8 +22135,6 @@ function clearWorkerOrderEditState() {
 }
 function canEditWorkerOrder(order) {
   if (!order || order.status === "cancelled") return false;
-  // Авлагатай (төлөөгүй) захиалга огт засахгүй.
-  if (!orderIsPaid(order)) return false;
   if (
     state.currentEmployee?.role === "sales" &&
     String(order.employeeId) !== String(state.currentEmployee.id)
@@ -22362,13 +22360,12 @@ function workerNewOrderStep(cart) {
       ? "Өөрчлөлт хадгалах"
       : "Хадгалах";
   const addBtn = `<div class="worker-order-card__tools"><button type="button" onclick="openPickerModal()" class="worker-order-add-btn" aria-label="Бараа сонгох"${saving ? " disabled" : ""}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>${editing ? "Бараа нэмэх" : "Бараа сонгох"}</span></button></div>`;
-  const promoEntries = workerPromoMixEntriesHtml();
   const promoHints = workerQuantityPromoHintsHtml(cart);
   const lines = `<div class="worker-order-lines-wrap"><div class="worker-order-lines divide-y divide-border">${listHtml || workerOrderEmptyState()}</div></div>`;
   // Edit: show lines first so existing items aren't hidden under controls.
   const bodyMain = editing
-    ? `${lines}${addBtn}${promoEntries}${promoHints}`
-    : `${addBtn}${promoEntries}${lines}${promoHints}`;
+    ? `${lines}${addBtn}${promoHints}`
+    : `${addBtn}${lines}${promoHints}`;
   return `<section class="worker-order-card${editing ? " worker-order-card--edit" : ""}"><header class="worker-order-card__head"><div class="worker-order-card__store-wrap">${workerStoreSummary(customer, true)}${headExtra}</div>${headAction}</header><div class="worker-order-card__body">${summaryHtml}${bodyMain}</div><footer class="worker-order-card__foot">${workerOrderOptionsHtml(cart)}${paymentTermPicker()}<button type="button" onclick="${saveAction}" class="btn btn--primary btn--lg btn--block${hasItems && !saving ? "" : " is-disabled"}" ${hasItems && !saving ? "" : "disabled"}>${saveLabel}</button></footer></section>${promoMixSheetHtml()}`;
 }
 function workerPromoRow(line) {
@@ -25055,9 +25052,7 @@ function orderReceiptModal(id, keepDraft = false) {
   const editable = canEditWorkerOrder(o);
   const cancellable = canCancelWorkerOrder(o);
   const lockNote = !editable
-    ? !orderIsPaid(o)
-      ? `<p class="receipt-edit-lock-note">Авлагатай захиалга засах боломжгүй.</p>`
-      : `<p class="receipt-edit-lock-note">Энэ захиалгыг засах эрхгүй.</p>`
+    ? `<p class="receipt-edit-lock-note">Энэ захиалгыг засах эрхгүй.</p>`
     : "";
   const cancelBtn = cancellable
     ? `<div class="receipt-edit-actions"><button type="button" onclick="confirmCancelWorkerOrder('${esc(o.id)}', true)" class="worker-order-cancel-btn worker-order-cancel-btn--block">Захиалга цуцлах</button></div>`
@@ -26254,11 +26249,7 @@ async function saveWorkerOrderEdit() {
     return alert("Захиалга олдсонгүй");
   }
   if (!canEditWorkerOrder(order)) {
-    return alert(
-      !orderIsPaid(order)
-        ? "Авлагатай захиалга засах боломжгүй"
-        : "Захиалга засах эрхгүй",
-    );
+    return alert("Захиалга засах эрхгүй");
   }
   const cart = workerCartSummary();
   if (!cart.paid.length) return alert("Бараа сонгоно уу");
