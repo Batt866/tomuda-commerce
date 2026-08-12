@@ -24,7 +24,17 @@ DOMAIN=shop.example.mn bash /root/deploy-vps-ubuntu.sh
 bash scripts/setup-tomuda-mn-domain.sh
 ```
 
-### Шинэчлэх
+## Шинэчлэх
+
+```bash
+# Mac → серверт скрипт илгээх (эхний удаа)
+scp scripts/update-vps-tomuda.sh root@SERVER_IP:/root/
+
+# Сервер дээр (GitHub руу push хийсний ДАРАА)
+bash /root/update-vps-tomuda.sh
+```
+
+Эсвэл гараар:
 
 ```bash
 cd /var/www/tomuda && git pull
@@ -33,6 +43,8 @@ pip install -r requirements.txt
 python manage.py migrate && python manage.py collectstatic --noinput
 systemctl restart tomuda
 ```
+
+> **Анхаар:** `git push` зөвхөн GitHub-д орно. Live сайт (`https://tomudagroup.mn`) дээр гаргахын тулд дээрх VPS update заавал хийнэ. Хуучин `https://tomuda.jobbox.mn` ашиглахгүй.
 
 ---
 
