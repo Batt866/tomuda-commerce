@@ -18840,6 +18840,61 @@ input.stock-in-sheet__input::placeholder {
   }
 }
 
+.stock-report-unified-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stock-report-receipt-block {
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--hex-card) 92%, transparent);
+}
+
+.stock-report-receipt-block__head {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hex-border);
+  background: color-mix(in srgb, var(--hex-secondary) 35%, transparent);
+}
+
+.stock-report-receipt-block__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stock-report-receipt-block__main:hover {
+  opacity: 0.92;
+}
+
+.stock-report-receipt-block__lines {
+  padding: 0 12px 8px;
+}
+
+.stock-report-receipt-block__lines .stock-report-lines-head {
+  margin-top: 4px;
+}
+
+.stock-report-receipt-block__empty {
+  margin: 0;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--hex-muted-foreground);
+}
+
 .stock-in-scan {
   display: flex;
   flex-direction: column;

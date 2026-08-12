@@ -16639,6 +16639,193 @@ const WAREHOUSE_PREPARE_LAST_COL = "G";
 const WAREHOUSE_PREPARE_TEMPLATE =
   "/static/tomuda/templates/warehouse-prepare-template.xls";
 const STOCK_IN_XLSX_TEMPLATE = WAREHOUSE_PREPARE_TEMPLATE;
+const STOCK_IN_REPORT_TEMPLATE =
+  "/static/tomuda/templates/stock-in-report-template.xlsx";
+const STOCK_IN_REPORT_LAST_COL = "N";
+const STOCK_IN_REPORT_COL_WIDTHS = [
+  13.98828125, 11.97265625, 13.98828125, 18.0234375, 11.97265625, 14.9296875,
+  14.9296875, 16.94921875, 20.984375, 16.0078125, 18.0234375, 22.05859375,
+  25.9609375, 25.9609375,
+];
+const STOCK_IN_REPORT_STYLES = {
+  title: 1,
+  meta: 2,
+  header: 3,
+  center: 4,
+  left: 5,
+  qty: 6,
+  money: 7,
+  totalLabel: 8,
+  totalQty: 9,
+  totalMoney: 10,
+};
+/** Header cells: bold text, no background fill. */
+function stockInReportPatchStylesXml(stylesXml) {
+  return String(stylesXml || "").replace(
+    /<xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" \/><\/xf>/,
+    '<xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" /></xf>',
+  );
+}
+function buildStockInReportSheetXml(receipt) {
+  receipt = normalizeStockInReceiptTotals(receipt);
+  const s = STOCK_IN_REPORT_STYLES;
+  const lastCol = STOCK_IN_REPORT_LAST_COL;
+  const colLetters = "ABCDEFGHIJKLMN";
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const day = receipt.createdAt ? isoDay(receipt.createdAt) || todayIso() : todayIso();
+  const dateText = warehouseSheetDateValue(day);
+  const receiptNo = receipt.receiptNumber
+    ? `#${receipt.receiptNumber}`
+    : "Дугааргүй";
+  const supplier = String(receipt.supplierName || "").trim() || "-";
+  const warehouse = String(receipt.warehouseName || "").trim() || "Үндсэн Агуулах";
+  const employee = String(receipt.employeeName || "").trim() || "-";
+  const metaText = `Баримт №: ${receiptNo} | Огноо: ${dateText} | Хариуцсан: ${employee}`;
+  const headers = [
+    "Огноо",
+    "Баримт №",
+    "Нийлүүлэгч",
+    "Агуулах",
+    "SKU",
+    "Барааны нэр",
+    "Том хайрцаг",
+    "Жижиг хайрцаг",
+    "Тоо ширхэг (Нэгж)",
+    "Нийт тоо (ш)",
+    "Нэгж өртөг (₮)",
+    "Нийт өртөг дүн (₮)",
+    "Нэгж борлуулах үнэ (₮)",
+    "Нийт борлуулах үнэ (₮)",
+  ];
+  const rows = [];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(xlsxRowXml(rowNum, height, cells, lastCol));
+    rowNum += 1;
+  };
+  const emptyCells = (row, from = "A", to = lastCol, style = 0) => {
+    const cols = colLetters.slice(
+      colLetters.indexOf(from),
+      colLetters.indexOf(to) + 1,
+    );
+    return cols
+      .split("")
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
+  };
+  pushRow(20.25, [
+    xlsxCellXml("A1", s.title, si("БАРААНЫ ОРЛОГЫН ТАЙЛАН"), "s"),
+    ...emptyCells(1, "B", lastCol, s.title),
+  ]);
+  pushRow(null, [
+    xlsxCellXml("A2", s.meta, si(metaText), "s"),
+    ...emptyCells(2, "B", lastCol, s.meta),
+  ]);
+  pushRow(null, emptyCells(3, "A", lastCol));
+  const headerRow = rowNum;
+  pushRow(27.95, headers.map((label, index) => {
+    const col = colLetters[index];
+    return xlsxCellXml(`${col}${headerRow}`, s.header, si(label), "s");
+  }));
+  const dataRows = [];
+  for (const line of receipt.lines || []) {
+    const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+    if (!totalQty) continue;
+    const r = rowNum;
+    dataRows.push(r);
+    const parts = stockReceiptQtyParts(line);
+    const costPrice = stockInReceiptLineCostPrice(line);
+    const salesPrice = stockInReceiptLineSalesPrice(line);
+    const costTotal = totalQty * costPrice;
+    const salesTotal = stockInReceiptLineTotal(line);
+    const sku = String(line.barcode || "").trim() || "-";
+    pushRow(null, [
+      xlsxCellXml(`A${r}`, s.center, si(dateText), "s"),
+      xlsxCellXml(`B${r}`, s.center, si(receiptNo), "s"),
+      xlsxCellXml(`C${r}`, s.left, si(supplier), "s"),
+      xlsxCellXml(`D${r}`, s.left, si(warehouse), "s"),
+      xlsxCellXml(`E${r}`, s.center, si(sku), "s"),
+      xlsxCellXml(`F${r}`, s.left, si(line.productName || ""), "s"),
+      xlsxPrepareQtyCell(`G${r}`, s.qty, parts.largePacks),
+      xlsxPrepareQtyCell(`H${r}`, s.qty, parts.packs),
+      xlsxPrepareQtyCell(`I${r}`, s.qty, parts.pieces),
+      xlsxPrepareQtyCell(`J${r}`, s.qty, totalQty),
+      xlsxCellXml(`K${r}`, s.money, costPrice, "n"),
+      xlsxCellXml(
+        `L${r}`,
+        s.money,
+        { f: `J${r}*K${r}`, v: costTotal },
+        "f",
+      ),
+      xlsxCellXml(`M${r}`, s.money, salesPrice, "n"),
+      xlsxCellXml(
+        `N${r}`,
+        s.money,
+        { f: `J${r}*M${r}`, v: salesTotal },
+        "f",
+      ),
+    ]);
+  }
+  const totalRow = rowNum;
+  const firstDataRow = dataRows[0] || totalRow;
+  const lastDataRow = dataRows[dataRows.length - 1] || firstDataRow;
+  const sumRange = (col) =>
+    dataRows.length ? `SUM(${col}${firstDataRow}:${col}${lastDataRow})` : "0";
+  const totalQty = (receipt.lines || []).reduce(
+    (sum, line) => sum + Math.max(0, Math.floor(Number(line.quantity) || 0)),
+    0,
+  );
+  const totalCost = (receipt.lines || []).reduce(
+    (sum, line) =>
+      sum +
+      Math.max(0, Math.floor(Number(line.quantity) || 0)) *
+        stockInReceiptLineCostPrice(line),
+    0,
+  );
+  const totalSales = Number(receipt.totalAmount) || 0;
+  pushRow(null, [
+    xlsxCellXml(`A${totalRow}`, s.totalLabel, si("НИЙТ ДҮН"), "s"),
+    ...emptyCells(totalRow, "B", "I", s.totalLabel),
+    xlsxCellXml(
+      `J${totalRow}`,
+      s.totalQty,
+      { f: sumRange("J"), v: totalQty },
+      "f",
+    ),
+    xlsxCellXml(`K${totalRow}`, s.totalLabel, null, "empty"),
+    xlsxCellXml(
+      `L${totalRow}`,
+      s.totalMoney,
+      { f: sumRange("L"), v: totalCost },
+      "f",
+    ),
+    xlsxCellXml(`M${totalRow}`, s.totalLabel, null, "empty"),
+    xlsxCellXml(
+      `N${totalRow}`,
+      s.totalMoney,
+      { f: sumRange("N"), v: totalSales },
+      "f",
+    ),
+  ]);
+  const lastRow = Math.max(1, rowNum - 1);
+  const colsXml = STOCK_IN_REPORT_COL_WIDTHS.map(
+    (width, index) =>
+      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+  ).join("");
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${lastCol}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData><pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/></worksheet>`;
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(strings),
+    sheetXml,
+  };
+}
 /** Stock-in Excel uses the same sheet layout/fonts as stock-out. */
 function buildStockInSheetXml(receipt, {
   titleText = null,
@@ -16655,18 +16842,15 @@ async function exportStockInExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
-  const tpl = await fetch(staticAssetUrl(STOCK_IN_XLSX_TEMPLATE)).then((r) => {
+  const tpl = await fetch(staticAssetUrl(STOCK_IN_REPORT_TEMPLATE)).then((r) => {
     if (!r.ok) throw new Error("template missing");
     return r.arrayBuffer();
   });
   const tplZip = await JSZip.loadAsync(tpl);
-  const stylesXml = stockReceiptPatchStylesXml(
+  const stylesXml = stockInReportPatchStylesXml(
     await tplZip.file("xl/styles.xml").async("string"),
   );
-  const styleIds = stockReceiptQtyStyleIds(stylesXml);
-  const { sharedStringsXml, sheetXml, printArea } = buildStockInSheetXml(receipt, {
-    styleIds,
-  });
+  const { sharedStringsXml, sheetXml } = buildStockInReportSheetXml(receipt);
   const themeFile = tplZip.file("xl/theme/theme1.xml");
   const themeXml = themeFile ? await themeFile.async("string") : null;
   const zip = await assembleStockReceiptXlsxZip({
@@ -16674,7 +16858,7 @@ async function exportStockInExcelXlsx(receipt) {
     sheetXml,
     stylesXml,
     themeXml,
-    printArea,
+    sheetName: "Орлогын тайлан",
   });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
@@ -18359,9 +18543,8 @@ function openStockReportReceipt(kind, id) {
     "max-w-3xl",
   );
 }
-function stockReportReceiptRow(kind, receipt) {
+function stockReportReceiptMeta(kind, receipt) {
   const lines = receipt.lines || [];
-  const total = stockReportReceiptTotal(kind, receipt);
   const no = receipt.receiptNumber
     ? `#${esc(receipt.receiptNumber)}`
     : "Дугааргүй";
@@ -18383,7 +18566,41 @@ function stockReportReceiptRow(kind, receipt) {
     kind === "out"
       ? `confirmStockOutExcel('${esc(receipt.id)}')`
       : `confirmStockInExcel('${esc(receipt.id)}')`;
-  return `<div class="line-list__row line-list__row--stock-report"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="line-list__row-main"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${metaParts.map((p) => esc(p)).join(" · ")}</p></div><b class="line-list__amount">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
+  return { no, metaParts, excelFn };
+}
+function stockReportReceiptBlockHeader(kind, receipt) {
+  const total = stockReportReceiptTotal(kind, receipt);
+  const { no, metaParts, excelFn } = stockReportReceiptMeta(kind, receipt);
+  return `<div class="stock-report-receipt-block__head"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="stock-report-receipt-block__main"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${metaParts.map((p) => esc(p)).join(" · ")}</p></div><b class="line-list__amount">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
+}
+function stockReportUnifiedListHtml(kind, receipts) {
+  let lineIndex = 0;
+  return receipts
+    .map((receipt) => {
+      const lineRows = (receipt.lines || [])
+        .map((line) => {
+          const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+          if (!qty) return "";
+          lineIndex += 1;
+          return stockReportDetailLineRow(
+            {
+              productName: line.productName || "-",
+              barcode: String(line.barcode || "").trim(),
+              quantity: qty,
+              amount: stockReportLineAmount(kind, line),
+            },
+            lineIndex,
+          );
+        })
+        .filter(Boolean)
+        .join("");
+      return `<div class="stock-report-receipt-block">${stockReportReceiptBlockHeader(kind, receipt)}${
+        lineRows
+          ? `<div class="stock-report-receipt-block__lines">${stockReportDetailLinesHeadRow()}${lineRows}</div>`
+          : `<p class="stock-report-receipt-block__empty">Бараа байхгүй</p>`
+      }</div>`;
+    })
+    .join("");
 }
 function stockReportAggregateHeadRow() {
   return `<div class="stock-report-products-head" aria-hidden="true"><span class="stock-report-products-head__name">Бараа</span><span class="stock-report-products-head__qty">Тоо</span><span class="stock-report-products-head__amount">Дүн</span></div>`;
@@ -18432,15 +18649,9 @@ function stockReportDetailLinesHeadRow() {
   return `<div class="stock-report-lines-head" aria-hidden="true"><span class="stock-report-lines-head__name">Бараа</span><span class="stock-report-lines-head__amount">Дүн</span></div>`;
 }
 function stockReportDetailLineRow(row, index) {
-  const metaParts = [
-    row.day ? warehouseDateDisplayText(row.day) : "",
-    row.receiptLabel,
-    row.party,
-    row.employeeName,
-    `${row.quantity.toLocaleString()} ш`,
-  ].filter(Boolean);
+  const metaParts = [`${row.quantity.toLocaleString()} ш`];
   const barcode = row.barcode;
-  return `<div class="line-list__row line-list__row--static stock-report-line-row"><div class="stock-report-line-row__main"><span class="stock-report-line-row__index">${index + 1}</span><div class="stock-report-line-row__copy"><span class="stock-report-line-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-line-row__barcode">${esc(barcode)}</span>` : ""}<p class="line-list__meta stock-report-line-row__meta">${esc(metaParts.join(" · "))}</p></div></div><b class="stock-report-line-row__amount">${fmt(row.amount)}</b></div>`;
+  return `<div class="line-list__row line-list__row--static stock-report-line-row"><div class="stock-report-line-row__main"><span class="stock-report-line-row__index">${index}</span><div class="stock-report-line-row__copy"><span class="stock-report-line-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-line-row__barcode">${esc(barcode)}</span>` : ""}<p class="line-list__meta stock-report-line-row__meta">${esc(metaParts.join(" · "))}</p></div></div><b class="stock-report-line-row__amount">${fmt(row.amount)}</b></div>`;
 }
 function stockReportsMenuHtml() {
   const sections = [];
@@ -18498,11 +18709,10 @@ function stockReportDetailView(kind) {
     `${card("Мөр", lines.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`,
     3,
   );
-  const linesPanel = `<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">Дэлгэрэнгүй · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list line-list--stock-lines stock-report-lines-table">${lines.length ? `${stockReportDetailLinesHeadRow()}${lines.map(stockReportDetailLineRow).join("")}` : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div>`;
-  const receiptsPanel = receipts.length
-    ? `<div class="line-panel"><div class="line-panel__section-title">Баримт татах · ${receipts.length}</div><p class="text-xs text-muted-foreground px-1">Баримт дээр дарж харна. Excel товчоор татна.</p><div class="line-list">${receipts.map((r) => stockReportReceiptRow(flow, r)).join("")}</div></div>`
-    : "";
-  return `<div class="space-y-4">${pageHead(title)}${filters}${metrics}${linesPanel}${receiptsPanel}</div>`;
+  const listPanel = receipts.length
+    ? `<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">Дэлгэрэнгүй · ${esc(warehouseDateDisplayText(day))} · ${receipts.length} баримт</div><div class="stock-report-unified-list">${stockReportUnifiedListHtml(flow, receipts)}</div></div>`
+    : `<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">Дэлгэрэнгүй · ${esc(warehouseDateDisplayText(day))}</div><p class="line-panel__empty">${emptyDay}</p></div>`;
+  return `<div class="space-y-4">${pageHead(title)}${filters}${metrics}${listPanel}</div>`;
 }
 function salesReportOrdersFiltered() {
   const orders = reportOrdersFiltered();
