@@ -11061,7 +11061,10 @@ function orderReceiptExportSnapshots(
     selectedIds.length > 0;
 
   if (selectionMode) {
-    if (!selectedIds.length) return [];
+    if (!selectedIds.length) {
+      if (workerIds.length) return filtered.map(orderReceiptSnapshot);
+      return [];
+    }
     const selected = new Set(selectedIds);
     const picked = filtered.filter((o) => selected.has(String(o.id)));
     if (picked.length) return picked.map(orderReceiptSnapshot);
@@ -11101,9 +11104,6 @@ function confirmWarehouseReceiptsExcel(
     return;
   }
   const workerIds = receiptPrintWorkerIds();
-  if (workerIds.length && !idList(state.receiptPrintOrderIds).length) {
-    return alert("Мэдээлэл татах баримтуудаа ✓ check хийнэ үү");
-  }
   confirmOrderReceiptsExcel(searchKey, employeeIds, {
     workerIds,
     // Do not filter by deliveryIds — түгээгч is applied when building each sheet.
@@ -11195,7 +11195,7 @@ function warehouseReceiptListItem(o) {
 }
 function warehouseReceiptPrintListItem(o) {
   const active = state.selectedWarehouseOrderId === o.id,
-    checked = idList(state.receiptPrintOrderIds).includes(o.id);
+    checked = idList(state.receiptPrintOrderIds).includes(String(o.id));
   return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(orderCustomerName(o))}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(orderCustomerName(o))}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions(includeDelivered = true) {
@@ -11208,8 +11208,7 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
     state.filters.order = "all";
   if (state.filters.order === "delivered") state.filters.order = "all";
   const workerIds = receiptPrintWorkerIds(),
-    sourceRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows,
-    displayRows = sourceRows.filter((o) => o.status !== "delivered");
+    displayRows = receiptPrintDisplayOrders(searchKey, employeeIds);
   if (workerIds.length) syncReceiptPrintSelection(displayRows);
   else {
     state.receiptPrintOrderIds = [];
@@ -11228,14 +11227,19 @@ function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
   const selected = displayRows.find(
       (o) => o.id === state.selectedWarehouseOrderId,
     ),
+    selectedReceiptCount = idList(state.receiptPrintOrderIds).length,
+    selectAllBar =
+      workerIds.length && displayRows.length
+        ? `<div class="wh-receipt-list__bulk"><span class="wh-receipt-list__bulk-count">${selectedReceiptCount}/${displayRows.length} сонгосон</span><button type="button" class="wh-receipt-list__bulk-btn" onclick="selectAllReceiptPrintOrders('${esc(searchKey)}', ${JSON.stringify(employeeIds)})">Бүгдийг сонгох</button><button type="button" class="wh-receipt-list__bulk-btn" onclick="clearReceiptPrintOrders()">Цэвэрлэх</button></div>`
+        : "",
     listHtml = displayRows.length
-      ? displayRows
+      ? `${selectAllBar}${displayRows
           .map(
             workerIds.length
               ? warehouseReceiptPrintListItem
               : warehouseReceiptListItem,
           )
-          .join("")
+          .join("")}`
       : `<p class="wh-receipt-list__empty">Захиалга олдсонгүй</p>`,
     detailHtml = selected
       ? warehouseOrderDetail(selected)
@@ -11951,16 +11955,37 @@ function syncReceiptPrintSelection(orders) {
     return;
   }
   const key = receiptPrintWorkerSyncToken();
+  const valid = new Set(orders.map((o) => String(o.id)));
   if (state.receiptPrintWorkerSyncKey !== key) {
     state.receiptPrintWorkerSyncKey = key;
-    // Default: nothing checked — user picks what to print/export.
-    state.receiptPrintOrderIds = [];
+    // Worker scope changed — default to all visible receipts in the list.
+    state.receiptPrintOrderIds = [...valid];
     return;
   }
-  const valid = new Set(orders.map((o) => o.id));
   state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter((id) =>
     valid.has(id),
   );
+}
+function receiptPrintDisplayOrders(
+  searchKey = "warehouseOrders",
+  employeeIds = [],
+) {
+  const rows = orderReceiptRowsFiltered(searchKey, employeeIds, receiptFilterOptions());
+  const workerIds = receiptPrintWorkerIds();
+  const sourceRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows;
+  return sourceRows.filter((o) => o.status !== "delivered");
+}
+function selectAllReceiptPrintOrders(searchKey = "warehouseOrders", employeeIds = []) {
+  if (!receiptPrintWorkerIds().length) return;
+  state.receiptPrintOrderIds = receiptPrintDisplayOrders(searchKey, employeeIds).map(
+    (o) => String(o.id),
+  );
+  render();
+}
+function clearReceiptPrintOrders() {
+  if (!receiptPrintWorkerIds().length) return;
+  state.receiptPrintOrderIds = [];
+  render();
 }
 function receiptPrintWorkerSelectHtml() {
   const people = receiptSalesEmployees(),
@@ -12074,10 +12099,11 @@ function bindReceiptPrintWorkerPickerDismiss() {
   });
 }
 function toggleReceiptPrintOrder(id) {
+  const sid = String(id || "");
   const current = idList(state.receiptPrintOrderIds);
-  state.receiptPrintOrderIds = current.includes(id)
-    ? current.filter((x) => x !== id)
-    : [...current, id];
+  state.receiptPrintOrderIds = current.includes(sid)
+    ? current.filter((x) => x !== sid)
+    : [...current, sid];
   render();
 }
 function orderDeliveryEmployeeId(o = {}) {
@@ -25820,10 +25846,13 @@ function printOrderReceiptsNow(ids) {
   })();
 }
 function printSelectedOrderReceipts() {
-  const ids = idList(state.receiptPrintOrderIds);
+  let ids = idList(state.receiptPrintOrderIds);
   if (!receiptPrintWorkerIds().length)
     return alert("Худалдааны төлөөлөгч сонгоно уу");
   if (!requireReceiptPrintDelivery("хэвлэх")) return;
+  if (!ids.length) {
+    ids = receiptPrintDisplayOrders().map((o) => String(o.id));
+  }
   if (!ids.length) return alert("Хэвлэх захиалга сонгоно уу");
   confirmPrintExport("Баримт хэвлэх", () => {
     void printOrderReceiptsNow(ids);
@@ -27743,6 +27772,8 @@ Object.assign(window, {
   toggleReceiptPrintWorkerPicker,
   closeReceiptPrintWorkerPicker,
   clearReceiptPrintWorkers,
+  selectAllReceiptPrintOrders,
+  clearReceiptPrintOrders,
   armWhReceiptPickerDismissGuard,
   toggleReceiptPrintOrder,
   printSelectedOrderReceipts,

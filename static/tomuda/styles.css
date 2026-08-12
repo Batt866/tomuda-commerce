@@ -12978,6 +12978,39 @@ textarea::placeholder {
   max-width: 100%;
 }
 
+.wh-receipt-list__bulk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hex-border);
+  background: var(--hex-secondary, #f4f4f5);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+.wh-receipt-list__bulk-count {
+  font-size: 12px;
+  color: var(--hex-muted-foreground, #64748b);
+  margin-right: auto;
+}
+
+.wh-receipt-list__bulk-btn {
+  border: none;
+  background: transparent;
+  color: var(--hex-primary, #0f7a3f);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.wh-receipt-list__bulk-btn:hover {
+  text-decoration: underline;
+}
+
 .wh-receipt-list__item--selectable {
   grid-template-columns: auto minmax(0, 1fr);
 }
