@@ -15322,7 +15322,7 @@ textarea::placeholder {
   --promo-sheet-line: #e2e8ef;
   --promo-sheet-ink: #1a2736;
   --promo-sheet-muted: #667788;
-  --promo-sheet-head: var(--hex-sidebar, #101623);
+  --promo-sheet-head: var(--hex-primary, #16899a);
   --promo-sheet-accent: var(--hex-primary, #16899a);
   border: 0;
   border-radius: 16px;
