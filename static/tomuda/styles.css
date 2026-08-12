@@ -18734,19 +18734,20 @@ input.stock-in-sheet__input::placeholder {
 }
 
 .stock-report-lines-table {
-  --stock-report-line-amount: 6.75rem;
+  --stock-report-col-qty: 4.25rem;
+  --stock-report-col-amount: 6.5rem;
 }
 
 .stock-report-lines-head,
 .stock-report-line-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--stock-report-line-amount);
+  grid-template-columns: minmax(0, 1fr) var(--stock-report-col-qty) var(--stock-report-col-amount);
   align-items: center;
-  column-gap: 12px;
+  column-gap: 10px;
 }
 
 .stock-report-lines-head {
-  padding: 6px 0 10px;
+  padding: 8px 0 8px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -18755,12 +18756,18 @@ input.stock-in-sheet__input::placeholder {
   border-bottom: 1px solid var(--hex-border);
 }
 
+.stock-report-lines-head__qty,
 .stock-report-lines-head__amount {
   text-align: right;
 }
 
 .stock-report-line-row {
-  padding: 11px 0;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--hex-border) 65%, transparent);
+}
+
+.stock-report-line-row:last-child {
+  border-bottom: none;
 }
 
 .stock-report-line-row__main {
@@ -18812,6 +18819,22 @@ input.stock-in-sheet__input::placeholder {
   line-height: 1.35;
 }
 
+.stock-report-line-row__qty {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+}
+
+.stock-report-line-row__unit {
+  margin-left: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hex-muted-foreground);
+}
+
 .stock-report-line-row__amount {
   text-align: right;
   font-size: 14px;
@@ -18826,13 +18849,15 @@ input.stock-in-sheet__input::placeholder {
 
 @media (min-width: 640px) {
   .stock-report-lines-table {
-    --stock-report-line-amount: 7.25rem;
+    --stock-report-col-qty: 4.75rem;
+    --stock-report-col-amount: 7rem;
   }
 }
 
 @media (max-width: 420px) {
   .stock-report-lines-table {
-    --stock-report-line-amount: 5.75rem;
+    --stock-report-col-qty: 3.75rem;
+    --stock-report-col-amount: 5.75rem;
   }
 
   .stock-report-line-row__amount {
@@ -18843,23 +18868,23 @@ input.stock-in-sheet__input::placeholder {
 .stock-report-unified-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .stock-report-receipt-block {
   border: 1px solid var(--hex-border);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--hex-card) 92%, transparent);
+  background: var(--hex-card);
 }
 
 .stock-report-receipt-block__head {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--hex-border);
-  background: color-mix(in srgb, var(--hex-secondary) 35%, transparent);
+  background: color-mix(in srgb, var(--hex-secondary) 28%, var(--hex-card));
 }
 
 .stock-report-receipt-block__main {
@@ -18880,17 +18905,63 @@ input.stock-in-sheet__input::placeholder {
   opacity: 0.92;
 }
 
+.stock-report-receipt-block__info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stock-report-receipt-block__no {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--hex-foreground);
+  line-height: 1.2;
+}
+
+.stock-report-receipt-block__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.stock-report-receipt-block__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--hex-muted-foreground);
+  background: color-mix(in srgb, var(--hex-secondary) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hex-border) 80%, transparent);
+}
+
+.stock-report-receipt-block__total {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+}
+
+.stock-report-receipt-block__excel {
+  flex-shrink: 0;
+}
+
 .stock-report-receipt-block__lines {
-  padding: 0 12px 8px;
+  padding: 2px 12px 4px;
 }
 
 .stock-report-receipt-block__lines .stock-report-lines-head {
-  margin-top: 4px;
+  margin-top: 0;
+  padding-top: 6px;
 }
 
 .stock-report-receipt-block__empty {
   margin: 0;
-  padding: 12px;
+  padding: 10px 12px;
   font-size: 13px;
   color: var(--hex-muted-foreground);
 }

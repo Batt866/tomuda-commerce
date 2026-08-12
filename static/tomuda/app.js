@@ -18638,17 +18638,20 @@ function stockReportReceiptMeta(kind, receipt) {
 function stockReportReceiptBlockHeader(kind, receipt) {
   const total = stockReportReceiptTotal(kind, receipt);
   const { no, metaParts, excelFn } = stockReportReceiptMeta(kind, receipt);
-  return `<div class="stock-report-receipt-block__head"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="stock-report-receipt-block__main"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${no}</span></div><p class="line-list__meta">${metaParts.map((p) => esc(p)).join(" · ")}</p></div><b class="line-list__amount">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
+  const chips = metaParts
+    .map((part) => `<span class="stock-report-receipt-block__chip">${esc(part)}</span>`)
+    .join("");
+  return `<div class="stock-report-receipt-block__head"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="stock-report-receipt-block__main"><div class="stock-report-receipt-block__info"><span class="stock-report-receipt-block__no">${no}</span><div class="stock-report-receipt-block__chips">${chips}</div></div><b class="stock-report-receipt-block__total">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm stock-report-receipt-block__excel" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
 }
 function stockReportUnifiedListHtml(kind, receipts) {
-  let lineIndex = 0;
   return receipts
     .map((receipt) => {
+      let receiptLineIndex = 0;
       const lineRows = (receipt.lines || [])
         .map((line) => {
           const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
           if (!qty) return "";
-          lineIndex += 1;
+          receiptLineIndex += 1;
           return stockReportDetailLineRow(
             {
               productName: line.productName || "-",
@@ -18656,14 +18659,14 @@ function stockReportUnifiedListHtml(kind, receipts) {
               quantity: qty,
               amount: stockReportLineAmount(kind, line),
             },
-            lineIndex,
+            receiptLineIndex,
           );
         })
         .filter(Boolean)
         .join("");
       return `<div class="stock-report-receipt-block">${stockReportReceiptBlockHeader(kind, receipt)}${
         lineRows
-          ? `<div class="stock-report-receipt-block__lines">${stockReportDetailLinesHeadRow()}${lineRows}</div>`
+          ? `<div class="stock-report-receipt-block__lines stock-report-lines-table">${stockReportDetailLinesHeadRow()}${lineRows}</div>`
           : `<p class="stock-report-receipt-block__empty">Бараа байхгүй</p>`
       }</div>`;
     })
@@ -18713,12 +18716,11 @@ function stockReportDetailLines(kind, receipts) {
   );
 }
 function stockReportDetailLinesHeadRow() {
-  return `<div class="stock-report-lines-head" aria-hidden="true"><span class="stock-report-lines-head__name">Бараа</span><span class="stock-report-lines-head__amount">Дүн</span></div>`;
+  return `<div class="stock-report-lines-head" aria-hidden="true"><span class="stock-report-lines-head__name">Бараа</span><span class="stock-report-lines-head__qty">Тоо</span><span class="stock-report-lines-head__amount">Дүн</span></div>`;
 }
 function stockReportDetailLineRow(row, index) {
-  const metaParts = [`${row.quantity.toLocaleString()} ш`];
   const barcode = row.barcode;
-  return `<div class="line-list__row line-list__row--static stock-report-line-row"><div class="stock-report-line-row__main"><span class="stock-report-line-row__index">${index}</span><div class="stock-report-line-row__copy"><span class="stock-report-line-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-line-row__barcode">${esc(barcode)}</span>` : ""}<p class="line-list__meta stock-report-line-row__meta">${esc(metaParts.join(" · "))}</p></div></div><b class="stock-report-line-row__amount">${fmt(row.amount)}</b></div>`;
+  return `<div class="line-list__row line-list__row--static stock-report-line-row"><div class="stock-report-line-row__main"><span class="stock-report-line-row__index">${index}</span><div class="stock-report-line-row__copy"><span class="stock-report-line-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-line-row__barcode">${esc(barcode)}</span>` : ""}</div></div><span class="stock-report-line-row__qty" aria-label="Тоо ширхэг">${row.quantity.toLocaleString()}<span class="stock-report-line-row__unit">ш</span></span><b class="stock-report-line-row__amount">${fmt(row.amount)}</b></div>`;
 }
 function stockReportsMenuHtml() {
   const sections = [];
