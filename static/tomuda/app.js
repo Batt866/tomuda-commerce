@@ -18725,13 +18725,13 @@ function promoBundleConditionFormulaHtml(buyDefault = "8", freeDefault = "1") {
     "buyQty",
     "Захиалгын босго (ш)",
     buyDefault,
-    "block",
+    "formula",
   );
   const freeField = promotionQtyField(
     "freeQty",
     "Урамшуулал (ш)",
     freeDefault,
-    "block",
+    "formula",
   );
   return `<div class="promo-bundle-formula" role="group" aria-label="Урамшууллын нөхцөл">
   <div class="promo-bundle-formula__card promo-bundle-formula__card--buy">${buyField}</div>
@@ -18968,13 +18968,21 @@ function promotionQtyField(name, label, defaultValue, variant = false) {
   const val = ` value="${esc(filled)}"`;
   const ph = fallback || "1";
   const mode =
-    variant === "bar" ? "bar" : variant === true || variant === "inline" ? "inline" : "block";
+    variant === "bar"
+      ? "bar"
+      : variant === "formula"
+        ? "formula"
+        : variant === true || variant === "inline"
+          ? "inline"
+          : "block";
   const cls =
     mode === "bar"
       ? "promo-qty-field promo-qty-field--bar"
       : mode === "inline"
         ? "promo-qty-field promo-qty-field--inline"
-        : "promo-qty-field";
+        : mode === "formula"
+          ? "promo-qty-field promo-qty-field--formula"
+          : "promo-qty-field";
   const wrap = mode === "block" ? `<div class="promo-qty-inline">` : "";
   const wrapEnd = mode === "block" ? `</div>` : "";
   const labelHtml = `<span class="promo-qty-field__label">${esc(label)}</span>`;
