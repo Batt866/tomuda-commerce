@@ -13870,7 +13870,6 @@ function confirmFinishStockIn() {
     onConfirm: () =>
       void finishStockInReceipt(receipt, {
         downloadExcel: false,
-        showReceipt: true,
       }),
   });
 }
@@ -13886,7 +13885,7 @@ function saveStockOutDraftToast() {
 }
 async function finishStockInReceipt(
   receipt,
-  { downloadExcel = false, clearDraftOnly = null, showReceipt = false } = {},
+  { downloadExcel = false, clearDraftOnly = null } = {},
 ) {
   if (!receipt?.lines?.length || stockInSaveLock) return;
   stockInSaveLock = true;
@@ -13897,13 +13896,8 @@ async function finishStockInReceipt(
       state.stockInDone = false;
       state.stockInReceipt = null;
       if (!stockInHasEntries()) state.stockInHighlightId = "";
-    } else if (showReceipt) {
-      state.stockInDraft = {};
-      state.stockInHighlightId = "";
-      state.stockInDone = true;
-      state.stockInReceipt = saved;
-      state.stockInSessionStartedAt = null;
     } else {
+      // Stay on орлого screen: clear lines and keep composing next receipt.
       startStockInSession();
     }
     render();
@@ -13925,7 +13919,7 @@ async function finishStockInReceipt(
       if (downloadExcel) exportStockInExcel(saved);
       return;
     }
-    showAppToast("Орлого хадгалагдлаа", "success");
+    showAppToast("Орлого хадгалагдлаа. Орлогын тайлангаас харна уу.", "success");
     if (downloadExcel) exportStockInExcel(saved);
   } finally {
     stockInSaveLock = false;
@@ -14697,25 +14691,6 @@ function stockInFooterHtml(list) {
 }
 function stockInPanel(list) {
   ensureStockInSession();
-  if (state.stockInDone && state.stockInReceipt) {
-    return `<div class="stock-in-sheet stock-in-sheet--done">
-  <header class="stock-in-sheet__head">
-    <div class="stock-in-sheet__nav">
-      <button type="button" class="stock-in-sheet__back" onclick="setInventoryTab('stock')" aria-label="Буцах">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
-      </button>
-      <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
-      ${stockInUserChipHtml()}
-    </div>
-  </header>
-  <div class="stock-in-sheet__body stock-in-sheet__body--receipt">
-    <div class="stock-in-sheet__scroll">${stockInReceiptPanel(state.stockInReceipt)}</div>
-    <div class="stock-in-sheet__footer stock-in-sheet__footer--simple">
-      <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary stock-in-sheet__btn--block" onclick="confirmNewStockIn()">Шинэ орлого</button>
-    </div>
-  </div>
-</div>`;
-  }
   const needSupplier = stockInHasEntries() && !stockInHasSupplier();
   const allProducts = state.products || [];
   return `<div class="stock-in-sheet">
