@@ -9829,11 +9829,21 @@ const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
 /** Item styles without bottom border (last row before promo). */
 const RECEIPT_XLSX_ITEM_LAST_ROW_STYLES = {
-  8: 63,
-  9: 64,
-  10: 65,
-  11: 66,
-  34: 67,
+  8: 64,
+  9: 65,
+  10: 66,
+  11: 67,
+  34: 68,
+};
+/** Resolved from receiptXlsxStylesXml() — do not reuse legacy 4/5/57/61/62 ids blindly. */
+const RECEIPT_XLSX_STYLE = {
+  metaNormal: 6,
+  metaBold: 16,
+  metaBoldRight: 20,
+  metaNormalRight: 56,
+  ibanLabel: 63,
+  signLabel: 62,
+  signLine: 58,
 };
 // ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» on one line (fitToWidth).
 // Take from B/C so the header never clips.
@@ -10446,12 +10456,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     RECEIPT_XLSX_COL_WIDTHS[7] +
     RECEIPT_XLSX_COL_WIDTHS[8];
   const companyAddrH = Math.max(
-    26,
+    22,
     receiptXlsxWrappedRowHeight(companyAddr, companyAddrColW - 4, {
-      min: 26,
+      min: 22,
       linePt: 11,
       pad: 4,
-      max: 36,
+      max: 32,
     }),
   );
   pushRow(companyAddrH, [
@@ -10471,7 +10481,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     // B:C merge — full left labels (e.g. Худалдааны төлөөлөгчийн утас:)
     merges.push(`B${r}:C${r}`, `D${r}:E${r}`, `F${r}:H${r}`, `I${r}:K${r}`);
     const bcW = RECEIPT_XLSX_COL_WIDTHS[1] + RECEIPT_XLSX_COL_WIDTHS[2];
-    const labelStyle = singleLine ? 56 : 5;
+    const labelStyle = singleLine
+      ? RECEIPT_XLSX_STYLE.metaNormalRight
+      : RECEIPT_XLSX_STYLE.metaNormal;
     const labelH = singleLine
       ? RECEIPT_XLSX_ROW_HEIGHT
       : receiptXlsxWrappedRowHeight(leftLabel, bcW, {
@@ -10482,13 +10494,23 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         });
     pushRow(labelH, [
       xlsxCellXml(`B${r}`, labelStyle, si(leftLabel), "s"),
-      xlsxCellXml(`D${r}`, 5, si(left), "s"),
-      xlsxCellXml(`F${r}`, 5, si(rightLabel), "s"),
-      xlsxCellXml(`I${r}`, rightBold ? 4 : 5, si(right), "s"),
+      xlsxCellXml(`D${r}`, RECEIPT_XLSX_STYLE.metaNormal, si(left), "s"),
+      xlsxCellXml(`F${r}`, RECEIPT_XLSX_STYLE.metaNormal, si(rightLabel), "s"),
+      xlsxCellXml(
+        `I${r}`,
+        rightBold ? RECEIPT_XLSX_STYLE.metaBold : RECEIPT_XLSX_STYLE.metaNormal,
+        si(right),
+        "s",
+      ),
       ...emptyCells(r, "C", "C", labelStyle),
-      ...emptyCells(r, "E", "E", 5),
-      ...emptyCells(r, "G", "H", 5),
-      ...emptyCells(r, "J", "K", rightBold ? 4 : 5),
+      ...emptyCells(r, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
+      ...emptyCells(r, "G", "H", RECEIPT_XLSX_STYLE.metaNormal),
+      ...emptyCells(
+        r,
+        "J",
+        "K",
+        rightBold ? RECEIPT_XLSX_STYLE.metaBold : RECEIPT_XLSX_STYLE.metaNormal,
+      ),
     ]);
   };
   pushMetaPairRow("Худалдааны төлөөлөгч:", f.salesName, "Харилцагч:", f.customerName, { rightBold: true });
@@ -10506,12 +10528,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
         : "";
     merges.push(`B${r}:E${r}`, `F${r}:H${r}`, `I${r}:K${r}`);
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-      xlsxCellXml(`B${r}`, 5, null, "empty"),
-      xlsxCellXml(`F${r}`, 5, si("И-мэйл:"), "s"),
-      xlsxCellXml(`I${r}`, 5, si(emailVal), "s"),
-      ...emptyCells(r, "C", "E", 5),
-      ...emptyCells(r, "G", "H", 5),
-      ...emptyCells(r, "J", "K", 5),
+      xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.metaNormal, null, "empty"),
+      xlsxCellXml(`F${r}`, RECEIPT_XLSX_STYLE.metaNormal, si("И-мэйл:"), "s"),
+      xlsxCellXml(`I${r}`, RECEIPT_XLSX_STYLE.metaNormal, si(emailVal), "s"),
+      ...emptyCells(r, "C", "E", RECEIPT_XLSX_STYLE.metaNormal),
+      ...emptyCells(r, "G", "H", RECEIPT_XLSX_STYLE.metaNormal),
+      ...emptyCells(r, "J", "K", RECEIPT_XLSX_STYLE.metaNormal),
     ]);
   }
 
@@ -10536,38 +10558,63 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     `D${bankR5}:E${bankR5}`,
   );
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-    xlsxCellXml(`B${bankR1}`, 5, si("Дансны нэр:"), "s"),
-    xlsxCellXml(`D${bankR1}`, 5, si("ТОМУДА"), "s"),
-    xlsxCellXml(`F${bankR1}`, 4, si("Хүргэлтийн хаяг:"), "s"),
-    ...emptyCells(bankR1, "C", "C", 5),
-    ...emptyCells(bankR1, "E", "E", 5),
-    ...emptyCells(bankR1, "G", "H", 4),
+    xlsxCellXml(`B${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("Дансны нэр:"), "s"),
+    xlsxCellXml(`D${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("ТОМУДА"), "s"),
+    xlsxCellXml(
+      `F${bankR1}`,
+      RECEIPT_XLSX_STYLE.metaBold,
+      si("Хүргэлтийн хаяг:"),
+      "s",
+    ),
+    ...emptyCells(bankR1, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR1, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR1, "G", "H", RECEIPT_XLSX_STYLE.metaBold),
   ]);
   const addrH = Math.max(57, Math.ceil(addressText.length / 42) * 12 + 8);
   const perBankH = RECEIPT_XLSX_ROW_HEIGHT;
   pushRow(perBankH, [
-    xlsxCellXml(`B${bankR2}`, 5, si("Регистрийн дугаар:"), "s"),
-    xlsxCellXml(`D${bankR2}`, 5, si("5397987"), "s"),
-    xlsxCellXml(`F${bankR2}`, 5, si(addressText), "s"),
-    ...emptyCells(bankR2, "C", "C", 5),
-    ...emptyCells(bankR2, "E", "E", 5),
+    xlsxCellXml(
+      `B${bankR2}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("Регистрийн дугаар:"),
+      "s",
+    ),
+    xlsxCellXml(`D${bankR2}`, RECEIPT_XLSX_STYLE.metaNormal, si("5397987"), "s"),
+    xlsxCellXml(`F${bankR2}`, RECEIPT_XLSX_STYLE.metaNormal, si(addressText), "s"),
+    ...emptyCells(bankR2, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR2, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(`B${bankR3}`, 5, si("Банкны нэр:"), "s"),
-    xlsxCellXml(`D${bankR3}`, 5, si("Хаан банк"), "s"),
-    ...emptyCells(bankR3, "C", "C", 5),
-    ...emptyCells(bankR3, "E", "E", 5),
+    xlsxCellXml(`B${bankR3}`, RECEIPT_XLSX_STYLE.metaNormal, si("Банкны нэр:"), "s"),
+    xlsxCellXml(`D${bankR3}`, RECEIPT_XLSX_STYLE.metaNormal, si("Хаан банк"), "s"),
+    ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(`B${bankR4}`, 4, si("Дансны дугаар:"), "s"),
-    xlsxCellXml(`C${bankR4}`, 62, si("IBAN:"), "s"),
-    xlsxCellXml(`D${bankR4}`, 5, si(RECEIPT_BANK_IBAN_SHORT), "s"),
-    ...emptyCells(bankR4, "E", "E", 5),
+    xlsxCellXml(
+      `B${bankR4}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("Дансны дугаар:"),
+      "s",
+    ),
+    xlsxCellXml(`C${bankR4}`, RECEIPT_XLSX_STYLE.ibanLabel, si("IBAN:"), "s"),
+    xlsxCellXml(
+      `D${bankR4}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si(RECEIPT_BANK_IBAN_SHORT),
+      "s",
+    ),
+    ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(`D${bankR5}`, 5, si(RECEIPT_BANK_ACCOUNT), "s"),
-    ...emptyCells(bankR5, "B", "C", 5),
-    ...emptyCells(bankR5, "E", "E", 4),
+    xlsxCellXml(
+      `D${bankR5}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si(RECEIPT_BANK_ACCOUNT),
+      "s",
+    ),
+    ...emptyCells(bankR5, "B", "C", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR5, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
@@ -10834,10 +10881,10 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const r = rowNum;
     merges.push(`B${r}:F${r}`, `G${r}:J${r}`);
     pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
-      xlsxCellXml(`B${r}`, 61, si(role), "s"),
-      ...emptyCells(r, "C", "F", 61),
-      xlsxCellXml(`G${r}`, 57, null, "empty"),
-      ...emptyCells(r, "H", "J", 57),
+      xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.signLabel, si(role), "s"),
+      ...emptyCells(r, "C", "F", RECEIPT_XLSX_STYLE.signLabel),
+      xlsxCellXml(`G${r}`, RECEIPT_XLSX_STYLE.signLine, null, "empty"),
+      ...emptyCells(r, "H", "J", RECEIPT_XLSX_STYLE.signLine),
       ...emptyCells(r, "K", "K", 1),
     ]);
   };
