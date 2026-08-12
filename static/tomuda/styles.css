@@ -5789,6 +5789,26 @@ button:focus-visible,
     min-height: 0;
   }
 
+  /* Орлого: гадна scroll түгжиж, жагсаалт дотор л гүйлгэнэ. Footer бэхлэгдэнэ. */
+  .app-shell--bottom-nav .app-main:has(.stock-in-sheet) {
+    overflow: hidden;
+  }
+
+  .app-shell--bottom-nav .app-main__inner:has(.stock-in-sheet) {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-shell--bottom-nav .app-main__inner:has(.stock-in-sheet) > .stock-in-sheet {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    margin: 0;
+  }
+
   .app-shell--bottom-nav .app-main {
     padding-top: var(--mobile-top-bar-offset) !important;
     padding-bottom: calc(
@@ -16420,7 +16440,14 @@ body.image-lightbox-open {
   --si-muted: #6b7788;
   --si-line: #d9e0e8;
   margin: -4px -2px 0;
-  min-height: calc(100dvh - 7.5rem);
+  height: calc(
+    100dvh - var(--mobile-top-bar-offset, 3.5rem) - var(--mobile-nav-h, 4.5rem) -
+      env(safe-area-inset-bottom, 0px) - 8px
+  );
+  max-height: calc(
+    100dvh - var(--mobile-top-bar-offset, 3.5rem) - var(--mobile-nav-h, 4.5rem) -
+      env(safe-area-inset-bottom, 0px) - 8px
+  );
   display: flex;
   flex-direction: column;
   background: var(--si-page);
@@ -16429,6 +16456,7 @@ body.image-lightbox-open {
 }
 
 .stock-in-sheet__head {
+  flex-shrink: 0;
   background: linear-gradient(180deg, var(--si-navy) 0%, var(--si-navy-2) 100%);
   color: #fff;
   padding: 12px 16px 18px;
@@ -16548,32 +16576,47 @@ body.image-lightbox-open {
 
 .stock-in-sheet__body {
   flex: 1;
-  padding: 12px 12px 18px;
+  min-height: 0;
+  padding: 12px 12px 10px;
   display: flex;
   flex-direction: column;
 }
 
 .stock-in-sheet__body--receipt {
-  gap: 12px;
+  gap: 0;
 }
 
 .stock-in-sheet__card {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding: 12px;
   border-radius: 16px;
   background: var(--si-card);
   border: 1px solid var(--si-line);
   box-shadow: 0 8px 24px rgba(15, 35, 55, 0.06);
-  min-height: 0;
 }
 
 .stock-in-sheet__scan-wrap {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.stock-in-sheet__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
 }
 
 .stock-in-sheet__scan {
@@ -16716,12 +16759,24 @@ body.image-lightbox-open {
 }
 
 .stock-in-sheet__empty {
-  padding: 28px 12px;
+  padding: 28px 14px;
   text-align: center;
   font-size: 13px;
+  line-height: 1.45;
   color: var(--si-muted);
   border: 1px dashed var(--si-line);
   border-radius: 12px;
+}
+
+.stock-in-sheet__empty-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--si-ink);
+}
+
+.stock-in-sheet__empty p {
+  margin: 0;
 }
 
 .stock-in-line {
@@ -16753,6 +16808,7 @@ body.image-lightbox-open {
   background: transparent;
   color: var(--si-danger);
   cursor: pointer;
+  z-index: 1;
 }
 
 .stock-in-line__delete svg {
@@ -16790,6 +16846,13 @@ body.image-lightbox-open {
   flex-shrink: 0;
 }
 
+.stock-in-line__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .stock-in-line__name {
   margin: 0;
   font-size: 14px;
@@ -16799,6 +16862,8 @@ body.image-lightbox-open {
 }
 
 .stock-in-line__sku {
+  margin: 0;
+  font-size: 12px;
   font-weight: 600;
   color: var(--si-muted);
 }
@@ -16815,6 +16880,11 @@ body.image-lightbox-open {
 .stock-in-line__unit {
   font-weight: 600;
   color: var(--si-muted);
+}
+
+.stock-in-line__unit-label {
+  color: var(--si-ink);
+  font-weight: 700;
 }
 
 .stock-in-line__stepper {
@@ -16855,12 +16925,20 @@ body.image-lightbox-open {
 }
 
 .stock-in-sheet__footer {
-  margin-top: auto;
-  padding-top: 8px;
+  flex-shrink: 0;
+  margin-top: 0;
+  padding-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   border-top: 1px solid var(--si-line);
+  background: var(--si-card);
+}
+
+.stock-in-sheet__footer--simple {
+  border-top: 0;
+  padding: 10px 12px 4px;
+  background: transparent;
 }
 
 .stock-in-sheet__totals {
@@ -16971,6 +17049,8 @@ body.image-lightbox-open {
     margin: 0;
     border-radius: 18px;
     max-width: 560px;
+    height: calc(100dvh - 6rem);
+    max-height: calc(100dvh - 6rem);
   }
 }
 

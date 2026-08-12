@@ -14142,10 +14142,13 @@ function stockInEntryRow(p) {
   <div class="stock-in-line__main">
     <button type="button" class="stock-in-line__open" onclick="stockInEntryModal('${esc(p.id)}')" aria-label="${esc(p.name)} засах">
       <img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-in-line__img" width="56" height="56" loading="lazy" decoding="async">
-      <p class="stock-in-line__name">${esc(p.name)} <span class="stock-in-line__sku">(${esc(sku)})</span></p>
+      <div class="stock-in-line__copy">
+        <p class="stock-in-line__name">${esc(p.name)}</p>
+        <p class="stock-in-line__sku">(${esc(sku)})</p>
+      </div>
     </button>
     <div class="stock-in-line__math">
-      <span class="stock-in-line__unit">${fmt(cost)} x</span>
+      <span class="stock-in-line__unit"><span class="stock-in-line__unit-label">Өртөг</span> ${fmt(cost)} x</span>
       <span class="stock-in-line__stepper">
         <button type="button" class="stock-in-line__step" onclick="bumpStockInLineQty('${esc(p.id)}',-1)" aria-label="Багасгах">−</button>
         <b class="stock-in-line__qty">${qty}</b>
@@ -14632,7 +14635,10 @@ function stockInSearchHitsHtml(list) {
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
   if (!filled.length) {
-    return `<div class="stock-in-sheet__empty">Бараа нэмэхийн тулд дээрээс хайж уншуулна уу.</div>`;
+    return `<div class="stock-in-sheet__empty">
+  <p class="stock-in-sheet__empty-title">Бараа хараахан нэмээгүй</p>
+  <p>Дээрээс хайж эсвэл скан хийнэ. Бараа олдвол голд тоо ширхэг, өртөг оруулах цонх гарна. OK дарахад энд жагсаалтад орно.</p>
+</div>`;
   }
   return `<div class="stock-in-sheet__lines">${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
 }
@@ -14668,8 +14674,11 @@ function stockInPanel(list) {
       <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
     </div>
   </header>
-  <div class="stock-in-sheet__body stock-in-sheet__body--receipt">${stockInReceiptPanel(state.stockInReceipt)}
-    <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary stock-in-sheet__btn--block" onclick="confirmNewStockIn()">Шинэ орлого</button>
+  <div class="stock-in-sheet__body stock-in-sheet__body--receipt">
+    <div class="stock-in-sheet__scroll">${stockInReceiptPanel(state.stockInReceipt)}</div>
+    <div class="stock-in-sheet__footer stock-in-sheet__footer--simple">
+      <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary stock-in-sheet__btn--block" onclick="confirmNewStockIn()">Шинэ орлого</button>
+    </div>
   </div>
 </div>`;
   }
@@ -14692,8 +14701,10 @@ function stockInPanel(list) {
   <div class="stock-in-sheet__body">
     <div class="stock-in-sheet__card">
       ${stockInScanToolbarHtml()}
-      ${stockInSearchHitsHtml(list)}
-      ${stockInLinesHtml(allProducts)}
+      <div class="stock-in-sheet__scroll">
+        ${stockInSearchHitsHtml(list)}
+        ${stockInLinesHtml(allProducts)}
+      </div>
       ${stockInFooterHtml(allProducts)}
     </div>
   </div>
