@@ -12297,54 +12297,154 @@ function confirmInventoryExport() {
     );
   });
 }
+const SALES_REPORT_XLSX_COL_WIDTHS = [28, 14, 18, 18, 14, 18, 12];
+const SALES_INFO_XLSX_COL_WIDTHS = [14, 26, 16, 12, 14, 18, 22, 14];
+function salesReportExcelBlankRow(cols = 7) {
+  return Array.from({ length: cols }, () => "");
+}
+function reportExcelStamp() {
+  const year = String(state.filters.reportYear || "").trim();
+  const month = String(state.filters.reportMonth || "").trim();
+  return year && month
+    ? `${year}-${String(month).padStart(2, "0")}`
+    : new Date().toISOString().slice(0, 10);
+}
+function salesReportExportMeta(orders) {
+  const emp =
+    salesOrderAgents().find((e) => e.id === state.filters.reportEmployeeId)
+      ?.name || "Бүгд";
+  const total = orders.reduce((s, o) => s + orderAmount(o), 0);
+  const receivable = orders
+    .filter((o) => !orderIsPaid(o))
+    .reduce((s, o) => s + orderAmount(o), 0);
+  return {
+    emp,
+    period: reportPeriodHint(),
+    total,
+    receivable,
+  };
+}
+function salesInfoPaymentStatus(o) {
+  return orderIsPaid(o) ? "Тооцоо дууссан" : "Төлбөрийн үлдэгдэлтэй";
+}
+function buildSalesReportExcelRows(orders, customers, meta) {
+  const { emp, period, total, receivable } = meta;
+  const rows = [
+    ["Борлуулалтын тайлан", "", "", "", "", "", ""],
+    salesReportExcelBlankRow(),
+    ["Ажилтан", emp, "", "Хугацаа", period, "", ""],
+    salesReportExcelBlankRow(),
+    ["Борлуулалт", "Авлага", "Захиалга", "Харилцагч", "", "", ""],
+    [
+      fmtExcelMoney(total),
+      fmtExcelMoney(receivable),
+      orders.length,
+      customers.length,
+      "",
+      "",
+      "",
+    ],
+    salesReportExcelBlankRow(),
+    ["ХАРИЛЦАГЧИД", "", "", "", "", "", ""],
+    ["Харилцагч", "Захиалга", "Борлуулалт", "Авлага", "", "", ""],
+    ...customers.map((c) => [
+      c.customerName,
+      c.orderCount,
+      fmtExcelMoney(c.sales),
+      c.receivable ? fmtExcelMoney(c.receivable) : "Авлагагүй",
+      "",
+      "",
+      "",
+    ]),
+    salesReportExcelBlankRow(),
+    ["ЗАХИАЛГУУД", "", "", "", "", "", ""],
+    [
+      "Баримт №",
+      "Огноо",
+      "Ажилтан",
+      "Харилцагч",
+      "Төлбөр",
+      "Дүн",
+      "Төлөв",
+    ],
+    ...orders.map((o) => [
+      formatReceiptNumber(o) || o.receiptNumber || "",
+      orderCreatedDay(o) || orderTakenDay(o) || "",
+      o.employeeName || "",
+      orderCustomerName(o),
+      paymentTermLabel(o.paymentTerm),
+      fmtExcelMoney(orderAmount(o)),
+      orderIsPaid(o) ? "Төлсөн" : "Авлага",
+    ]),
+  ];
+  return rows;
+}
+function buildSalesInfoExcelRows(orders, meta) {
+  const { emp, period, total, receivable } = meta;
+  const cols = SALES_INFO_XLSX_COL_WIDTHS.length;
+  return [
+    ["Борлуулалтын мэдээ", ...salesReportExcelBlankRow(cols - 1).slice(1)],
+    salesReportExcelBlankRow(cols),
+    ["Ажилтан", emp, "", "Хугацаа", period, "", "", ""],
+    salesReportExcelBlankRow(cols),
+    ["Борлуулалт", "Авлага", "Захиалга", "", "", "", "", ""],
+    [
+      fmtExcelMoney(total),
+      fmtExcelMoney(receivable),
+      orders.length,
+      "",
+      "",
+      "",
+      "",
+      "",
+    ],
+    salesReportExcelBlankRow(cols),
+    ["ЗАХИАЛГУУД", ...salesReportExcelBlankRow(cols - 1).slice(1)],
+    [
+      "Баримт №",
+      "Харилцагч",
+      "Ажилтан",
+      "Төлбөр",
+      "Хүргэлт",
+      "Дүн",
+      "Төлөв",
+      "Захиалга огноо",
+    ],
+    ...orders.map((o) => [
+      formatReceiptNumber(o) || o.receiptNumber || "",
+      orderCustomerName(o),
+      o.employeeName || "",
+      paymentTermLabel(o.paymentTerm),
+      orderDeliveryDay(o) || "",
+      fmtExcelMoney(orderAmount(o)),
+      salesInfoPaymentStatus(o),
+      orderCreatedDay(o) || orderTakenDay(o) || "",
+    ]),
+  ];
+}
 function confirmReportExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   confirmDataExport("Мэдээлэл татах", () => {
-    const orders = reportOrdersFiltered();
+    const orders = salesReportOrdersFiltered();
     const customers = salesReportCustomerRows(orders);
-    const total = orders.reduce((s, o) => s + orderAmount(o), 0);
-    const receivable = orders
-      .filter((o) => !orderIsPaid(o))
-      .reduce((s, o) => s + orderAmount(o), 0);
-    const emp =
-      salesOrderAgents().find(
-        (e) => e.id === state.filters.reportEmployeeId,
-      )?.name || "Бүгд";
-    excel("Борлуулалтын-тайлан.xlsx", [
-      ["Борлуулалтын тайлан"],
-      ["Ажилтан", emp],
-      ["Хугацаа", reportPeriodHint()],
-      ["Нийт борлуулалт", total],
-      ["Авлага", receivable],
-      ["Захиалга", orders.length],
-      [],
-      ["Харилцагч", "Захиалга", "Борлуулалт", "Авлага"],
-      ...customers.map((c) => [
-        c.customerName,
-        c.orderCount,
-        c.sales,
-        c.receivable,
-      ]),
-      [],
-      [
-        "Баримт №",
-        "Огноо",
-        "Ажилтан",
-        "Харилцагч",
-        "Төлбөр",
-        "Дүн",
-        "Төлөв",
-      ],
-      ...orders.map((o) => [
-        formatReceiptNumber(o) || o.receiptNumber || "",
-        orderCreatedDay(o) || orderTakenDay(o) || "",
-        o.employeeName || "",
-        orderCustomerName(o),
-        paymentTermLabel(o.paymentTerm),
-        orderAmount(o),
-        orderIsPaid(o) ? "Төлсөн" : "Авлага",
-      ]),
-    ]);
+    const meta = salesReportExportMeta(orders);
+    const stamp = reportExcelStamp();
+    excel(`Борлуулалтын-тайлан-${stamp}.xlsx`, buildSalesReportExcelRows(orders, customers, meta), {
+      sheetName: "Борлуулалтын тайлан",
+      colWidths: SALES_REPORT_XLSX_COL_WIDTHS,
+    });
+  });
+}
+function confirmSalesInfoExport() {
+  if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  confirmDataExport("Мэдээлэл татах", () => {
+    const orders = salesReportOrdersFiltered();
+    const meta = salesReportExportMeta(orders);
+    const stamp = reportExcelStamp();
+    excel(`Борлуулалтын-мэдээ-${stamp}.xlsx`, buildSalesInfoExcelRows(orders, meta), {
+      sheetName: "Борлуулалтын мэдээ",
+      colWidths: SALES_INFO_XLSX_COL_WIDTHS,
+    });
   });
 }
 function confirmEmployeeExcel() {
@@ -17924,7 +18024,7 @@ function reportPeriodHint() {
   if (!year && month) return `${Number(month)}-р сар (бүх жил)`;
   return `${year} оны ${Number(month)}-р сар`;
 }
-function reportDateFiltersHtml() {
+function reportDateFiltersHtml(exportOnclick = "confirmReportExport()") {
   const empId = String(state.filters.reportEmployeeId || "").trim();
   const year = String(state.filters.reportYear || "").trim();
   const month = String(state.filters.reportMonth || "").trim();
@@ -17955,7 +18055,7 @@ function reportDateFiltersHtml() {
   const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Харилцагч, баримт №-ээр хайх..." })}<div class="sales-report-filters"><label class="sales-report-filters__field"><span class="sales-report-filters__label">Ажилтан</span><select onchange="setReportEmployee(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Ажилтан">${empOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Жил</span><select onchange="setReportYear(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Жил">${yearOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Сар</span><select onchange="setReportMonth(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Сар">${monthOpts}</select></label><span class="page-toolbar__hint">${esc(reportPeriodHint())}</span></div>`;
   return pageToolbarHtml({
     filters,
-    actions: excelDownloadBtn("confirmReportExport()"),
+    actions: excelDownloadBtn(exportOnclick),
   });
 }
 function setReportEmployee(id) {
@@ -18376,7 +18476,7 @@ function salesInfoDetailView() {
   const receivable = filtered
     .filter((o) => !orderIsPaid(o))
     .reduce((s, o) => s + orderAmount(o), 0);
-  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml()}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Захиалгууд · ${orderCount}</div><div class="line-list">${reportPaymentListHtml(filtered, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml("confirmSalesInfoExport()")}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Захиалгууд · ${orderCount}</div><div class="line-list">${reportPaymentListHtml(filtered, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div></div>`;
 }
 function stockReportsView() {
   if (!canViewReportsHub()) {
@@ -18640,15 +18740,15 @@ function promoQtyLiveText(buyMode, buyQty, freeQty, buyCount = 0, freeCount = 0)
     short: true,
   });
   if (buyMode === "total") {
-    if (buy > 0 && free > 0) return `${buy} ${unit} → ${free} ш үнэгүй`;
+    if (buy > 0 && free > 0) return `${buy} ${unit} → ${free} ш урамшуулал`;
     return "";
   }
   if (buyMode === "each") {
     if (buyCount < 1) return "";
-    return `${buyCount} бараа бүгд → ${free || "?"} ш`;
+    return `${buyCount} бараа бүгд → ${free || "?"} ш урамшуулал`;
   }
   if (buyCount < 1) return "";
-  return `${buyCount} бараанаас аль нэг → ${free || "?"} ш`;
+  return `${buyCount} бараанаас аль нэг → ${free || "?"} ш урамшуулал`;
 }
 function promoQtyLivePreviewHtml(buyMode, buyQty, freeQty) {
   const buyCount = (state.promoPick?.buyProductIds || []).length;
@@ -19431,20 +19531,20 @@ function quantityPromoOfferText(prog) {
   const unit = quantityPromoUnitLabel(prog.buyUnit || "piece");
   if (prog.buyMode === "total") {
     if (prog.buyUnit === "pack") {
-      return `Нийт дурын ${prog.buyQty} хайрцаг захиалахад ${freeNames} ${freeQty} ш үнэгүй.`;
+      return `Нийт дурын ${prog.buyQty} хайрцаг захиалахад ${freeNames} ${freeQty} ш урамшуулал.`;
     }
     if (prog.buyUnit === "large") {
-      return `Том хайрцагнаас нийт ${prog.buyQty} авбал ${freeNames} ${freeQty} ш үнэгүй.`;
+      return `Том хайрцагнаас нийт ${prog.buyQty} авбал ${freeNames} ${freeQty} ш урамшуулал.`;
     }
-    return `Дурын төрлөөс ${prog.buyQty} ${unit} сонгоод ${freeNames} ${freeQty} ш үнэгүй аваарай!`;
+    return `Дурын төрлөөс ${prog.buyQty} ${unit} сонгоод ${freeNames} ${freeQty} ш урамшуулал аваарай!`;
   }
   if (prog.buyMode === "each") {
-    return `Сонгосон бүх бараа тус бүртээ босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
+    return `Сонгосон бүх бараа тус бүртээ босгонд хүрвэл ${freeNames} ${freeQty} ш урамшуулал.`;
   }
   if (prog.buyUnit === "large") {
-    return `Том хайрцагнаас босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
+    return `Том хайрцагнаас босгонд хүрвэл ${freeNames} ${freeQty} ш урамшуулал.`;
   }
-  return `Сонгосон бараанаас аль нэг нь босгонд хүрвэл ${freeNames} ${freeQty} ш үнэгүй.`;
+  return `Сонгосон бараанаас аль нэг нь босгонд хүрвэл ${freeNames} ${freeQty} ш урамшуулал.`;
 }
 function quantityPromoDisplayTitle(prog) {
   const freeNames = promotionProductLabels(prog.freeIds);
@@ -19600,7 +19700,7 @@ function workerQtyPromoProgressCardHtml(prog, qtyByProduct) {
     .filter(Boolean)
     .join("");
   const status = isActive
-    ? `Урамшуулал идэвхтэй · <b>${prog.grantedFree} ш</b> үнэгүй${prog.needForNext > 0 ? ` · дараагийн багц хүртэл <b>${prog.needForNext}</b> ${meter.unit}` : ""}`
+    ? `Урамшуулал идэвхтэй · <b>${prog.grantedFree} ш</b>${prog.needForNext > 0 ? ` · дараагийн багц хүртэл <b>${prog.needForNext}</b> ${meter.unit}` : ""}`
     : `Дараагийн урамшуулал хүртэл <b>${prog.needForNext}</b> ${meter.unit}`;
   const meterLabel =
     prog.buyMode === "each"
@@ -27070,6 +27170,7 @@ Object.assign(window, {
   stockInSmallPacksInput,
   stockInCostPriceWarn,
   confirmReportExport,
+  confirmSalesInfoExport,
   confirmEmployeeExcel,
   openWarehousePrepare,
   confirmOrderReceiptsExcel,
