@@ -4275,13 +4275,19 @@ img[data-product-img],
     color-mix(in srgb, var(--hex-foreground) 14%, var(--hex-border));
   --thumb-shadow: 0 1px 3px rgba(16, 22, 35, 0.1);
   --mobile-nav-h: calc(var(--phi-4) + var(--phi-0));
-  --mobile-nav-offset: calc(
-    var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px)
-  );
+  /* Safe-area tokens — iOS/Android-д ижил тооцоо */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --mobile-nav-offset: calc(var(--mobile-nav-h) + var(--sab));
   --mobile-top-content-h: var(--phi-3);
   --mobile-top-bar-offset: calc(
-    env(safe-area-inset-top, 0px) + var(--mobile-top-content-h) + var(--phi-1)
+    var(--sat) + var(--mobile-top-content-h) + var(--phi-1)
   );
+  /* Viewport height: vh → dvh (Samsung/Apple browser chrome-д ойролцоо) */
+  --app-vh: 100vh;
+  --app-vh: 100dvh;
   --app-gutter: var(--phi-1);
   --space-1: var(--phi-neg-1);
   --space-2: var(--phi-0);
@@ -4299,11 +4305,18 @@ img[data-product-img],
 
 * {
   border-color: var(--hex-border);
+  box-sizing: border-box;
+}
+html {
+  height: 100%;
+  height: -webkit-fill-available;
 }
 html,
 body,
 #app {
   min-height: 100%;
+  min-height: var(--app-vh, 100dvh);
+  min-height: -webkit-fill-available;
   background: var(--hex-background) !important;
 }
 body {
@@ -4312,7 +4325,10 @@ body {
   color: var(--hex-foreground);
   font-size: var(--font-md);
   line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   font-family:
+    "Roboto",
     ui-sans-serif,
     system-ui,
     -apple-system,
@@ -5177,7 +5193,7 @@ button:focus-visible,
   gap: var(--space-3);
   min-height: var(--mobile-top-content-h);
   padding: var(--phi-neg-1) var(--phi-1);
-  padding-top: calc(var(--phi-neg-1) + env(safe-area-inset-top, 0px));
+  padding-top: calc(var(--phi-neg-1) + var(--sat));
   background: var(--hex-card);
   border-bottom: 1px solid var(--hex-border);
   box-shadow: none;
@@ -5277,7 +5293,7 @@ button:focus-visible,
   box-sizing: border-box;
   min-height: var(--mobile-nav-offset);
   height: var(--mobile-nav-offset);
-  padding: var(--phi-neg-1) var(--phi-0) env(safe-area-inset-bottom, 0px);
+  padding: var(--phi-neg-1) var(--phi-0) var(--sab);
   background: var(--hex-card);
   border-top: 1px solid var(--hex-border);
   box-shadow: none;
@@ -5793,8 +5809,8 @@ button:focus-visible,
   }
 
   .app-shell--stock-in {
-    height: 100dvh;
-    max-height: 100dvh;
+    height: var(--app-vh, 100dvh);
+    max-height: var(--app-vh, 100dvh);
     overflow: hidden;
   }
 
@@ -5804,14 +5820,16 @@ button:focus-visible,
   }
 
   .app-shell--stock-in .app-main {
-    padding-top: env(safe-area-inset-top, 0px) !important;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0 !important;
     overflow: hidden;
   }
 
   .app-shell--stock-in .app-main__inner {
     height: 100%;
     min-height: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
     display: flex;
     flex-direction: column;
   }
@@ -5819,9 +5837,14 @@ button:focus-visible,
   .app-shell--stock-in .app-main__inner > .stock-in-sheet {
     flex: 1;
     min-height: 0;
-    height: auto;
-    max-height: none;
+    height: 100% !important;
+    max-height: none !important;
     margin: 0;
+  }
+
+  /* Apple/Samsung: status bar-ийн доор ижил зай (translucent биш) */
+  .app-shell--stock-in .stock-in-sheet__head {
+    padding-top: max(12px, var(--sat));
   }
 
   /* Орлого: гадна scroll түгжиж, жагсаалт дотор л гүйлгэнэ. Footer бэхлэгдэнэ. */
@@ -5862,8 +5885,8 @@ button:focus-visible,
   }
 
   .app-shell--bottom-nav {
-    height: 100dvh;
-    max-height: 100dvh;
+    height: var(--app-vh, 100dvh);
+    max-height: var(--app-vh, 100dvh);
     overflow: hidden;
   }
 
@@ -5902,6 +5925,17 @@ button:focus-visible,
 
   .app-shell:not(.app-shell--bottom-nav) .app-main__inner {
     padding-top: 52px !important;
+  }
+
+  /* Орлого: дээд хоосон зай бүү үлдээ (дээрх :not(bottom-nav) padding-ийг дарна). */
+  .app-shell--stock-in.app-shell:not(.app-shell--bottom-nav) .app-main,
+  .app-shell--stock-in .app-main {
+    padding: 0 !important;
+  }
+
+  .app-shell--stock-in.app-shell:not(.app-shell--bottom-nav) .app-main__inner,
+  .app-shell--stock-in .app-main__inner {
+    padding-top: 0 !important;
   }
 
   .mobile-menu-button--sheet {
@@ -16472,8 +16506,8 @@ body.image-lightbox-open {
   --si-line: var(--hex-border, #d8dee6);
   --si-pad: clamp(10px, 2.4vw, 16px);
   margin: 0;
-  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 4px);
-  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 4px);
+  height: 100%;
+  max-height: none;
   display: flex;
   flex-direction: column;
   background: var(--si-page);
@@ -16481,14 +16515,8 @@ body.image-lightbox-open {
 }
 
 .app-shell--bottom-nav .stock-in-sheet {
-  height: calc(
-    100dvh - env(safe-area-inset-top, 0px) - var(--mobile-nav-h, 4.5rem) -
-      env(safe-area-inset-bottom, 0px) - 4px
-  );
-  max-height: calc(
-    100dvh - env(safe-area-inset-top, 0px) - var(--mobile-nav-h, 4.5rem) -
-      env(safe-area-inset-bottom, 0px) - 4px
-  );
+  height: 100%;
+  max-height: none;
 }
 
 .stock-in-sheet__head {
@@ -16577,8 +16605,9 @@ body.image-lightbox-open {
 
 .stock-in-sheet__meta {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  align-items: start;
   margin-bottom: 10px;
 }
 
@@ -16586,6 +16615,11 @@ body.image-lightbox-open {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.stock-in-sheet__field--half {
   min-width: 0;
 }
 
@@ -16595,17 +16629,29 @@ body.image-lightbox-open {
   color: rgba(255, 255, 255, 0.88);
 }
 
-.stock-in-sheet__select {
+.stock-in-sheet__select,
+input.stock-in-sheet__input {
+  box-sizing: border-box;
   width: 100%;
-  min-height: 38px;
-  padding: 7px 28px 7px 10px;
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  margin: 0;
+  padding: 0 12px;
   border: 0;
   border-radius: 8px;
-  background: #fff;
+  background-color: #fff;
   color: var(--si-ink);
+  font-family: inherit;
   font-size: 13px;
   font-weight: 700;
+  line-height: 42px;
+  -webkit-appearance: none;
   appearance: none;
+}
+
+select.stock-in-sheet__select {
+  padding-right: 28px;
   background-image: linear-gradient(45deg, transparent 50%, #5b6575 50%),
     linear-gradient(135deg, #5b6575 50%, transparent 50%);
   background-position: calc(100% - 14px) calc(50% - 2px),
@@ -16614,10 +16660,14 @@ body.image-lightbox-open {
   background-repeat: no-repeat;
 }
 
-input.stock-in-sheet__input.stock-in-sheet__select,
-.stock-in-sheet__input {
-  padding-right: 10px;
+input.stock-in-sheet__input {
+  padding-right: 12px;
   background-image: none;
+  line-height: normal;
+}
+
+input.stock-in-sheet__input::placeholder {
+  color: #94a3b8;
   font-weight: 600;
 }
 
@@ -17219,9 +17269,9 @@ input.stock-in-sheet__input.stock-in-sheet__select,
   }
 
   .stock-in-sheet__meta {
-    grid-template-columns: minmax(240px, 340px) minmax(240px, 340px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 16px;
-    max-width: none;
+    max-width: 720px;
     margin-bottom: 0;
   }
 
@@ -17230,11 +17280,19 @@ input.stock-in-sheet__input.stock-in-sheet__select,
     font-size: 12px;
   }
 
-  .stock-in-sheet__select {
+  .stock-in-sheet__select,
+  input.stock-in-sheet__input {
+    height: 44px;
     min-height: 44px;
+    max-height: 44px;
     font-size: 14px;
     border: 1px solid var(--si-line);
     box-shadow: none;
+    line-height: 44px;
+  }
+
+  input.stock-in-sheet__input {
+    line-height: normal;
   }
 
   .stock-in-sheet__hint {
@@ -17448,7 +17506,8 @@ input.stock-in-sheet__input.stock-in-sheet__select,
   }
 
   .stock-in-sheet__meta {
-    grid-template-columns: minmax(280px, 380px) minmax(280px, 380px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 840px;
   }
 
   .stock-in-line {
