@@ -18695,6 +18695,145 @@ input.stock-in-sheet__input::placeholder {
   }
 }
 
+.stock-report-mode-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.stock-report-mode-filters__chip {
+  padding: 7px 12px;
+  border: 1px solid var(--hex-border);
+  border-radius: 999px;
+  background: var(--hex-card);
+  color: var(--hex-muted-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stock-report-mode-filters__chip.is-active {
+  border-color: color-mix(in srgb, var(--hex-primary) 35%, var(--hex-border));
+  background: color-mix(in srgb, var(--hex-primary) 10%, var(--hex-card));
+  color: var(--hex-primary);
+}
+
+.line-list--stock-lines {
+  padding-top: 0;
+}
+
+.stock-report-lines-table {
+  --stock-report-line-amount: 6.75rem;
+}
+
+.stock-report-lines-head,
+.stock-report-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--stock-report-line-amount);
+  align-items: center;
+  column-gap: 12px;
+}
+
+.stock-report-lines-head {
+  padding: 6px 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.stock-report-lines-head__amount {
+  text-align: right;
+}
+
+.stock-report-line-row {
+  padding: 11px 0;
+  cursor: default;
+}
+
+.stock-report-line-row__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stock-report-line-row__index {
+  flex-shrink: 0;
+  min-width: 1.35rem;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--hex-muted-foreground) 70%, var(--hex-foreground));
+  line-height: 1.35;
+  padding-top: 1px;
+  text-align: right;
+}
+
+.stock-report-line-row__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stock-report-line-row__name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--hex-foreground);
+}
+
+.stock-report-line-row__barcode {
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--hex-muted-foreground);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-report-line-row__meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.stock-report-line-row__amount {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+@media (min-width: 640px) {
+  .stock-report-lines-table {
+    --stock-report-line-amount: 7.25rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .stock-report-lines-table {
+    --stock-report-line-amount: 5.75rem;
+  }
+
+  .stock-report-line-row__amount {
+    font-size: 13px;
+  }
+}
+
 .stock-in-scan {
   display: flex;
   flex-direction: column;

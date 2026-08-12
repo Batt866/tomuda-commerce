@@ -31,6 +31,7 @@ const state = {
     reportMonth: "",
     stockReportKind: "",
     stockReportDate: "",
+    stockReportMode: "products",
     promotionTab: "price",
     promotionDetail: "",
   },
@@ -18193,16 +18194,19 @@ function salesReportEmployeeBlockHtml(row) {
 function stockReportKindLabel(kind) {
   if (kind === "sales") return "Борлуулалтын тайлан";
   if (kind === "salesInfo") return "Борлуулалтын мэдээ";
-  if (kind === "in") return "Орлогын баримт";
-  if (kind === "inProducts") return "Орлогын барааны тайлан";
-  if (kind === "out") return "Зарлагын баримт";
-  if (kind === "outProducts") return "Зарлагын барааны тайлан";
+  if (kind === "in" || kind === "inProducts") return "Орлогын тайлан";
+  if (kind === "out" || kind === "outProducts") return "Зарлагын тайлан";
   return "Тайлан";
 }
 function stockReportFlowKind(kind) {
   if (kind === "inProducts") return "in";
   if (kind === "outProducts") return "out";
   return kind;
+}
+function normalizeStockReportKindInput(kind) {
+  if (kind === "inProducts") return { kind: "in", mode: "products" };
+  if (kind === "outProducts") return { kind: "out", mode: "products" };
+  return { kind, mode: null };
 }
 function ensureStockReportDateDefault() {
   if (!normalizeIsoDateInput(state.filters.stockReportDate)) {
@@ -18230,25 +18234,18 @@ function openStockReport(kind) {
     if (!canViewSalesInfo()) {
       return alertModal("Эрхгүй", "Борлуулалтын мэдээ харах эрхгүй.");
     }
-  } else if (
-    kind === "in" ||
-    kind === "out" ||
-    kind === "inProducts" ||
-    kind === "outProducts"
-  ) {
+  } else {
+    const flow = stockReportFlowKind(kind);
+    if (flow !== "in" && flow !== "out") return;
     if (!canViewStockReports()) {
       return alertModal("Эрхгүй", "Тайлан харах эрхгүй.");
     }
-  } else {
-    return;
+    const normalized = normalizeStockReportKindInput(kind);
+    kind = normalized.kind;
+    if (normalized.mode) state.filters.stockReportMode = normalized.mode;
   }
   state.filters.stockReportKind = kind;
-  if (
-    kind === "in" ||
-    kind === "out" ||
-    kind === "inProducts" ||
-    kind === "outProducts"
-  ) {
+  if (kind === "in" || kind === "out") {
     ensureStockReportDateDefault();
   }
   if (state.currentView !== "stockReports") {
@@ -18257,6 +18254,11 @@ function openStockReport(kind) {
   }
   render();
   scrollAppMainToTop();
+}
+function setStockReportMode(mode) {
+  if (mode !== "products" && mode !== "lines") return;
+  state.filters.stockReportMode = mode;
+  render();
 }
 function setStockReportDate(day) {
   commitDatePickerChange(() => {
@@ -18268,6 +18270,10 @@ function selectStockReportToday() {
   commitDatePickerChange(() => {
     state.filters.stockReportDate = todayIso();
   });
+}
+function stockReportModeChipsHtml() {
+  const mode = state.filters.stockReportMode || "products";
+  return `<div class="stock-report-mode-filters"><button type="button" onclick="setStockReportMode('products')" class="stock-report-mode-filters__chip${mode === "products" ? " is-active" : ""}">Бараагаар</button><button type="button" onclick="setStockReportMode('lines')" class="stock-report-mode-filters__chip${mode === "lines" ? " is-active" : ""}">Дэлгэрэнгүй</button></div>`;
 }
 function stockReportDateFiltersHtml() {
   ensureStockReportDateDefault();
@@ -18397,6 +18403,55 @@ function stockReportAggregateRow(row, index) {
   const barcode = String(row.barcode || "").trim();
   return `<div class="line-list__row line-list__row--static stock-report-product-row"><div class="stock-report-product-row__main"><span class="stock-report-product-row__index">${index + 1}</span><div class="stock-report-product-row__copy"><span class="stock-report-product-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-product-row__barcode">${esc(barcode)}</span>` : ""}</div></div><span class="stock-report-product-row__qty" aria-label="Тоо ширхэг">${qty.toLocaleString()}<span class="stock-report-product-row__unit">ш</span></span><b class="stock-report-product-row__amount">${fmt(row.amount)}</b></div>`;
 }
+function stockReportDetailLines(kind, receipts) {
+  const rows = [];
+  for (const receipt of receipts) {
+    const day = isoDay(receipt?.createdAt) || "";
+    const receiptLabel = receipt.receiptNumber
+      ? `#${receipt.receiptNumber}`
+      : kind === "out"
+        ? stockOutReceiptTitle(receipt)
+        : "Баримт";
+    const party =
+      kind === "out"
+        ? String(receipt.recipientNote || receipt.warehouseLocation || "").trim()
+        : String(receipt.supplierName || "").trim();
+    for (const line of receipt.lines || []) {
+      const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+      if (!qty) continue;
+      rows.push({
+        day,
+        receiptLabel,
+        party,
+        employeeName: receipt.employeeName || "",
+        productName: line.productName || "-",
+        barcode: String(line.barcode || "").trim(),
+        quantity: qty,
+        amount: stockReportLineAmount(kind, line),
+      });
+    }
+  }
+  return rows.sort(
+    (a, b) =>
+      String(a.day).localeCompare(String(b.day)) ||
+      String(a.receiptLabel).localeCompare(String(b.receiptLabel)) ||
+      String(a.productName).localeCompare(String(b.productName), "mn"),
+  );
+}
+function stockReportDetailLinesHeadRow() {
+  return `<div class="stock-report-lines-head" aria-hidden="true"><span class="stock-report-lines-head__name">Бараа</span><span class="stock-report-lines-head__amount">Дүн</span></div>`;
+}
+function stockReportDetailLineRow(row, index) {
+  const metaParts = [
+    row.day ? warehouseDateDisplayText(row.day) : "",
+    row.receiptLabel,
+    row.party,
+    row.employeeName,
+    `${row.quantity.toLocaleString()} ш`,
+  ].filter(Boolean);
+  const barcode = row.barcode;
+  return `<div class="line-list__row line-list__row--static stock-report-line-row"><div class="stock-report-line-row__main"><span class="stock-report-line-row__index">${index + 1}</span><div class="stock-report-line-row__copy"><span class="stock-report-line-row__name">${esc(row.productName)}</span>${barcode ? `<span class="stock-report-line-row__barcode">${esc(barcode)}</span>` : ""}<p class="line-list__meta stock-report-line-row__meta">${esc(metaParts.join(" · "))}</p></div></div><b class="stock-report-line-row__amount">${fmt(row.amount)}</b></div>`;
+}
 function stockReportsMenuHtml() {
   const sections = [];
   const salesItems = [
@@ -18415,10 +18470,8 @@ function stockReportsMenuHtml() {
   }
   if (canViewStockReports()) {
     const items = [
-      ["in", "Орлогын баримт", "stock"],
-      ["inProducts", "Орлогын барааны тайлан", "inventory"],
-      ["out", "Зарлагын баримт", "inventory"],
-      ["outProducts", "Зарлагын барааны тайлан", "stock"],
+      ["in", "Орлогын тайлан", "inventory"],
+      ["out", "Зарлагын тайлан", "stock"],
     ];
     sections.push(
       `<h3 class="admin-hub__heading">Орлого / Зарлага</h3><div class="admin-hub__settings">${items
@@ -18432,25 +18485,56 @@ function stockReportsMenuHtml() {
   return sections.join("") || `<p class="text-sm text-muted-foreground">Харах эрхтэй тайлан байхгүй.</p>`;
 }
 function stockReportDetailView(kind) {
-  ensureStockReportDateDefault();
   const flow = stockReportFlowKind(kind);
+  ensureStockReportDateDefault();
+  const mode = state.filters.stockReportMode || "products";
   const day = normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
   const receipts = stockReportReceiptsForDay(flow, day);
   const products = stockReportAggregateLines(flow, receipts);
+  const lines = stockReportDetailLines(flow, receipts);
   const total = receipts.reduce(
     (sum, r) => sum + stockReportReceiptTotal(flow, r),
     0,
   );
   const emptyDay =
-    day === todayIso()
-      ? "Өнөөдөр баримт байхгүй"
-      : "Сонгосон өдөр баримт байхгүй";
-  const title = stockReportKindLabel(kind);
-  const filters = pageToolbarHtml({ filters: stockReportDateFiltersHtml() });
-  if (kind === "inProducts" || kind === "outProducts") {
-    return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Бараа", products.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`, 3)}<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">Барааны нэгдсэн тайлан · ${esc(warehouseDateDisplayText(day))}</div><div class="line-list line-list--stock-products stock-report-products-table">${products.length ? `${stockReportAggregateHeadRow()}${products.map(stockReportAggregateRow).join("")}` : `<p class="line-panel__empty">Бараа байхгүй</p>`}</div></div></div>`;
-  }
-  return `<div class="space-y-4">${pageHead(title)}${filters}${metricsBar(`${card("Баримт", receipts.length)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel"><div class="line-panel__section-title">Баримтууд · ${esc(warehouseDateDisplayText(day))}</div><p class="text-xs text-muted-foreground px-1">Баримт дээр дарж харна. Excel товчоор татна.</p><div class="line-list">${receipts.length ? receipts.map((r) => stockReportReceiptRow(flow, r)).join("") : `<p class="line-panel__empty">${emptyDay}</p>`}</div></div></div>`;
+    flow === "out"
+      ? day === todayIso()
+        ? "Өнөөдөр зарлага байхгүй"
+        : "Сонгосон өдөр зарлага байхгүй"
+      : day === todayIso()
+        ? "Өнөөдөр орлого байхгүй"
+        : "Сонгосон өдөр орлого байхгүй";
+  const title = stockReportKindLabel(flow);
+  const filters = pageToolbarHtml({
+    filters: `${stockReportDateFiltersHtml()}${stockReportModeChipsHtml()}`,
+  });
+  const metrics =
+    mode === "products"
+      ? metricsBar(
+          `${card("Бараа", products.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`,
+          3,
+        )
+      : metricsBar(
+          `${card("Мөр", lines.length)}${card("Нийт дүн", fmt(total))}${card("Баримт", receipts.length)}`,
+          3,
+        );
+  const sectionTitle =
+    mode === "products"
+      ? `Бараагаар · ${esc(warehouseDateDisplayText(day))}`
+      : `Дэлгэрэнгүй · ${esc(warehouseDateDisplayText(day))}`;
+  const listBody =
+    mode === "products"
+      ? products.length
+        ? `${stockReportAggregateHeadRow()}${products.map(stockReportAggregateRow).join("")}`
+        : `<p class="line-panel__empty">${emptyDay}</p>`
+      : lines.length
+        ? `${stockReportDetailLinesHeadRow()}${lines.map(stockReportDetailLineRow).join("")}`
+        : `<p class="line-panel__empty">${emptyDay}</p>`;
+  const listClass =
+    mode === "products"
+      ? "line-list line-list--stock-products stock-report-products-table"
+      : "line-list line-list--stock-lines stock-report-lines-table";
+  return `<div class="space-y-4">${pageHead(title)}${filters}${metrics}<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">${sectionTitle}</div><div class="${listClass}">${listBody}</div></div></div>`;
 }
 function salesReportOrdersFiltered() {
   const orders = reportOrdersFiltered();
@@ -18512,16 +18596,13 @@ function stockReportsView() {
     }
     return kind === "salesInfo" ? salesInfoDetailView() : salesReportDetailView();
   }
-  if (
-    kind === "in" ||
-    kind === "out" ||
-    kind === "inProducts" ||
-    kind === "outProducts"
-  ) {
+  if (kind === "in" || kind === "out" || kind === "inProducts" || kind === "outProducts") {
     if (!canViewStockReports()) {
       return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
     }
-    return stockReportDetailView(kind);
+    const normalized = normalizeStockReportKindInput(kind);
+    if (normalized.mode) state.filters.stockReportMode = normalized.mode;
+    return stockReportDetailView(normalized.kind);
   }
   return `<div class="space-y-4">${pageHead("Тайлан")}<section class="admin-hub">${stockReportsMenuHtml()}</section></div>`;
 }
@@ -27503,6 +27584,7 @@ Object.assign(window, {
   openStockReportsHub,
   openStockReport,
   setStockReportDate,
+  setStockReportMode,
   selectStockReportToday,
   openStockReportReceipt,
   setPaymentTerm,
