@@ -14413,13 +14413,72 @@ textarea::placeholder {
   font-weight: 600;
   color: var(--hex-muted-foreground);
   line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metrics-bar__value {
+  max-width: 100%;
   font-size: 1.05rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  letter-spacing: -0.01em;
+}
+
+/* 4 багана: мөнгөн дүн урт үед давхцахгүй — доош мөрлөхгүй */
+.metrics-bar--4 .metrics-bar__item {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 3px;
+  overflow: hidden;
+}
+
+.metrics-bar--4 .metrics-bar__item:nth-child(1),
+.metrics-bar--4 .metrics-bar__item:nth-child(2) {
+  flex: 1.4 1 0;
+}
+
+.metrics-bar--4 .metrics-bar__item:nth-child(3),
+.metrics-bar--4 .metrics-bar__item:nth-child(4) {
+  flex: 0.7 1 0;
+}
+
+.metrics-bar--4 .metrics-bar__label {
+  font-size: 10px;
+}
+
+.metrics-bar--4 .metrics-bar__value {
+  font-size: clamp(0.62rem, 2.45vw, 0.92rem);
+  letter-spacing: -0.03em;
+}
+
+.metrics-bar--3 .metrics-bar__item {
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.metrics-bar--3 .metrics-bar__value {
+  font-size: clamp(0.72rem, 2.7vw, 1.05rem);
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 380px) {
+  .metrics-bar--4 .metrics-bar__value {
+    font-size: clamp(0.55rem, 2.2vw, 0.78rem);
+  }
+
+  .metrics-bar--4 .metrics-bar__item {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
 }
 
 .metrics-bar--count {
