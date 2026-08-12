@@ -14153,43 +14153,41 @@ function stockInEntryRow(p) {
   const hasSmall = productPackSize(p) > 0 || packs > 0;
   const highlight =
     state.stockInHighlightId === p.id ? " stock-in-line--scan" : "";
-  const qtyRows = [];
+  const chips = [];
   if (hasLarge) {
-    qtyRows.push(
-      `<div class="stock-in-line__qty-row"><span>Том хайрцаг</span><b>${largePacks} ш</b></div>`,
+    chips.push(
+      `<span class="stock-in-line__chip"><em>Том</em><b>${largePacks}</b></span>`,
     );
   }
   if (hasSmall) {
-    qtyRows.push(
-      `<div class="stock-in-line__qty-row"><span>Жижиг хайрцаг</span><b>${packs} ш</b></div>`,
+    chips.push(
+      `<span class="stock-in-line__chip"><em>Жижиг</em><b>${packs}</b></span>`,
     );
   }
-  qtyRows.push(
-    `<div class="stock-in-line__qty-row"><span>Тоо ширхэг</span><b>${hasLarge || hasSmall ? pieces : qty} ш</b></div>`,
+  chips.push(
+    `<span class="stock-in-line__chip"><em>Тоо</em><b>${hasLarge || hasSmall ? pieces : qty} ш</b></span>`,
   );
   return `<article class="stock-in-line${highlight}" data-stock-in-id="${esc(p.id)}">
-  <div class="stock-in-line__top">
-    <button type="button" class="stock-in-line__open" onclick="stockInEntryModal('${esc(p.id)}')">
-      <img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-in-line__img" width="56" height="56" loading="lazy" decoding="async">
-      <div class="stock-in-line__copy">
-        <p class="stock-in-line__name">${esc(p.name)}</p>
-        ${sku ? `<p class="stock-in-line__sku">(${esc(sku)})</p>` : ""}
-      </div>
-    </button>
-    <div class="stock-in-line__icons">
-      <button type="button" class="stock-in-line__icon-btn" onclick="stockInEntryModal('${esc(p.id)}')" aria-label="Засах">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-      </button>
-      <button type="button" class="stock-in-line__icon-btn stock-in-line__icon-btn--danger" onclick="confirmRemoveStockDraft('${esc(p.id)}','in')" aria-label="Устгах">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>
-      </button>
-    </div>
+  <button type="button" class="stock-in-line__open" onclick="stockInEntryModal('${esc(p.id)}')">
+    <img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-in-line__img" width="48" height="48" loading="lazy" decoding="async">
+    <span class="stock-in-line__copy">
+      <span class="stock-in-line__name">${esc(p.name)}</span>
+      ${sku ? `<span class="stock-in-line__sku">${esc(sku)}</span>` : ""}
+    </span>
+  </button>
+  <div class="stock-in-line__chips">${chips.join("")}</div>
+  <div class="stock-in-line__totals">
+    <span class="stock-in-line__total"><em>Нийт</em><b>${qty} ш</b></span>
+    <span class="stock-in-line__total"><em>Өртөг</em><b>${fmt(costTotal)}</b></span>
+    <span class="stock-in-line__total stock-in-line__total--price"><em>Үнэ</em><b>${fmt(salesTotal)}</b></span>
   </div>
-  <div class="stock-in-line__qty-list">${qtyRows.join("")}</div>
-  <div class="stock-in-line__summary">
-    <p class="stock-in-line__total-pcs">Нийт ш: <b>${qty} ш</b></p>
-    <p><span>Өртөг</span> <b>${fmt(cost)} x ${qty} ш = ${fmt(costTotal)}</b></p>
-    <p><span>Нийт Үнэ</span> <b>${fmt(sales)} x ${qty} ш = ${fmt(salesTotal)}</b></p>
+  <div class="stock-in-line__icons">
+    <button type="button" class="stock-in-line__icon-btn" onclick="stockInEntryModal('${esc(p.id)}')" aria-label="Засах">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>
+    <button type="button" class="stock-in-line__icon-btn stock-in-line__icon-btn--danger" onclick="confirmRemoveStockDraft('${esc(p.id)}','in')" aria-label="Устгах">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>
+    </button>
   </div>
 </article>`;
 }
@@ -21671,8 +21669,22 @@ function workerStorePickStep() {
   return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" aria-label="Харилцагч хайх"></div>${selectedBanner}${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
 }
 function pickWorkerStore(id) {
-  state.workerCustomer = state.workerCustomer === id ? "" : id;
+  const nextId = state.workerCustomer === id ? "" : id;
+  state.workerCustomer = nextId;
   render();
+  if (!nextId) return;
+  // Жагсаалтаас доош сонгосны дараа сонгосон баннер дээр автоматаар гарна.
+  requestAnimationFrame(() => {
+    scrollPageToTop();
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    document
+      .querySelector(".worker-pick-selected")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 function confirmWorkerStore() {
   if (!state.workerCustomer || state.editingOrderId) return;
