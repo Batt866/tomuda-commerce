@@ -4018,9 +4018,7 @@ img[data-product-img],
 }
 
 .app-shell--bottom-nav .scroll-top-fab {
-  bottom: calc(
-    var(--mobile-nav-h) + 14px + env(safe-area-inset-bottom, 0px)
-  );
+  bottom: calc(var(--mobile-nav-offset) + 14px);
 }
 
 .pwa-install-inner {
@@ -4276,7 +4274,10 @@ img[data-product-img],
   --thumb-border: 1.5px solid
     color-mix(in srgb, var(--hex-foreground) 14%, var(--hex-border));
   --thumb-shadow: 0 1px 3px rgba(16, 22, 35, 0.1);
-  --mobile-nav-h: var(--phi-4);
+  --mobile-nav-h: calc(var(--phi-4) + var(--phi-0));
+  --mobile-nav-offset: calc(
+    var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px)
+  );
   --mobile-top-content-h: var(--phi-3);
   --mobile-top-bar-offset: calc(
     env(safe-area-inset-top, 0px) + var(--mobile-top-content-h) + var(--phi-1)
@@ -5273,8 +5274,10 @@ button:focus-visible,
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: var(--phi-neg-1);
-  min-height: var(--mobile-nav-h);
-  padding: var(--phi-neg-1) var(--phi-0) max(var(--phi-0), env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  min-height: var(--mobile-nav-offset);
+  height: var(--mobile-nav-offset);
+  padding: var(--phi-neg-1) var(--phi-0) env(safe-area-inset-bottom, 0px);
   background: var(--hex-card);
   border-top: 1px solid var(--hex-border);
   box-shadow: none;
@@ -5844,7 +5847,7 @@ button:focus-visible,
   .app-shell--bottom-nav .app-main {
     padding-top: var(--mobile-top-bar-offset) !important;
     padding-bottom: calc(
-      var(--mobile-nav-h) + var(--phi-1) + env(safe-area-inset-bottom, 0px)
+      var(--mobile-nav-offset) + var(--phi-1)
     ) !important;
     padding-left: var(--app-gutter) !important;
     padding-right: var(--app-gutter) !important;
@@ -11358,8 +11361,8 @@ textarea::placeholder {
     flex: none;
     min-height: 0;
     overflow: visible;
-    /* Fixed footer-ийн доор бараа нуугдахгүй зай */
-    padding-bottom: calc(210px + env(safe-area-inset-bottom, 0px));
+    /* Fixed footer + bottom nav-ийн доор бараа нуугдахгүй зай */
+    padding-bottom: calc(240px + var(--mobile-nav-offset));
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__head {
@@ -11394,15 +11397,15 @@ textarea::placeholder {
     max-height: none;
   }
 
-  /* Доод панел навигацийн дээр бэхлэгдэнэ — зайгүй нийлнэ (safe-area nav-д аль хэдийн орсон). */
+  /* Доод панел навигацийн дээр бэхлэгдэнэ — товч бүрэн харагдана. */
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card__foot {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--mobile-nav-h);
+    bottom: var(--mobile-nav-offset);
     z-index: 40;
     margin: 0;
-    padding: 10px var(--app-gutter) 8px;
+    padding: 10px var(--app-gutter) 12px;
     background: var(--hex-background);
     box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.06);
   }
@@ -18445,7 +18448,8 @@ label.excel-import-toolbar__upload {
   position: fixed;
   left: 50%;
   bottom: calc(
-    var(--mobile-nav-h, 72px) + 16px + env(safe-area-inset-bottom, 0px)
+    var(--mobile-nav-offset, calc(var(--mobile-nav-h, 72px) + env(safe-area-inset-bottom, 0px))) +
+      16px
   );
   z-index: 10050;
   max-width: min(92vw, 420px);
