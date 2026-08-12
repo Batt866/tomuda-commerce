@@ -7434,6 +7434,88 @@ textarea::placeholder {
 
 .worker-view--ordering .worker-order-summary {
   position: static;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.worker-view--ordering .worker-order-stats {
+  gap: 6px;
+}
+
+.worker-view--ordering .worker-order-stat {
+  gap: 1px;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+
+.worker-view--ordering .worker-order-stat__value {
+  font-size: 0.95rem;
+}
+
+.worker-view--ordering .worker-order-stat--total .worker-order-stat__value {
+  font-size: 0.9rem;
+}
+
+.worker-view--ordering .worker-order-stat__label {
+  font-size: 10px;
+}
+
+.worker-view--ordering .worker-order-summary .worker-order-field {
+  gap: 3px;
+}
+
+.worker-view--ordering .worker-order-summary .worker-order-field__label {
+  font-size: 11px;
+}
+
+.worker-view--ordering .worker-order-summary .field-input {
+  min-height: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+.worker-view--ordering .worker-receivable {
+  column-gap: 8px;
+  row-gap: 2px;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+
+.worker-view--ordering .worker-receivable__list {
+  gap: 2px;
+}
+
+.worker-view--ordering .worker-receivable__open {
+  gap: 6px;
+  padding: 0;
+}
+
+.worker-view--ordering .worker-receivable__amount {
+  font-size: 12px;
+}
+
+.worker-view--ordering .worker-order-card__body {
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.worker-view--ordering .worker-order-card__tools {
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.worker-view--ordering .worker-order-add-btn {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.worker-view--ordering .worker-order-lines-wrap {
+  gap: 6px;
+  margin: 2px 0 8px;
+  padding: 2px 0 4px;
 }
 
 .worker-order-stats__note {
@@ -17542,10 +17624,10 @@ body.image-lightbox-open {
 }
 
 .stock-in-sheet__meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: 8px;
-  align-items: start;
+  align-items: stretch;
   margin-bottom: 10px;
 }
 
@@ -17558,6 +17640,7 @@ body.image-lightbox-open {
 }
 
 .stock-in-sheet__field--half {
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -17589,6 +17672,8 @@ input.stock-in-sheet__input {
 }
 
 select.stock-in-sheet__select {
+  min-width: 0;
+  max-width: 100%;
   padding-right: 28px;
   background-image: linear-gradient(45deg, transparent 50%, #5b6575 50%),
     linear-gradient(135deg, #5b6575 50%, transparent 50%);
@@ -18246,7 +18331,6 @@ input.stock-in-sheet__input::placeholder {
   }
 
   .stock-in-sheet__meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px 16px;
     max-width: 720px;
     margin-bottom: 0;
@@ -18497,7 +18581,6 @@ input.stock-in-sheet__input::placeholder {
   }
 
   .stock-in-sheet__meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     max-width: 840px;
   }
 
