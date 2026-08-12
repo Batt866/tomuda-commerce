@@ -2923,6 +2923,7 @@ function defaultViewForRole(r) {
 function canViewStockReports() {
   return (
     isAdmin() ||
+    hasPermission("stockReports.view") ||
     hasPermission("warehouse.view") ||
     hasPermission("warehouse.edit") ||
     hasPermission("stockIn.view") ||
@@ -2933,8 +2934,32 @@ function canViewStockReports() {
 function canViewSalesReport() {
   return isAdmin() || hasPermission("reports.view");
 }
+function canViewSalesInfo() {
+  return (
+    isAdmin() ||
+    hasPermission("salesInfo.view") ||
+    hasPermission("reports.view")
+  );
+}
+function canViewWarehousePrepare() {
+  return (
+    isAdmin() ||
+    hasPermission("warehousePrepare.view") ||
+    hasPermission("warehouse.view") ||
+    hasPermission("warehouse.edit")
+  );
+}
+function canViewDeletionLog() {
+  return (
+    isAdmin() ||
+    hasPermission("deletionLog.view") ||
+    hasPermission("settings.view") ||
+    hasPermission("stockAlert.view") ||
+    hasPermission("orderHistory.view")
+  );
+}
 function canViewReportsHub() {
-  return canViewStockReports() || canViewSalesReport();
+  return canViewStockReports() || canViewSalesReport() || canViewSalesInfo();
 }
 function canAccessView(viewId) {
   if (viewId === "employeePermissions" && canManageEmployeePermissions()) {
@@ -2942,9 +2967,10 @@ function canAccessView(viewId) {
   }
   if (viewId === "stockReports") return canViewReportsHub();
   if (viewId === "reports") return canViewSalesReport();
+  if (viewId === "warehouse") return canViewWarehousePrepare();
   if (permApi()) {
     if (
-      (viewId === "warehouse" || viewId === "inventory") &&
+      viewId === "inventory" &&
       (hasPermission("warehouse.view") || hasPermission("warehouse.edit"))
     ) {
       return true;
@@ -3544,8 +3570,7 @@ function sidebarNavForRole(role) {
   return nav;
 }
 function bottomNavForRole(role) {
-  const canWh =
-    canAccessView("warehouse") || hasPermission("warehouse.view");
+  const canWh = canViewWarehousePrepare();
   const canInv =
     canAccessView("inventory") || hasPermission("warehouse.view");
   const specs = {
@@ -8417,7 +8442,7 @@ function adminHubHtml() {
       "reports",
     ]);
   }
-  if (canManageStockAlert() || canManageOrderHistorySettings()) {
+  if (canManageStockAlert() || canManageOrderHistorySettings() || canViewDeletionLog()) {
     settings.push(["deletionLogModal()", "Устгасан бүртгэл", "inventory"]);
   }
   const settingsHtml = settings.length
@@ -8531,7 +8556,9 @@ function deletionLogLabel(entry) {
   return { type, actor };
 }
 function deletionLogModal() {
-  if (!isAdmin()) return;
+  if (!canViewDeletionLog()) {
+    return alertModal("Эрхгүй", "Устгасан бүртгэл харах эрхгүй.");
+  }
   const log = [...normalizeDeletionLog(state.deletionLog || [])]
     .reverse()
     .slice(0, 100);
@@ -12484,8 +12511,8 @@ function confirmEmployeeExcel() {
   confirmDataExport("Бараа бэлдэх", employeeExcel, "Бараа бэлдэх хуудас татах уу?");
 }
 function openWarehousePrepare() {
-  if (!canAccessView("warehouse")) {
-    return alertModal("Эрхгүй", "Агуулах харах эрхгүй.");
+  if (!canViewWarehousePrepare()) {
+    return alertModal("Эрхгүй", "Агуулах бэлдэх эрхгүй.");
   }
   state.filters.warehouseTab = "orders";
   if (state.currentView !== "warehouse") {
@@ -18213,9 +18240,13 @@ function openStockReportsHub() {
   scrollAppMainToTop();
 }
 function openStockReport(kind) {
-  if (kind === "sales" || kind === "salesInfo") {
+  if (kind === "sales") {
     if (!canViewSalesReport()) {
       return alertModal("Эрхгүй", "Борлуулалтын тайлан харах эрхгүй.");
+    }
+  } else if (kind === "salesInfo") {
+    if (!canViewSalesInfo()) {
+      return alertModal("Эрхгүй", "Борлуулалтын мэдээ харах эрхгүй.");
     }
   } else if (
     kind === "in" ||
@@ -18381,11 +18412,11 @@ function stockReportAggregateRow(row, index) {
 }
 function stockReportsMenuHtml() {
   const sections = [];
-  if (canViewSalesReport()) {
-    const salesItems = [
-      ["sales", "Борлуулалтын тайлан", "reports"],
-      ["salesInfo", "Борлуулалтын мэдээ", "customers"],
-    ];
+  const salesItems = [
+    ["sales", "Борлуулалтын тайлан", "reports", canViewSalesReport],
+    ["salesInfo", "Борлуулалтын мэдээ", "customers", canViewSalesInfo],
+  ].filter(([, , , can]) => can());
+  if (salesItems.length) {
     sections.push(
       `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${salesItems
         .map(
@@ -18485,7 +18516,11 @@ function stockReportsView() {
   }
   const kind = state.filters.stockReportKind;
   if (kind === "sales" || kind === "salesInfo") {
-    if (!canViewSalesReport()) {
+    if (kind === "salesInfo") {
+      if (!canViewSalesInfo()) {
+        return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын мэдээ харах эрхгүй.</p></div>`;
+      }
+    } else if (!canViewSalesReport()) {
       return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын тайлан харах эрхгүй.</p></div>`;
     }
     return kind === "salesInfo" ? salesInfoDetailView() : salesReportDetailView();

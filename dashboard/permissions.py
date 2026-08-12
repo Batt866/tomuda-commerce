@@ -45,6 +45,9 @@ PERM_GROUPS: list[dict[str, Any]] = [
             {"id": "stockIn", "label": "Орлого", "actions": CRUD},
             {"id": "stockOut", "label": "Зарлага", "actions": CRUD},
             {"id": "reports", "label": "Борлуулалтын тайлан", "actions": CRUD},
+            {"id": "salesInfo", "label": "Борлуулалтын мэдээ", "actions": CRUD},
+            {"id": "stockReports", "label": "Орлого/зарлага тайлан", "actions": CRUD},
+            {"id": "warehousePrepare", "label": "Агуулах бэлдэх", "actions": CRUD},
             {"id": "receipts", "label": "Баримтууд", "actions": CRUD},
             {"id": "promotions", "label": "Урамшуулал", "actions": CRUD},
             {"id": "stockAlert", "label": "Үлдэгдлийн мэдэгдэл", "actions": CRUD},
@@ -59,6 +62,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
                 "label": "Захиалгын түүх шалгах",
                 "actions": CRUD,
             },
+            {"id": "deletionLog", "label": "Устгасан бүртгэл", "actions": ["view"]},
             {"id": "orderDeliveryMark", "label": "Хүргэлт тэмдэглэх", "actions": ["view"]},
             {
                 "id": "orderDeliveryConfirm",
@@ -182,6 +186,26 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "excelExport.create": ["reports.view"],
     "excelExport.edit": ["reports.view"],
     "excelExport.delete": ["reports.view"],
+    "salesInfo.view": ["reports.view"],
+    "salesInfo.create": ["reports.view", "reports.create"],
+    "salesInfo.edit": ["reports.edit"],
+    "salesInfo.delete": ["reports.delete"],
+    "stockReports.view": [
+        "warehouse.view",
+        "warehouse.edit",
+        "stockIn.view",
+        "stockOut.view",
+        "receipts.view",
+        "reports.view",
+    ],
+    "stockReports.create": ["excelExport.view", "reports.view"],
+    "stockReports.edit": ["warehouse.edit", "stockIn.edit", "stockOut.edit"],
+    "stockReports.delete": ["warehouse.edit", "receipts.delete"],
+    "warehousePrepare.view": ["warehouse.view", "warehouse.edit"],
+    "warehousePrepare.create": ["warehouse.view", "warehouse.edit"],
+    "warehousePrepare.edit": ["warehouse.edit"],
+    "warehousePrepare.delete": ["warehouse.edit"],
+    "deletionLog.view": ["settings.view", "stockAlert.view", "orderHistory.view"],
     "excelImport.view": ["products.create", "customers.create"],
     "excelImport.create": ["products.create", "customers.create"],
     "excelImport.edit": ["products.create", "customers.create"],
@@ -224,6 +248,8 @@ def expand_legacy_permissions(raw: list[str]) -> list[str]:
             _add_crud(keys, module_id)
         if "settings.view" in ALL_PERMISSION_KEY_SET:
             keys.add("settings.view")
+        if "deletionLog.view" in ALL_PERMISSION_KEY_SET:
+            keys.add("deletionLog.view")
     if "warehouse.edit" in keys:
         if "warehouse.view" in ALL_PERMISSION_KEY_SET:
             keys.add("warehouse.view")
@@ -244,6 +270,10 @@ def expand_legacy_permissions(raw: list[str]) -> list[str]:
         _add_crud(keys, "employeeAdd")
     if "reports.view" in keys:
         _add_crud(keys, "excelExport")
+        _add_crud(keys, "salesInfo")
+    if "warehouse.view" in keys or "warehouse.edit" in keys:
+        _add_crud(keys, "warehousePrepare")
+        _add_crud(keys, "stockReports")
     if "products.create" in keys or "customers.create" in keys:
         _add_crud(keys, "excelImport")
         _add_crud(keys, "excelTemplate")
@@ -284,6 +314,8 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "count.create",
         "count.edit",
         "receipts.view",
+        "warehousePrepare.view",
+        "stockReports.view",
     ],
     "delivery": ["orders.view", "orderDeliveryMark.view"],
 }

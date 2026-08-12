@@ -18,7 +18,7 @@
       modules: [
         { id: "customers", label: "Харилцагч", actions: CRUD },
         { id: "products", label: "Бараа", actions: CRUD },
-        { id: "warehouse", label: "Нярав", actions: CRUD },
+        { id: "warehouse", label: "Агуулах", actions: CRUD },
         { id: "employees", label: "Ажилтан", actions: CRUD },
         { id: "suppliers", label: "Нийлүүлэгч", actions: CRUD },
       ],
@@ -35,6 +35,9 @@
         { id: "stockIn", label: "Орлого", actions: CRUD },
         { id: "stockOut", label: "Зарлага", actions: CRUD },
         { id: "reports", label: "Борлуулалтын тайлан", actions: CRUD },
+        { id: "salesInfo", label: "Борлуулалтын мэдээ", actions: CRUD },
+        { id: "stockReports", label: "Орлого/зарлага тайлан", actions: CRUD },
+        { id: "warehousePrepare", label: "Агуулах бэлдэх", actions: CRUD },
         { id: "receipts", label: "Баримтууд", actions: CRUD },
         { id: "promotions", label: "Урамшуулал", actions: CRUD },
         { id: "stockAlert", label: "Үлдэгдлийн мэдэгдэл", actions: CRUD },
@@ -49,6 +52,7 @@
           label: "Захиалгын түүх шалгах",
           actions: CRUD,
         },
+        { id: "deletionLog", label: "Устгасан бүртгэл", actions: ["view"] },
         { id: "orderDeliveryMark", label: "Хүргэлт тэмдэглэх", actions: ["view"] },
         {
           id: "orderDeliveryConfirm",
@@ -165,6 +169,26 @@
     "excelExport.create": ["reports.view"],
     "excelExport.edit": ["reports.view"],
     "excelExport.delete": ["reports.view"],
+    "salesInfo.view": ["reports.view"],
+    "salesInfo.create": ["reports.view", "reports.create"],
+    "salesInfo.edit": ["reports.edit"],
+    "salesInfo.delete": ["reports.delete"],
+    "stockReports.view": [
+      "warehouse.view",
+      "warehouse.edit",
+      "stockIn.view",
+      "stockOut.view",
+      "receipts.view",
+      "reports.view",
+    ],
+    "stockReports.create": ["excelExport.view", "reports.view"],
+    "stockReports.edit": ["warehouse.edit", "stockIn.edit", "stockOut.edit"],
+    "stockReports.delete": ["warehouse.edit", "receipts.delete"],
+    "warehousePrepare.view": ["warehouse.view", "warehouse.edit"],
+    "warehousePrepare.create": ["warehouse.view", "warehouse.edit"],
+    "warehousePrepare.edit": ["warehouse.edit"],
+    "warehousePrepare.delete": ["warehouse.edit"],
+    "deletionLog.view": ["settings.view", "stockAlert.view", "orderHistory.view"],
     "excelImport.view": ["products.create", "customers.create"],
     "excelImport.create": ["products.create", "customers.create"],
     "excelImport.edit": ["products.create", "customers.create"],
@@ -203,6 +227,7 @@
         "dashboard",
       ].forEach(addCrud);
       if (ALL_KEY_SET.has("settings.view")) set.add("settings.view");
+      if (ALL_KEY_SET.has("deletionLog.view")) set.add("deletionLog.view");
     }
     if (set.has("warehouse.edit")) {
       if (ALL_KEY_SET.has("warehouse.view")) set.add("warehouse.view");
@@ -220,9 +245,14 @@
     if (set.has("products.edit")) addCrud("categoryAdd");
     if (set.has("employees.create")) addCrud("employeeAdd");
     if (set.has("reports.view")) addCrud("excelExport");
+    if (set.has("reports.view")) addCrud("salesInfo");
     if (set.has("products.create") || set.has("customers.create")) {
       addCrud("excelImport");
       addCrud("excelTemplate");
+    }
+    if (set.has("warehouse.view") || set.has("warehouse.edit")) {
+      addCrud("warehousePrepare");
+      addCrud("stockReports");
     }
     return [...set];
   }
@@ -261,6 +291,8 @@
       "count.create",
       "count.edit",
       "receipts.view",
+      "warehousePrepare.view",
+      "stockReports.view",
     ],
     delivery: ["orders.view", "orderDeliveryMark.view"],
   };
@@ -276,7 +308,7 @@
     employees: "employees.view",
     suppliers: "suppliers.view",
     employeePermissions: "permissions.view",
-    stockReports: "warehouse.view",
+    stockReports: "stockReports.view",
     reports: "reports.view",
     promotions: "promotions.view",
     warehouseReceipts: "receipts.view",
@@ -331,6 +363,13 @@
     const perm = VIEW_PERMISSION[viewId];
     if (!perm) return false;
     if (viewId === "warehouse" || viewId === "inventory") {
+      if (viewId === "warehouse") {
+        return (
+          hasPermission("warehousePrepare.view", emp) ||
+          hasPermission("warehouse.view", emp) ||
+          hasPermission("warehouse.edit", emp)
+        );
+      }
       return (
         hasPermission("warehouse.view", emp) || hasPermission("warehouse.edit", emp)
       );
@@ -347,6 +386,7 @@
     }
     if (viewId === "stockReports") {
       return (
+        hasPermission("stockReports.view", emp) ||
         hasPermission("warehouse.view", emp) ||
         hasPermission("warehouse.edit", emp) ||
         hasPermission("stockIn.view", emp) ||
@@ -407,7 +447,8 @@
       set.has("promotions.view") ||
       set.has("stockAlert.view") ||
       set.has("percentDiscount.view") ||
-      set.has("orderHistory.view")
+      set.has("orderHistory.view") ||
+      set.has("deletionLog.view")
     ) {
       set.add("dashboard.view");
     }
