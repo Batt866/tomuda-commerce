@@ -15351,67 +15351,51 @@ function exportStockInExcelFallback(receipt) {
   const day = receipt.createdAt
     ? isoDay(receipt.createdAt) || todayIso()
     : todayIso();
-  const dateLong = stockInReceiptLongDate(day);
-  const orgName = stockInReceiptOrgName(receipt);
-  const supplier = receipt.supplierName || "—";
-  const { activeLines, pieceQty, totalAmount } =
-    stockInReceiptLineStats(receipt);
+  const period = stockInReportPeriodText([receipt], day);
+  const { activeLines, pieceQty } = stockInReceiptLineStats(receipt);
   const h = (value) => xlsxXmlEsc(value ?? "");
+  const dayText = warehouseDateDisplayText(day);
+  const noText = receipt.receiptNumber
+    ? String(receipt.receiptNumber)
+    : "—";
+  const supplier = String(receipt.supplierName || "").trim() || "—";
+  const employee = String(receipt.employeeName || "").trim() || "—";
+  let totalAmount = 0;
   const bodyRows = activeLines
     .map((line, index) => {
-      const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+      const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
+      const unitPrice = stockInReceiptLineSalesPrice(line);
+      const lineTotal = stockInReceiptLineTotal(line);
+      totalAmount += lineTotal;
       const unit = stockInReceiptLineUnit(line);
-      return `<tr><td class="c">${index + 1}</td><td>${h(receiptProductNameText(line.productName))}</td><td class="barcode c">${h(line.barcode || "—")}</td><td class="c">${h(unit)}</td><td class="c">${h(totalQty.toLocaleString())}</td><td class="r">${fmtExcelMoney(stockInReceiptLineSalesPrice(line))}</td><td class="r">${fmtExcelMoney(stockInReceiptLineTotal(line))}</td></tr>`;
+      const sku = String(line.barcode || "").trim() || "—";
+      return `<tr><td class="c">${index + 1}</td><td>${h(dayText)}</td><td>${h(noText)}</td><td>${h(supplier)}</td><td>${h(employee)}</td><td>${h(receiptProductNameText(line.productName))}</td><td class="barcode">${h(sku)}</td><td class="c">${h(unit)}</td><td class="r">${h(qty.toLocaleString())}</td><td class="r">${fmtExcelMoney(unitPrice)}</td><td class="r">${fmtExcelMoney(lineTotal)}</td></tr>`;
     })
     .join("");
-  const receiptNoRaw = receipt.receiptNumber ? String(receipt.receiptNumber) : "";
-  const receiptNoDisplay = receiptNoRaw
-    ? receiptNoRaw.startsWith("#")
-      ? receiptNoRaw.slice(1)
-      : receiptNoRaw
-    : "—";
-  const html = `<!doctype html><!-- tomuda-stock-xls-v816 --><html><head><meta charset="utf-8"><style>
-body { font-family: Arial, sans-serif; color: #000; max-width: 210mm; margin: 0 auto; font-size: 11px; }
-.form-top { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 8px; align-items: flex-start; }
-.form-code { font-size: 10px; font-weight: 700; white-space: nowrap; margin-left: auto; flex-shrink: 0; }
-.form-legal { font-size: 8px; color: #444; text-align: left; max-width: 55%; line-height: 1.35; }
-.title { font-size: 14px; font-weight: 800; margin: 0 0 8px; text-align: center; letter-spacing: 0.02em; }
-.date { margin: 0 0 10px; text-align: center; font-size: 10px; }
-.party { margin: 0 0 12px; }
-.party-value-line { margin: 0 0 2px; border-bottom: 1px solid #000; padding-bottom: 2px; font-weight: 700; font-size: 11px; }
-.party-caption { display: block; font-size: 9px; color: #555; margin: 0 0 8px; text-align: left; }
-table.stock-in { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
-.stock-in td, .stock-in th { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; }
-.head th { text-align: center; font-weight: 700; background: #fff; }
-.head-sub th { font-weight: 700; background: #fff; }
-.total td { font-weight: 800; border-top: 1px solid #000; }
-.sign { margin-top: 12px; font-size: 11px; }
-.sign-row { display: grid; grid-template-columns: minmax(7rem, max-content) 1fr; gap: 8px; align-items: flex-end; margin: 8px 0; }
-.sign-row span:first-child { white-space: nowrap; }
-.sign-line { display: block; min-height: 1.1em; border-bottom: 1px solid #000; }
+  const html = `<!doctype html><!-- tomuda-stock-xls-v823 --><html><head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; color: #000; margin: 16px; font-size: 11px; }
+.title { font-size: 16px; font-weight: 800; margin: 0 0 8px; text-align: center; }
+.meta { margin: 0 0 12px; font-size: 11px; }
+table.stock-in { width: 100%; border-collapse: collapse; font-size: 10px; }
+.stock-in td, .stock-in th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: middle; }
+.head th { text-align: center; font-weight: 700; background: #f1f5f9; }
+.summary { margin-top: 12px; font-size: 11px; }
+.summary p { margin: 4px 0; }
 .barcode { mso-number-format:"\\@"; }
 .c { text-align: center; }
-.r { text-align: right; padding-right: 10px; }
-@media print { body { max-width: 210mm; } .party-value-line, .sign-line { border-bottom: 1px solid #000 !important; } }
+.r { text-align: right; }
+@media print { body { margin: 8mm; } }
 </style></head><body>
-<div class="form-top"><span class="form-legal">${STOCK_IN_FORM_LEGAL}</span><span class="form-code">${STOCK_IN_FORM_CODE}</span></div>
-<h1 class="title">${STOCK_IN_RECEIPT_TITLE} № ${h(receiptNoDisplay)}</h1>
-<p class="date">${h(dateLong)}</p>
-<div class="party">
-  <p class="party-value-line">${h(orgName)}</p>
-  <p class="party-caption">(Байгууллагын нэр)</p>
-  <p class="party-value-line">${h(supplier)}</p>
-  <p class="party-caption">(Бэлтгэн нийлүүлэгчийн нэр)</p>
-</div>
+<h1 class="title">БАРААНЫ ОРЛОГЫН ТАЙЛАН</h1>
+<p class="meta">Хугацаа: ${h(period)}</p>
 <table class="stock-in">
-<tr class="head"><th rowspan="2">№</th><th rowspan="2">Материалын үнэт зүйлийн нэр, зэрэг, дугаар</th><th rowspan="2">Код</th><th rowspan="2">Хэмжих нэгж</th><th colspan="3">${STOCK_IN_TABLE_GROUP_LABEL}</th></tr>
-<tr class="head-sub"><th>Тоо</th><th>Нэгжийн үнэ</th><th>Нийт дүн</th></tr>
+<tr class="head"><th>№</th><th>Огноо</th><th>Орлого №</th><th>Нийлүүлэгч</th><th>Бүртгэсэн ажилтан</th><th>Бараа</th><th>Код</th><th>Хэмжих нэгж</th><th>Тоо</th><th>Нэгжийн үнэ</th><th>Нийт дүн</th></tr>
 ${bodyRows}
-<tr class="total"><td colspan="4">Дүн</td><td class="c">${h(pieceQty.toLocaleString())}</td><td></td><td class="r">${fmtExcelMoney(totalAmount)}</td></tr>
 </table>
-<div class="sign">
-  <div class="sign-row"><span>${STOCK_IN_SIGN_RECEIVED_LABEL}</span><span class="sign-line">&nbsp;</span></div>
-  <div class="sign-row"><span>${STOCK_IN_SIGN_HANDED_LABEL}</span><span class="sign-line">&nbsp;</span></div>
+<div class="summary">
+  <p>Нийт орлогын баримт: <b>1</b></p>
+  <p>Нийт барааны тоо: <b>${h(pieceQty.toLocaleString())}</b></p>
+  <p>Нийт дүн: <b>${fmtExcelMoney(totalAmount)}</b></p>
 </div>
 </body></html>`;
   const blob = new Blob(["\uFEFF" + html], {
@@ -17639,13 +17623,15 @@ async function exportStockInExcelXlsx(receipt) {
   if (typeof JSZip === "undefined") {
     throw new Error("JSZip missing");
   }
+  const day = isoDay(receipt.createdAt) || todayIso();
   const { sharedStringsXml, sheetXml, printArea } =
-    buildStockInReportSheetXml(receipt);
+    buildStockInReportListSheetXml([receipt], { day });
   const zip = await assembleStockInReportXlsxZip({
     sharedStringsXml,
     sheetXml,
     printArea,
     sheetName: "Орлогын тайлан",
+    stylesXml: stockInListReportStylesXml(),
   });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, stockInReceiptFileName(receipt));
