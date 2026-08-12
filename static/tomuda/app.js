@@ -9841,7 +9841,7 @@ const RECEIPT_XLSX_STYLE = {
   metaBold: 4,
   metaBoldRight: 20,
   metaNormalRight: 56,
-  ibanLabel: 62,
+  ibanLabel: 58,
   signLabel: 61,
   signLine: 57,
 };
