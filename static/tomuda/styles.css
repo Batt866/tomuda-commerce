@@ -18573,6 +18573,18 @@ input.stock-in-sheet__input::placeholder {
   column-gap: 12px;
 }
 
+.line-list__row--static.stock-report-product-row,
+.line-list__row--static.stock-report-line-row {
+  display: grid;
+  justify-content: initial;
+  cursor: default;
+}
+
+.line-list__row--static.stock-report-line-row:hover,
+.line-list__row--static.stock-report-product-row:hover {
+  background: color-mix(in srgb, var(--hex-secondary) 45%, transparent);
+}
+
 .stock-report-products-head {
   padding: 6px 0 10px;
   font-size: 11px;
@@ -18590,11 +18602,6 @@ input.stock-in-sheet__input::placeholder {
 
 .stock-report-product-row {
   padding: 11px 0;
-  cursor: default;
-}
-
-.stock-report-product-row:hover {
-  background: color-mix(in srgb, var(--hex-secondary) 45%, transparent);
 }
 
 .stock-report-product-row__main {
@@ -18754,7 +18761,6 @@ input.stock-in-sheet__input::placeholder {
 
 .stock-report-line-row {
   padding: 11px 0;
-  cursor: default;
 }
 
 .stock-report-line-row__main {
