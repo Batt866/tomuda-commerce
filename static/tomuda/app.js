@@ -18601,63 +18601,80 @@ function promoQtyModeMeta(mode) {
   if (mode === "each") {
     return {
       id: "each",
-      title: "Бүгд хамт",
-      hint: "Бараа бүр өөрийн босгоо хангана",
+      title: "Бүх бараа хамт",
+      hint: "Сонгосон бараа бүр өөрийн босгоо хангана",
+      example: "ж: төрөл бүрээс 2 ш",
     };
   }
   if (mode === "total") {
     return {
       id: "total",
-      title: "Нийт тоо",
-      hint: "Сонгосон барааны нийлбэр босгод хүрнэ",
+      title: "Холиод нийлбэрээр",
+      hint: "Олон бараанаас дурын хольж нийт тоогоор тоолно",
+      example: "ж: 6 хайрцаг → 1 тавиур",
     };
   }
   return {
     id: "any",
-    title: "Аль нэг",
-    hint: "Аль нэг бараа босгонд хүрвэл болно",
+    title: "Аль нэг бараа",
+    hint: "Сонгосон бараанаас аль нэг нь босгонд хүрвэл болно",
+    example: "ж: 2 том хайрцаг → үнэгүй",
   };
 }
 function promoQtyModeCardsHtml(buyMode) {
-  const modes = ["any", "each", "total"].map(promoQtyModeMeta);
-  const active = promoQtyModeMeta(buyMode);
-  return `<div class="promo-qty-mode"><div class="seg-tabs promo-qty-mode__tabs" role="tablist" aria-label="Урамшууллын горим">${modes
+  const modes = ["total", "any", "each"].map(promoQtyModeMeta);
+  return `<div class="promo-qty-step" data-promo-step="1">
+  <p class="promo-qty-step__label"><span class="promo-qty-step__num">1</span>Ямар дүрэм вэ?</p>
+  <div class="promo-qty-choices" role="radiogroup" aria-label="Урамшууллын горим">${modes
     .map((m) => {
       const on = buyMode === m.id;
-      return `<button type="button" role="tab" aria-selected="${on ? "true" : "false"}" onclick="setPromotionQtyBuyMode('${m.id}')" class="seg-tab${on ? " is-active" : ""}">${esc(m.title)}</button>`;
+      return `<button type="button" role="radio" aria-checked="${on ? "true" : "false"}" onclick="setPromotionQtyBuyMode('${m.id}')" class="promo-qty-choice${on ? " is-active" : ""}">
+  <span class="promo-qty-choice__radio" aria-hidden="true"></span>
+  <span class="promo-qty-choice__body">
+    <span class="promo-qty-choice__title">${esc(m.title)}</span>
+    <span class="promo-qty-choice__hint">${esc(m.hint)}</span>
+    <span class="promo-qty-choice__ex">${esc(m.example)}</span>
+  </span>
+</button>`;
     })
-    .join("")}</div><p class="promo-qty-mode__hint">${esc(active.hint)}</p></div>`;
+    .join("")}</div>
+</div>`;
 }
 function promoQtyUnitMeta(unit) {
   if (unit === "pack") {
     return {
       id: "pack",
       title: "Хайрцаг",
-      hint: "Жижиг хайрцгаар тоолно (ж: 12ш = 1 хайрцаг)",
+      hint: "12ш = 1 хайрцаг гэх мэт",
     };
   }
   if (unit === "large") {
     return {
       id: "large",
       title: "Том хайрцаг",
-      hint: "Том хайрцагнаас тэдийг авбал урамшуулал олгоно",
+      hint: "Том хайрцгаар тоолно",
     };
   }
   return {
     id: "piece",
     title: "Ширхэг",
-    hint: "Ширхэгээр тоолно",
+    hint: "Нэгж ширхэгээр",
   };
 }
 function promoQtyUnitTabsHtml(buyUnit) {
   const units = ["piece", "pack", "large"].map(promoQtyUnitMeta);
-  const active = promoQtyUnitMeta(buyUnit);
-  return `<div class="promo-qty-unit"><div class="seg-tabs promo-qty-unit__tabs" role="tablist" aria-label="Тоолох нэгж">${units
+  return `<div class="promo-qty-step" data-promo-step="2">
+  <p class="promo-qty-step__label"><span class="promo-qty-step__num">2</span>Юугаар тоолох вэ?</p>
+  <div class="promo-qty-units" role="radiogroup" aria-label="Тоолох нэгж">${units
     .map((u) => {
       const on = buyUnit === u.id;
-      return `<button type="button" role="tab" aria-selected="${on ? "true" : "false"}" onclick="setPromotionQtyBuyUnit('${u.id}')" class="seg-tab${on ? " is-active" : ""}">${esc(u.title)}</button>`;
+      return `<button type="button" role="radio" aria-checked="${on ? "true" : "false"}" onclick="setPromotionQtyBuyUnit('${u.id}')" class="promo-qty-unit-chip${on ? " is-active" : ""}">
+  <span class="promo-qty-unit-chip__title">${esc(u.title)}</span>
+  <span class="promo-qty-unit-chip__hint">${esc(u.hint)}</span>
+</button>`;
     })
-    .join("")}</div><p class="promo-qty-unit__hint">${esc(active.hint)}</p></div>`;
+    .join("")}</div>
+</div>`;
 }
 function setPromotionQtyBuyUnit(unit) {
   capturePromoFormDraft();
@@ -18668,19 +18685,24 @@ function setPromotionQtyBuyUnit(unit) {
 function promoQtyLiveText(buyMode, buyQty, freeQty, buyCount = 0, freeCount = 0) {
   const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
   const free = Math.max(0, Math.floor(Number(freeQty) || 0));
-  const unit = quantityPromoUnitLabel(state.promoQtyBuyUnit || "piece", {
-    short: true,
-  });
+  const unit = quantityPromoUnitLabel(state.promoQtyBuyUnit || "piece");
+  const freeNames = promotionProductLabels(
+    state.promoPick?.freeProductIds || [],
+  );
+  const gift = freeNames || "үнэгүй бараа";
   if (buyMode === "total") {
-    if (buy > 0 && free > 0) return `${buy} ${unit} → ${free} ш үнэгүй`;
-    return "";
+    if (buy < 1 || free < 1) return "";
+    if (buyCount > 0) {
+      return `Сонгосон ${buyCount} бараанаас нийт ${buy} ${unit} авбал «${gift}» ${free} ш үнэгүй.`;
+    }
+    return `Нийт ${buy} ${unit} авбал «${gift}» ${free} ш үнэгүй.`;
   }
   if (buyMode === "each") {
     if (buyCount < 1) return "";
-    return `${buyCount} бараа бүгд → ${free || "?"} ш үнэгүй`;
+    return `${buyCount} бараа БҮГД босгоо хангавал «${gift}» ${free || "?"} ш үнэгүй.`;
   }
   if (buyCount < 1) return "";
-  return `${buyCount} бараанаас аль нэг → ${free || "?"} ш үнэгүй`;
+  return `${buyCount} бараанаас АЛЬ НЭГ босгонд хүрвэл «${gift}» ${free || "?"} ш үнэгүй.`;
 }
 function promoQtyLivePreviewHtml(buyMode, buyQty, freeQty) {
   const buyCount = (state.promoPick?.buyProductIds || []).length;
@@ -18694,12 +18716,13 @@ function promoQtyLivePreviewHtml(buyMode, buyQty, freeQty) {
   <span data-promo-sum-tip hidden></span>
 </div>`;
   }
-  return `<p class="promo-qty-summary" data-promo-bundle-summary data-promo-live-preview>
-  <span data-promo-live-text>${esc(text)}</span>
+  return `<div class="promo-qty-summary" data-promo-bundle-summary data-promo-live-preview>
+  <p class="promo-qty-summary__label">Товчхон</p>
+  <p class="promo-qty-summary__text" data-promo-live-text>${esc(text)}</p>
   <span data-promo-sum-buy hidden>${esc(String(Math.max(0, Math.floor(Number(buyQty) || 0))))}</span>
   <span data-promo-sum-free hidden>${esc(String(Math.max(0, Math.floor(Number(freeQty) || 0))))}</span>
   <span data-promo-sum-tip hidden></span>
-</p>`;
+</div>`;
 }
 function syncPromoBundleSummary() {
   const buy =
@@ -18746,35 +18769,31 @@ function syncPromoBundleSummary() {
     preview.classList.toggle("is-empty", !hasText);
   }
 }
-function promoBundleRuleSummaryHtml(buyQty, freeQty) {
-  return promoQtyLivePreviewHtml(
-    state.promoQtyBuyMode === "each" || state.promoQtyBuyMode === "total"
-      ? state.promoQtyBuyMode
-      : "any",
-    buyQty,
-    freeQty,
-  );
-}
 function promoBundleConditionFormulaHtml(buyDefault = "8", freeDefault = "1") {
   const unit = quantityPromoUnitLabel(state.promoQtyBuyUnit || "piece", {
     short: true,
   });
   const buyField = promotionQtyField(
     "buyQty",
-    `Босго (${unit})`,
+    `Хэд авбал (${unit})`,
     buyDefault,
     "formula",
   );
   const freeField = promotionQtyField(
     "freeQty",
-    "Үнэгүй (ш)",
+    "Хэд үнэгүй (ш)",
     freeDefault,
     "formula",
   );
-  return `<div class="promo-bundle-formula" role="group" aria-label="Урамшууллын нөхцөл">
-  <div class="promo-bundle-formula__card promo-bundle-formula__card--buy">${buyField}</div>
-  <span class="promo-bundle-formula__arrow" aria-hidden="true">→</span>
-  <div class="promo-bundle-formula__card promo-bundle-formula__card--gift">${freeField}</div>
+  return `<div class="promo-qty-step" data-promo-step="3">
+  <p class="promo-qty-step__label"><span class="promo-qty-step__num">3</span>Хэд авбал юу өгөх вэ?</p>
+  <div class="promo-qty-threshold">
+    <div class="promo-bundle-formula" role="group" aria-label="Урамшууллын нөхцөл">
+      <div class="promo-bundle-formula__card promo-bundle-formula__card--buy">${buyField}</div>
+      <span class="promo-bundle-formula__arrow" aria-hidden="true">→</span>
+      <div class="promo-bundle-formula__card promo-bundle-formula__card--gift">${freeField}</div>
+    </div>
+  </div>
 </div>`;
 }
 function promoAmountInputHtml(
@@ -19847,8 +19866,11 @@ function promotionMultiBuyPickerBlock(selectedIds, buyMode = "any") {
     fieldName: "buyProductIds",
     selectedIds,
     excludeIds: [],
-    title: "Тооцогдох бараа",
-    hint: "",
+    title: "3. Захиалгад тооцогдох бараа",
+    hint:
+      buyMode === "each"
+        ? "Бараа бүрт босго оруулна"
+        : "Бараа бүрт босго оруулна · аль нэг хангагдвал болно",
     placeholder: "Бараа хайж нэмэх...",
     variant: "buy",
     badge: "",
@@ -20260,14 +20282,15 @@ function promotionQtyModal() {
     fieldName: "freeProductIds",
     selectedIds: freeIds,
     excludeIds: [],
-    title: "Өгөх бараа",
-    hint: "",
+    title:
+      buyMode === "total" ? "5. Үнэгүй өгөх бараа" : "4. Үнэгүй өгөх бараа",
+    hint: "Тавиур, бэлэг гэх мэт",
     placeholder: "Үнэгүй бараа хайх...",
     badge: "",
     qty:
       buyMode === "total"
         ? null
-        : { name: "freeQty", label: "Үнэгүй (ш)", defaultValue: "1" },
+        : { name: "freeQty", label: "Хэд үнэгүй (ш)", defaultValue: "1" },
     compact: true,
   });
   let bodyHtml;
@@ -20277,8 +20300,8 @@ function promotionQtyModal() {
       fieldName: "buyProductIds",
       selectedIds: buyIds,
       excludeIds: [],
-      title: "Тооцогдох бараа",
-      hint: "",
+      title: "4. Захиалгад тооцогдох бараа",
+      hint: "Эдгээрийн тоог хольж нийлбэрлэнэ",
       placeholder: "Бараа хайж нэмэх...",
       variant: "buy",
       badge: "",
@@ -20286,7 +20309,7 @@ function promotionQtyModal() {
       perProductQty: false,
       compact: true,
     });
-    bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="${buyUnit}">${modeBlock}${unitBlock}${livePreview}<div class="promo-qty-threshold">${promoBundleConditionFormulaHtml(buyQtyDefault, freeQtyDefault)}</div>${buyProducts}${freePicker}`;
+    bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="${buyUnit}">${modeBlock}${unitBlock}${promoBundleConditionFormulaHtml(buyQtyDefault, freeQtyDefault)}${livePreview}${buyProducts}${freePicker}`;
   } else {
     const buyBlock = promotionMultiBuyPickerBlock(buyIds, buyMode);
     bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="${buyUnit}">${modeBlock}${unitBlock}${livePreview}${buyBlock}${freePicker}`;
