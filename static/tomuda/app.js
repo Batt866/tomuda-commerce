@@ -13966,24 +13966,26 @@ function stockInSupplierField({ emphasize = false } = {}) {
     : missing
       ? `<p class="stock-in-sheet__hint stock-in-sheet__hint--warn">Баталгаажуулахад нийлүүлэгч заавал сонгоно.</p>`
       : "";
-  return `<label class="stock-in-sheet__field${missing ? " is-missing" : ""}"><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><select id="stockInSupplierSelect" class="stock-in-sheet__select${missing ? " is-invalid" : ""}" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half${missing ? " is-missing" : ""}"><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><select id="stockInSupplierSelect" class="stock-in-sheet__select${missing ? " is-invalid" : ""}" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
 }
 function stockInWarehouseField() {
-  return `<label class="stock-in-sheet__field"><span class="stock-in-sheet__field-label">Агуулах:</span><select class="stock-in-sheet__select" disabled aria-label="Агуулах"><option selected>[Үндсэн агуулах]</option></select></label>`;
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><select class="stock-in-sheet__select" disabled aria-label="Агуулах"><option selected>Үндсэн Агуулах</option></select></label>`;
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
-  return `<div class="stock-in-sheet__scan-wrap">
-  <div class="stock-in-sheet__scan">
-    <button type="button" class="stock-in-sheet__scan-main" onclick="document.getElementById('stockInBarcodeInput')?.focus()">
-      <span class="stock-in-sheet__scan-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><path d="M7 8h2v8H7zm4 0h1v8h-1zm3 0h3v8h-3z"/></svg></span>
-      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__scan-input" placeholder="Бараа хайх / Уншуулах" value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Бараа хайх / Уншуулах">
-    </button>
-    <button type="button" class="stock-in-sheet__scan-cam" tabindex="-1" onclick="startBarcodeScan('stockIn')" aria-label="Скан">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M20 8V6a2 2 0 0 0-2-2h-2M20 16v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="3"/><path d="M16 4h2a1 1 0 0 1 1 1v2"/></svg>
-    </button>
-    <button type="button" class="stock-in-sheet__scan-go" tabindex="-1" onclick="stockInScanSubmit()" aria-label="Хайх">Хайх</button>
-  </div>
+  return `<div class="stock-in-sheet__tools">
+  <label class="stock-in-sheet__search">
+    <span class="stock-in-sheet__search-label">Бараа хайх:</span>
+    <span class="stock-in-sheet__search-box">
+      <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Бараа хайх">
+      <button type="button" class="stock-in-sheet__search-go" tabindex="-1" onclick="stockInScanSubmit()">Хайх</button>
+    </span>
+  </label>
+  <button type="button" class="stock-in-sheet__scan-btn" onclick="startBarcodeScan('stockIn')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><path d="M7 8h2v8H7zm4 0h1v8h-1zm3 0h3v8h-3z"/></svg>
+    <span>Scan хийх</span>
+  </button>
   ${barcodeScannerPanelHtml()}
 </div>`;
 }
@@ -14129,33 +14131,57 @@ function stockInBarcodeKeydown(e) {
   stockInScanSubmit();
 }
 function stockInEntryRow(p) {
+  const d = state.stockInDraft[p.id] || {};
   const qty = stockInLineQty(p);
   const cost = stockInLineCost(p) || productCostPrice(p) || 0;
-  const lineTotal = qty * cost;
-  const sku = p.barcode || p.sku || p.id || "";
+  const sales = productSalesPrice(p) || 0;
+  const costTotal = qty * cost;
+  const salesTotal = qty * sales;
+  const sku = p.barcode || p.sku || "";
+  const largePacks = Math.max(0, Math.floor(Number(d.largePacks) || 0));
+  const packs = Math.max(0, Math.floor(Number(d.packs) || 0));
+  const pieces = Math.max(0, Math.floor(Number(d.qty) || 0));
+  const hasLarge = productLargeBoxPieceCount(p) > 0 || largePacks > 0;
+  const hasSmall = productPackSize(p) > 0 || packs > 0;
   const highlight =
     state.stockInHighlightId === p.id ? " stock-in-line--scan" : "";
+  const qtyRows = [];
+  if (hasLarge) {
+    qtyRows.push(
+      `<div class="stock-in-line__qty-row"><span>Том хайрцаг</span><b>${largePacks} ш</b></div>`,
+    );
+  }
+  if (hasSmall) {
+    qtyRows.push(
+      `<div class="stock-in-line__qty-row"><span>Жижиг хайрцаг</span><b>${packs} ш</b></div>`,
+    );
+  }
+  qtyRows.push(
+    `<div class="stock-in-line__qty-row"><span>Тоо ширхэг</span><b>${hasLarge || hasSmall ? pieces : qty} ш</b></div>`,
+  );
   return `<article class="stock-in-line${highlight}" data-stock-in-id="${esc(p.id)}">
-  <button type="button" class="stock-in-line__delete" onclick="confirmRemoveStockDraft('${esc(p.id)}','in')" aria-label="Устгах">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>
-  </button>
-  <div class="stock-in-line__main">
-    <button type="button" class="stock-in-line__open" onclick="stockInEntryModal('${esc(p.id)}')" aria-label="${esc(p.name)} засах">
+  <div class="stock-in-line__top">
+    <button type="button" class="stock-in-line__open" onclick="stockInEntryModal('${esc(p.id)}')">
       <img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" class="stock-in-line__img" width="56" height="56" loading="lazy" decoding="async">
       <div class="stock-in-line__copy">
         <p class="stock-in-line__name">${esc(p.name)}</p>
-        <p class="stock-in-line__sku">(${esc(sku)})</p>
+        ${sku ? `<p class="stock-in-line__sku">(${esc(sku)})</p>` : ""}
       </div>
     </button>
-    <div class="stock-in-line__math">
-      <span class="stock-in-line__unit"><span class="stock-in-line__unit-label">Өртөг</span> ${fmt(cost)} x</span>
-      <span class="stock-in-line__stepper">
-        <button type="button" class="stock-in-line__step" onclick="bumpStockInLineQty('${esc(p.id)}',-1)" aria-label="Багасгах">−</button>
-        <b class="stock-in-line__qty">${qty}</b>
-        <button type="button" class="stock-in-line__step stock-in-line__step--plus" onclick="bumpStockInLineQty('${esc(p.id)}',1)" aria-label="Нэмэх">+</button>
-      </span>
-      <span class="stock-in-line__eq">= ${fmt(lineTotal)}</span>
+    <div class="stock-in-line__icons">
+      <button type="button" class="stock-in-line__icon-btn" onclick="stockInEntryModal('${esc(p.id)}')" aria-label="Засах">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <button type="button" class="stock-in-line__icon-btn stock-in-line__icon-btn--danger" onclick="confirmRemoveStockDraft('${esc(p.id)}','in')" aria-label="Устгах">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
     </div>
+  </div>
+  <div class="stock-in-line__qty-list">${qtyRows.join("")}</div>
+  <div class="stock-in-line__summary">
+    <p class="stock-in-line__total-pcs">Нийт ш: <b>${qty} ш</b></p>
+    <p><span>Өртөг</span> <b>${fmt(cost)} x ${qty} ш = ${fmt(costTotal)}</b></p>
+    <p><span>Нийт Үнэ</span> <b>${fmt(sales)} x ${qty} ш = ${fmt(salesTotal)}</b></p>
   </div>
 </article>`;
 }
@@ -14615,7 +14641,11 @@ function stockInDraftStats(list = state.products) {
     (sum, p) => sum + stockInLineQty(p) * stockInLineCost(p),
     0,
   );
-  return { filled, skuCount: filled.length, pieceQty, totalCost };
+  const totalSales = filled.reduce(
+    (sum, p) => sum + stockInLineQty(p) * (productSalesPrice(p) || 0),
+    0,
+  );
+  return { filled, skuCount: filled.length, pieceQty, totalCost, totalSales };
 }
 function stockInSearchHitsHtml(list) {
   const q = String(state.stockInScanQuery || "").trim();
@@ -14630,31 +14660,40 @@ function stockInSearchHitsHtml(list) {
         `<button type="button" class="stock-in-sheet__hit" onclick="stockInEntryModal('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="40" height="40" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}</small></span></button>`,
     )
     .join("");
-  return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа</p>${rows}</div>`;
+  return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо/өртөг оруулна</p>${rows}</div>`;
 }
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
   if (!filled.length) {
     return `<div class="stock-in-sheet__empty">
   <p class="stock-in-sheet__empty-title">Бараа хараахан нэмээгүй</p>
-  <p>Дээрээс хайж эсвэл скан хийнэ. Бараа олдвол голд тоо ширхэг, өртөг оруулах цонх гарна. OK дарахад энд жагсаалтад орно.</p>
+  <p>Дээрээс хайж эсвэл Scan хийнэ. Бараа олдвол голд тоо ширхэг, өртөг оруулах цонх гарна. Хадгалсны дараа энд жагсаалтад орно.</p>
 </div>`;
   }
   return `<div class="stock-in-sheet__lines">${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
 }
+function stockInUserChipHtml() {
+  const emp =
+    state.currentEmployee ||
+    (state.employees || []).find(
+      (e) => String(e.id) === String(state.stockInEmployeeId || ""),
+    ) ||
+    null;
+  const name = stockInEmployeeName() || emp?.name || "Ажилтан";
+  const avatar = emp
+    ? employeeAvatarHtml(emp, "stock-in-sheet__avatar")
+    : `<span class="stock-in-sheet__avatar" aria-hidden="true">${esc(String(name).trim().charAt(0) || "А")}</span>`;
+  return `<div class="stock-in-sheet__user">${avatar}<span class="stock-in-sheet__user-name">${esc(name)}</span></div>`;
+}
 function stockInFooterHtml(list) {
-  const { skuCount, pieceQty, totalCost } = stockInDraftStats(list);
+  const { skuCount, pieceQty, totalCost, totalSales } = stockInDraftStats(list);
   const canFinish = stockInCanFinish();
   return `<footer class="stock-in-sheet__footer">
-  <div class="stock-in-sheet__totals">
-    <div class="stock-in-sheet__totals-left">
-      <p>Нийт төрөл: <b>${skuCount}</b></p>
-      <p>Нийт тоо: <b>${pieceQty} ш</b></p>
-    </div>
-    <div class="stock-in-sheet__totals-right">
-      <span>НИЙТ ДҮН:</span>
-      <strong>${fmt(totalCost)}</strong>
-    </div>
+  <div class="stock-in-sheet__stats">
+    <p>Нийт төрөл: <b>${skuCount}</b></p>
+    <p>Нийт Өртөг Дүн: <b>${fmt(totalCost)}</b></p>
+    <p>Нийт ш: <b>${pieceQty} ш</b></p>
+    <p>Нийт Үнэ Дүн: <b>${fmt(totalSales)}</b></p>
   </div>
   <div class="stock-in-sheet__actions">
     <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--ghost" onclick="saveStockInDraftToast()">Түр хадгалах</button>
@@ -14672,6 +14711,7 @@ function stockInPanel(list) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
       </button>
       <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
+      ${stockInUserChipHtml()}
     </div>
   </header>
   <div class="stock-in-sheet__body stock-in-sheet__body--receipt">
@@ -14691,22 +14731,20 @@ function stockInPanel(list) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 6 9 12l6 6"/></svg>
       </button>
       <h1 class="stock-in-sheet__title">БАРААНЫ ОРЛОГО</h1>
+      ${stockInUserChipHtml()}
     </div>
-    <p class="stock-in-sheet__section">ЕРӨНХИЙ МЭДЭЭЛЭЛ</p>
     <div class="stock-in-sheet__meta${needSupplier ? " is-blocked" : ""}">
       ${stockInSupplierField({ emphasize: needSupplier })}
       ${stockInWarehouseField()}
     </div>
+    ${stockInScanToolbarHtml()}
   </header>
   <div class="stock-in-sheet__body">
-    <div class="stock-in-sheet__card">
-      ${stockInScanToolbarHtml()}
-      <div class="stock-in-sheet__scroll">
-        ${stockInSearchHitsHtml(list)}
-        ${stockInLinesHtml(allProducts)}
-      </div>
-      ${stockInFooterHtml(allProducts)}
+    <div class="stock-in-sheet__scroll">
+      ${stockInSearchHitsHtml(list)}
+      ${stockInLinesHtml(allProducts)}
     </div>
+    ${stockInFooterHtml(allProducts)}
   </div>
 </div>`;
 }
