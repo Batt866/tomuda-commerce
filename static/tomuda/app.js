@@ -8303,7 +8303,9 @@ function shell(content) {
   const sidebarNav = sidebarNavForRole(userRole);
   const bottomNav = bottomNavForRole(userRole);
   const emp = state.currentEmployee,
-    useBottomNav = bottomNav.length >= 2,
+    stockInFocus =
+      state.currentView === "inventory" && state.filters.inventory === "in",
+    useBottomNav = bottomNav.length >= 2 && !stockInFocus,
     pageTitle = currentPageTitle(sidebarNav),
     workerOrdersList =
       state.currentView === "worker" && state.filters.worker === "orders",
@@ -8311,7 +8313,7 @@ function shell(content) {
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${scrollTopFabHtml()}${mobileBottomNav(bottomNav)}</div>`;
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${stockInFocus ? " app-shell--stock-in" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${scrollTopFabHtml()}${useBottomNav ? mobileBottomNav(bottomNav) : ""}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
   const svg =
@@ -14664,12 +14666,7 @@ function stockInSearchHitsHtml(list) {
 }
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
-  if (!filled.length) {
-    return `<div class="stock-in-sheet__empty">
-  <p class="stock-in-sheet__empty-title">Бараа хараахан нэмээгүй</p>
-  <p>Дээрээс хайж эсвэл Scan хийнэ. Бараа олдвол голд тоо ширхэг, өртөг оруулах цонх гарна. Хадгалсны дараа энд жагсаалтад орно.</p>
-</div>`;
-  }
+  if (!filled.length) return "";
   return `<div class="stock-in-sheet__lines">${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
 }
 function stockInUserChipHtml() {
@@ -14695,10 +14692,7 @@ function stockInFooterHtml(list) {
     <p>Нийт ш: <b>${pieceQty} ш</b></p>
     <p>Нийт Үнэ Дүн: <b>${fmt(totalSales)}</b></p>
   </div>
-  <div class="stock-in-sheet__actions">
-    <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--ghost" onclick="saveStockInDraftToast()">Түр хадгалах</button>
-    <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary${canFinish ? "" : " is-disabled"}" onclick="confirmFinishStockIn()" aria-disabled="${canFinish ? "false" : "true"}">Орлого баталгаажуулах</button>
-  </div>
+  <button type="button" class="stock-in-sheet__btn stock-in-sheet__btn--primary stock-in-sheet__btn--block${canFinish ? "" : " is-disabled"}" onclick="confirmFinishStockIn()" aria-disabled="${canFinish ? "false" : "true"}">Орлого баталгаажуулах</button>
 </footer>`;
 }
 function stockInPanel(list) {
@@ -14737,8 +14731,10 @@ function stockInPanel(list) {
       ${stockInSupplierField({ emphasize: needSupplier })}
       ${stockInWarehouseField()}
     </div>
-    ${stockInScanToolbarHtml()}
   </header>
+  <section class="stock-in-sheet__search-panel" aria-label="Бараа хайх">
+    ${stockInScanToolbarHtml()}
+  </section>
   <div class="stock-in-sheet__body">
     <div class="stock-in-sheet__scroll">
       ${stockInSearchHitsHtml(list)}
