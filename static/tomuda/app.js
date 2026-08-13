@@ -2547,7 +2547,7 @@ function pageToolbarSearch({
 } = {}) {
   const handler =
     oninput || (focusKey ? `search('${focusKey}',this.value)` : "");
-  return `<input data-focus="${esc(focusKey || "")}" value="${esc(value)}" oninput="${handler}" placeholder="${esc(placeholder)}" class="page-toolbar__search app-input" autocomplete="off">`;
+  return `<input data-focus="${esc(focusKey || "")}" type="text" inputmode="search" value="${esc(value)}" oninput="${handler}" placeholder="${esc(placeholder)}" class="page-toolbar__search app-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-search-${esc(focusKey || "q")}">`;
 }
 function pageToolbarPrimaryBtn(label, onclick, extraClass = "") {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-primary ${extraClass}">${esc(label)}</button>`;
@@ -8254,13 +8254,21 @@ function search(key, value) {
   state.searches[key] = value;
   clearTimeout(searchRenderTimer);
   searchRenderTimer = setTimeout(() => {
+    if (patchLiveSearch(key)) return;
     render();
     const el = document.querySelector(`[data-focus="${key}"]`);
     if (el) {
       el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
+      try {
+        el.setSelectionRange(el.value.length, el.value.length);
+      } catch (_) {}
     }
   }, 220);
+}
+function patchLiveSearch(key) {
+  if (key === "workerStore") return patchWorkerStorePickList();
+  if (key === "customers") return patchCustomersList();
+  return false;
 }
 function scrollAppMainToTop() {
   requestAnimationFrame(() => {
@@ -8859,8 +8867,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* B+C fits «Худалдааны төлөөлөгчийн утас:»; C also holds right-flush IBAN */
-.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 14.9%; } .receipt-grid__c { width: 14.8%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 11.2%; }
+/* B+C fits «Худалдааны төлөөлөгчийн утас:»; C stays modest for IBAN */
+.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 18.5%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 12.9%; }
 .receipt-grid__f { width: 11.5%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -9858,9 +9866,9 @@ const RECEIPT_XLSX_STYLE = {
   signLabel: 61,
   signLine: 57,
 };
-// ҮНДСЭН A–K: C wider so «Худалдааны төлөөлөгчийн утас:» fits on one line in B:C.
+// ҮНДСЭН A–K: extra width on B (not C) so «Худалдааны төлөөлөгчийн утас:» fits in B:C.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 13.0, 16.5, 2.875, 7.75, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
+  3.0, 17.5, 11.0, 2.875, 8.75, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
@@ -11907,13 +11915,15 @@ function customerListRow(c, actionsHtml, active = false) {
   const sub = customerSubtitle(c);
   return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
-function focusSavedCustomer(customerId, customerName) {
+function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
   state.currentView = "customers";
   state.searches.customers = "";
   state.customerHighlightId = customerId;
   render();
-  showAppToast(`${customerName} хадгалагдлаа`, "success");
+  if (!opts.silent) {
+    showAppToast(`${customerName} хадгалагдлаа`, "success");
+  }
   const scrollToSaved = () => {
     const card = document.querySelector(`[data-customer-id="${customerId}"]`);
     if (!card) return;
@@ -11927,7 +11937,7 @@ function focusSavedCustomer(customerId, customerName) {
     if (state.currentView === "customers") render();
   }, 5000);
 }
-function customersView() {
+function customersListHtml() {
   const q = state.searches.customers || "";
   let rows = sortCustomersByName(
     state.customers.filter((c) => customerMatchesQuery(c, q)),
@@ -11940,6 +11950,19 @@ function customersView() {
       rows = [hit, ...rows];
     }
   }
+  return rows.length
+    ? `${customerListHead()}${rows.map(customerRow).join("")}`
+    : `<div class="line-panel__empty">Харилцагч олдсонгүй</div>`;
+}
+function patchCustomersList() {
+  if (state.currentView !== "customers") return false;
+  const list = document.querySelector(".customer-list");
+  if (!list) return false;
+  list.innerHTML = customersListHtml();
+  return true;
+}
+function customersView() {
+  const q = state.searches.customers || "";
   const excelBtn = canExportExcel()
       ? excelDownloadBtn("confirmCustomerExcel()", {
           label: "Харилцагчийн мэдээлэл татах",
@@ -11952,7 +11975,7 @@ function customersView() {
       hasPermission("customerAdd.view")
         ? pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer")
         : "";
-  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${rows.length ? `${customerListHead()}${rows.map(customerRow).join("")}` : `<div class="line-panel__empty">Харилцагч олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${customersListHtml()}</div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Мэдээлэл татах уу?") {
   confirmModal(title, message, {
@@ -23507,16 +23530,40 @@ function filterWorkerStores() {
     state.customers.filter((c) => customerMatchesQuery(c, q)),
   );
 }
-function workerStorePickStep() {
-  const q = state.searches.workerStore || "",
-    rows = filterWorkerStores(),
-    selected = state.workerCustomer
-      ? state.customers.find((c) => c.id === state.workerCustomer)
-      : null;
+function workerStorePickRestHtml() {
+  const q = state.searches.workerStore || "";
+  const rows = filterWorkerStores();
+  const selected = state.workerCustomer
+    ? state.customers.find((c) => c.id === state.workerCustomer)
+    : null;
   const selectedBanner = selected
     ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
-  return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" aria-label="Харилцагч хайх"></div>${selectedBanner}${rows.length ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>` : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`}</section>`;
+  const listHtml = rows.length
+    ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>`
+    : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`;
+  return `${selectedBanner}${listHtml}`;
+}
+function patchWorkerStorePickList() {
+  if (state.currentView !== "worker" || state.filters.worker !== "new") {
+    return false;
+  }
+  if (state.workerStoreReady) return false;
+  const listHost = document.querySelector(".worker-pick");
+  const toolbar = listHost?.querySelector(".worker-pick__toolbar");
+  if (!toolbar) return false;
+  let node = toolbar.nextSibling;
+  while (node) {
+    const next = node.nextSibling;
+    node.remove();
+    node = next;
+  }
+  toolbar.insertAdjacentHTML("afterend", workerStorePickRestHtml());
+  return true;
+}
+function workerStorePickStep() {
+  const q = state.searches.workerStore || "";
+  return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх"></div>${workerStorePickRestHtml()}</section>`;
 }
 function pickWorkerStore(id) {
   const nextId = state.workerCustomer === id ? "" : id;
@@ -23543,6 +23590,29 @@ function confirmWorkerStore() {
   resetWorkerCart();
   render();
   pushAppHistory();
+}
+function startOrderForCustomer(customerId) {
+  const id = String(customerId || "").trim();
+  if (!id) return false;
+  if (!canAccessView("worker") || !canTakeOrdersRole(currentRole())) {
+    return false;
+  }
+  if (state.editingOrderId) return false;
+  state.currentView = "worker";
+  state.filters.worker = "new";
+  state.workerCustomer = id;
+  state.workerStoreReady = true;
+  state.deliveryDate = defaultDeliveryDate();
+  state.searches.workerStore = "";
+  state.settlementAgreed = false;
+  state.settlementText = "";
+  state.settlementMonth = "";
+  state.settlementDay = "";
+  state.applyPercentDiscount = false;
+  resetWorkerCart();
+  render();
+  pushAppHistory();
+  return true;
 }
 function abortWorkerOrder() {
   clearWorkerOrderEditState();
@@ -25327,13 +25397,16 @@ async function applyCustomerSave(data, id) {
   const savedCustomer =
     state.customers.find((c) => String(c.id) === String(customerId)) ||
     customer;
+  const savedId = savedCustomer?.id || customerId;
+  const savedName =
+    savedCustomer?.name || savedCustomer?.companyName || customerName;
   const syncedOrders = syncOrdersCustomerName(savedCustomer);
   if (syncedOrders > 0) scheduleBackendSave();
   closeModal({ discardCustomerDraft: true });
-  focusSavedCustomer(
-    customerId,
-    savedCustomer?.name || savedCustomer?.companyName || customerName,
-  );
+  const openedOrder = !id && startOrderForCustomer(savedId);
+  if (!openedOrder) {
+    focusSavedCustomer(savedId, savedName, { silent: !id });
+  }
   if (softSaved) {
     showAppToast(
       upsertError

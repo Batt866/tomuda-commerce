@@ -2003,6 +2003,14 @@ label.excel-import-toolbar__upload {
   flex: 1 1 160px;
   min-width: 0;
   padding: 10px 14px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.page-toolbar__search::-webkit-search-decoration,
+.page-toolbar__search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .page-toolbar__select {
