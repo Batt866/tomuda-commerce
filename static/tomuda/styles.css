@@ -7297,6 +7297,55 @@ textarea::placeholder {
   }
 }
 
+.app-shell:not(.app-shell--bottom-nav) .worker-view__tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: min(100%, 28rem);
+  padding: 4px;
+  margin: 0 0 12px;
+  border: none;
+  border-radius: var(--btn-radius);
+  background: var(--hex-secondary);
+}
+
+.app-shell:not(.app-shell--bottom-nav) .worker-view__tabs .seg-tab {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  margin: 0;
+  background: transparent;
+  color: var(--hex-muted-foreground);
+}
+
+.app-shell:not(.app-shell--bottom-nav) .worker-view__tabs .seg-tab + .seg-tab {
+  border-left: none;
+}
+
+.app-shell:not(.app-shell--bottom-nav) .worker-view__tabs .seg-tab:hover:not(.is-active) {
+  color: var(--hex-foreground);
+  background: color-mix(in srgb, var(--hex-card) 80%, transparent);
+}
+
+.app-shell:not(.app-shell--bottom-nav) .worker-view__tabs .seg-tab.is-active {
+  color: var(--hex-primary-foreground);
+  background: var(--hex-primary);
+  border-bottom-color: transparent;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(16, 22, 35, 0.12);
+}
+
+.app-shell:not(.app-shell--bottom-nav) .worker-order-top-meta {
+  width: min(100%, 28rem);
+  margin: 0 0 12px;
+}
+
+.app-shell:not(.app-shell--bottom-nav) .worker-order-top-meta .field-input {
+  min-height: 40px;
+  height: 40px;
+}
+
 .worker-view {
   display: flex;
   flex-direction: column;

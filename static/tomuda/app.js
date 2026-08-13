@@ -8859,8 +8859,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* B fits «Дансны дугаар:»; C = right-flush IBAN only */
-.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 14.9%; } .receipt-grid__c { width: 7.8%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 18.2%; }
+/* B+C fits «Худалдааны төлөөлөгчийн утас:»; C also holds right-flush IBAN */
+.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 14.9%; } .receipt-grid__c { width: 14.8%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 11.2%; }
 .receipt-grid__f { width: 11.5%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -9858,9 +9858,9 @@ const RECEIPT_XLSX_STYLE = {
   signLabel: 61,
   signLine: 57,
 };
-// ҮНДСЭН A–K: C wider for «Худалдааны төлөөлөгчийн утас:»; title row uses B→K.
+// ҮНДСЭН A–K: C wider so «Худалдааны төлөөлөгчийн утас:» fits on one line in B:C.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 13.0, 9.0, 2.875, 15.25, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
+  3.0, 13.0, 16.5, 2.875, 7.75, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
 ];
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
