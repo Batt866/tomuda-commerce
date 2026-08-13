@@ -8980,9 +8980,6 @@ td, th { border: none; }
   padding: 0 !important;
   background: transparent !important;
 }
-.receipt-grid--sheet tr.receipt-items__row--before-promo > td {
-  border-bottom: none !important;
-}
 .receipt-grid--sheet tr.receipt-grid__spacer--promo-gap > td {
   border: none !important;
   height: 8px;
@@ -9102,7 +9099,7 @@ td, th { border: none; }
   border: none !important;
 }
 .receipt-info__iban-label {
-  font-weight: 700;
+  font-weight: 400;
   font-size: 9px;
   line-height: 1.3;
   white-space: nowrap;
@@ -9529,8 +9526,8 @@ td, th { border: none; }
 .receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9px; }
 .receipt-grid__value b { font-weight: 700; font-size: inherit; }
 .receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9px; }
-.receipt-grid__iban-nums { font-weight: 400; font-size: 11px !important; line-height: 1.25; }
-.receipt-grid__iban-nums b { font-size: 11px !important; font-weight: 400; }
+.receipt-grid__iban-nums { font-weight: 700; font-size: 11px !important; line-height: 1.25; }
+.receipt-grid__iban-nums b { font-size: 11px !important; font-weight: 700; }
 .receipt-grid__iban-b {
   text-align: left !important;
   white-space: nowrap;
@@ -9848,14 +9845,6 @@ const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 22;
 /** First payment-warning row — taller for wrapped text. */
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
-/** Item styles without bottom border (last row before promo). Max valid s= index is 67. */
-const RECEIPT_XLSX_ITEM_LAST_ROW_STYLES = {
-  8: 63,
-  9: 64,
-  10: 65,
-  11: 66,
-  34: 67,
-};
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 68 → indices 0–67). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -10618,21 +10607,21 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     xlsxCellXml(`C${bankR4}`, RECEIPT_XLSX_STYLE.ibanLabel, si("IBAN:"), "s"),
     xlsxCellXml(
       `D${bankR4}`,
-      RECEIPT_XLSX_STYLE.metaNormal,
+      RECEIPT_XLSX_STYLE.metaBold,
       si(RECEIPT_BANK_IBAN_SHORT),
       "s",
     ),
-    ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.metaBold),
   ]);
   pushRow(perBankH, [
     xlsxCellXml(
       `D${bankR5}`,
-      RECEIPT_XLSX_STYLE.metaNormal,
+      RECEIPT_XLSX_STYLE.metaBold,
       si(RECEIPT_BANK_ACCOUNT),
       "s",
     ),
     ...emptyCells(bankR5, "B", "C", RECEIPT_XLSX_STYLE.metaNormal),
-    ...emptyCells(bankR5, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR5, "E", "E", RECEIPT_XLSX_STYLE.metaBold),
   ]);
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
@@ -10657,7 +10646,6 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ...emptyCells(headerRow, "I", "I", 7),
   ]);
 
-  const hasPromoLines = promoItems.length > 0;
   items.forEach((item, index) => {
     const p =
       state.products.find((x) => x.id === item.productId) ||
@@ -10670,26 +10658,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
     const nameText = receiptProductNameText(item.productName);
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
-    const isLastBeforePromo =
-      hasPromoLines && index === items.length - 1;
-    const itemStyle = (styleId) =>
-      isLastBeforePromo
-        ? RECEIPT_XLSX_ITEM_LAST_ROW_STYLES[styleId] || styleId
-        : styleId;
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
-      xlsxCellXml(`A${r}`, itemStyle(9), si(String(index + 1)), "s"),
-      xlsxCellXml(`B${r}`, itemStyle(8), si(nameText), "s"),
-      xlsxCellXml(`E${r}`, itemStyle(9), si(unitText), "s"),
+      xlsxCellXml(`A${r}`, 9, si(String(index + 1)), "s"),
+      xlsxCellXml(`B${r}`, 8, si(nameText), "s"),
+      xlsxCellXml(`E${r}`, 9, si(unitText), "s"),
       barcodeText !== "-"
-        ? xlsxBarcodeCell(`F${r}`, itemStyle(34), barcodeText, si)
-        : xlsxCellXml(`F${r}`, itemStyle(34), null, "empty"),
-      xlsxCellXml(`H${r}`, itemStyle(11), qty, "n"),
-      xlsxCellXml(`J${r}`, itemStyle(10), Number(unitPrice) || 0, "n"),
-      xlsxCellXml(`K${r}`, itemStyle(10), Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "C", "D", itemStyle(8)),
-      ...emptyCells(r, "G", "G", itemStyle(34)),
-      ...emptyCells(r, "I", "I", itemStyle(11)),
+        ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
+        : xlsxCellXml(`F${r}`, 34, null, "empty"),
+      xlsxCellXml(`H${r}`, 11, qty, "n"),
+      xlsxCellXml(`J${r}`, 10, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(`K${r}`, 10, Number(lineTotal) || 0, "n"),
+      ...emptyCells(r, "C", "D", 8),
+      ...emptyCells(r, "G", "G", 34),
+      ...emptyCells(r, "I", "I", 11),
     ]);
   });
 
