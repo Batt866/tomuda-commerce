@@ -274,12 +274,12 @@
     </style>
     <link
       rel="preload"
-      href="{% static 'tomuda/styles.css' %}?v=20260813-xlsx-barcode-cols"
+      href="{% static 'tomuda/styles.css' %}?v=20260813-xlsx-stock-out-list"
       as="style"
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260813-xlsx-barcode-cols"
+      href="{% static 'tomuda/app.js' %}?v=20260813-xlsx-stock-out-list"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -317,7 +317,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260813-xlsx-barcode-cols"
+      href="{% static 'tomuda/styles.css' %}?v=20260813-xlsx-stock-out-list"
     />
   </head>
   <body>
@@ -449,7 +449,7 @@
       };
       window.__loadTomudaApp = function () {
         var sources = [
-          "{% static 'tomuda/app.js' %}?v=20260813-xlsx-barcode-cols",
+          "{% static 'tomuda/app.js' %}?v=20260813-xlsx-stock-out-list",
           "{% static 'tomuda/app.js' %}?v=" + Date.now(),
           "{% static 'tomuda/app.js' %}",
         ];
@@ -510,7 +510,7 @@
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
-    <script src="{% static 'tomuda/permissions.js' %}?v=20260813-xlsx-barcode-cols"></script>
+    <script src="{% static 'tomuda/permissions.js' %}?v=20260813-xlsx-stock-out-list"></script>
     <script src="{% static 'tomuda/capacitor-geolocation.js' %}?v=20260705-promo-labels"></script>
     <script>
       __loadTomudaApp();
