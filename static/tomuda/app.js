@@ -700,8 +700,11 @@ function InvoiceHeader(logoSrc, o) {
 }
 /** Max paid lines alone on one A4 body (header/info already take space). */
 const RECEIPT_PAGE_PAID_MAX = 26;
-/** Soft capacity for paid + upper footer before promo/summary/signatures. */
-const RECEIPT_PAGE_SOFT_MAX = 20;
+/**
+ * Soft capacity for paid lines before Урамшуулал→signatures.
+ * Keep that block together: if crowded, break before Урамшуулал (next page).
+ */
+const RECEIPT_PAGE_SOFT_MAX = 12;
 function receiptPaidItems(o) {
   return (o.items || []).filter((i) => !i.isPromoFree);
 }
@@ -990,8 +993,9 @@ function receiptSignatureRowsHtml(opts = {}) {
   const fill = pushDown
     ? `<tr class="receipt-grid__fill"><td colspan="11"></td></tr>`
     : `<tr class="receipt-grid__spacer receipt-grid__spacer--sign"><td colspan="11"></td></tr>`;
+  // Label A–E + line F–I (one column forward/left vs old B–F / G–J); J–K clear.
   const block = (role) =>
-    `<tr class="receipt-grid__sign"><td></td><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td></tr>`;
+    `<tr class="receipt-grid__sign"><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td><td></td></tr>`;
   const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
   return `${fill}${block(RECEIPT_SIGN_HANDED_LABEL)}${gap}${block(RECEIPT_SIGN_RECEIVED_LABEL)}`;
 }
@@ -1031,7 +1035,8 @@ function receiptLowerFooterRows(o, opts = {}) {
     grossHtml && hasPromo
       ? `<tr class="receipt-grid__spacer receipt-grid__spacer--gross-promo"><td colspan="11"></td></tr>`
       : "";
-  return `${gross}${grossPromoGap}${receiptPromoRowsHtml(o)}${receiptSummaryRowsHtml(sub, vat, payable, payTerm, o)}<tr class="receipt-grid__spacer receipt-grid__spacer--pay-warn"><td colspan="11"></td></tr>${receiptWarningRowsHtml()}${receiptSignatureRowsHtml(opts)}`;
+  // One unbreakable print block: Урамшуулал → totals → warn → signatures.
+  return `<tbody class="receipt-footer-keep">${gross}${grossPromoGap}${receiptPromoRowsHtml(o)}${receiptSummaryRowsHtml(sub, vat, payable, payTerm, o)}<tr class="receipt-grid__spacer receipt-grid__spacer--pay-warn"><td colspan="11"></td></tr>${receiptWarningRowsHtml()}${receiptSignatureRowsHtml(opts)}</tbody>`;
 }
 function receiptFooterRows(o, opts = {}) {
   const mode = opts.footerMode || "full";
@@ -8868,8 +8873,8 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* B+C fits «Худалдааны төлөөлөгчийн утас:»; C stays modest for IBAN */
-.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 18.5%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 12.9%; }
-.receipt-grid__f { width: 11.5%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
+.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 17.5%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 14.5%; }
+.receipt-grid__f { width: 10.8%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -9186,6 +9191,11 @@ td, th { border: none; }
   vertical-align: middle;
 }
 .receipt-items__row { page-break-inside: avoid; break-inside: avoid; }
+tbody.receipt-footer-keep {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+}
 .receipt-items__row td { font-size: 10px; }
 .receipt-items__num { width: 2%; text-align: right; max-width: 20px; padding-right: 2px; font-size: 9px; color: #555; }
 .receipt-items__name {
@@ -9508,14 +9518,14 @@ td, th { border: none; }
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 14px;
   font-weight: 700;
-  padding: 4px 4px !important;
+  padding: 8px 4px !important;
   margin: 0;
   letter-spacing: 0;
   color: ${RECEIPT_TEXT};
-  line-height: 1.2;
+  line-height: 1.35;
   box-sizing: border-box;
 }
-.receipt-grid__header--title td { padding-top: 3px !important; padding-bottom: 3px !important; }
+.receipt-grid__header--title td { padding-top: 8px !important; padding-bottom: 8px !important; height: 30px; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
 .receipt-grid__meta td { font-size: 9px; line-height: 1.15; padding: 1px 2px !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
@@ -9841,8 +9851,8 @@ const RECEIPT_XLSX_ROW_HEIGHT = 15;
 const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
 /** Slightly taller title / signature labels only. */
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
-/** «ЗАРЛАГЫН БАРИМТ» row — tall enough for 14pt title without clipping. */
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 22;
+/** «ЗАРЛАГЫН БАРИМТ» row — breathing room above/below 14pt title. */
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 30;
 /** First payment-warning row — taller for wrapped text. */
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 68 → indices 0–67). */
@@ -9855,10 +9865,34 @@ const RECEIPT_XLSX_STYLE = {
   signLabel: 61,
   signLine: 57,
 };
-// ҮНДСЭН A–K: extra width on B (not C) so «Худалдааны төлөөлөгчийн утас:» fits in B:C.
+// ҮНДСЭН A–K: E wide enough for full «Хэмжих нэгж» (was clipping at ~8.75).
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 17.5, 11.0, 2.875, 8.75, 9.625, 5.625, 4.875, 3.75, 9.25, 9.5,
+  3.0, 15.0, 11.0, 2.875, 13.25, 8.625, 5.625, 4.875, 3.75, 9.25, 9.5,
 ];
+/** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
+const RECEIPT_XLSX_PAGE_ROWS = 44;
+/** True when keep-together block starting at keepStartRow would not fit on its page. */
+function receiptXlsxNeedsBreakBefore(keepStartRow, keepRows, pageRows = RECEIPT_XLSX_PAGE_ROWS) {
+  const start = Math.max(1, Number(keepStartRow) || 1);
+  const need = Math.max(1, Number(keepRows) || 1);
+  const pos = (start - 1) % Math.max(1, pageRows);
+  const remaining = pageRows - pos;
+  return need > remaining;
+}
+function receiptXlsxRowBreaksXml(rowBreaks) {
+  const ids = [
+    ...new Set(
+      (rowBreaks || [])
+        .map((row) => Math.max(1, Number(row) || 0))
+        .filter((row) => row > 1)
+        .map((row) => row - 1), // OOXML brk id = 0-based index of first row on new page
+    ),
+  ].sort((a, b) => a - b);
+  if (!ids.length) return "";
+  return `<rowBreaks count="${ids.length}" manualBreakCount="${ids.length}">${ids
+    .map((id) => `<brk id="${id}" max="16383" man="1"/>`)
+    .join("")}</rowBreaks>`;
+}
 /** Approximate Excel column-width units for a 9pt Arial label. */
 function receiptXlsxLabelUnits(text) {
   let units = 0;
@@ -10386,9 +10420,10 @@ function xlsxZipWriteUtf8(zip, path, xml) {
 }
 // Appends one receipt's rows/merges starting at startRow; returns next free row.
 // Layout mirrors zarlaga-receipt-undsen.xls (11 cols A–K) exactly.
-function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
+function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = null) {
   const { si, siRich } = ctx;
   let rowNum = startRow;
+  let footerKeepStart = 0;
   const emptyCells = (
     row,
     from = "A",
@@ -10736,6 +10771,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
+  // Keep Урамшуулал → signatures together; page-break only before this block.
+  if (promoLines.length) footerKeepStart = rowNum;
   // Урамшуулал: no borders on A–D (left of name); grid only on E→K data cells
   promoLines.forEach((item, idx) => {
     const r = rowNum;
@@ -10777,6 +10814,7 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
     ]);
   }
 
+  if (!footerKeepStart) footerKeepStart = rowNum;
   const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
     const r = rowNum;
     // Non-grand: label B:D, amount E:K.
@@ -10883,16 +10921,16 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   });
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
-  // Label B:F right-aligned; dotted signature line G→J
+  // Label A:E right-aligned; dotted signature line F→I (one column forward/left).
   const pushSignRow = (role) => {
     const r = rowNum;
-    merges.push(`B${r}:F${r}`, `G${r}:J${r}`);
+    merges.push(`A${r}:E${r}`, `F${r}:I${r}`);
     pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
-      xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.signLabel, si(role), "s"),
-      ...emptyCells(r, "C", "F", RECEIPT_XLSX_STYLE.signLabel),
-      xlsxCellXml(`G${r}`, RECEIPT_XLSX_STYLE.signLine, null, "empty"),
-      ...emptyCells(r, "H", "J", RECEIPT_XLSX_STYLE.signLine),
-      ...emptyCells(r, "K", "K", 1),
+      xlsxCellXml(`A${r}`, RECEIPT_XLSX_STYLE.signLabel, si(role), "s"),
+      ...emptyCells(r, "B", "E", RECEIPT_XLSX_STYLE.signLabel),
+      xlsxCellXml(`F${r}`, RECEIPT_XLSX_STYLE.signLine, null, "empty"),
+      ...emptyCells(r, "G", "I", RECEIPT_XLSX_STYLE.signLine),
+      ...emptyCells(r, "J", "K", 1),
     ]);
   };
   pushSignRow(RECEIPT_SIGN_HANDED_LABEL);
@@ -10905,9 +10943,20 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1) {
   }
   pushSignRow(RECEIPT_SIGN_RECEIVED_LABEL);
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
+  if (rowBreaks && footerKeepStart > 1) {
+    const keepRows = Math.max(1, rowNum - footerKeepStart);
+    if (receiptXlsxNeedsBreakBefore(footerKeepStart, keepRows)) {
+      rowBreaks.push(footerKeepStart);
+    }
+  }
   return rowNum;
 }
-function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
+function receiptWorksheetXml(
+  rows,
+  merges,
+  lastRow,
+  { hasLogo = false, rowBreaks = null } = {},
+) {
   const uniqueMerges = [...new Set(merges)];
   const mergeXml = uniqueMerges
     .map((ref) => `<mergeCell ref="${ref}"/>`)
@@ -10915,10 +10964,11 @@ function receiptWorksheetXml(rows, merges, lastRow, { hasLogo = false } = {}) {
   const mergeCellsXml = uniqueMerges.length
     ? `<mergeCells count="${uniqueMerges.length}">${mergeXml}</mergeCells>`
     : "";
-  // ECMA-376 order: mergeCells → pageMargins → pageSetup → drawing
+  // ECMA-376 order: mergeCells → pageMargins → pageSetup → rowBreaks → drawing
   const drawingXml = hasLogo ? `<drawing r:id="rId1"/>` : "";
+  const breaksXml = receiptXlsxRowBreaksXml(rowBreaks);
   // Fit width to one A4 page, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.7" bottom="0.4" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.55" right="0.55" top="0.7" bottom="0.4" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>${breaksXml}${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -10927,11 +10977,13 @@ function buildReceiptSheetXml(
 ) {
   const rows = [];
   const merges = [];
-  const nextRow = appendReceiptSheetRows(o, ctx, rows, merges, 1);
+  const rowBreaks = [];
+  const nextRow = appendReceiptSheetRows(o, ctx, rows, merges, 1, rowBreaks);
   return {
     sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
     sheetXml: receiptWorksheetXml(rows, merges, nextRow - 1, {
       hasLogo: !!opts.hasLogo,
+      rowBreaks,
     }),
     sheetName: xlsxSafeSheetName(
       opts.sheetName || `Баримт ${formatReceiptNumber(o)}`,
@@ -10948,18 +11000,20 @@ function buildReceiptsCombinedSheetXml(
 ) {
   const rows = [];
   const merges = [];
+  const rowBreaks = [];
   let rowNum = 1;
   orders.forEach((o, index) => {
     if (index > 0) {
       rows.push(xlsxRowXml(rowNum, RECEIPT_XLSX_ROW_HEIGHT, [], RECEIPT_XLSX_LAST_COL));
       rowNum += 1;
     }
-    rowNum = appendReceiptSheetRows(o, ctx, rows, merges, rowNum);
+    rowNum = appendReceiptSheetRows(o, ctx, rows, merges, rowNum, rowBreaks);
   });
   return {
     sharedStringsXml: xlsxSharedStringsXml(ctx.strings),
     sheetXml: receiptWorksheetXml(rows, merges, Math.max(1, rowNum - 1), {
       hasLogo: !!opts.hasLogo,
+      rowBreaks,
     }),
   };
 }
