@@ -19872,23 +19872,23 @@ function promoQtyModeMeta(mode) {
     return {
       id: "each",
       title: "Бүгд",
-      hint: "Бүх бараа босгонд хүрнэ",
+      hint: "Бүх бараа тус бүрдээ босгонд хүрнэ",
     };
   if (mode === "total")
     return {
       id: "total",
       title: "Нийлбэр",
-      hint: "Тоо нэмэгдэнэ",
+      hint: "Аль бараанаас ч нийлээд босгонд хүрвэл",
     };
   return {
     id: "any",
     title: "Аль нэг",
-    hint: "Нэг бараа босгонд хүрвэл",
+    hint: "Нэг бараа тусдаа босгонд хүрвэл",
   };
 }
 function promoQtyModeHelperText(mode) {
   if (mode === "total") {
-    return "Сонгосон бараануудын тоо нэмэгдэж нийлээд босгонд хүрэхэд урамшуулал бодогдоно.";
+    return "Жишээ: 5 бараа сонгоод босго 5 болговол тэднээс аль бараанаас ч байсан нийлээд 5 ш авахад урамшуулал олгоно.";
   }
   if (mode === "any") {
     return "Сонгосон бараануудаас аль нэг нь тусдаа босгонд хүрэхэд урамшуулал бодогдоно.";
@@ -20386,7 +20386,7 @@ function normalizeQuantityPromotionRule(rule) {
   buyIds.forEach((id) => {
     buyQtyByProduct[id] = buyQty;
   });
-  return { ...rule, buyQtyByProduct, buyMode: mode === "total" ? "each" : mode };
+  return { ...rule, buyQtyByProduct, buyMode: mode };
 }
 function normalizePromotionRuleShape(rule) {
   if (!rule || typeof rule !== "object") return rule;
