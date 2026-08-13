@@ -15355,9 +15355,6 @@ function exportStockInExcelFallback(receipt) {
   const { activeLines, pieceQty } = stockInReceiptLineStats(receipt);
   const h = (value) => xlsxXmlEsc(value ?? "");
   const dayText = warehouseDateDisplayText(day);
-  const noText = receipt.receiptNumber
-    ? String(receipt.receiptNumber)
-    : "—";
   const supplier = String(receipt.supplierName || "").trim() || "—";
   const employee = String(receipt.employeeName || "").trim() || "—";
   let totalAmount = 0;
@@ -15369,10 +15366,10 @@ function exportStockInExcelFallback(receipt) {
       totalAmount += lineTotal;
       const unit = stockInReceiptLineUnit(line);
       const sku = String(line.barcode || "").trim() || "—";
-      return `<tr><td class="c">${index + 1}</td><td>${h(dayText)}</td><td>${h(noText)}</td><td>${h(supplier)}</td><td>${h(employee)}</td><td>${h(receiptProductNameText(line.productName))}</td><td class="barcode">${h(sku)}</td><td class="c">${h(unit)}</td><td class="r">${h(qty.toLocaleString())}</td><td class="r">${fmtExcelMoney(unitPrice)}</td><td class="r">${fmtExcelMoney(lineTotal)}</td></tr>`;
+      return `<tr><td class="c">${index + 1}</td><td>${h(dayText)}</td><td>${h(supplier)}</td><td>${h(employee)}</td><td>${h(receiptProductNameText(line.productName))}</td><td class="barcode">${h(sku)}</td><td class="c">${h(unit)}</td><td class="r">${h(qty.toLocaleString())}</td><td class="r">${fmtExcelMoney(unitPrice)}</td><td class="r">${fmtExcelMoney(lineTotal)}</td></tr>`;
     })
     .join("");
-  const html = `<!doctype html><!-- tomuda-stock-xls-v823 --><html><head><meta charset="utf-8"><style>
+  const html = `<!doctype html><!-- tomuda-stock-xls-v828 --><html><head><meta charset="utf-8"><style>
 body { font-family: Arial, sans-serif; color: #000; margin: 16px; font-size: 11px; }
 .title { font-size: 16px; font-weight: 800; margin: 0 0 8px; text-align: center; }
 .meta { margin: 0 0 12px; font-size: 11px; }
@@ -15386,10 +15383,11 @@ table.stock-in { width: 100%; border-collapse: collapse; font-size: 10px; }
 .r { text-align: right; }
 @media print { body { margin: 8mm; } }
 </style></head><body>
-<h1 class="title">БАРААНЫ ОРЛОГЫН ТАЙЛАН</h1>
-<p class="meta">Хугацаа: ${h(period)}</p>
+<h1 class="title">${h(stockInReportTitleText([receipt]))}</h1>
+<p class="meta">Хэвлэсэн огноо: ${h(warehouseDateDisplayText(todayIso()))}</p>
+<p class="meta">Орлого авсан өдрийн огноо: ${h(period)}</p>
 <table class="stock-in">
-<tr class="head"><th>№</th><th>Огноо</th><th>Орлого №</th><th>Нийлүүлэгч</th><th>Бүртгэсэн ажилтан</th><th>Бараа</th><th>Код</th><th>Хэмжих нэгж</th><th>Тоо</th><th>Нэгжийн үнэ</th><th>Нийт дүн</th></tr>
+<tr class="head"><th>№</th><th>Огноо</th><th>Нийлүүлэгч</th><th>Бүртгэсэн ажилтан</th><th>Бараа</th><th>Barcode</th><th>Хэмжих нэгж</th><th>Тоо/ш</th><th>Нэгжийн үнэ</th><th>Нийт дүн</th></tr>
 ${bodyRows}
 </table>
 <div class="summary">
@@ -16880,8 +16878,8 @@ function stockInReportWorksheetXml(rows, merges, lastRow) {
   ).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${STOCK_IN_REPORT_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.45" header="0.15" footer="0.15"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
-const STOCK_IN_LIST_REPORT_LAST_COL = "K";
-const STOCK_IN_LIST_REPORT_COL_WIDTHS = [5, 12, 14, 16, 18, 32, 16, 12, 8, 12, 13];
+const STOCK_IN_LIST_REPORT_LAST_COL = "J";
+const STOCK_IN_LIST_REPORT_COL_WIDTHS = [5, 12, 16, 18, 32, 16, 12, 8, 12, 13];
 const STOCK_IN_LIST_REPORT_TITLE_ROW_H = 24;
 const STOCK_IN_LIST_REPORT_META_ROW_H = 20;
 const STOCK_IN_LIST_REPORT_HEADER_ROW_H = 20;
@@ -16929,6 +16927,17 @@ function stockInReportPeriodText(receipts, fallbackDay) {
   const max = warehouseDateDisplayText(days[days.length - 1]);
   return min === max ? min : `${min} – ${max}`;
 }
+function stockInReportTitleText(receipts) {
+  const nos = [
+    ...new Set(
+      (receipts || [])
+        .map((receipt) => String(receipt.receiptNumber || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!nos.length) return "БАРААНЫ ОРЛОГЫН ТАЙЛАН";
+  return `БАРААНЫ ОРЛОГЫН ТАЙЛАН № ${nos.join(", ")}`;
+}
 function buildStockInReportListSheetXml(receipts, { day } = {}) {
   const s = STOCK_IN_LIST_REPORT_STYLES;
   const lastCol = STOCK_IN_LIST_REPORT_LAST_COL;
@@ -16963,7 +16972,7 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
     pushRow(height, [xlsxCellXml(`A${r}`, 0, null, "empty")]);
   };
   pushRow(STOCK_IN_LIST_REPORT_TITLE_ROW_H, [
-    xlsxCellXml("A1", s.title, si("БАРААНЫ ОРЛОГЫН ТАЙЛАН"), "s"),
+    xlsxCellXml("A1", s.title, si(stockInReportTitleText(receipts)), "s"),
   ]);
   pushSpacerRow();
   const pushMetaRow = (text) => {
@@ -16982,20 +16991,19 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   pushRow(STOCK_IN_LIST_REPORT_HEADER_ROW_H, [
     xlsxCellXml(`A${headerRow}`, s.tableHeader, si("№"), "s"),
     xlsxCellXml(`B${headerRow}`, s.tableHeader, si("Огноо"), "s"),
-    xlsxCellXml(`C${headerRow}`, s.tableHeader, si("Орлого №"), "s"),
-    xlsxCellXml(`D${headerRow}`, s.tableHeader, si("Нийлүүлэгч"), "s"),
+    xlsxCellXml(`C${headerRow}`, s.tableHeader, si("Нийлүүлэгч"), "s"),
     xlsxCellXml(
-      `E${headerRow}`,
+      `D${headerRow}`,
       s.tableHeader,
       si("Бүртгэсэн ажилтан"),
       "s",
     ),
-    xlsxCellXml(`F${headerRow}`, s.tableHeader, si("Бараа"), "s"),
-    xlsxCellXml(`G${headerRow}`, s.tableHeader, si("Код"), "s"),
-    xlsxCellXml(`H${headerRow}`, s.tableHeader, si("Хэмжих нэгж"), "s"),
-    xlsxCellXml(`I${headerRow}`, s.tableHeader, si("Тоо"), "s"),
-    xlsxCellXml(`J${headerRow}`, s.tableHeader, si("Нэгжийн үнэ"), "s"),
-    xlsxCellXml(`K${headerRow}`, s.tableHeader, si("Нийт дүн"), "s"),
+    xlsxCellXml(`E${headerRow}`, s.tableHeader, si("Бараа"), "s"),
+    xlsxCellXml(`F${headerRow}`, s.tableHeader, si("Barcode"), "s"),
+    xlsxCellXml(`G${headerRow}`, s.tableHeader, si("Хэмжих нэгж"), "s"),
+    xlsxCellXml(`H${headerRow}`, s.tableHeader, si("Тоо/ш"), "s"),
+    xlsxCellXml(`I${headerRow}`, s.tableHeader, si("Нэгжийн үнэ"), "s"),
+    xlsxCellXml(`J${headerRow}`, s.tableHeader, si("Нийт дүн"), "s"),
   ]);
   const dataRows = [];
   let lineIndex = 0;
@@ -17004,9 +17012,6 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   (receipts || []).forEach((receipt) => {
     const { activeLines } = stockInReceiptLineStats(receipt);
     const dayText = warehouseDateDisplayText(isoDay(receipt.createdAt));
-    const noText = receipt.receiptNumber
-      ? String(receipt.receiptNumber)
-      : "—";
     const supplier = String(receipt.supplierName || "").trim() || "—";
     const employee = String(receipt.employeeName || "").trim() || "—";
     activeLines.forEach((line) => {
@@ -17024,20 +17029,19 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
       pushRow(STOCK_IN_LIST_REPORT_DATA_ROW_H, [
         xlsxCellXml(`A${r}`, s.noCenter, lineIndex, "n"),
         xlsxCellXml(`B${r}`, s.textLeft, si(dayText), "s"),
-        xlsxCellXml(`C${r}`, s.textLeft, si(noText), "s"),
-        xlsxCellXml(`D${r}`, s.textLeft, si(supplier), "s"),
-        xlsxCellXml(`E${r}`, s.textLeft, si(employee), "s"),
-        xlsxCellXml(`F${r}`, s.textLeft, si(nameText), "s"),
+        xlsxCellXml(`C${r}`, s.textLeft, si(supplier), "s"),
+        xlsxCellXml(`D${r}`, s.textLeft, si(employee), "s"),
+        xlsxCellXml(`E${r}`, s.textLeft, si(nameText), "s"),
         sku
-          ? xlsxBarcodeCell(`G${r}`, s.barcode, sku, si)
-          : xlsxCellXml(`G${r}`, s.barcode, si("—"), "s"),
-        xlsxCellXml(`H${r}`, s.textCenter, si(unit), "s"),
-        xlsxCellXml(`I${r}`, s.intRight, qty, "n"),
-        xlsxCellXml(`J${r}`, s.moneyRight, unitPrice, "n"),
+          ? xlsxBarcodeCell(`F${r}`, s.barcode, sku, si)
+          : xlsxCellXml(`F${r}`, s.barcode, si("—"), "s"),
+        xlsxCellXml(`G${r}`, s.textCenter, si(unit), "s"),
+        xlsxCellXml(`H${r}`, s.intRight, qty, "n"),
+        xlsxCellXml(`I${r}`, s.moneyRight, unitPrice, "n"),
         xlsxCellXml(
-          `K${r}`,
+          `J${r}`,
           s.moneyRight,
-          { f: `I${r}*J${r}`, v: lineTotal },
+          { f: `H${r}*I${r}`, v: lineTotal },
           "f",
         ),
       ]);
@@ -17047,10 +17051,10 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   const firstDataRow = dataRows[0];
   const lastDataRow = dataRows[dataRows.length - 1];
   const qtyFormula = dataRows.length
-    ? `SUM(I${firstDataRow}:I${lastDataRow})`
+    ? `SUM(H${firstDataRow}:H${lastDataRow})`
     : "0";
   const amountFormula = dataRows.length
-    ? `SUM(K${firstDataRow}:K${lastDataRow})`
+    ? `SUM(J${firstDataRow}:J${lastDataRow})`
     : "0";
   const receiptCount = (receipts || []).length;
   const summaryRows = [
@@ -17075,12 +17079,12 @@ function buildStockInReportListSheetXml(receipts, { day } = {}) {
   ];
   summaryRows.forEach(({ label, formula, cached, style }) => {
     const r = rowNum;
-    merges.push(`A${r}:J${r}`);
+    merges.push(`A${r}:I${r}`);
     pushRow(STOCK_IN_LIST_REPORT_META_ROW_H, [
       xlsxCellXml(`A${r}`, s.summaryText, si(label), "s"),
       formula
-        ? xlsxCellXml(`K${r}`, style, { f: formula, v: cached }, "f")
-        : xlsxCellXml(`K${r}`, style, Number(cached) || 0, "n"),
+        ? xlsxCellXml(`J${r}`, style, { f: formula, v: cached }, "f")
+        : xlsxCellXml(`J${r}`, style, Number(cached) || 0, "n"),
     ]);
   });
   const lastRow = Math.max(1, rowNum - 1);
