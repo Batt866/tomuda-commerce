@@ -22771,9 +22771,11 @@ function workerView() {
     orders = workerOrdersList(),
     inActiveOrder =
       tab === "new" && state.workerStoreReady && !!state.workerCustomer;
-  const topMeta = inActiveOrder ? workerOrderTopMetaHtml() : "";
+  const agentMeta =
+    tab === "new" || state.editingOrderId ? workerOrderAgentMetaHtml() : "";
+  const receivableMeta = inActiveOrder ? workerOrderReceivableMetaHtml() : "";
   const orderFoot = inActiveOrder ? workerOrderFootHtml(cart) : "";
-  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${topMeta}${orderFoot}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
+  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${agentMeta}${workerViewTabsHtml(tab)}${receivableMeta}${orderFoot}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
 }
 function clearWorkerOrderHighlight() {
   state.workerOrdersArrived = false;
@@ -23477,19 +23479,23 @@ function workerOrderAgentField() {
     )
     .join("")}</select></label>`;
 }
-function workerOrderTopMetaHtml() {
+function workerOrderAgentMetaHtml() {
   ensureOrderEmployeeSelection();
   const editing = !!state.editingOrderId;
   const editingOrder = editing
     ? state.orders.find((x) => x.id === state.editingOrderId)
     : null;
-  const customer = state.customers.find((c) => c.id === state.workerCustomer);
   const showAgentPicker = !editing && shouldShowOrderAgentPicker();
   const agentHtml = showAgentPicker
     ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
     : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(editingOrder?.employeeName || state.currentEmployee?.name || "-")}</p></div>`;
+  return `<div class="worker-order-top-meta">${agentHtml}</div>`;
+}
+function workerOrderReceivableMetaHtml() {
+  const customer = state.customers.find((c) => c.id === state.workerCustomer);
   const receivableHtml = workerReceivableHtml(customer?.id);
-  return `<div class="worker-order-top-meta">${agentHtml}${receivableHtml}</div>`;
+  if (!receivableHtml) return "";
+  return `<div class="worker-order-top-meta">${receivableHtml}</div>`;
 }
 function workerOrderEmptyState() {
   return `<div class="worker-order-empty"><p class="worker-order-empty__text">Бараа байхгүй</p></div>`;
