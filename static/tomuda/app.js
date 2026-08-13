@@ -362,6 +362,7 @@ let orderSubmitLock = false;
 let stockInSaveLock = false;
 let stockOutSaveLock = false;
 let customerSaveLock = false;
+let customerFormDraft = null;
 let warehouseReceiptScrollId = "";
 let whReceiptPickerDismissGuard = 0;
 let whReceiptPickerSuppressDismissUntil = 0;
@@ -24115,17 +24116,18 @@ function initImageLightbox() {
     if (e.key === "Escape" && imageLightboxOpen()) closeImageLightbox();
   });
 }
-function closeModal() {
+function closeModal(opts) {
   closeConfirmCard();
   stopBarcodeScan();
   if (state.pickerActiveId) finishPickerEditFor(state.pickerActiveId);
   state.pickerActiveId = "";
   state.pickerQtyProductId = "";
   state.pickerQtyRevertQty = null;
+  if (opts && opts.discardCustomerDraft) customerFormDraft = null;
+  else stashCustomerFormDraft();
   destroyCustomerMap();
   state.promoPick = null;
   state.promoFormDraft = null;
-  state.customerFormDraft = null;
   state.searches.deliveryPick = "";
   const deliveryTrigger = document.getElementById("warehouse-delivery-trigger");
   if (deliveryTrigger) deliveryTrigger.setAttribute("aria-expanded", "false");
@@ -24918,7 +24920,46 @@ function captureCustomerForm() {
     document.getElementById("customerLat")?.value || data.latitude || "";
   data.longitude =
     document.getElementById("customerLng")?.value || data.longitude || "";
+  const image = readCustomerImageFromForm(form);
+  if (image) data.image = image;
+  data.customerId = String(form.getAttribute("data-customer-id") || "").trim();
   return data;
+}
+function customerDraftHasContent(draft) {
+  if (!draft || typeof draft !== "object") return false;
+  const textKeys = [
+    "name",
+    "registrationNumber",
+    "companyName",
+    "email",
+    "address",
+    "locationText",
+    "phone1",
+    "phone2",
+    "district",
+    "khoroo",
+    "latitude",
+    "longitude",
+  ];
+  if (textKeys.some((key) => String(draft[key] || "").trim())) return true;
+  if (
+    Array.isArray(draft.phones) &&
+    draft.phones.some((phone) => String(phone || "").trim())
+  ) {
+    return true;
+  }
+  return !!String(draft.image || "").trim();
+}
+function stashCustomerFormDraft() {
+  const captured = captureCustomerForm();
+  if (!captured) return;
+  if (!customerDraftHasContent(captured)) {
+    if (String(customerFormDraft?.customerId || "") === String(captured.customerId || "")) {
+      customerFormDraft = null;
+    }
+    return;
+  }
+  customerFormDraft = captured;
 }
 function customerFromDraft(id, draft) {
   const saved = state.customers.find((x) => x.id === id) || {};
@@ -25008,21 +25049,20 @@ function customerModal(id, draft = null) {
       id ? "Харилцагч засах эрхгүй." : "Харилцагч нэмэх эрхгүй.",
     );
   }
-  const useDraft = draft || null;
-  if (useDraft)
-    state.customerFormDraft = {
-      ...useDraft,
-      customerId: id || useDraft.customerId || "",
-    };
-  else state.customerFormDraft = null;
-  const c = customerFromDraft(id, useDraft);
-  const cid = esc(id || "");
+  stashCustomerFormDraft();
+  const cid = String(id || "").trim();
+  const cidAttr = esc(cid);
+  const matchingStored =
+    customerFormDraft &&
+    String(customerFormDraft.customerId || "") === cid;
+  const useDraft = draft || (matchingStored ? customerFormDraft : null);
+  const c = customerFromDraft(cid, useDraft);
   const receivableHost = id
     ? `<div data-customer-receivable-host>${customerEditReceivableSectionHtml(id)}</div>`
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cid}" novalidate onsubmit="saveCustomer(event,'${cid}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр / Дэлгүүрийн нэр", c.name, "text", "Жишээ: Номин 5-р хороо")}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}${field("locationText", "Олж очих заавар (түгээгчид)", c.locationText || "", "text", "Жишээ: 12-р байрны 1 давхар, улаан хаалга")}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр / Дэлгүүрийн нэр", c.name, "text", "Жишээ: Номин 5-р хороо")}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}${field("locationText", "Олж очих заавар (түгээгчид)", c.locationText || "", "text", "Жишээ: 12-р байрны 1 давхар, улаан хаалга")}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -25289,7 +25329,7 @@ async function applyCustomerSave(data, id) {
     customer;
   const syncedOrders = syncOrdersCustomerName(savedCustomer);
   if (syncedOrders > 0) scheduleBackendSave();
-  closeModal();
+  closeModal({ discardCustomerDraft: true });
   focusSavedCustomer(
     customerId,
     savedCustomer?.name || savedCustomer?.companyName || customerName,
