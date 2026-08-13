@@ -7416,6 +7416,17 @@ textarea::placeholder {
   display: block;
 }
 
+.worker-order-top-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.worker-order-top-meta .worker-order-meta {
+  display: block;
+}
+
 .worker-order-lines-wrap {
   display: flex;
   flex-direction: column;
@@ -7461,15 +7472,18 @@ textarea::placeholder {
   font-size: 10px;
 }
 
-.worker-view--ordering .worker-order-summary .worker-order-field {
+.worker-view--ordering .worker-order-summary .worker-order-field,
+.worker-view--ordering .worker-order-top-meta .worker-order-field {
   gap: 3px;
 }
 
-.worker-view--ordering .worker-order-summary .worker-order-field__label {
+.worker-view--ordering .worker-order-summary .worker-order-field__label,
+.worker-view--ordering .worker-order-top-meta .worker-order-field__label {
   font-size: 11px;
 }
 
-.worker-view--ordering .worker-order-summary .field-input {
+.worker-view--ordering .worker-order-summary .field-input,
+.worker-view--ordering .worker-order-top-meta .field-input {
   min-height: 36px;
   height: 36px;
   font-size: 13px;
@@ -11911,6 +11925,11 @@ textarea::placeholder {
 
   .app-shell--bottom-nav .worker-view--ordering .worker-view__tabs {
     margin-bottom: 8px;
+  }
+
+  .app-shell--bottom-nav .worker-view--ordering .worker-order-top-meta {
+    flex-shrink: 0;
+    margin: 0 0 8px;
   }
 
   .app-shell--bottom-nav .worker-view--ordering .worker-order-card {

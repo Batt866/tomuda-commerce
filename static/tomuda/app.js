@@ -22771,8 +22771,9 @@ function workerView() {
     orders = workerOrdersList(),
     inActiveOrder =
       tab === "new" && state.workerStoreReady && !!state.workerCustomer;
+  const topMeta = inActiveOrder ? workerOrderTopMetaHtml() : "";
   const orderFoot = inActiveOrder ? workerOrderFootHtml(cart) : "";
-  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${orderFoot}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
+  return `<div class="worker-view space-y-3${tab === "orders" ? " worker-view--orders" : ""}${state.workerOrdersArrived && tab === "orders" ? " worker-view--orders-arrived" : ""}${inActiveOrder ? " worker-view--ordering" : ""}">${workerViewTabsHtml(tab)}${topMeta}${orderFoot}${tab === "new" ? workerNew(cart) : workerOrders(orders)}</div>`;
 }
 function clearWorkerOrderHighlight() {
   state.workerOrdersArrived = false;
@@ -23476,6 +23477,20 @@ function workerOrderAgentField() {
     )
     .join("")}</select></label>`;
 }
+function workerOrderTopMetaHtml() {
+  ensureOrderEmployeeSelection();
+  const editing = !!state.editingOrderId;
+  const editingOrder = editing
+    ? state.orders.find((x) => x.id === state.editingOrderId)
+    : null;
+  const customer = state.customers.find((c) => c.id === state.workerCustomer);
+  const showAgentPicker = !editing && shouldShowOrderAgentPicker();
+  const agentHtml = showAgentPicker
+    ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
+    : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(editingOrder?.employeeName || state.currentEmployee?.name || "-")}</p></div>`;
+  const receivableHtml = workerReceivableHtml(customer?.id);
+  return `<div class="worker-order-top-meta">${agentHtml}${receivableHtml}</div>`;
+}
 function workerOrderEmptyState() {
   return `<div class="worker-order-empty"><p class="worker-order-empty__text">Бараа байхгүй</p></div>`;
 }
@@ -23739,24 +23754,14 @@ function workerNew(cart) {
   return workerNewOrderStep(cart);
 }
 function workerNewOrderStep(cart) {
-  ensureOrderEmployeeSelection();
   const editing = !!state.editingOrderId;
   const editingOrder = editing
     ? state.orders.find((x) => x.id === state.editingOrderId)
     : null;
   const customer = state.customers.find((c) => c.id === state.workerCustomer),
-    showAgentPicker = !editing && shouldShowOrderAgentPicker(),
-    agentMetaHtml = showAgentPicker
-      ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
-      : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(editingOrder?.employeeName || state.currentEmployee?.name || "-")}</p></div>`,
-    receivableHtml = workerReceivableHtml(customer?.id),
     paidProducts = workerPaidProductsInCart(),
     hasItems = paidProducts.length > 0,
-    summaryHtml = workerOrderSummaryPanel(cart, {
-      agentMetaHtml,
-      receivableHtml,
-      hasItems,
-    }),
+    summaryHtml = workerOrderSummaryPanel(cart, { hasItems }),
     listHtml = hasItems
       ? paidProducts.map(workerSelectedRow).join("") +
         (cart.promo.length ? cart.promo.map(workerPromoRow).join("") : "")
@@ -23830,10 +23835,10 @@ function workerOrderStatsHtml(cart) {
   if (!cart.skuCount) return "";
   return `<div class="worker-order-stats"><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.skuCount}</span><span class="worker-order-stat__label">Бараа</span></div><div class="worker-order-stat"><span class="worker-order-stat__value">${cart.pieceQty}</span><span class="worker-order-stat__label">Ширхэг</span></div><div class="worker-order-stat worker-order-stat--total"><span class="worker-order-stat__value">${fmt(cart.total)}</span><span class="worker-order-stat__label">Дүн</span></div></div>${cart.discount > 0 ? `<p class="worker-order-stats__note">Хөнгөлөлт ${fmt(cart.discount)} · Үндсэн дүн ${fmt(cart.gross)}</p>` : ""}`;
 }
-function workerOrderSummaryPanel(cart, { agentMetaHtml = "", receivableHtml = "", hasItems = false } = {}) {
+function workerOrderSummaryPanel(cart, { hasItems = false } = {}) {
   const stats = hasItems ? workerOrderStatsHtml(cart) : "";
-  if (!stats && !agentMetaHtml && !receivableHtml) return "";
-  return `<div class="worker-order-summary">${stats}${agentMetaHtml}${receivableHtml}</div>`;
+  if (!stats) return "";
+  return `<div class="worker-order-summary">${stats}</div>`;
 }
 function workerSelectedRow(p) {
   const editing = state.workerOrderActiveId === p.id;
