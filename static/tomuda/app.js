@@ -4133,10 +4133,13 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   const preferRemote =
     !!opts.preferRemote &&
     (!!opts.pullFromServer || !businessEntityDirty());
-  // Customers + employees stamp updatedAt on edit so pre-save peer merge
-  // cannot wipe this device's just-saved row with an older server blob.
+  // Customers, employees, and products stamp updatedAt on edit so a
+  // in-flight peer pull cannot wipe this device's just-saved row
+  // (e.g. жижиг хайрцаг) with an older server blob.
   const useUpdatedAt =
-    opts.entityKind === "customers" || opts.entityKind === "employees";
+    opts.entityKind === "customers" ||
+    opts.entityKind === "employees" ||
+    opts.entityKind === "products";
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), { ...item });
@@ -25820,6 +25823,8 @@ function buildProductDataFromForm(form) {
     }
     data.largeBoxQuantity = large;
   }
+  data.boxQuantity = Math.floor(Number(data.boxQuantity) || 1);
+  data.largeBoxQuantity = Math.floor(Number(data.largeBoxQuantity) || 0);
   data.country = String(data.country || "").trim() || "Монгол";
   data.unit = normalizeProductUnit(data.unit);
   const image = readProductImageFromForm(form);
@@ -25955,6 +25960,13 @@ async function applyProductSave(data, id) {
   const product = state.products.find((p) => p.id === productId);
   if (product) {
     product.updatedAt = new Date().toISOString();
+    product.boxQuantity = Math.floor(Number(product.boxQuantity) || 1);
+    product.largeBoxQuantity = Math.floor(
+      Number(product.largeBoxQuantity) || 0,
+    );
+    if (state.workerQtyParts && productId) {
+      delete state.workerQtyParts[productId];
+    }
   }
   if (product && storedProductImage(product)) {
     try {
