@@ -372,6 +372,8 @@ let settlementBlurTimer = null;
 let stockInScanRenderPending = false;
 let stockInScanBlurTimer = null;
 let stockInScanForceRender = false;
+let stockInScanTimer = null;
+let stockOutScanTimer = null;
 let barcodeScanRenderPending = false;
 let loginFormActiveUntil = 0;
 let loginFormGuardBound = false;
@@ -14483,7 +14485,7 @@ function stockInScanToolbarHtml() {
     <span class="stock-in-sheet__search-label">Бараа хайх:</span>
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Бараа хайх">
+      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" oncompositionend="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Бараа хайх">
       <button type="button" class="stock-in-sheet__search-go" tabindex="-1" onclick="stockInScanSubmit()">Хайх</button>
     </span>
   </label>
@@ -14516,7 +14518,7 @@ function stockOutScanToolbarHtml() {
     <span class="stock-in-sheet__search-label">Бараа хайх:</span>
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" oninput="stockOutScanDraft(this)" onkeydown="stockOutBarcodeKeydown(event)" aria-label="Бараа хайх">
+      <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" oninput="stockOutScanDraft(this)" oncompositionend="stockOutScanDraft(this)" onkeydown="stockOutBarcodeKeydown(event)" aria-label="Бараа хайх">
       <button type="button" class="stock-in-sheet__search-go" tabindex="-1" onclick="stockOutScanSubmit()">Хайх</button>
     </span>
   </label>
@@ -14567,8 +14569,9 @@ function stockInScanDraft(el) {
   state.stockInScanQuery = value;
   state.searches.inventory = value;
   stockInScanFocus();
-  clearTimeout(searchRenderTimer);
-  searchRenderTimer = setTimeout(() => {
+  clearTimeout(stockInScanTimer);
+  stockInScanTimer = setTimeout(() => {
+    if (patchStockInSearchHits()) return;
     const snap = captureStockInScanFocus() || {
       focused: true,
       value: state.stockInScanQuery || "",
@@ -14584,7 +14587,13 @@ function stockInScanDraft(el) {
       stockInScanForceRender = false;
     }
     restoreStockInScanFocus(snap);
-  }, 180);
+  }, 120);
+}
+function searchQueryNorm(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFC");
 }
 function findProductsByQuery(code) {
   const value = String(code || "").trim();
@@ -14597,15 +14606,13 @@ function findProductsByQuery(code) {
     productMatchCodes(p).some((c) => c.includes(value)),
   );
   if (partialCode.length === 1) return partialCode;
-  const q = value.toLowerCase();
+  const q = searchQueryNorm(value);
   const exactName = state.products.filter(
-    (p) => String(p.name || "").trim().toLowerCase() === q,
+    (p) => searchQueryNorm(p.name) === q,
   );
   if (exactName.length) return exactName;
   const nameHits = state.products.filter((p) =>
-    String(p.name || "")
-      .toLowerCase()
-      .includes(q),
+    searchQueryNorm(p.name).includes(q),
   );
   if (nameHits.length) return nameHits;
   return partialCode;
@@ -14653,7 +14660,13 @@ function applyStockInBarcode(code) {
 }
 function stockInScanSubmit() {
   const input = document.getElementById("stockInBarcodeInput");
-  applyStockInBarcode(input?.value || state.stockInScanQuery || "");
+  const query = String(input?.value || state.stockInScanQuery || "").trim();
+  state.stockInScanQuery = query;
+  state.searches.inventory = query;
+  if (input) input.value = query;
+  patchStockInSearchHits();
+  const matches = findProductsByQuery(query).filter((p) => stockInLineQty(p) <= 0);
+  if (matches.length === 1) applyStockInBarcode(query);
 }
 function stockInBarcodeKeydown(e) {
   if (e.key !== "Enter") return;
@@ -14704,8 +14717,9 @@ function stockOutScanDraft(el) {
   state.stockOutScanQuery = value;
   state.searches.inventory = value;
   stockOutScanFocus();
-  clearTimeout(searchRenderTimer);
-  searchRenderTimer = setTimeout(() => {
+  clearTimeout(stockOutScanTimer);
+  stockOutScanTimer = setTimeout(() => {
+    if (patchStockOutSearchHits()) return;
     const snap = captureStockOutScanFocus() || {
       focused: true,
       value: state.stockOutScanQuery || "",
@@ -14721,7 +14735,7 @@ function stockOutScanDraft(el) {
       stockInScanForceRender = false;
     }
     restoreStockOutScanFocus(snap);
-  }, 180);
+  }, 120);
 }
 function applyStockOutBarcode(code) {
   ensureStockOutSession();
@@ -14761,7 +14775,13 @@ function applyStockOutBarcode(code) {
 }
 function stockOutScanSubmit() {
   const input = document.getElementById("stockOutBarcodeInput");
-  applyStockOutBarcode(input?.value || state.stockOutScanQuery || "");
+  const query = String(input?.value || state.stockOutScanQuery || "").trim();
+  state.stockOutScanQuery = query;
+  state.searches.inventory = query;
+  if (input) input.value = query;
+  patchStockOutSearchHits();
+  const matches = findProductsByQuery(query).filter((p) => stockOutLineQty(p) <= 0);
+  if (matches.length === 1) applyStockOutBarcode(query);
 }
 function stockOutBarcodeKeydown(e) {
   if (e.key !== "Enter") return;
@@ -15283,13 +15303,24 @@ function stockInDraftStats(list = state.products) {
   );
   return { filled, skuCount: filled.length, pieceQty, totalCost, totalSales };
 }
-function stockInSearchHitsHtml(list) {
+function stockInSearchHitProducts() {
   const q = String(state.stockInScanQuery || "").trim();
-  if (!q) return "";
-  const hits = findProductsByQuery(q)
+  if (!q) return [];
+  return findProductsByQuery(q)
     .filter((p) => stockInLineQty(p) <= 0)
     .slice(0, 8);
-  if (!hits.length) return "";
+}
+function stockInSearchHitsContentHtml() {
+  const q = String(state.stockInScanQuery || "").trim();
+  if (!q) return "";
+  const hits = stockInSearchHitProducts();
+  if (!hits.length) {
+    const emptyCatalog = !(state.products || []).length;
+    const msg = emptyCatalog
+      ? "Барааны мэдээлэл татагдаагүй байна. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу."
+      : `${esc(q)} — нэр эсвэл SKU-гаар дахин хайна уу.`;
+    return `<div class="stock-in-sheet__hits stock-in-sheet__hits--miss"><p class="stock-in-sheet__hits-label">Бараа олдсонгүй</p><p class="stock-in-sheet__hits-empty">${msg}</p></div>`;
+  }
   const rows = hits
     .map(
       (p) =>
@@ -15297,6 +15328,23 @@ function stockInSearchHitsHtml(list) {
     )
     .join("");
   return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо/өртөг оруулна</p>${rows}</div>`;
+}
+function patchStockInSearchHits() {
+  const scroll = document.querySelector(".stock-in-sheet__scroll");
+  if (!scroll) return false;
+  const q = String(state.stockInScanQuery || "").trim();
+  const prev = scroll.querySelector(".stock-in-sheet__hits");
+  if (!q) {
+    prev?.remove();
+    return true;
+  }
+  const html = stockInSearchHitsContentHtml();
+  if (prev) prev.outerHTML = html;
+  else scroll.insertAdjacentHTML("afterbegin", html);
+  return true;
+}
+function stockInSearchHitsHtml(list) {
+  return stockInSearchHitsContentHtml();
 }
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
@@ -15340,13 +15388,24 @@ function stockOutDraftStats(list = state.products) {
   );
   return { filled, skuCount: filled.length, pieceQty, totalSales };
 }
-function stockOutSearchHitsHtml(list) {
+function stockOutSearchHitProducts() {
   const q = String(state.stockOutScanQuery || "").trim();
-  if (!q) return "";
-  const hits = findProductsByQuery(q)
+  if (!q) return [];
+  return findProductsByQuery(q)
     .filter((p) => stockOutLineQty(p) <= 0)
     .slice(0, 8);
-  if (!hits.length) return "";
+}
+function stockOutSearchHitsContentHtml() {
+  const q = String(state.stockOutScanQuery || "").trim();
+  if (!q) return "";
+  const hits = stockOutSearchHitProducts();
+  if (!hits.length) {
+    const emptyCatalog = !(state.products || []).length;
+    const msg = emptyCatalog
+      ? "Барааны мэдээлэл татагдаагүй байна. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу."
+      : `${esc(q)} — нэр эсвэл SKU-гаар дахин хайна уу.`;
+    return `<div class="stock-in-sheet__hits stock-in-sheet__hits--miss"><p class="stock-in-sheet__hits-label">Бараа олдсонгүй</p><p class="stock-in-sheet__hits-empty">${msg}</p></div>`;
+  }
   const rows = hits
     .map(
       (p) =>
@@ -15354,6 +15413,23 @@ function stockOutSearchHitsHtml(list) {
     )
     .join("");
   return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо оруулна</p>${rows}</div>`;
+}
+function patchStockOutSearchHits() {
+  const scroll = document.querySelector(".stock-in-sheet__scroll");
+  if (!scroll) return false;
+  const q = String(state.stockOutScanQuery || "").trim();
+  const prev = scroll.querySelector(".stock-in-sheet__hits");
+  if (!q) {
+    prev?.remove();
+    return true;
+  }
+  const html = stockOutSearchHitsContentHtml();
+  if (prev) prev.outerHTML = html;
+  else scroll.insertAdjacentHTML("afterbegin", html);
+  return true;
+}
+function stockOutSearchHitsHtml(list) {
+  return stockOutSearchHitsContentHtml();
 }
 function stockOutLinesHtml(list) {
   const filled = (list || []).filter((p) => stockOutLineQty(p) > 0);

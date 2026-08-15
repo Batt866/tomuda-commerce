@@ -18084,6 +18084,20 @@ input.stock-in-sheet__input::placeholder {
   color: var(--si-muted);
 }
 
+.stock-in-sheet__hits--miss {
+  padding: 12px 14px;
+  border: 1px dashed var(--si-line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.stock-in-sheet__hits-empty {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--si-muted);
+}
+
 .stock-in-sheet__hit {
   display: flex;
   align-items: center;
