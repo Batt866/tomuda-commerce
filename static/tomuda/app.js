@@ -14474,7 +14474,7 @@ function stockInSupplierField() {
 function stockInWarehouseField() {
   ensureStockInSession();
   const value = esc(state.stockInWarehouseName || "");
-  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><input type="text" class="stock-in-sheet__select stock-in-sheet__input" value="${value}" placeholder="Агуулахын нэр..." autocomplete="off" oninput="setStockInWarehouseName(this.value)" aria-label="Агуулах"></label>`;
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><input type="text" class="stock-in-sheet__input" value="${value}" placeholder="Агуулахын нэр..." autocomplete="off" oninput="setStockInWarehouseName(this.value)" aria-label="Агуулах"></label>`;
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
@@ -14502,12 +14502,12 @@ function stockOutEmployeeField() {
 function stockOutRecipientField() {
   ensureStockOutSession();
   const note = esc(state.stockOutRecipientNote || "");
-  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Хэнд:</span><input type="text" class="stock-in-sheet__select stock-in-sheet__input" value="${note}" placeholder="Дэлгүүр / ажилтан / бусад..." autocomplete="off" oninput="setStockOutRecipientNote(this.value)" aria-label="Хэнд"></label>`;
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Хэнд:</span><input type="text" class="stock-in-sheet__input" value="${note}" placeholder="Дэлгүүр / ажилтан / бусад..." autocomplete="off" oninput="setStockOutRecipientNote(this.value)" aria-label="Хэнд"></label>`;
 }
 function stockOutWarehouseField() {
   ensureStockOutSession();
   const value = esc(state.stockOutWarehouseName || "");
-  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><input type="text" class="stock-in-sheet__select stock-in-sheet__input" value="${value}" placeholder="Агуулахын нэр..." autocomplete="off" oninput="setStockOutWarehouseName(this.value)" aria-label="Агуулах"></label>`;
+  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Агуулах:</span><input type="text" class="stock-in-sheet__input" value="${value}" placeholder="Агуулахын нэр..." autocomplete="off" oninput="setStockOutWarehouseName(this.value)" aria-label="Агуулах"></label>`;
 }
 function stockOutScanToolbarHtml() {
   const q = esc(state.stockOutScanQuery || "");
