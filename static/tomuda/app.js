@@ -2546,6 +2546,50 @@ function initExcelImportHandlers() {
     if (file) handleImportFile(kind, file);
   });
 }
+function initStockInSearchHandlers() {
+  if (initStockInSearchHandlers._bound) return;
+  initStockInSearchHandlers._bound = true;
+  const run = (el) => {
+    if (el.id === "stockInBarcodeInput") stockInScanDraft(el);
+    else if (el.id === "stockOutBarcodeInput") stockOutScanDraft(el);
+  };
+  const onEvent = (e) => {
+    const el = e.target;
+    if (
+      !el ||
+      (el.id !== "stockInBarcodeInput" && el.id !== "stockOutBarcodeInput")
+    )
+      return;
+    if (e.type === "keydown") {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (el.id === "stockInBarcodeInput") stockInScanSubmit();
+        else stockOutScanSubmit();
+      }
+      return;
+    }
+    if (e.type === "paste" || e.type === "search") {
+      setTimeout(() => {
+        run(el);
+        if (e.type === "search") {
+          if (el.id === "stockInBarcodeInput") stockInScanSubmit();
+          else stockOutScanSubmit();
+        }
+      }, 0);
+      return;
+    }
+    run(el);
+  };
+  [
+    "input",
+    "keyup",
+    "change",
+    "paste",
+    "search",
+    "compositionend",
+    "keydown",
+  ].forEach((type) => document.addEventListener(type, onEvent, true));
+}
 function pageToolbarSearch({
   focusKey,
   value = "",
@@ -6039,6 +6083,7 @@ function completeBootUiInit(options = {}) {
   initQtyStepperButtons();
   initCountInputHandlers();
   initExcelImportHandlers();
+  initStockInSearchHandlers();
   initConfirmCard();
   initConfirmDeleteActions();
   initStockSwipeRows();
@@ -14480,15 +14525,17 @@ function stockInWarehouseField() {
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
-  return `<div class="stock-in-sheet__tools">
+  const searching = String(state.stockInScanQuery || "").trim() ? " is-searching" : "";
+  return `<div class="stock-in-sheet__tools${searching}">
   <label class="stock-in-sheet__search">
     <span class="stock-in-sheet__search-label">Бараа хайх:</span>
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" oninput="stockInScanDraft(this)" oncompositionend="stockInScanDraft(this)" onkeydown="stockInBarcodeKeydown(event)" aria-label="Бараа хайх">
-      <button type="button" class="stock-in-sheet__search-go" tabindex="-1" onclick="stockInScanSubmit()">Хайх</button>
+      <input id="stockInBarcodeInput" data-focus="stockInScan" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" aria-label="Бараа хайх">
+      <button type="button" class="stock-in-sheet__search-go" onclick="stockInScanSubmit()">Хайх</button>
     </span>
   </label>
+  <div class="stock-in-sheet__live-hits" data-stock-in-live-hits>${stockInSearchHitsContentHtml()}</div>
   <button type="button" class="stock-in-sheet__scan-btn" onclick="startBarcodeScan('stockIn')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><path d="M7 8h2v8H7zm4 0h1v8h-1zm3 0h3v8h-3z"/></svg>
     <span>Scan хийх</span>
@@ -14513,15 +14560,17 @@ function stockOutWarehouseField() {
 }
 function stockOutScanToolbarHtml() {
   const q = esc(state.stockOutScanQuery || "");
-  return `<div class="stock-in-sheet__tools">
+  const searching = String(state.stockOutScanQuery || "").trim() ? " is-searching" : "";
+  return `<div class="stock-in-sheet__tools${searching}">
   <label class="stock-in-sheet__search">
     <span class="stock-in-sheet__search-label">Бараа хайх:</span>
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" oninput="stockOutScanDraft(this)" oncompositionend="stockOutScanDraft(this)" onkeydown="stockOutBarcodeKeydown(event)" aria-label="Бараа хайх">
-      <button type="button" class="stock-in-sheet__search-go" tabindex="-1" onclick="stockOutScanSubmit()">Хайх</button>
+      <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" aria-label="Бараа хайх">
+      <button type="button" class="stock-in-sheet__search-go" onclick="stockOutScanSubmit()">Хайх</button>
     </span>
   </label>
+  <div class="stock-in-sheet__live-hits" data-stock-out-live-hits>${stockOutSearchHitsContentHtml()}</div>
   <button type="button" class="stock-in-sheet__scan-btn" onclick="startBarcodeScan('stockOut')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><path d="M7 8h2v8H7zm4 0h1v8h-1zm3 0h3v8h-3z"/></svg>
     <span>Scan хийх</span>
@@ -14569,9 +14618,10 @@ function stockInScanDraft(el) {
   state.stockInScanQuery = value;
   state.searches.inventory = value;
   stockInScanFocus();
+  patchStockInSearchHits();
   clearTimeout(stockInScanTimer);
   stockInScanTimer = setTimeout(() => {
-    if (patchStockInSearchHits()) return;
+    if (document.querySelector("[data-stock-in-live-hits]")) return;
     const snap = captureStockInScanFocus() || {
       focused: true,
       value: state.stockInScanQuery || "",
@@ -14587,13 +14637,88 @@ function stockInScanDraft(el) {
       stockInScanForceRender = false;
     }
     restoreStockInScanFocus(snap);
-  }, 120);
+  }, 80);
 }
 function searchQueryNorm(value) {
   return String(value || "")
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
     .trim()
     .toLowerCase()
-    .normalize("NFC");
+    .normalize("NFC")
+    .replace(/ё/g, "е")
+    .replace(/[àáâäa]/g, "а")
+    .replace(/[èéêëe]/g, "е")
+    .replace(/[ìíîïiі]/g, "и")
+    .replace(/[òóôöoө]/g, "о")
+    .replace(/[ùúûüuү]/g, "у")
+    .replace(/[ýy]/g, "у")
+    .replace(/[cс]/g, "с")
+    .replace(/[pр]/g, "р")
+    .replace(/[xх]/g, "х")
+    .replace(/[kк]/g, "к")
+    .replace(/[mм]/g, "м")
+    .replace(/[tт]/g, "т")
+    .replace(/[nн]/g, "н")
+    .replace(/[bв]/g, "в");
+}
+function searchQueryLatin(value) {
+  const pairs = [
+    ["ш", "sh"],
+    ["ч", "ch"],
+    ["ц", "ts"],
+    ["ю", "yu"],
+    ["я", "ya"],
+    ["х", "h"],
+    ["а", "a"],
+    ["б", "b"],
+    ["в", "v"],
+    ["г", "g"],
+    ["д", "d"],
+    ["е", "e"],
+    ["ж", "j"],
+    ["з", "z"],
+    ["и", "i"],
+    ["й", "i"],
+    ["к", "k"],
+    ["л", "l"],
+    ["м", "m"],
+    ["н", "n"],
+    ["о", "o"],
+    ["ө", "o"],
+    ["п", "p"],
+    ["р", "r"],
+    ["с", "s"],
+    ["т", "t"],
+    ["у", "u"],
+    ["ү", "u"],
+    ["ф", "f"],
+    ["э", "e"],
+    ["ы", "i"],
+    ["ь", ""],
+    ["ъ", ""],
+  ];
+  let out = searchQueryNorm(value);
+  pairs.forEach(([from, to]) => {
+    out = out.split(from).join(to);
+  });
+  return out;
+}
+function productTextMatchesQuery(p, raw) {
+  const q = searchQueryNorm(raw);
+  if (!q) return false;
+  const qLatin = searchQueryLatin(raw);
+  const name = searchQueryNorm(p.name);
+  if (name.includes(q)) return true;
+  const nameLatin = searchQueryLatin(p.name);
+  if (qLatin && nameLatin.includes(qLatin)) return true;
+  return productMatchCodes(p).some((c) => {
+    const code = String(c || "");
+    return (
+      code.includes(String(raw).trim()) ||
+      searchQueryNorm(code).includes(q) ||
+      (qLatin && searchQueryLatin(code).includes(qLatin))
+    );
+  });
 }
 function findProductsByQuery(code) {
   const value = String(code || "").trim();
@@ -14602,19 +14727,15 @@ function findProductsByQuery(code) {
     productMatchCodes(p).some((c) => c === value),
   );
   if (exactCode.length) return exactCode;
+  const q = searchQueryNorm(value);
+  const exactName = state.products.filter((p) => searchQueryNorm(p.name) === q);
+  if (exactName.length) return exactName;
+  const nameHits = state.products.filter((p) => productTextMatchesQuery(p, value));
+  if (nameHits.length) return nameHits;
   const partialCode = state.products.filter((p) =>
     productMatchCodes(p).some((c) => c.includes(value)),
   );
   if (partialCode.length === 1) return partialCode;
-  const q = searchQueryNorm(value);
-  const exactName = state.products.filter(
-    (p) => searchQueryNorm(p.name) === q,
-  );
-  if (exactName.length) return exactName;
-  const nameHits = state.products.filter((p) =>
-    searchQueryNorm(p.name).includes(q),
-  );
-  if (nameHits.length) return nameHits;
   return partialCode;
 }
 function findProductByBarcode(code) {
@@ -14717,9 +14838,10 @@ function stockOutScanDraft(el) {
   state.stockOutScanQuery = value;
   state.searches.inventory = value;
   stockOutScanFocus();
+  patchStockOutSearchHits();
   clearTimeout(stockOutScanTimer);
   stockOutScanTimer = setTimeout(() => {
-    if (patchStockOutSearchHits()) return;
+    if (document.querySelector("[data-stock-out-live-hits]")) return;
     const snap = captureStockOutScanFocus() || {
       focused: true,
       value: state.stockOutScanQuery || "",
@@ -14735,7 +14857,7 @@ function stockOutScanDraft(el) {
       stockInScanForceRender = false;
     }
     restoreStockOutScanFocus(snap);
-  }, 120);
+  }, 80);
 }
 function applyStockOutBarcode(code) {
   ensureStockOutSession();
@@ -15330,18 +15452,20 @@ function stockInSearchHitsContentHtml() {
   return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо/өртөг оруулна</p>${rows}</div>`;
 }
 function patchStockInSearchHits() {
-  const scroll = document.querySelector(".stock-in-sheet__scroll");
-  if (!scroll) return false;
   const q = String(state.stockInScanQuery || "").trim();
-  const prev = scroll.querySelector(".stock-in-sheet__hits");
-  if (!q) {
-    prev?.remove();
-    return true;
-  }
   const html = stockInSearchHitsContentHtml();
-  if (prev) prev.outerHTML = html;
-  else scroll.insertAdjacentHTML("afterbegin", html);
-  return true;
+  const live = document.querySelector("[data-stock-in-live-hits]");
+  const tools = live?.closest(".stock-in-sheet__tools");
+  if (tools) tools.classList.toggle("is-searching", !!q);
+  if (live) live.innerHTML = html;
+  const scroll = document.querySelector(".stock-in-sheet__scroll");
+  const prev = scroll?.querySelector(".stock-in-sheet__hits");
+  if (scroll) {
+    if (!q) prev?.remove();
+    else if (prev) prev.outerHTML = html;
+    else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
+  }
+  return !!(live || scroll);
 }
 function stockInSearchHitsHtml(list) {
   return stockInSearchHitsContentHtml();
@@ -15415,18 +15539,20 @@ function stockOutSearchHitsContentHtml() {
   return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо оруулна</p>${rows}</div>`;
 }
 function patchStockOutSearchHits() {
-  const scroll = document.querySelector(".stock-in-sheet__scroll");
-  if (!scroll) return false;
   const q = String(state.stockOutScanQuery || "").trim();
-  const prev = scroll.querySelector(".stock-in-sheet__hits");
-  if (!q) {
-    prev?.remove();
-    return true;
-  }
   const html = stockOutSearchHitsContentHtml();
-  if (prev) prev.outerHTML = html;
-  else scroll.insertAdjacentHTML("afterbegin", html);
-  return true;
+  const live = document.querySelector("[data-stock-out-live-hits]");
+  const tools = live?.closest(".stock-in-sheet__tools");
+  if (tools) tools.classList.toggle("is-searching", !!q);
+  if (live) live.innerHTML = html;
+  const scroll = document.querySelector(".stock-in-sheet__scroll");
+  const prev = scroll?.querySelector(".stock-in-sheet__hits");
+  if (scroll) {
+    if (!q) prev?.remove();
+    else if (prev) prev.outerHTML = html;
+    else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
+  }
+  return !!(live || scroll);
 }
 function stockOutSearchHitsHtml(list) {
   return stockOutSearchHitsContentHtml();
