@@ -6443,6 +6443,89 @@ function productBoxQtyTotal(
   if (small) total += pk * small;
   return total;
 }
+function productBoxQtyTotalWithPack(
+  p,
+  { largePacks = 0, packs = 0, qty = 0 } = {},
+  packSizeOverride = 0,
+) {
+  const small =
+    Number(packSizeOverride) > 1
+      ? Math.floor(Number(packSizeOverride))
+      : productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  const largePieces =
+    small && largeCount > 1 ? small * largeCount : productLargeBoxPieceCount(p);
+  const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+  let pk = Math.max(0, Math.floor(Number(packs) || 0));
+  const pc = Math.max(0, Math.floor(Number(qty) || 0));
+  if (largeCount > 1 && lp > 0 && pk >= lp * largeCount) {
+    pk -= lp * largeCount;
+  }
+  let total = pc;
+  if (largePieces) total += lp * largePieces;
+  if (small) total += pk * small;
+  return total;
+}
+/** Best жижиг хайрцаг size so explicit parts match total (handles stale boxQuantity). */
+function effectivePackSizeFromParts(p, parts, totalQty, item) {
+  const total = Math.max(0, Math.floor(Number(totalQty) || 0));
+  const normalized = normalizeQtyParts(parts);
+  const packSize = productPackSize(p);
+  const lp = normalized.largePacks;
+  const pk = normalized.packs;
+  const loose = normalized.pieces;
+  const largePieces = productLargeBoxPieceCount(p);
+  const usedLarge = largePieces ? lp * largePieces : 0;
+  const candidates = [];
+  const add = (n) => {
+    const v = Math.floor(Number(n) || 0);
+    if (v > 1 && !candidates.includes(v)) candidates.push(v);
+  };
+  add(packSize);
+  if (item && Number(item.boxQuantity) > 1) add(item.boxQuantity);
+  if (pk > 0) {
+    const remainder = total - loose - usedLarge;
+    if (remainder >= 0 && remainder % pk === 0) add(remainder / pk);
+  }
+  for (const small of candidates) {
+    if (
+      productBoxQtyTotalWithPack(
+        p,
+        { largePacks: lp, packs: pk, qty: loose },
+        small,
+      ) === total
+    ) {
+      return small;
+    }
+  }
+  return packSize;
+}
+function partsMatchTotal(p, parts, totalQty, item) {
+  const total = Math.max(0, Math.floor(Number(totalQty) || 0));
+  const normalized = normalizeQtyParts(parts);
+  if (!productPackSize(p) && !productLargeBoxPieceCount(p)) {
+    return normalized.pieces === total;
+  }
+  const small = effectivePackSizeFromParts(p, normalized, total, item);
+  if (!small) {
+    return (
+      !normalized.largePacks &&
+      !normalized.packs &&
+      normalized.pieces === total
+    );
+  }
+  return (
+    productBoxQtyTotalWithPack(
+      p,
+      {
+        largePacks: normalized.largePacks,
+        packs: normalized.packs,
+        qty: normalized.pieces,
+      },
+      small,
+    ) === total
+  );
+}
 function ensureWorkerQtyParts() {
   if (!state.workerQtyParts || typeof state.workerQtyParts !== "object") {
     state.workerQtyParts = {};
@@ -6544,13 +6627,10 @@ function workerQtyPartsForProduct(p, qty) {
   const stored = state.workerQtyParts?.[p.id];
   if (stored) {
     const parts = normalizeQtyParts(stored);
-    const rebuilt = productBoxQtyTotal(p, {
-      largePacks: parts.largePacks,
-      packs: parts.packs,
-      qty: parts.pieces,
-    });
-    if (rebuilt === total) {
-      const rolled = rollUpQtyParts(parts, packSize, largeCount);
+    if (partsMatchTotal(p, parts, total)) {
+      const splitPack =
+        effectivePackSizeFromParts(p, parts, total) || packSize;
+      const rolled = rollUpQtyParts(parts, splitPack, largeCount);
       return {
         largePacks: rolled.largePacks,
         packs: rolled.packs,
@@ -6610,6 +6690,39 @@ function resolveWarehousePrepareParts(
     if (rebuilt === total) {
       return { largePacks: lp, packs: pk, loosePieces: loose, totalQty: total };
     }
+    const largePart = large > 1 ? lp * large : 0;
+    const looseExplicit =
+      loosePieces != null && loosePieces !== "" && Number(loosePieces) >= 0;
+    const pk0 = Math.max(0, Math.floor(Number(packs) || 0));
+    const lp0 = Math.max(0, Math.floor(Number(largePacks) || 0));
+    const loose0 = looseExplicit
+      ? Math.max(0, Math.floor(Number(loosePieces) || 0))
+      : loose;
+    if (pk0 > 0 || lp0 > 0) {
+      const impliedSmall =
+        pk0 > 0 && total >= loose0 + largePart
+          ? (total - loose0 - largePart) / pk0
+          : 0;
+      if (pk0 > 0 && impliedSmall >= 1 && Number.isInteger(impliedSmall)) {
+        return {
+          largePacks: lp0,
+          packs: pk0,
+          loosePieces: loose0,
+          totalQty: total,
+        };
+      }
+      if (pk0 > 0 && small > 1) {
+        const looseFixed = total - largePart - pk0 * small;
+        if (looseFixed >= 0) {
+          return {
+            largePacks: lp0,
+            packs: pk0,
+            loosePieces: looseFixed,
+            totalQty: total,
+          };
+        }
+      }
+    }
   }
   let rem = total;
   let lp = 0;
@@ -6648,43 +6761,42 @@ function normalizeWarehousePrepareParts(
 }
 function orderItemPrepareParts(item, product) {
   const totalQty = Math.max(0, Math.floor(Number(item.quantity) || 0));
-  const packSize =
-    Number(item.boxQuantity) > 1
-      ? Math.floor(Number(item.boxQuantity))
-      : productPackSize(product);
+  const snapshotPack =
+    Number(item.boxQuantity) > 1 ? Math.floor(Number(item.boxQuantity)) : 0;
+  const currentPack = productPackSize(product);
   const largeCount =
     Number(item.largeBoxQuantity) > 1
       ? Math.floor(Number(item.largeBoxQuantity))
       : productLargeBoxCount(product);
-  const largeSize =
-    packSize > 1 && largeCount > 1
-      ? packSize * largeCount
-      : productLargeBoxPieceCount(product);
   const largePacks =
     item.largePacks != null && item.largePacks !== ""
       ? Math.max(0, Math.floor(Number(item.largePacks) || 0))
       : 0;
-  if (!packSize && !largeSize) {
+  if (!currentPack && !productLargeBoxPieceCount(product)) {
     return { largePacks: 0, packs: 0, loosePieces: totalQty, totalQty };
   }
-  if (
+  const hasExplicitPacks =
     ("packs" in item && item.packs != null && item.packs !== "") ||
-    largePacks > 0
-  ) {
-    const packs = Math.max(0, Math.floor(Number(item.packs) || 0));
-    const loosePieces =
-      item.loosePieces != null && item.loosePieces !== ""
-        ? Math.max(0, Math.floor(Number(item.loosePieces) || 0))
-        : Math.max(
-            0,
-            totalQty -
-              largePacks * (largeSize || 0) -
-              packs * (packSize || 0),
-          );
-    const excl = exclusiveOrderQtyParts(
-      { largePacks, packs, pieces: loosePieces },
-      largeCount,
-    );
+    largePacks > 0 ||
+    (item.loosePieces != null && item.loosePieces !== "");
+  const explicitParts = hasExplicitPacks
+    ? normalizeQtyParts({
+        largePacks,
+        packs: item.packs,
+        pieces: item.loosePieces,
+      })
+    : null;
+  const packSize = hasExplicitPacks
+    ? effectivePackSizeFromParts(product, explicitParts, totalQty, item) ||
+      snapshotPack ||
+      currentPack
+    : snapshotPack || currentPack;
+  const largeSize =
+    packSize > 1 && largeCount > 1
+      ? packSize * largeCount
+      : productLargeBoxPieceCount(product);
+  if (hasExplicitPacks) {
+    const excl = exclusiveOrderQtyParts(explicitParts, largeCount);
     return resolveWarehousePrepareParts(
       totalQty,
       excl.packs,
@@ -6714,6 +6826,24 @@ function orderItemPrepareParts(item, product) {
   );
 }
 function warehousePreparePackSize(item, product) {
+  const totalQty = Math.max(0, Math.floor(Number(item?.qty ?? item?.quantity) || 0));
+  const hasExplicit =
+    (item?.packs != null && item.packs !== "") ||
+    (item?.largePacks != null && Number(item.largePacks) > 0) ||
+    (item?.loosePieces != null && item.loosePieces !== "");
+  if (hasExplicit && totalQty > 0) {
+    const resolved = effectivePackSizeFromParts(
+      product,
+      normalizeQtyParts({
+        largePacks: item.largePacks,
+        packs: item.packs,
+        pieces: item.loosePieces,
+      }),
+      totalQty,
+      item,
+    );
+    if (resolved > 1) return resolved;
+  }
   if (Number(item?.boxQuantity) > 1) {
     return Math.floor(Number(item.boxQuantity));
   }
@@ -6761,14 +6891,26 @@ function pickerQtyFromParts(packsOrParts, piecesOrProduct, maybeProduct) {
     p = maybeProduct;
   }
   if (!p?.id) return parts.pieces;
-  return Math.min(
-    maxWorkerPaidQty(p.id),
-    productBoxQtyTotal(p, {
-      largePacks: parts.largePacks,
-      packs: parts.packs,
-      qty: parts.pieces,
-    }),
-  );
+  const maxOk = maxWorkerPaidQty(p.id);
+  const hintTotal = getWorkerQty(p.id);
+  const small =
+    effectivePackSizeFromParts(
+      p,
+      parts,
+      hintTotal > 0 ? hintTotal : maxOk,
+    ) || productPackSize(p);
+  const total = small
+    ? productBoxQtyTotalWithPack(
+        p,
+        {
+          largePacks: parts.largePacks,
+          packs: parts.packs,
+          qty: parts.pieces,
+        },
+        small,
+      )
+    : parts.pieces;
+  return Math.min(maxOk, total);
 }
 function pickerQtyToParts(q, p, { preferStored = true } = {}) {
   const packSize = productPackSize(p);
@@ -6779,12 +6921,9 @@ function pickerQtyToParts(q, p, { preferStored = true } = {}) {
     const stored = state.workerQtyParts?.[p?.id];
     if (stored) {
       const parts = normalizeQtyParts(stored);
-      const rebuilt = productBoxQtyTotal(p, {
-        largePacks: parts.largePacks,
-        packs: parts.packs,
-        qty: parts.pieces,
-      });
-      if (rebuilt === total) return exclusiveOrderQtyParts(parts, largeCount);
+      if (partsMatchTotal(p, parts, total)) {
+        return exclusiveOrderQtyParts(parts, largeCount);
+      }
     }
   }
   if (!packSize && !largePieces) {
@@ -6809,8 +6948,16 @@ function pickerPackMax(p, pieces = 0, largePacks = 0) {
   const largePieces = productLargeBoxPieceCount(p);
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
-  const used = (largePieces ? lp * largePieces : 0) + pc;
+  const usedLarge = largePieces ? lp * largePieces : 0;
   const maxTotal = maxWorkerPaidQty(p.id);
+  const targetTotal = getWorkerQty(p.id);
+  if (targetTotal > 0) {
+    return Math.max(
+      0,
+      Math.floor(Math.min(maxTotal, targetTotal) - usedLarge - pc),
+    );
+  }
+  const used = usedLarge + pc;
   return Math.floor(Math.max(0, maxTotal - used) / packSize);
 }
 function pickerLargeMax(p, pieces = 0, packs = 0) {
@@ -6821,6 +6968,11 @@ function pickerLargeMax(p, pieces = 0, packs = 0) {
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
   const used = (packSize ? pk * packSize : 0) + pc;
   const maxTotal = maxWorkerPaidQty(p.id);
+  const targetTotal = getWorkerQty(p.id);
+  if (targetTotal > 0) {
+    const room = Math.max(0, Math.min(maxTotal, targetTotal) - used);
+    return Math.floor(room / largePieces);
+  }
   return Math.floor(Math.max(0, maxTotal - used) / largePieces);
 }
 function pickerPieceMax(p, packs = 0, largePacks = 0) {
@@ -6829,8 +6981,16 @@ function pickerPieceMax(p, packs = 0, largePacks = 0) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const maxTotal = maxWorkerPaidQty(p.id);
+  const targetTotal = getWorkerQty(p.id);
+  const usedLarge = largePieces ? lp * largePieces : 0;
+  if (targetTotal > 0 && pk > 0) {
+    return Math.max(
+      0,
+      Math.min(maxTotal, targetTotal) - usedLarge - pk,
+    );
+  }
   const used =
-    (largePieces ? lp * largePieces : 0) + (packSize ? pk * packSize : 0);
+    usedLarge + (packSize ? pk * packSize : 0);
   return Math.max(0, maxTotal - used);
 }
 function readPickerQtyParts(id) {
@@ -6964,7 +7124,7 @@ function pickerPartStepperApply(btn, kind) {
   else return;
   const parts = { largePacks, packs, pieces };
   const nextTotal = pickerQtyFromParts(parts, p);
-  if (nextTotal <= currentTotal && action === "inc") {
+  if (action === "inc" && nextTotal < currentTotal) {
     showStockLimitToast();
     return;
   }
@@ -13083,17 +13243,33 @@ function productCard(p, active = false) {
   const unit = esc(p.unit || "ш");
   return `<article class="product-card product-card--clickable${active ? " product-card--active" : ""}" data-product-card-id="${esc(p.id)}" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><span class="product-card__media" aria-hidden="true"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-card__img" width="72" height="72" loading="lazy" decoding="async" alt=""></span><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд</span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
 }
+function productMatchCodes(p) {
+  return [p.barcode, p.sku]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+}
+function productMatchesInventoryQuery(p, q) {
+  const query = String(q || "").trim();
+  if (!query) return true;
+  if (
+    String(p.name || "")
+      .toLowerCase()
+      .includes(query.toLowerCase())
+  )
+    return true;
+  return productMatchCodes(p).some((code) => code.includes(query));
+}
 function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   const cat = state.filters.inventoryCategory,
     q = state.searches.inventory || "",
-    list = state.products.filter(
-      (p) =>
-        (cat === "all" || p.category === cat) &&
-        (String(p.name || "")
-          .toLowerCase()
-          .includes(q.toLowerCase()) ||
-          String(p.barcode || "").includes(q)),
-    );
+    isRegister = tab === "in" || tab === "out",
+    list = isRegister
+      ? state.products
+      : state.products.filter(
+          (p) =>
+            (cat === "all" || p.category === cat) &&
+            productMatchesInventoryQuery(p, q),
+        );
   if (tab === "in") return stockInPanel(list);
   if (tab === "out") return stockOutPanel(list);
   return `<div class="bg-card rounded p-3 space-y-3">${pageToolbarHtml({ filters: pageToolbarSearch({ focusKey: "inventory", value: q, placeholder: "Хайх..." }), actions: excelDownloadBtn("confirmInventoryExport()") })}${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх төрөл", handler: "setInventoryCategory" })}</div>${stockGrid(list)}`;
@@ -14370,6 +14546,7 @@ function captureStockInScanFocus() {
 function restoreStockInScanFocus(snap) {
   if (!snap) return;
   state.stockInScanQuery = String(snap.value || "");
+  state.searches.inventory = state.stockInScanQuery;
   const el = document.getElementById("stockInBarcodeInput");
   if (!el) return;
   el.value = state.stockInScanQuery;
@@ -14412,14 +14589,14 @@ function stockInScanDraft(el) {
 function findProductsByQuery(code) {
   const value = String(code || "").trim();
   if (!value) return [];
-  const exactBarcode = state.products.filter(
-    (p) => String(p.barcode || "").trim() === value,
+  const exactCode = state.products.filter((p) =>
+    productMatchCodes(p).some((c) => c === value),
   );
-  if (exactBarcode.length) return exactBarcode;
-  const partialBarcode = state.products.filter((p) =>
-    String(p.barcode || "").includes(value),
+  if (exactCode.length) return exactCode;
+  const partialCode = state.products.filter((p) =>
+    productMatchCodes(p).some((c) => c.includes(value)),
   );
-  if (partialBarcode.length === 1) return partialBarcode;
+  if (partialCode.length === 1) return partialCode;
   const q = value.toLowerCase();
   const exactName = state.products.filter(
     (p) => String(p.name || "").trim().toLowerCase() === q,
@@ -14431,7 +14608,7 @@ function findProductsByQuery(code) {
       .includes(q),
   );
   if (nameHits.length) return nameHits;
-  return partialBarcode;
+  return partialCode;
 }
 function findProductByBarcode(code) {
   const matches = findProductsByQuery(code);
@@ -14464,6 +14641,7 @@ function applyStockInBarcode(code) {
   state.stockInReceipt = null;
   state.stockInHighlightId = product.id;
   state.stockInScanQuery = "";
+  state.searches.inventory = "";
   const input = document.getElementById("stockInBarcodeInput");
   if (input) input.value = "";
   if (barcodeScanning && barcodeScanTarget === "stockIn") {
@@ -14498,6 +14676,7 @@ function captureStockOutScanFocus() {
 function restoreStockOutScanFocus(snap) {
   if (!snap) return;
   state.stockOutScanQuery = String(snap.value || "");
+  state.searches.inventory = state.stockOutScanQuery;
   const el = document.getElementById("stockOutBarcodeInput");
   if (!el) return;
   el.value = state.stockOutScanQuery;
@@ -14571,6 +14750,7 @@ function applyStockOutBarcode(code) {
   state.stockOutReceipt = null;
   state.stockOutHighlightId = product.id;
   state.stockOutScanQuery = "";
+  state.searches.inventory = "";
   const input = document.getElementById("stockOutBarcodeInput");
   if (input) input.value = "";
   if (barcodeScanning && barcodeScanTarget === "stockOut") {
@@ -15106,7 +15286,7 @@ function stockInDraftStats(list = state.products) {
 function stockInSearchHitsHtml(list) {
   const q = String(state.stockInScanQuery || "").trim();
   if (!q) return "";
-  const hits = (list || [])
+  const hits = findProductsByQuery(q)
     .filter((p) => stockInLineQty(p) <= 0)
     .slice(0, 8);
   if (!hits.length) return "";
@@ -15163,7 +15343,7 @@ function stockOutDraftStats(list = state.products) {
 function stockOutSearchHitsHtml(list) {
   const q = String(state.stockOutScanQuery || "").trim();
   if (!q) return "";
-  const hits = (list || [])
+  const hits = findProductsByQuery(q)
     .filter((p) => stockOutLineQty(p) <= 0)
     .slice(0, 8);
   if (!hits.length) return "";
@@ -22038,6 +22218,16 @@ function workerPaidLines() {
       const largeCount = productLargeBoxCount(p);
       const raw = workerQtyPartsForProduct(p, q);
       const unitPrice = Number(p.price) || 0;
+      const savedPackSize =
+        effectivePackSizeFromParts(
+          p,
+          {
+            largePacks: raw.largePacks,
+            packs: raw.packs,
+            pieces: raw.loosePieces,
+          },
+          q,
+        ) || packSize;
       return {
         productId: p.id,
         productName: p.name,
@@ -22045,7 +22235,7 @@ function workerPaidLines() {
         largePacks: raw.largePacks || 0,
         packs: raw.packs,
         loosePieces: raw.loosePieces,
-        boxQuantity: packSize || 0,
+        boxQuantity: savedPackSize || 0,
         largeBoxQuantity: largeCount || 0,
         price: unitPrice,
         total: unitPrice * q,
@@ -22636,7 +22826,7 @@ function cleanSessionQtyParts(raw, qtyMap) {
     )
       return;
     const parts = normalizeQtyParts(value);
-    if (pickerQtyFromParts(parts, product) === qty) {
+    if (partsMatchTotal(product, parts, qty)) {
       result[id] = parts;
     }
   });
@@ -23800,16 +23990,13 @@ function seedWorkerCartFromOrder(order) {
     if (!p || (!productPackSize(p) && !productLargeBoxPieceCount(p))) return;
     const stored = state.workerQtyParts?.[id];
     if (stored) {
-      const rebuilt = productBoxQtyTotal(p, {
-        largePacks: stored.largePacks,
-        packs: stored.packs,
-        qty: stored.pieces,
-      });
-      if (rebuilt === qty[id]) {
-        // Old lines often only have жижиг — roll into том for the editor.
+      if (partsMatchTotal(p, stored, qty[id])) {
+        const splitPack =
+          effectivePackSizeFromParts(p, stored, qty[id]) ||
+          productPackSize(p);
         const rolled = rollUpQtyParts(
           stored,
-          productPackSize(p),
+          splitPack,
           productLargeBoxCount(p),
         );
         syncWorkerQtyParts(id, rolled);
@@ -27247,12 +27434,7 @@ function setWorkerQty(id, qty) {
       const stored = state.workerQtyParts?.[id];
       if (stored) {
         const parts = normalizeQtyParts(stored);
-        const rebuilt = productBoxQtyTotal(p, {
-          largePacks: parts.largePacks,
-          packs: parts.packs,
-          qty: parts.pieces,
-        });
-        if (rebuilt === q) {
+        if (partsMatchTotal(p, parts, q)) {
           syncWorkerQtyParts(id, parts);
         } else {
           syncWorkerQtyParts(id, pickerQtyToParts(q, p));
