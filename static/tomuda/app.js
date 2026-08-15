@@ -372,8 +372,6 @@ let settlementBlurTimer = null;
 let stockInScanRenderPending = false;
 let stockInScanBlurTimer = null;
 let stockInScanForceRender = false;
-let stockInScanTimer = null;
-let stockOutScanTimer = null;
 let barcodeScanRenderPending = false;
 let loginFormActiveUntil = 0;
 let loginFormGuardBound = false;
@@ -2568,27 +2566,15 @@ function initStockInSearchHandlers() {
       }
       return;
     }
-    if (e.type === "paste" || e.type === "search") {
-      setTimeout(() => {
-        run(el);
-        if (e.type === "search") {
-          if (el.id === "stockInBarcodeInput") stockInScanSubmit();
-          else stockOutScanSubmit();
-        }
-      }, 0);
+    if (e.type === "paste") {
+      setTimeout(() => run(el), 0);
       return;
     }
     run(el);
   };
-  [
-    "input",
-    "keyup",
-    "change",
-    "paste",
-    "search",
-    "compositionend",
-    "keydown",
-  ].forEach((type) => document.addEventListener(type, onEvent, true));
+  ["input", "compositionend", "paste", "keydown"].forEach((type) =>
+    document.addEventListener(type, onEvent, true),
+  );
 }
 function pageToolbarSearch({
   focusKey,
@@ -5677,6 +5663,12 @@ function stockInScanBlur() {
 }
 function flushPendingStockInScanRender() {
   if (isEditingStockInScan()) return;
+  if (
+    document.querySelector("[data-stock-in-live-hits], [data-stock-out-live-hits]")
+  ) {
+    stockInScanRenderPending = false;
+    return;
+  }
   if (barcodeScanning) {
     stockInScanRenderPending = true;
     return;
@@ -14525,13 +14517,12 @@ function stockInWarehouseField() {
 }
 function stockInScanToolbarHtml() {
   const q = esc(state.stockInScanQuery || "");
-  const searching = String(state.stockInScanQuery || "").trim() ? " is-searching" : "";
-  return `<div class="stock-in-sheet__tools${searching}">
+  return `<div class="stock-in-sheet__tools">
   <label class="stock-in-sheet__search">
     <span class="stock-in-sheet__search-label">Бараа хайх:</span>
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="stockInBarcodeInput" data-focus="stockInScan" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" aria-label="Бараа хайх">
+      <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" aria-label="Бараа хайх">
       <button type="button" class="stock-in-sheet__search-go" onclick="stockInScanSubmit()">Хайх</button>
     </span>
   </label>
@@ -14560,13 +14551,12 @@ function stockOutWarehouseField() {
 }
 function stockOutScanToolbarHtml() {
   const q = esc(state.stockOutScanQuery || "");
-  const searching = String(state.stockOutScanQuery || "").trim() ? " is-searching" : "";
-  return `<div class="stock-in-sheet__tools${searching}">
+  return `<div class="stock-in-sheet__tools">
   <label class="stock-in-sheet__search">
     <span class="stock-in-sheet__search-label">Бараа хайх:</span>
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" aria-label="Бараа хайх">
+      <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" aria-label="Бараа хайх">
       <button type="button" class="stock-in-sheet__search-go" onclick="stockOutScanSubmit()">Хайх</button>
     </span>
   </label>
@@ -14600,11 +14590,12 @@ function restoreStockInScanFocus(snap) {
   state.searches.inventory = state.stockInScanQuery;
   const el = document.getElementById("stockInBarcodeInput");
   if (!el) return;
-  el.value = state.stockInScanQuery;
+  if (el.value !== state.stockInScanQuery) el.value = state.stockInScanQuery;
   if (!snap.focused) return;
+  if (document.activeElement === el) return;
   requestAnimationFrame(() => {
     const input = document.getElementById("stockInBarcodeInput");
-    if (!input) return;
+    if (!input || document.activeElement === input) return;
     input.focus({ preventScroll: true });
     try {
       const start = snap.start ?? input.value.length;
@@ -14619,25 +14610,6 @@ function stockInScanDraft(el) {
   state.searches.inventory = value;
   stockInScanFocus();
   patchStockInSearchHits();
-  clearTimeout(stockInScanTimer);
-  stockInScanTimer = setTimeout(() => {
-    if (document.querySelector("[data-stock-in-live-hits]")) return;
-    const snap = captureStockInScanFocus() || {
-      focused: true,
-      value: state.stockInScanQuery || "",
-      start: (state.stockInScanQuery || "").length,
-      end: (state.stockInScanQuery || "").length,
-    };
-    snap.focused = true;
-    stockInScanRenderPending = false;
-    stockInScanForceRender = true;
-    try {
-      render();
-    } finally {
-      stockInScanForceRender = false;
-    }
-    restoreStockInScanFocus(snap);
-  }, 80);
 }
 function searchQueryNorm(value) {
   return String(value || "")
@@ -14813,11 +14785,12 @@ function restoreStockOutScanFocus(snap) {
   state.searches.inventory = state.stockOutScanQuery;
   const el = document.getElementById("stockOutBarcodeInput");
   if (!el) return;
-  el.value = state.stockOutScanQuery;
+  if (el.value !== state.stockOutScanQuery) el.value = state.stockOutScanQuery;
   if (!snap.focused) return;
+  if (document.activeElement === el) return;
   requestAnimationFrame(() => {
     const input = document.getElementById("stockOutBarcodeInput");
-    if (!input) return;
+    if (!input || document.activeElement === input) return;
     input.focus({ preventScroll: true });
     try {
       const start = snap.start ?? input.value.length;
@@ -14839,25 +14812,6 @@ function stockOutScanDraft(el) {
   state.searches.inventory = value;
   stockOutScanFocus();
   patchStockOutSearchHits();
-  clearTimeout(stockOutScanTimer);
-  stockOutScanTimer = setTimeout(() => {
-    if (document.querySelector("[data-stock-out-live-hits]")) return;
-    const snap = captureStockOutScanFocus() || {
-      focused: true,
-      value: state.stockOutScanQuery || "",
-      start: (state.stockOutScanQuery || "").length,
-      end: (state.stockOutScanQuery || "").length,
-    };
-    snap.focused = true;
-    stockInScanRenderPending = false;
-    stockInScanForceRender = true;
-    try {
-      render();
-    } finally {
-      stockInScanForceRender = false;
-    }
-    restoreStockOutScanFocus(snap);
-  }, 80);
 }
 function applyStockOutBarcode(code) {
   ensureStockOutSession();
@@ -15455,15 +15409,14 @@ function patchStockInSearchHits() {
   const q = String(state.stockInScanQuery || "").trim();
   const html = stockInSearchHitsContentHtml();
   const live = document.querySelector("[data-stock-in-live-hits]");
-  const tools = live?.closest(".stock-in-sheet__tools");
-  if (tools) tools.classList.toggle("is-searching", !!q);
-  if (live) live.innerHTML = html;
+  if (live && live.innerHTML !== html) live.innerHTML = html;
   const scroll = document.querySelector(".stock-in-sheet__scroll");
-  const prev = scroll?.querySelector(".stock-in-sheet__hits");
+  const prev = scroll?.querySelector(":scope > .stock-in-sheet__hits");
   if (scroll) {
     if (!q) prev?.remove();
-    else if (prev) prev.outerHTML = html;
-    else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
+    else if (prev) {
+      if (prev.outerHTML !== html) prev.outerHTML = html;
+    } else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
   }
   return !!(live || scroll);
 }
@@ -15542,15 +15495,14 @@ function patchStockOutSearchHits() {
   const q = String(state.stockOutScanQuery || "").trim();
   const html = stockOutSearchHitsContentHtml();
   const live = document.querySelector("[data-stock-out-live-hits]");
-  const tools = live?.closest(".stock-in-sheet__tools");
-  if (tools) tools.classList.toggle("is-searching", !!q);
-  if (live) live.innerHTML = html;
+  if (live && live.innerHTML !== html) live.innerHTML = html;
   const scroll = document.querySelector(".stock-in-sheet__scroll");
-  const prev = scroll?.querySelector(".stock-in-sheet__hits");
+  const prev = scroll?.querySelector(":scope > .stock-in-sheet__hits");
   if (scroll) {
     if (!q) prev?.remove();
-    else if (prev) prev.outerHTML = html;
-    else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
+    else if (prev) {
+      if (prev.outerHTML !== html) prev.outerHTML = html;
+    } else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
   }
   return !!(live || scroll);
 }

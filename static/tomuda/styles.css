@@ -17943,10 +17943,6 @@ input.stock-in-sheet__input::placeholder {
   font-weight: 600;
 }
 
-.stock-in-sheet__tools.is-searching .stock-in-sheet__scan-btn {
-  display: none;
-}
-
 .stock-in-sheet__live-hits {
   display: none;
 }
@@ -18708,10 +18704,6 @@ input.stock-in-sheet__input::placeholder {
 
   .stock-in-sheet__scroll > .stock-in-sheet__hits {
     display: flex;
-  }
-
-  .stock-in-sheet__tools.is-searching .stock-in-sheet__scan-btn {
-    display: inline-flex;
   }
 
   /* Two-pane workspace: search hits | selected lines */
