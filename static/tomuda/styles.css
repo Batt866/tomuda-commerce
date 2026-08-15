@@ -17898,6 +17898,26 @@ input.stock-in-sheet__input::placeholder {
   font-weight: 600;
 }
 
+/* Нийлүүлэгч + Агуулах — global #app select min-height-ийг давах */
+.stock-in-sheet__meta .stock-in-sheet__select,
+.stock-in-sheet__meta .stock-in-sheet__input {
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.stock-in-sheet__meta select.stock-in-sheet__select {
+  padding-right: 28px !important;
+}
+
+.stock-in-sheet__meta input.stock-in-sheet__input {
+  padding-right: 12px !important;
+}
+
 .stock-in-sheet__select:disabled {
   color: #334155;
   opacity: 0.98;
@@ -18554,6 +18574,14 @@ input.stock-in-sheet__input::placeholder {
     border: 1px solid var(--si-line);
     box-shadow: none;
     line-height: 1.25;
+  }
+
+  .stock-in-sheet__meta .stock-in-sheet__select,
+  .stock-in-sheet__meta .stock-in-sheet__input {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    font-size: 14px !important;
   }
 
   .stock-in-sheet__select:focus,
