@@ -18020,17 +18020,6 @@ input.stock-in-sheet__input::placeholder {
   display: none;
 }
 
-.stock-in-sheet__live-hits:not(:empty) {
-  display: block;
-  position: absolute;
-  left: var(--si-pad);
-  right: var(--si-pad);
-  top: calc(100% + 6px);
-  z-index: 40;
-  max-height: none;
-  overflow: visible;
-}
-
 .stock-in-search-window {
   display: flex;
   flex-direction: column;
@@ -18080,32 +18069,21 @@ input.stock-in-sheet__input::placeholder {
   -webkit-overflow-scrolling: touch;
 }
 
-.stock-in-sheet:has(.stock-in-sheet__live-hits:not(:empty)) .stock-in-sheet__scroll {
-  pointer-events: none;
-  opacity: 0.38;
+.stock-in-sheet__scroll > .stock-in-sheet__hits {
+  display: flex;
 }
 
-@media (min-width: 1024px) {
-  .stock-in-sheet:has(.stock-in-sheet__live-hits:not(:empty)) .stock-in-sheet__scroll {
-    pointer-events: auto;
-    opacity: 1;
-  }
-}
-
-.stock-in-sheet__live-hits .stock-in-sheet__hits {
+.stock-in-sheet__tools {
   display: flex;
   flex-direction: column;
-  gap: 0;
-}
-
-.stock-in-sheet__scroll > .stock-in-sheet__hits {
-  display: none;
+  gap: 8px;
 }
 
 .stock-in-sheet__search-panel {
   position: relative;
   z-index: 5;
   flex-shrink: 0;
+  overflow: visible;
   padding: 10px var(--si-pad);
   background: color-mix(in srgb, var(--si-primary) 8%, #ffffff);
   border-bottom: 1px solid var(--si-line);

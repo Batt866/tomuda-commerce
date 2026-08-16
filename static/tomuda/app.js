@@ -12720,12 +12720,6 @@ function exportProductsExcelFallback() {
     ...productExcelDataRows(products),
   ]);
 }
-function inventoryLogTypeLabel(type) {
-  const t = String(type || "").toLowerCase();
-  if (t === "in") return "Орлого";
-  if (t === "out") return "Зарлага";
-  return String(type || "-");
-}
 function inventoryStockExportList() {
   const cat = state.filters.inventoryCategory;
   const q = state.searches.inventory || "";
@@ -12746,42 +12740,32 @@ function inventoryStockExportList() {
 function confirmInventoryExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   const products = inventoryStockExportList();
-  const logs = state.inventoryLogs || [];
-  if (!products.length && !logs.length) return alert("Үлдэгдэл байхгүй");
+  if (!products.length) return alert("Үлдэгдэл байхгүй");
   confirmDataExport("Мэдээлэл татах", () => {
     const stamp = new Date().toISOString().slice(0, 10);
-    const rows = [
-      ["Үлдэгдэл"],
-      [productSheetDateLabel()],
-      [],
-      ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"],
-      ...products.map((p, i) => [
-        i + 1,
-        p.name || "",
-        p.category || "",
-        p.barcode || "-",
-        Number(p.stock) || 0,
-        p.unit || "ш",
-      ]),
-    ];
-    if (logs.length) {
-      rows.push(
+    excel(
+      `Үлдэгдэл-${stamp}.xlsx`,
+      [
+        ["Үлдэгдэл"],
+        [`${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
         [],
-        ["Агуулахын лог"],
-        ["Огноо", "Бараа", "Төрөл", "Тоо", "Ажилтан"],
-        ...logs.map((l) => [
-          dte(l.date),
-          l.productName || "",
-          inventoryLogTypeLabel(l.type),
-          Number(l.quantity) || l.quantity || 0,
-          l.employeeName || "",
+        ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"],
+        ...products.map((p, i) => [
+          i + 1,
+          p.name || "",
+          p.category || "",
+          p.barcode || "-",
+          Number(p.stock) || 0,
+          p.unit || "ш",
         ]),
-      );
-    }
-    excel(`Үлдэгдэл-${stamp}.xlsx`, rows, {
-      sheetName: "Үлдэгдэл",
-      freezeHeaderRow: 4,
-    });
+      ],
+      {
+        sheetName: "Үлдэгдэл",
+        freezeHeaderRow: 4,
+        colWidths: [4, 36, 16, 16, 11, 8],
+        merges: ["A1:F1", "A2:F2"],
+      },
+    );
   });
 }
 const SALES_REPORT_XLSX_COL_WIDTHS = [28, 14, 18, 18, 14, 18, 12];
@@ -15657,14 +15641,18 @@ function patchStockInSearchHits() {
   const live = document.querySelector("[data-stock-in-live-hits]");
   if (live && live.innerHTML !== html) live.innerHTML = html;
   const scroll = document.querySelector(".stock-in-sheet__scroll");
-  const prev = scroll?.querySelector(":scope > .stock-in-sheet__hits");
-  if (scroll) {
-    if (!q) prev?.remove();
-    else if (prev) {
-      if (prev.outerHTML !== html) prev.outerHTML = html;
-    } else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
+  if (!scroll) return !!live;
+  const prev = scroll.querySelector(":scope > .stock-in-sheet__hits");
+  if (!q) {
+    prev?.remove();
+    return !!live;
   }
-  return !!(live || scroll);
+  if (prev) {
+    if (prev.outerHTML !== html) prev.outerHTML = html;
+  } else {
+    scroll.insertAdjacentHTML("afterbegin", html);
+  }
+  return true;
 }
 function clearStockInSearch() {
   state.stockInScanQuery = "";
@@ -15749,14 +15737,18 @@ function patchStockOutSearchHits() {
   const live = document.querySelector("[data-stock-out-live-hits]");
   if (live && live.innerHTML !== html) live.innerHTML = html;
   const scroll = document.querySelector(".stock-in-sheet__scroll");
-  const prev = scroll?.querySelector(":scope > .stock-in-sheet__hits");
-  if (scroll) {
-    if (!q) prev?.remove();
-    else if (prev) {
-      if (prev.outerHTML !== html) prev.outerHTML = html;
-    } else if (!live) scroll.insertAdjacentHTML("afterbegin", html);
+  if (!scroll) return !!live;
+  const prev = scroll.querySelector(":scope > .stock-in-sheet__hits");
+  if (!q) {
+    prev?.remove();
+    return !!live;
   }
-  return !!(live || scroll);
+  if (prev) {
+    if (prev.outerHTML !== html) prev.outerHTML = html;
+  } else {
+    scroll.insertAdjacentHTML("afterbegin", html);
+  }
+  return true;
 }
 function clearStockOutSearch() {
   state.stockOutScanQuery = "";
@@ -29178,8 +29170,14 @@ function simpleSheetXml(rows, si, opts = {}) {
       return `<row r="${rowNum}" spans="1:${colCount}">${cells.join("")}</row>`;
     })
     .join("");
+  const merges = (opts.merges || []).filter(Boolean);
+  const mergeXml = merges.length
+    ? `<mergeCells count="${merges.length}">${merges
+        .map((ref) => `<mergeCell ref="${xlsxXmlEsc(ref)}"/>`)
+        .join("")}</mergeCells>`
+    : "";
   const pageSetup = `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>`;
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews>${sheetView}</sheetViews><sheetFormatPr defaultRowHeight="15"/>${colsXml}<sheetData>${sheetRows}</sheetData>${pageSetup}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews>${sheetView}</sheetViews><sheetFormatPr defaultRowHeight="15"/>${colsXml}<sheetData>${sheetRows}</sheetData>${mergeXml}${pageSetup}</worksheet>`;
 }
 async function downloadRowsXlsx(name, rows, sheetName = "Sheet1", opts = {}) {
   if (typeof JSZip === "undefined") {
