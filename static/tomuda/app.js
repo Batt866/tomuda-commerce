@@ -1814,7 +1814,7 @@ function customerHistoryOrderRow(o, open = false) {
   const items = (o.items || []).filter((it) => !it?.isPromoFree);
   const itemList = items.length
     ? `<ul class="customer-history__items">${items.map(customerHistoryItemLine).join("")}</ul>`
-    : `<p class="customer-history__empty-items">Бараа алга</p>`;
+    : `<p class="customer-history__empty-items">Бараа байхгүй</p>`;
   const paid = orderIsPaid(o);
   const payCls = !paid ? "text-tone-danger" : "text-tone-success";
   const payLabel = paid
@@ -12720,19 +12720,68 @@ function exportProductsExcelFallback() {
     ...productExcelDataRows(products),
   ]);
 }
+function inventoryLogTypeLabel(type) {
+  const t = String(type || "").toLowerCase();
+  if (t === "in") return "Орлого";
+  if (t === "out") return "Зарлага";
+  return String(type || "-");
+}
+function inventoryStockExportList() {
+  const cat = state.filters.inventoryCategory;
+  const q = state.searches.inventory || "";
+  return state.products
+    .filter(
+      (p) =>
+        (cat === "all" || !cat || p.category === cat) &&
+        productMatchesInventoryQuery(p, q),
+    )
+    .sort(
+      (a, b) =>
+        String(a.category || "").localeCompare(
+          String(b.category || ""),
+          "mn",
+        ) || String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+    );
+}
 function confirmInventoryExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
+  const products = inventoryStockExportList();
+  const logs = state.inventoryLogs || [];
+  if (!products.length && !logs.length) return alert("Үлдэгдэл байхгүй");
   confirmDataExport("Мэдээлэл татах", () => {
-    excel(
-      "Агуулахын-лог.xlsx",
-      state.inventoryLogs.map((l) => [
-        dte(l.date),
-        l.productName,
-        l.type,
-        l.quantity,
-        l.employeeName,
+    const stamp = new Date().toISOString().slice(0, 10);
+    const rows = [
+      ["Үлдэгдэл"],
+      [productSheetDateLabel()],
+      [],
+      ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"],
+      ...products.map((p, i) => [
+        i + 1,
+        p.name || "",
+        p.category || "",
+        p.barcode || "-",
+        Number(p.stock) || 0,
+        p.unit || "ш",
       ]),
-    );
+    ];
+    if (logs.length) {
+      rows.push(
+        [],
+        ["Агуулахын лог"],
+        ["Огноо", "Бараа", "Төрөл", "Тоо", "Ажилтан"],
+        ...logs.map((l) => [
+          dte(l.date),
+          l.productName || "",
+          inventoryLogTypeLabel(l.type),
+          Number(l.quantity) || l.quantity || 0,
+          l.employeeName || "",
+        ]),
+      );
+    }
+    excel(`Үлдэгдэл-${stamp}.xlsx`, rows, {
+      sheetName: "Үлдэгдэл",
+      freezeHeaderRow: 4,
+    });
   });
 }
 const SALES_REPORT_XLSX_COL_WIDTHS = [28, 14, 18, 18, 14, 18, 12];
@@ -13520,17 +13569,18 @@ function stockInTakeRowHtml({
   ariaLabel = "",
   hint = "",
   hintAttr = "",
+  extraInputAttrs = "",
 }) {
   const idAttr = `stock-in-${name}`;
   const inputAttrs = readonly
     ? `id="${idAttr}" name="${name}" readonly tabindex="-1" data-stock-in-${name}`
-    : `id="${idAttr}" name="${name}" oninput="${oninput}"`;
+    : `id="${idAttr}" name="${name}" oninput="${oninput}" onblur="stockInQtyFieldsBlur(this)"`;
   const inputClass = `stock-in-take__input${accent ? " stock-in-take__input--accent" : ""}${soft ? " stock-in-take__input--soft" : ""}`;
   const hintHtml =
     hintAttr || hint
       ? `<p class="stock-in-take__hint"${hintAttr ? ` ${hintAttr}` : ""}>${hint}</p>`
       : "";
-  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><div class="stock-in-take__text"><span class="stock-in-take__label">${label}</span>${hintHtml}</div><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label></div>`;
+  return `<div class="stock-in-take__row${accent ? " stock-in-take__row--accent" : ""}${readonly ? " stock-in-take__row--readonly" : ""}"><span class="stock-in-take__icon">${icon}</span><div class="stock-in-take__text"><span class="stock-in-take__label">${label}</span>${hintHtml}</div><label class="stock-in-take__control"><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${inputAttrs}${extraInputAttrs ? ` ${extraInputAttrs}` : ""} value="${esc(String(value || ""))}" placeholder="${esc(placeholder)}" class="${inputClass}" aria-label="${esc(ariaLabel || label)}"><span class="stock-in-take__suffix">${esc(suffix)}</span></label></div>`;
 }
 function stockInLargePacksInput(el) {
   stockInQtyFieldsInput(el);
@@ -13538,14 +13588,165 @@ function stockInLargePacksInput(el) {
 function stockInSmallPacksInput(el) {
   stockInQtyFieldsInput(el);
 }
-function stockInQtyFieldsInput(_el) {
-  const form = _el?.closest?.("form");
+let stockInQtyCarryTimer = 0;
+function stockInQtyScope(el) {
+  const form = el?.closest?.("form");
   const root =
-    _el?.closest?.(".stock-in-take") ||
-    _el?.closest?.(".stock-in-qty-fields") ||
+    el?.closest?.(".stock-in-take") ||
+    el?.closest?.(".stock-in-qty-fields") ||
     form;
-  if (!root) return;
-  const scope = form || root;
+  return { form, root, scope: form || root };
+}
+function stockInWriteQtyPart(input, n) {
+  if (!input) return;
+  const next = n > 0 ? String(n) : "";
+  if (input.value !== next) input.value = next;
+}
+function normalizeStockQtyParts(largePacks, packs, pieces, p) {
+  const smallSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
+  let lp = Math.max(0, Math.floor(Number(largePacks) || 0));
+  let pk = Math.max(0, Math.floor(Number(packs) || 0));
+  let pc = Math.max(0, Math.floor(Number(pieces) || 0));
+  if (smallSize > 1 && pc >= smallSize) {
+    pk += Math.floor(pc / smallSize);
+    pc = pc % smallSize;
+  }
+  if (largeCount > 1 && pk >= largeCount) {
+    lp += Math.floor(pk / largeCount);
+    pk = pk % largeCount;
+  }
+  return { largePacks: lp, packs: pk, pieces: pc };
+}
+function splitTotalIntoBoxParts(total, smallSize, largeCount) {
+  let remaining = Math.max(0, Math.floor(Number(total) || 0));
+  let lp = 0;
+  let pk = 0;
+  const small = Math.max(0, Math.floor(Number(smallSize) || 0));
+  const large = Math.max(0, Math.floor(Number(largeCount) || 0));
+  const largePieces = small > 1 && large > 1 ? small * large : 0;
+  if (largePieces > 1) {
+    lp = Math.floor(remaining / largePieces);
+    remaining %= largePieces;
+  }
+  if (small > 1) {
+    pk = Math.floor(remaining / small);
+    remaining %= small;
+  }
+  return { largePacks: lp, packs: pk, pieces: remaining };
+}
+function partsFromStockForm(formData, p) {
+  const totalRaw = String(formData.get("totalQty") ?? "").trim();
+  if (totalRaw !== "") {
+    return splitTotalIntoBoxParts(
+      totalRaw,
+      productPackSize(p),
+      productLargeBoxCount(p),
+    );
+  }
+  return normalizeStockQtyParts(
+    formData.get("largePacks"),
+    formData.get("packs"),
+    formData.get("qty"),
+    p,
+  );
+}
+function stockInApplyTotalSplit(el) {
+  const { scope, root } = stockInQtyScope(el);
+  if (!scope || !root) return false;
+  const totalInput =
+    scope.querySelector('input[name="totalQty"]') ||
+    scope.querySelector("[data-stock-in-total-qty]");
+  const largeInput = scope.querySelector('input[name="largePacks"]');
+  const packInput = scope.querySelector('input[name="packs"]');
+  const qtyInput = scope.querySelector('input[name="qty"]');
+  if (!totalInput) return false;
+  const smallSize = Math.max(
+    0,
+    Math.floor(Number(root.dataset.smallBoxSize || 0) || 0),
+  );
+  const largeCount = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
+  );
+  const total = Math.max(0, Math.floor(Number(totalInput.value) || 0));
+  const parts = splitTotalIntoBoxParts(total, smallSize, largeCount);
+  const before = [
+    largeInput?.value || "",
+    packInput?.value || "",
+    qtyInput?.value || "",
+  ].join("|");
+  stockInWriteQtyPart(largeInput, parts.largePacks);
+  stockInWriteQtyPart(packInput, parts.packs);
+  stockInWriteQtyPart(qtyInput, parts.pieces);
+  const after = [
+    largeInput?.value || "",
+    packInput?.value || "",
+    qtyInput?.value || "",
+  ].join("|");
+  return before !== after;
+}
+function stockInCarryOverflowIntoBoxes(el) {
+  const { scope, root } = stockInQtyScope(el);
+  if (!scope || !root) return false;
+  const name = el?.name;
+  if (name !== "qty" && name !== "packs") return false;
+  const largeInput = scope.querySelector('input[name="largePacks"]');
+  const packInput = scope.querySelector('input[name="packs"]');
+  const qtyInput = scope.querySelector('input[name="qty"]');
+  const smallSize = Math.max(
+    0,
+    Math.floor(Number(root.dataset.smallBoxSize || 0) || 0),
+  );
+  const largeCount = Math.max(
+    0,
+    Math.floor(Number(root.dataset.largeBoxCount || 0) || 0),
+  );
+  let lp = Math.max(0, Math.floor(Number(largeInput?.value) || 0));
+  let pk = Math.max(0, Math.floor(Number(packInput?.value) || 0));
+  let pc = Math.max(0, Math.floor(Number(qtyInput?.value) || 0));
+  const before = `${lp}|${pk}|${pc}`;
+  if (name === "qty" && smallSize > 1 && pc >= smallSize) {
+    pk += Math.floor(pc / smallSize);
+    pc = pc % smallSize;
+  }
+  if (
+    (name === "qty" || name === "packs") &&
+    largeCount > 1 &&
+    pk >= largeCount
+  ) {
+    lp += Math.floor(pk / largeCount);
+    pk = pk % largeCount;
+  }
+  if (`${lp}|${pk}|${pc}` === before) return false;
+  stockInWriteQtyPart(largeInput, lp);
+  stockInWriteQtyPart(packInput, pk);
+  stockInWriteQtyPart(qtyInput, pc);
+  return true;
+}
+function stockInQtyFieldsBlur(el) {
+  clearTimeout(stockInQtyCarryTimer);
+  if (el?.name === "totalQty") stockInApplyTotalSplit(el);
+  else stockInCarryOverflowIntoBoxes(el);
+  stockInQtyFieldsInput(el, { carry: false, splitTotal: false });
+}
+function stockInQtyFieldsInput(_el, { carry = true, splitTotal = true } = {}) {
+  const { root, scope } = stockInQtyScope(_el);
+  if (!root || !scope) return;
+  const changed = _el?.name;
+  if (splitTotal && changed === "totalQty") {
+    clearTimeout(stockInQtyCarryTimer);
+    stockInQtyCarryTimer = setTimeout(() => {
+      stockInApplyTotalSplit(_el);
+      stockInQtyFieldsInput(_el, { carry: false, splitTotal: false });
+    }, 450);
+  } else if (carry && (changed === "qty" || changed === "packs")) {
+    clearTimeout(stockInQtyCarryTimer);
+    stockInQtyCarryTimer = setTimeout(() => {
+      stockInCarryOverflowIntoBoxes(_el);
+      stockInQtyFieldsInput(_el, { carry: false, splitTotal: false });
+    }, 450);
+  }
   const largePacks =
     scope.querySelector('input[name="largePacks"]')?.value ?? "";
   const packs = scope.querySelector('input[name="packs"]')?.value ?? "";
@@ -13572,17 +13773,23 @@ function stockInQtyFieldsInput(_el) {
   const largePreview = scope.querySelector("[data-stock-in-large-preview]");
   const packPreview = scope.querySelector("[data-stock-in-pack-preview]");
   const totalPreview = scope.querySelector("[data-stock-in-qty-total]");
-  const totalQtyInput = scope.querySelector("[data-stock-in-total-qty]");
+  const totalQtyInput =
+    scope.querySelector('input[name="totalQty"]') ||
+    scope.querySelector("[data-stock-in-total-qty]");
   const totalCostEl = scope.querySelector("[data-stock-in-total-cost]");
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
   const fromLarge = largeCount ? lp * largeCount : 0;
   const totalSmall = fromLarge + pk;
-  const total =
+  const partsTotal =
     (largePieces ? lp * largePieces : 0) +
     (smallSize ? pk * smallSize : 0) +
     pc;
+  const total =
+    changed === "totalQty"
+      ? Math.max(0, Math.floor(Number(_el?.value) || 0))
+      : partsTotal;
   const unitCost = costTyped
     ? Math.max(0, Math.floor(Number(costRaw) || 0))
     : priorCost;
@@ -13616,8 +13823,19 @@ function stockInQtyFieldsInput(_el) {
   if (totalPreview) {
     totalPreview.textContent = total > 0 ? `Нийт: ${total} ширхэг` : "";
   }
-  if (totalQtyInput) totalQtyInput.value = String(total || 0);
+  if (totalQtyInput && changed !== "totalQty") {
+    totalQtyInput.value = total > 0 ? String(total) : "";
+  }
   if (totalCostEl) totalCostEl.textContent = `${fmt(totalCost)}`;
+  const salesPrice = Math.max(
+    0,
+    Math.floor(Number(root.dataset.salesPrice || 0) || 0),
+  );
+  const totalSalesEl = scope.querySelector("[data-stock-in-total-sales]");
+  if (totalSalesEl) {
+    const totalSales = total > 0 && salesPrice > 0 ? total * salesPrice : 0;
+    totalSalesEl.textContent = `${fmt(totalSales)}`;
+  }
 }
 function stockInPackQtyFieldsHtml(p, d = {}) {
   const smallSize = productPackSize(p);
@@ -13653,17 +13871,17 @@ function stockInPackQtyFieldsHtml(p, d = {}) {
       : "";
   const totalPreviewText = total > 0 ? `Нийт: ${total} ширхэг` : "";
   const largeField = largePieces
-    ? `<label class="block"><span class="field-label">Том хайрцаг</span><input name="largePacks" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${largeVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} том хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-large-preview>${largePreviewText}</p></label>`
+    ? `<label class="block"><span class="field-label">Том хайрцаг</span><input name="largePacks" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${largeVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} том хайрцаг" oninput="stockInQtyFieldsInput(this)" onblur="stockInQtyFieldsBlur(this)"><p class="stock-in-pack-preview" data-stock-in-large-preview>${largePreviewText}</p></label>`
     : "";
   const smallField = smallSize
-    ? `<label class="block"><span class="field-label">Жижиг хайрцаг</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} жижиг хайрцаг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview" data-stock-in-pack-preview>${packPreviewText}</p></label>`
+    ? `<label class="block"><span class="field-label">Жижиг хайрцаг</span><input name="packs" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${packsVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} жижиг хайрцаг" oninput="stockInQtyFieldsInput(this)" onblur="stockInQtyFieldsBlur(this)"><p class="stock-in-pack-preview" data-stock-in-pack-preview>${packPreviewText}</p></label>`
     : "";
   const fieldCount = 1 + (largePieces ? 1 : 0) + (smallSize ? 1 : 0);
   const gridClass =
     fieldCount >= 3
       ? "grid grid-cols-1 sm:grid-cols-3 gap-2"
       : "grid grid-cols-2 gap-2";
-  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}"><div class="${gridClass}">${largeField}${smallField}<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
+  return `<div class="stock-in-qty-fields" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}"><div class="${gridClass}">${largeField}${smallField}<label class="block"><span class="field-label">Тоо ширхэг</span><input name="qty" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${qtyVal}" placeholder="0" class="field-input app-input" aria-label="${esc(p.name)} тоо ширхэг" oninput="stockInQtyFieldsInput(this)" onblur="stockInQtyFieldsBlur(this)"><p class="stock-in-pack-preview stock-in-pack-preview--spacer" aria-hidden="true">&nbsp;</p></label></div><p class="stock-in-qty-total" data-stock-in-qty-total>${totalPreviewText}</p></div>`;
 }
 function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const isOut = mode === "out";
@@ -13765,17 +13983,34 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
       name: "qty",
       value: qtyVal,
       ariaLabel: `${p.name} тоо ширхэг`,
+      hint: smallSize ? "Хайрцагнаас үлдсэн задгай" : "",
     }),
   );
   qtyRows.push(
     stockInTakeRowHtml({
       icon: stockInTakeIcon("sum"),
       label: "Нийт тоо ширхэг",
-      name: "total-qty",
-      value: String(initialTotal || 0),
-      readonly: true,
+      name: "totalQty",
+      value: initialTotal > 0 ? String(initialTotal) : "",
       accent: true,
+      placeholder: "0",
       ariaLabel: "Нийт тоо ширхэг",
+      extraInputAttrs: 'data-stock-in-total-qty',
+      hint:
+        smallSize || largePieces
+          ? "Жишээ: 10000 — хайрцагт автоматаар хуваана"
+          : "",
+    }),
+  );
+  qtyRows.push(
+    stockInTakeRowHtml({
+      icon: stockInTakeIcon("tag"),
+      label: "Борлуулалтын үнэ",
+      name: "salesPrice",
+      value: salesPrice ? String(salesPrice) : "0",
+      suffix: "₮",
+      readonly: true,
+      ariaLabel: "Борлуулалтын үнэ",
     }),
   );
   if (!isOut) {
@@ -13793,10 +14028,13 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
       }),
     );
   }
+  const initialSales =
+    initialTotal > 0 && salesPrice > 0 ? initialTotal * salesPrice : 0;
   const noteHtml = `<label class="stock-in-take__note"><span class="stock-in-take__note-label">Тэмдэглэл</span><textarea name="note" rows="1" class="stock-in-take__note-input" placeholder="Сонголтоор тэмдэглэл бичнэ">${esc(noteVal)}</textarea></label>`;
+  const salesTotalHtml = `<div class="stock-in-take__total"><span class="stock-in-take__icon">${stockInTakeIcon("calc")}</span><span class="stock-in-take__total-label">Нийт үнэ дүн</span><strong class="stock-in-take__total-value" data-stock-in-total-sales>${fmt(initialSales)}</strong></div>`;
   const costBlock = isOut
-    ? ""
-    : `<p class="stock-in-take__warn text-sm text-tone-warning${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p><div class="stock-in-take__total"><span class="stock-in-take__icon">${stockInTakeIcon("calc")}</span><span class="stock-in-take__total-label">Нийт өртөг дүн</span><strong class="stock-in-take__total-value" data-stock-in-total-cost>${fmt(initialCost)}</strong></div>`;
+    ? salesTotalHtml
+    : `<p class="stock-in-take__warn text-sm text-tone-warning${costExceeds ? "" : " hidden"}" data-stock-in-cost-warn>Өртөг үнэ Борлуулалтын үнээс давсан байна</p><div class="stock-in-take__total"><span class="stock-in-take__icon">${stockInTakeIcon("calc")}</span><span class="stock-in-take__total-label">Нийт өртөг дүн</span><strong class="stock-in-take__total-value" data-stock-in-total-cost>${fmt(initialCost)}</strong></div>${salesTotalHtml}`;
   const submitClass = isOut
     ? "stock-in-take__submit stock-in-take__submit--danger"
     : "stock-in-take__submit";
@@ -13808,7 +14046,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
     initialTotal > 0
       ? `<button type="button" class="stock-in-take__remove" onclick="confirmRemoveStockDraft('${esc(p.id)}','${isOut ? "out" : "in"}')">${isOut ? "Зарлагаас буцаах" : "Орлогоос буцаах"}</button>`
       : "";
-  return `<form onsubmit="${onsubmit}" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}" data-prior-cost="${priorCost}"><div class="stock-in-take__body"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p>${packRules}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div>${noteHtml}${costBlock}</div><div class="stock-in-take__actions">${removeBtn}<button type="submit" class="${submitClass}">${stockInTakeIcon("save")}<span>${submitLabel}</span></button></div></form>`;
+  return `<form onsubmit="${onsubmit}" class="stock-in-take" data-small-box-size="${smallSize}" data-large-box-count="${largeCount}" data-large-box-size="${largePieces}" data-prior-cost="${priorCost}" data-sales-price="${salesPrice}"><div class="stock-in-take__body"><div class="stock-in-take__product"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="stock-in-take__thumb"><div class="stock-in-take__product-text"><p class="stock-in-take__name">${esc(p.name)}</p><p class="stock-in-take__price">Борлуулалтын үнэ: <b>${fmt(salesPrice)}</b></p>${packRules}</div></div><div class="stock-in-take__rows">${qtyRows.join("")}</div>${noteHtml}${costBlock}</div><div class="stock-in-take__actions">${removeBtn}<button type="submit" class="${submitClass}">${stockInTakeIcon("save")}<span>${submitLabel}</span></button></div></form>`;
 }
 function stockInEntryModal(id) {
   const p = state.products.find((x) => x.id === id);
@@ -13827,6 +14065,7 @@ function stockInEntryModal(id) {
       stockInLargePacksInput(large);
     }
     const focusEl =
+      form?.querySelector('input[name="totalQty"]') ||
       form?.querySelector('input[name="qty"]') ||
       form?.querySelector('input[name="packs"]') ||
       form?.querySelector('input[name="largePacks"]');
@@ -14899,6 +15138,7 @@ function stockInEntryRow(p) {
     <span class="stock-in-line__copy">
       <span class="stock-in-line__name">${esc(p.name)}</span>
       ${sku ? `<span class="stock-in-line__sku">${esc(sku)}</span>` : ""}
+      <span class="stock-in-line__sku">Борлуулалтын үнэ: ${fmt(sales)}</span>
     </span>
   </button>
   <div class="stock-in-line__chips">${chips.join("")}</div>
@@ -15231,12 +15471,10 @@ function applyStockInEntryModal(e, id) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   const formData = new FormData(e.target);
-  const largePacks = Math.max(
-    0,
-    Math.floor(Number(formData.get("largePacks") || 0)),
-  );
-  const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
-  const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
+  const parts = partsFromStockForm(formData, p);
+  const largePacks = parts.largePacks;
+  const packs = parts.packs;
+  const pieces = parts.pieces;
   const qty = stockInEntryTotalQty(largePacks, packs, pieces, p);
   if (qty <= 0) {
     delete state.stockInDraft[id];
@@ -15384,26 +15622,34 @@ function stockInSearchHitProducts() {
   if (!q) return [];
   return findProductsByQuery(q)
     .filter((p) => stockInLineQty(p) <= 0)
-    .slice(0, 8);
+    .slice(0, 24);
+}
+function stockInSearchHitsWindowHtml(hits, { emptyMsg, pickFn, closeFn }) {
+  const head = `<div class="stock-in-search-window__head"><p>Олдсон бараа</p><button type="button" class="stock-in-search-window__close" onclick="${closeFn}()" aria-label="Хайх цонх хаах">✕</button></div>`;
+  if (!hits.length) {
+    return `<div class="stock-in-sheet__hits stock-in-sheet__hits--miss stock-in-search-window" role="dialog" aria-label="Хайлтын үр дүн">${head}<div class="stock-in-search-window__body"><p class="stock-in-sheet__hits-empty">${emptyMsg}</p></div></div>`;
+  }
+  const rows = hits
+    .map(
+      (p) =>
+        `<button type="button" class="stock-in-sheet__hit" onclick="${pickFn}('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="40" height="40" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}</small></span></button>`,
+    )
+    .join("");
+  return `<div class="stock-in-sheet__hits stock-in-search-window" role="dialog" aria-label="Хайлтын үр дүн">${head}<div class="stock-in-search-window__body">${rows}</div></div>`;
 }
 function stockInSearchHitsContentHtml() {
   const q = String(state.stockInScanQuery || "").trim();
   if (!q) return "";
   const hits = stockInSearchHitProducts();
-  if (!hits.length) {
-    const emptyCatalog = !(state.products || []).length;
-    const msg = emptyCatalog
-      ? "Барааны мэдээлэл татагдаагүй байна. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу."
-      : `${esc(q)} — нэр эсвэл SKU-гаар дахин хайна уу.`;
-    return `<div class="stock-in-sheet__hits stock-in-sheet__hits--miss"><p class="stock-in-sheet__hits-label">Бараа олдсонгүй</p><p class="stock-in-sheet__hits-empty">${msg}</p></div>`;
-  }
-  const rows = hits
-    .map(
-      (p) =>
-        `<button type="button" class="stock-in-sheet__hit" onclick="stockInEntryModal('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="40" height="40" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}</small></span></button>`,
-    )
-    .join("");
-  return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо/өртөг оруулна</p>${rows}</div>`;
+  const emptyCatalog = !(state.products || []).length;
+  const emptyMsg = emptyCatalog
+    ? "Барааны мэдээлэл татагдаагүй байна. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу."
+    : `${esc(q)} — нэр эсвэл SKU-гаар дахин хайна уу.`;
+  return stockInSearchHitsWindowHtml(hits, {
+    emptyMsg,
+    pickFn: "stockInPickSearchHit",
+    closeFn: "clearStockInSearch",
+  });
 }
 function patchStockInSearchHits() {
   const q = String(state.stockInScanQuery || "").trim();
@@ -15420,13 +15666,24 @@ function patchStockInSearchHits() {
   }
   return !!(live || scroll);
 }
+function clearStockInSearch() {
+  state.stockInScanQuery = "";
+  state.searches.inventory = "";
+  const input = document.getElementById("stockInBarcodeInput");
+  if (input) input.value = "";
+  patchStockInSearchHits();
+}
+function stockInPickSearchHit(id) {
+  clearStockInSearch();
+  stockInEntryModal(id);
+}
 function stockInSearchHitsHtml(list) {
   return stockInSearchHitsContentHtml();
 }
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
   if (!filled.length) {
-    return `<div class="stock-in-sheet__empty"><p class="stock-in-sheet__empty-title">Сонгосон бараа алга</p><p>Хайлт эсвэл scan хийж бараа нэмнэ үү.</p></div>`;
+    return `<div class="stock-in-sheet__empty"><p class="stock-in-sheet__empty-title">Бараа сонгоогүй байна</p><p>Хайлт эсвэл scan хийж бараа нэмнэ үү.</p></div>`;
   }
   return `<div class="stock-in-sheet__lines"><p class="stock-in-sheet__lines-label">Сонгосон бараа · ${filled.length}</p>${filled.map((p) => stockInEntryRow(p)).join("")}</div>`;
 }
@@ -15470,26 +15727,21 @@ function stockOutSearchHitProducts() {
   if (!q) return [];
   return findProductsByQuery(q)
     .filter((p) => stockOutLineQty(p) <= 0)
-    .slice(0, 8);
+    .slice(0, 24);
 }
 function stockOutSearchHitsContentHtml() {
   const q = String(state.stockOutScanQuery || "").trim();
   if (!q) return "";
   const hits = stockOutSearchHitProducts();
-  if (!hits.length) {
-    const emptyCatalog = !(state.products || []).length;
-    const msg = emptyCatalog
-      ? "Барааны мэдээлэл татагдаагүй байна. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу."
-      : `${esc(q)} — нэр эсвэл SKU-гаар дахин хайна уу.`;
-    return `<div class="stock-in-sheet__hits stock-in-sheet__hits--miss"><p class="stock-in-sheet__hits-label">Бараа олдсонгүй</p><p class="stock-in-sheet__hits-empty">${msg}</p></div>`;
-  }
-  const rows = hits
-    .map(
-      (p) =>
-        `<button type="button" class="stock-in-sheet__hit" onclick="stockOutModal('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="40" height="40" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}</small></span></button>`,
-    )
-    .join("");
-  return `<div class="stock-in-sheet__hits"><p class="stock-in-sheet__hits-label">Олдсон бараа · дарахад тоо оруулна</p>${rows}</div>`;
+  const emptyCatalog = !(state.products || []).length;
+  const emptyMsg = emptyCatalog
+    ? "Барааны мэдээлэл татагдаагүй байна. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу."
+    : `${esc(q)} — нэр эсвэл SKU-гаар дахин хайна уу.`;
+  return stockInSearchHitsWindowHtml(hits, {
+    emptyMsg,
+    pickFn: "stockOutPickSearchHit",
+    closeFn: "clearStockOutSearch",
+  });
 }
 function patchStockOutSearchHits() {
   const q = String(state.stockOutScanQuery || "").trim();
@@ -15506,13 +15758,24 @@ function patchStockOutSearchHits() {
   }
   return !!(live || scroll);
 }
+function clearStockOutSearch() {
+  state.stockOutScanQuery = "";
+  state.searches.inventory = "";
+  const input = document.getElementById("stockOutBarcodeInput");
+  if (input) input.value = "";
+  patchStockOutSearchHits();
+}
+function stockOutPickSearchHit(id) {
+  clearStockOutSearch();
+  stockOutModal(id);
+}
 function stockOutSearchHitsHtml(list) {
   return stockOutSearchHitsContentHtml();
 }
 function stockOutLinesHtml(list) {
   const filled = (list || []).filter((p) => stockOutLineQty(p) > 0);
   if (!filled.length) {
-    return `<div class="stock-in-sheet__empty"><p class="stock-in-sheet__empty-title">Сонгосон бараа алга</p><p>Хайлт эсвэл scan хийж бараа нэмнэ үү.</p></div>`;
+    return `<div class="stock-in-sheet__empty"><p class="stock-in-sheet__empty-title">Бараа сонгоогүй байна</p><p>Хайлт эсвэл scan хийж бараа нэмнэ үү.</p></div>`;
   }
   return `<div class="stock-in-sheet__lines"><p class="stock-in-sheet__lines-label">Сонгосон бараа · ${filled.length}</p>${filled.map((p) => stockOutEntryRow(p)).join("")}</div>`;
 }
@@ -15846,6 +16109,7 @@ function stockOutEntryRow(p) {
     <span class="stock-in-line__copy">
       <span class="stock-in-line__name">${esc(p.name)}</span>
       ${sku ? `<span class="stock-in-line__sku">${esc(sku)}</span>` : ""}
+      <span class="stock-in-line__sku">Борлуулалтын үнэ: ${fmt(sales)}</span>
       <span class="stock-in-line__sku">Үлд: ${Math.max(0, stockNow - qty)} ${esc(p.unit || "ш")}</span>
     </span>
   </button>
@@ -15930,6 +16194,13 @@ function stockOutModal(id) {
     if (large && String(large.value || "").trim()) {
       stockInLargePacksInput(large);
     }
+    const focusEl =
+      form?.querySelector('input[name="totalQty"]') ||
+      form?.querySelector('input[name="qty"]') ||
+      form?.querySelector('input[name="packs"]') ||
+      form?.querySelector('input[name="largePacks"]');
+    focusEl?.focus?.();
+    focusEl?.select?.();
   });
 }
 function applyStockOutModal(e, id) {
@@ -15942,12 +16213,10 @@ function applyStockOutModal(e, id) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   const formData = new FormData(e.target);
-  const largePacks = Math.max(
-    0,
-    Math.floor(Number(formData.get("largePacks") || 0)),
-  );
-  const packs = Math.max(0, Math.floor(Number(formData.get("packs") || 0)));
-  const pieces = Math.max(0, Math.floor(Number(formData.get("qty") || 0)));
+  const parts = partsFromStockForm(formData, p);
+  const largePacks = parts.largePacks;
+  const packs = parts.packs;
+  const pieces = parts.pieces;
   const qty = stockInEntryTotalQty(largePacks, packs, pieces, p);
   if (qty <= 0) {
     delete state.stockOutDraft[id];
@@ -24460,12 +24729,21 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
       : "",
     closeLabel = esc(opts.closeLabel || "Цонхыг хаах"),
     titleHtml = opts.titleHtml ? title : esc(title),
-    panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "";
+    panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "",
+    closeAsBack = !!opts.closeAsBack;
+  const closeBtn = `<button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm${closeAsBack ? " modal-close--back" : ""}" aria-label="${closeAsBack ? "Буцах" : closeLabel}">${
+    closeAsBack
+      ? `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg>`
+      : `<span aria-hidden="true">✕</span>`
+  }</button>`;
+  const head = closeAsBack
+    ? `<div class="modal-panel__head modal-panel__head--back p-4 sm:p-6 border-b border-border"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3>${closeBtn}</div>`
+    : `<div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3>${closeBtn}</div>`;
   const wasOpen = !!modal.innerHTML.trim();
   const modalScrollTop = wasOpen
     ? (modal.querySelector(".modal-scroll")?.scrollTop ?? 0)
     : 0;
-  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}><div class="modal-panel__head p-4 sm:p-6 border-b border-border flex justify-between items-center gap-3"><h3 id="${titleId}" class="modal-panel__title text-lg font-semibold">${titleHtml}</h3><button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm" aria-label="${closeLabel}"><span aria-hidden="true">✕</span></button></div>${body}</div></div>`;
+  modal.innerHTML = `<div class="modal-backdrop fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-modal-backdrop><div class="modal-panel bg-card rounded w-full ${max} max-h-[90vh] overflow-hidden shadow-lg${panelExtra}"${dialogAttr}>${head}${body}</div></div>`;
   requestAnimationFrame(() => {
     enhanceMobileNumericInputs(document);
     bindProductImages(document);
@@ -25913,16 +26191,24 @@ function productModal(id) {
     treatZeroAsEmpty: true,
   });
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
+  const catList = cats();
+  const showNewCat = !catList.length;
+  const categoryAddBtn = canManageProductCategories()
+    ? `<button type="button" class="product-form__category-add" onclick="toggleProductNewCategoryField()">+ Шинэ төрөл</button>`
+    : "";
+  const categoryHtml = `<label class="product-form__category"><span class="block text-sm font-medium mb-2">Төрөл</span><div class="product-form__category-row"><select name="category" class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${catList
+    .map(
+      (c) =>
+        `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
+    )
+    .join(
+      "",
+    )}</select>${categoryAddBtn}</div><div class="product-form__category-new" id="productNewCategoryField"${showNewCat ? "" : " hidden"}><input name="newCategoryName" type="text" autocomplete="off" placeholder="Шинэ төрлийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="button" class="btn btn--primary shrink-0" onclick="addCategoryFromProductForm()">Нэмэх</button></div></label>`;
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div><label><span class="block text-sm font-medium mb-2">Төрөл</span><select name="category" required class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${cats()
-      .map(
-        (c) =>
-          `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
-      )
-      .join(
-        "",
-      )}</select></label><label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>${categoryHtml}<label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    "max-w-2xl",
+    { panelClass: "product-form-modal", closeAsBack: true },
   );
   requestAnimationFrame(() => initProductImageField(p));
 }
@@ -26136,6 +26422,16 @@ function buildProductDataFromForm(form) {
   const data = Object.fromEntries(new FormData(form));
   data.name = String(data.name || "").trim();
   if (!data.name) return { error: "Барааны нэр оруулна уу" };
+  const newCat = String(data.newCategoryName || "").trim();
+  delete data.newCategoryName;
+  if (newCat) {
+    if (canManageProductCategories() && !cats().includes(newCat)) {
+      if (!state.extraCategories.includes(newCat)) {
+        state.extraCategories.push(newCat);
+      }
+    }
+    data.category = newCat;
+  }
   if (!data.category?.trim()) return { error: "Төрөл сонгоно уу" };
   data.price = Number(data.price || 0);
   delete data.costPrice;
@@ -26475,6 +26771,43 @@ async function saveProduct(e, id) {
       submitBtn.textContent = prevLabel;
     }
   }
+}
+function toggleProductNewCategoryField() {
+  const row = document.getElementById("productNewCategoryField");
+  if (!row) return;
+  const open = row.hasAttribute("hidden");
+  row.toggleAttribute("hidden", !open);
+  if (open) row.querySelector("input")?.focus();
+}
+function addCategoryFromProductForm() {
+  const form = document.querySelector("form.product-form");
+  const input = form?.querySelector("[name='newCategoryName']");
+  const select = form?.elements?.category;
+  const name = String(input?.value || "").trim();
+  if (!name) return alert("Төрөлийн нэр оруулна уу");
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Төрөл нэмэх эрхгүй.");
+  }
+  const existing = cats().find(
+    (c) => String(c).toLowerCase() === name.toLowerCase(),
+  );
+  const chosen = existing || name;
+  if (!existing) {
+    if (!state.extraCategories.includes(name)) {
+      state.extraCategories.push(name);
+    }
+    criticalBackendSave();
+    showAppToast(`«${name}» төрөл нэмэгдлээ`, "success");
+  }
+  if (select && ![...select.options].some((o) => o.value === chosen)) {
+    const opt = document.createElement("option");
+    opt.value = chosen;
+    opt.textContent = chosen;
+    select.appendChild(opt);
+  }
+  if (select) select.value = chosen;
+  if (input) input.value = "";
+  document.getElementById("productNewCategoryField")?.setAttribute("hidden", "");
 }
 function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
@@ -28820,6 +29153,10 @@ function simpleSheetXml(rows, si, opts = {}) {
           maxWidth: opts.maxColWidth || 48,
         });
   const colsXml = `<cols>${simpleSheetColsXml(widths)}</cols>`;
+  const freezeRow = Math.max(0, Number(opts.freezeHeaderRow) || 0);
+  const sheetView = freezeRow
+    ? `<sheetView workbookViewId="0"><pane ySplit="${freezeRow}" topLeftCell="A${freezeRow + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${freezeRow + 1}" sqref="A${freezeRow + 1}"/></sheetView>`
+    : `<sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView>`;
   const sheetRows = normalizedRows
     .map((row, rowIdx) => {
       const rowNum = rowIdx + 1;
@@ -28841,7 +29178,8 @@ function simpleSheetXml(rows, si, opts = {}) {
       return `<row r="${rowNum}" spans="1:${colCount}">${cells.join("")}</row>`;
     })
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${colsXml}<sheetData>${sheetRows}</sheetData><pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const pageSetup = `<pageMargins left="0.5" right="0.5" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastRef}"/><sheetViews>${sheetView}</sheetViews><sheetFormatPr defaultRowHeight="15"/>${colsXml}<sheetData>${sheetRows}</sheetData>${pageSetup}</worksheet>`;
 }
 async function downloadRowsXlsx(name, rows, sheetName = "Sheet1", opts = {}) {
   if (typeof JSZip === "undefined") {
@@ -28923,6 +29261,7 @@ Object.assign(window, {
   confirmRemoveWorkerCartItem,
   applyStockInEntryModal,
   stockInQtyFieldsInput,
+  stockInQtyFieldsBlur,
   stockInLargePacksInput,
   stockInSmallPacksInput,
   stockInCostPriceWarn,
@@ -28953,6 +29292,8 @@ Object.assign(window, {
   productDetail,
   productModal,
   handleProductImage,
+  toggleProductNewCategoryField,
+  addCategoryFromProductForm,
   applySettlementTextInput,
   growSettlementInput,
   settlementInputFocus,
@@ -29030,6 +29371,10 @@ Object.assign(window, {
   stockOutScanDraft,
   stockInScanSubmit,
   stockOutScanSubmit,
+  clearStockInSearch,
+  clearStockOutSearch,
+  stockInPickSearchHit,
+  stockOutPickSearchHit,
   clearPickerFilter,
   startBarcodeScan,
   stopBarcodeScan,
