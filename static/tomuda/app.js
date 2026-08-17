@@ -12746,8 +12746,9 @@ function confirmInventoryExport() {
     excel(
       `Үлдэгдэл-${stamp}.xlsx`,
       [
-        ["Үлдэгдэл"],
-        [`${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
+        // Title/date in column B so № (A) stays narrow.
+        ["", "Үлдэгдэл"],
+        ["", productSheetDateLabel()],
         [],
         ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"],
         ...products.map((p, i) => [
@@ -12762,8 +12763,8 @@ function confirmInventoryExport() {
       {
         sheetName: "Үлдэгдэл",
         freezeHeaderRow: 4,
-        colWidths: [4, 36, 16, 16, 11, 8],
-        merges: ["A1:F1", "A2:F2"],
+        colWidths: [3, 36, 16, 16, 11, 8],
+        merges: ["B1:F1", "B2:F2"],
       },
     );
   });
