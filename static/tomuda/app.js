@@ -4069,7 +4069,7 @@ function productImageFallbackList(p = {}, { thumb = false } = {}) {
 }
 function productImgDataAttrs(p, { thumb = false } = {}) {
   const thumbAttr = thumb ? ' data-product-img-thumb="1"' : "";
-  return `data-product-img data-product-id="${esc(p.id)}"${thumbAttr} alt="${esc(p.name)}"`;
+  return `data-product-img data-product-id="${esc(p.id)}"${thumbAttr}`;
 }
 function productImageSrc(p, opts = {}) {
   return productImageFallbackList(p, opts)[0];
@@ -15688,10 +15688,14 @@ function patchStockInSearchHits() {
   const live = document.querySelector("[data-stock-in-live-hits]");
   if (live && live.innerHTML !== html) live.innerHTML = html;
   const scroll = document.querySelector(".stock-in-sheet__scroll");
-  if (!scroll) return !!live;
+  if (!scroll) {
+    if (live) bindProductImages(live);
+    return !!live;
+  }
   const prev = scroll.querySelector(":scope > .stock-in-sheet__hits");
   if (!q) {
     prev?.remove();
+    if (live) bindProductImages(live);
     return !!live;
   }
   if (prev) {
@@ -15699,6 +15703,9 @@ function patchStockInSearchHits() {
   } else {
     scroll.insertAdjacentHTML("afterbegin", html);
   }
+  const hits = scroll.querySelector(":scope > .stock-in-sheet__hits");
+  if (hits) bindProductImages(hits);
+  if (live) bindProductImages(live);
   return true;
 }
 function clearStockInSearch() {
@@ -15782,10 +15789,14 @@ function patchStockOutSearchHits() {
   const live = document.querySelector("[data-stock-out-live-hits]");
   if (live && live.innerHTML !== html) live.innerHTML = html;
   const scroll = document.querySelector(".stock-in-sheet__scroll");
-  if (!scroll) return !!live;
+  if (!scroll) {
+    if (live) bindProductImages(live);
+    return !!live;
+  }
   const prev = scroll.querySelector(":scope > .stock-in-sheet__hits");
   if (!q) {
     prev?.remove();
+    if (live) bindProductImages(live);
     return !!live;
   }
   if (prev) {
@@ -15793,6 +15804,9 @@ function patchStockOutSearchHits() {
   } else {
     scroll.insertAdjacentHTML("afterbegin", html);
   }
+  const hits = scroll.querySelector(":scope > .stock-in-sheet__hits");
+  if (hits) bindProductImages(hits);
+  if (live) bindProductImages(live);
   return true;
 }
 function clearStockOutSearch() {
