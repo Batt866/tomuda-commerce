@@ -6438,6 +6438,36 @@ textarea {
   color: var(--hex-foreground);
 }
 
+/* Native select chevrons sit on the border — custom arrow with inset. */
+#app select:not([multiple]):not([size]),
+#modal select:not([multiple]):not([size]),
+.page-toolbar__select,
+select.app-input,
+select.field-input,
+.product-form select,
+.modal-scroll select:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 2.25rem !important;
+  background-image: linear-gradient(45deg, transparent 50%, #687386 50%),
+    linear-gradient(135deg, #687386 50%, transparent 50%);
+  background-position:
+    calc(100% - 1rem) calc(50% - 0.15rem),
+    calc(100% - 0.7rem) calc(50% - 0.15rem);
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+#app select:not([multiple]):not([size]):disabled,
+#modal select:not([multiple]):not([size]):disabled,
+select.app-input:disabled,
+select.field-input:disabled,
+.product-form select:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--hex-muted-foreground);
@@ -17951,13 +17981,14 @@ body.image-lightbox-open {
 select.stock-in-sheet__select {
   min-width: 0;
   max-width: 100%;
-  padding-right: 28px;
+  padding-right: 2.25rem;
   cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, #5b6575 50%),
     linear-gradient(135deg, #5b6575 50%, transparent 50%);
-  background-position: calc(100% - 14px) calc(50% - 2px),
-    calc(100% - 9px) calc(50% - 2px);
-  background-size: 5px 5px, 5px 5px;
+  background-position:
+    calc(100% - 1rem) calc(50% - 0.15rem),
+    calc(100% - 0.7rem) calc(50% - 0.15rem);
+  background-size: 0.35rem 0.35rem, 0.35rem 0.35rem;
   background-repeat: no-repeat;
 }
 
@@ -17984,7 +18015,7 @@ input.stock-in-sheet__input::placeholder {
 }
 
 .stock-in-sheet__meta select.stock-in-sheet__select {
-  padding-right: 28px !important;
+  padding-right: 2.25rem !important;
 }
 
 .stock-in-sheet__meta input.stock-in-sheet__input {
