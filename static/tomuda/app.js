@@ -483,6 +483,7 @@ const fmtCountQty = (n) => {
   return num.toLocaleString("mn-MN");
 };
 const fmtExcelMoney = (n) => `${Number(n || 0).toLocaleString("en-US")}₮`;
+const fmtExcelNumber = (n) => Number(n || 0).toLocaleString("en-US");
 const RECEIPT_PERCENT_DISCOUNT = 3;
 const RECEIPT_FONT = "Arial, Helvetica, sans-serif";
 const RECEIPT_FONT_TITLE = '"Times New Roman", Times, serif';
@@ -12907,8 +12908,13 @@ function inventoryExcelDataRows(products = inventoryStockExportList()) {
     }
     if (item.type === "catTotal") {
       // Excel shows only the top-left cell of a merge, so the label must be in A.
-      const row = [`${item.name} нийт`, "", "", item.salesTotal];
-      if (showCost) row.push(item.costTotal);
+      const row = [
+        `${item.name} нийт`,
+        "",
+        "",
+        fmtExcelNumber(item.salesTotal),
+      ];
+      if (showCost) row.push(fmtExcelNumber(item.costTotal));
       row.push("", "");
       rows.push(row);
       continue;
@@ -12918,9 +12924,9 @@ function inventoryExcelDataRows(products = inventoryStockExportList()) {
       item.index,
       p.name || "",
       p.barcode || "-",
-      productSalesPrice(p),
+      fmtExcelNumber(productSalesPrice(p)),
     ];
-    if (showCost) row.push(productCostPrice(p));
+    if (showCost) row.push(fmtExcelNumber(productCostPrice(p)));
     row.push(Number(p.stock) || 0, p.unit || "ширхэг");
     rows.push(row);
   }
@@ -12946,8 +12952,8 @@ function confirmInventoryExport() {
           0,
         )
       : 0;
-    const grandRow = ["Нийт дүн", "", "", salesGrand];
-    if (showCost) grandRow.push(costGrand);
+    const grandRow = ["Нийт дүн", "", "", fmtExcelNumber(salesGrand)];
+    if (showCost) grandRow.push(fmtExcelNumber(costGrand));
     grandRow.push("", "");
     const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`];
     // Data starts at Excel row 5 (title / date / blank / header).
