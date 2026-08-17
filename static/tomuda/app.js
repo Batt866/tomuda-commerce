@@ -12935,7 +12935,7 @@ function inventoryExcelDataRows(products = inventoryStockExportList()) {
 const INVENTORY_STOCK_REPORT_TITLE = "Агуулахын барааны үлдэгдэл";
 const INVENTORY_STOCK_REPORT_TITLE_ROW_H = 24;
 const INVENTORY_STOCK_REPORT_META_ROW_H = 18;
-const INVENTORY_STOCK_REPORT_HEADER_ROW_H = 20;
+const INVENTORY_STOCK_REPORT_HEADER_ROW_H = 28;
 const INVENTORY_STOCK_REPORT_DATA_ROW_H = 18;
 const INVENTORY_STOCK_REPORT_SPACER_ROW_H = 10;
 function inventoryExportPrintedDateText() {
@@ -12978,8 +12978,8 @@ function inventoryStockReportColumns(showCost) {
 }
 function inventoryStockReportColWidths(showCost) {
   return showCost
-    ? [5, 30, 14, 14, 10, 8, 12, 12, 14, 14]
-    : [5, 32, 14, 14, 10, 8, 12, 14];
+    ? [5, 28, 14, 14, 10, 9, 13, 13, 24, 24]
+    : [5, 32, 14, 14, 10, 9, 13, 24];
 }
 function inventoryStockReportHeaders(showCost) {
   const headers = ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"];
@@ -12988,6 +12988,22 @@ function inventoryStockReportHeaders(showCost) {
   if (showCost) headers.push("Өртөг үнийн нийлбэр");
   headers.push("Нэгж үнийн нийлбэр");
   return headers;
+}
+const INVENTORY_STOCK_REPORT_STYLES = {
+  title: 1,
+  metaValue: 3,
+  tableHeader: 5,
+  category: 15,
+  noCenter: 6,
+  textLeft: 7,
+  barcode: 8,
+  textCenter: 9,
+  intRight: 10,
+  summaryText: 12,
+  summaryInt: 13,
+};
+function inventoryStockReportStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="3"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFCBD5E1"/></left><right style="thin"><color rgb="FFCBD5E1"/></right><top style="thin"><color rgb="FFCBD5E1"/></top><bottom style="thin"><color rgb="FFCBD5E1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function inventoryStockReportWorksheetXml(rows, merges, lastRow, lastCol, colWidths) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -13005,7 +13021,7 @@ function buildInventoryStockSheetXml(products) {
   const showCost = canViewProductCost();
   const cols = inventoryStockReportColumns(showCost);
   const lastCol = cols.lastCol;
-  const s = STOCK_IN_LIST_REPORT_STYLES;
+  const s = INVENTORY_STOCK_REPORT_STYLES;
   const colWidths = inventoryStockReportColWidths(showCost);
   const headers = inventoryStockReportHeaders(showCost);
   const strings = [];
@@ -13068,7 +13084,7 @@ function buildInventoryStockSheetXml(products) {
       const r = rowNum;
       merges.push(`A${r}:${lastCol}${r}`);
       pushRow(INVENTORY_STOCK_REPORT_DATA_ROW_H, [
-        xlsxCellXml(`A${r}`, s.tableHeader, si(item.name), "s"),
+        xlsxCellXml(`A${r}`, s.category, si(item.name), "s"),
       ]);
       continue;
     }
@@ -13229,7 +13245,7 @@ async function exportInventoryExcelXlsx(products) {
     sheetXml,
     printArea,
     sheetName: "Үлдэгдэл",
-    stylesXml: stockInListReportStylesXml(),
+    stylesXml: inventoryStockReportStylesXml(),
   });
   const blob = await zipToExcelBlob(zip);
   await downloadBlobFile(blob, `Үлдэгдэл-${stamp}.xlsx`);
