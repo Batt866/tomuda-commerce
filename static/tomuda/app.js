@@ -19669,8 +19669,10 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
     );
   }
 
-  const signXf =
+  const signXfLeft =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
+  const signXfCenter =
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>';
   // Category row (style 15): no fill — bold centered label only.
   if (fillCategory) {
     const catXfPlain =
@@ -19685,7 +19687,8 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
     `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
 
   const appendXfs = [];
-  if (!out.includes(signXf)) appendXfs.push(signXf);
+  if (out.includes(signXfLeft)) out = out.replace(signXfLeft, signXfCenter);
+  else if (!out.includes(signXfCenter)) appendXfs.push(signXfCenter);
   for (const fillId of [largeFillId, smallFillId, pieceFillId]) {
     const head = qtyHeadXf(fillId);
     const cell = qtyCellXf(fillId);
@@ -19886,12 +19889,15 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(12, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
-    merges.push(`A${r}:C${r}`, `D${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
+    merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
     pushRow(WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT, [
-      xlsxCellXml(`A${r}`, s.signLabel, si(role), "s"),
-      ...emptyCells(r, "B", "C", s.signLabel),
-      xlsxCellXml(`D${r}`, s.signLine, null, "empty"),
-      ...emptyCells(r, "E", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
+      xlsxCellXml(
+        `A${r}`,
+        s.signLine,
+        si(`${role} ____________________`),
+        "s",
+      ),
+      ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
     ]);
   };
   pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_HANDED_LABEL);
@@ -20016,7 +20022,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .num.qty-piece:empty { font-weight: 400; }
 .stock { font-weight: 700; background: #fff; white-space: nowrap; }
 .spacer td { height: 18px; border: none !important; }
-.sign-label { text-align: left; font-weight: 700; border: none !important; white-space: nowrap; }
+.sign-label { text-align: center; font-weight: 400; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
 .sign-gap td { height: 18px; border: none !important; }
 </style></head><body><table class="prepare">
@@ -20028,9 +20034,9 @@ ${workerRows}
 <tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
-<tr><td colspan="3" class="sign-label">${RECEIPT_SIGN_HANDED_LABEL}</td><td colspan="3" class="sign-line"></td><td style="border:none"></td></tr>
+<tr><td colspan="7" class="sign-label">${RECEIPT_SIGN_HANDED_LABEL} _____________________</td></tr>
 <tr class="sign-gap"><td colspan="7"></td></tr>
-<tr><td colspan="3" class="sign-label">${RECEIPT_SIGN_RECEIVED_LABEL}</td><td colspan="3" class="sign-line"></td><td style="border:none"></td></tr>
+<tr><td colspan="7" class="sign-label">${RECEIPT_SIGN_RECEIVED_LABEL} _____________________</td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`Агуулах-бэлдэх-${stamp}.xls`, html);
 }
