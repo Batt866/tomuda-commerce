@@ -13323,13 +13323,7 @@ function productMatchCodes(p) {
 function productMatchesInventoryQuery(p, q) {
   const query = String(q || "").trim();
   if (!query) return true;
-  if (
-    String(p.name || "")
-      .toLowerCase()
-      .includes(query.toLowerCase())
-  )
-    return true;
-  return productMatchCodes(p).some((code) => code.includes(query));
+  return productTextMatchesQuery(p, query);
 }
 function inventoryRegisterBody(tab = state.filters.inventory || "stock") {
   const cat = state.filters.inventoryCategory,
@@ -14834,27 +14828,47 @@ function stockInScanDraft(el) {
   stockInScanFocus();
   patchStockInSearchHits();
 }
-function searchQueryNorm(value) {
+/** Soft normalize: case, NFC, Mongolian vowel unify — keeps Latin letters intact. */
+function searchQueryMild(value) {
   return String(value || "")
     .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
     .trim()
     .toLowerCase()
     .normalize("NFC")
     .replace(/ё/g, "е")
+    .replace(/ө/g, "о")
+    .replace(/ү/g, "у");
+}
+/** Visual lookalikes (Latin ↔ Cyrillic) for mistyped product names. */
+function searchQueryLookalike(value) {
+  return searchQueryMild(value)
     .replace(/[àáâäa]/g, "а")
     .replace(/[èéêëe]/g, "е")
     .replace(/[ìíîïiі]/g, "и")
-    .replace(/[òóôöoө]/g, "о")
-    .replace(/[ùúûüuү]/g, "у")
+    .replace(/[òóôöo]/g, "о")
+    .replace(/[ùúûüu]/g, "у")
     .replace(/[ýy]/g, "у")
-    .replace(/[cс]/g, "с")
+    .replace(/[csс]/g, "с")
     .replace(/[pр]/g, "р")
+    .replace(/[rр]/g, "р")
     .replace(/[xх]/g, "х")
+    .replace(/[hх]/g, "х")
     .replace(/[kк]/g, "к")
     .replace(/[mм]/g, "м")
     .replace(/[tт]/g, "т")
     .replace(/[nн]/g, "н")
-    .replace(/[bв]/g, "в");
+    .replace(/[bв]/g, "в")
+    .replace(/[vв]/g, "в")
+    .replace(/[gг]/g, "г")
+    .replace(/[dд]/g, "д")
+    .replace(/[lл]/g, "л")
+    .replace(/[zз]/g, "з")
+    .replace(/[jж]/g, "ж")
+    .replace(/[fф]/g, "ф")
+    .replace(/[wу]/g, "у");
+}
+function searchQueryNorm(value) {
+  return searchQueryLookalike(value);
 }
 function searchQueryLatin(value) {
   const pairs = [
@@ -14892,97 +14906,138 @@ function searchQueryLatin(value) {
     ["ь", ""],
     ["ъ", ""],
   ];
-  let out = searchQueryNorm(value);
+  // Use mild form so Latin transliteration (b→б sound) is not turned into в.
+  let out = searchQueryMild(value);
   pairs.forEach(([from, to]) => {
     out = out.split(from).join(to);
   });
   return out;
 }
+function searchTextForms(value) {
+  const mild = searchQueryMild(value);
+  const like = searchQueryLookalike(value);
+  const latin = searchQueryLatin(value);
+  return [...new Set([mild, like, latin].filter(Boolean))];
+}
+function searchTextMatches(haystack, needle) {
+  const qForms = searchTextForms(needle);
+  if (!qForms.length) return false;
+  const hForms = searchTextForms(haystack);
+  return qForms.some((q) =>
+    hForms.some(
+      (h) =>
+        h.includes(q) ||
+        (q.length >= 3 && h.length >= 3 && q.includes(h)),
+    ),
+  );
+}
+function searchTokensMatch(haystack, needle) {
+  const q = searchQueryMild(needle);
+  const tokens = q.split(/[\s\-_/.,;:+]+/).filter((t) => t.length >= 2);
+  if (tokens.length < 2) return false;
+  return tokens.every((t) => searchTextMatches(haystack, t));
+}
+function barcodeDigits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+function barcodesLooselyEqual(a, b) {
+  const da = barcodeDigits(a);
+  const db = barcodeDigits(b);
+  if (!da || !db) return false;
+  if (da === db) return true;
+  if (da.length === 12 && db.length === 13 && db === `0${da}`) return true;
+  if (db.length === 12 && da.length === 13 && da === `0${db}`) return true;
+  if (da.length >= 8 && db.length >= 8 && (da.endsWith(db) || db.endsWith(da)))
+    return true;
+  return false;
+}
+function barcodesLooselyIncludes(code, query) {
+  const dc = barcodeDigits(code);
+  const dq = barcodeDigits(query);
+  if (dc && dq) {
+    if (dc.includes(dq) || dq.includes(dc)) return true;
+    if (barcodesLooselyEqual(dc, dq)) return true;
+  }
+  const raw = String(query || "").trim();
+  const c = String(code || "").trim();
+  if (!raw || !c) return false;
+  return c.includes(raw) || raw.includes(c);
+}
 function productTextMatchesQuery(p, raw) {
-  const q = searchQueryNorm(raw);
+  const q = String(raw || "").trim();
   if (!q) return false;
-  const qLatin = searchQueryLatin(raw);
-  const name = searchQueryNorm(p.name);
-  if (name.includes(q)) return true;
-  const nameLatin = searchQueryLatin(p.name);
-  if (qLatin && nameLatin.includes(qLatin)) return true;
-  return productMatchCodes(p).some((c) => {
-    const code = String(c || "");
-    return (
-      code.includes(String(raw).trim()) ||
-      searchQueryNorm(code).includes(q) ||
-      (qLatin && searchQueryLatin(code).includes(qLatin))
-    );
-  });
+  if (searchTextMatches(p.name || "", q) || searchTokensMatch(p.name || "", q))
+    return true;
+  return productMatchCodes(p).some((c) => barcodesLooselyIncludes(c, q));
 }
 function findProductsByQuery(code) {
   const value = String(code || "").trim();
   if (!value) return [];
-  const exactCode = state.products.filter((p) =>
-    productMatchCodes(p).some((c) => c === value),
+  const products = state.products || [];
+  const exactCode = products.filter((p) =>
+    productMatchCodes(p).some((c) => c === value || barcodesLooselyEqual(c, value)),
   );
   if (exactCode.length) return exactCode;
-  const q = searchQueryNorm(value);
-  const exactName = state.products.filter((p) => searchQueryNorm(p.name) === q);
-  if (exactName.length) return exactName;
-  const nameHits = state.products.filter((p) => productTextMatchesQuery(p, value));
-  if (nameHits.length) return nameHits;
-  const partialCode = state.products.filter((p) =>
-    productMatchCodes(p).some((c) => c.includes(value)),
+  const qMild = searchQueryMild(value);
+  const exactName = products.filter(
+    (p) => searchQueryMild(p.name) === qMild || searchQueryLookalike(p.name) === searchQueryLookalike(value),
   );
-  if (partialCode.length === 1) return partialCode;
-  return partialCode;
+  if (exactName.length) return exactName;
+  const textHits = products.filter((p) => productTextMatchesQuery(p, value));
+  if (textHits.length) return textHits;
+  return products.filter((p) =>
+    productMatchCodes(p).some((c) => barcodesLooselyIncludes(c, value)),
+  );
 }
 function findProductByBarcode(code) {
   const matches = findProductsByQuery(code);
   return matches.length === 1 ? matches[0] : matches[0] || null;
 }
-function applyStockInBarcode(code) {
+function stockInUnusedSearchHits(query) {
+  return findProductsByQuery(query).filter((p) => stockInLineQty(p) <= 0);
+}
+function stockOutUnusedSearchHits(query) {
+  return findProductsByQuery(query).filter((p) => stockOutLineQty(p) <= 0);
+}
+/** Same path for typing, Хайх, and camera scan. */
+function stockInApplySearchQuery(code, { fromScan = false } = {}) {
   ensureStockInSession();
   if (!canManageStockIn()) {
     alertModal("Эрхгүй", "Орлого бүртгэх эрхгүй.");
     return false;
   }
   const query = String(code || "").trim();
-  const matches = findProductsByQuery(query);
-  if (!matches.length) {
-    alert("Бараа олдсонгүй");
-    return false;
-  }
-  if (matches.length > 1) {
-    const sample = matches
-      .slice(0, 5)
-      .map((p) => p.name)
-      .join(", ");
-    alert(
-      `Олон бараа олдлоо (${matches.length}): ${sample}${matches.length > 5 ? "…" : ""}.\nНэрийг илүү тодорхой бичнэ үү.`,
-    );
-    return false;
-  }
-  const product = matches[0];
-  state.stockInDone = false;
-  state.stockInReceipt = null;
-  state.stockInHighlightId = product.id;
-  state.stockInScanQuery = "";
-  state.searches.inventory = "";
+  state.stockInScanQuery = query;
+  state.searches.inventory = query;
   const input = document.getElementById("stockInBarcodeInput");
-  if (input) input.value = "";
-  if (barcodeScanning && barcodeScanTarget === "stockIn") {
+  if (input) input.value = query;
+  patchStockInSearchHits();
+  if (fromScan && barcodeScanning && barcodeScanTarget === "stockIn") {
     stopBarcodeScan();
   }
-  // Скан/хайсны дараа тоо ширхэгийг автоматаар бүү нэм — хэрэглэгч цонхонд өөрөө оруулна.
-  stockInEntryModal(product.id);
-  return true;
+  if (!query) return false;
+  const matches = stockInUnusedSearchHits(query);
+  if (matches.length === 1) {
+    const product = matches[0];
+    state.stockInDone = false;
+    state.stockInReceipt = null;
+    state.stockInHighlightId = product.id;
+    state.stockInScanQuery = "";
+    state.searches.inventory = "";
+    if (input) input.value = "";
+    patchStockInSearchHits();
+    stockInEntryModal(product.id);
+    return true;
+  }
+  return matches.length > 0;
+}
+function applyStockInBarcode(code) {
+  return stockInApplySearchQuery(code, { fromScan: true });
 }
 function stockInScanSubmit() {
   const input = document.getElementById("stockInBarcodeInput");
   const query = String(input?.value || state.stockInScanQuery || "").trim();
-  state.stockInScanQuery = query;
-  state.searches.inventory = query;
-  if (input) input.value = query;
-  patchStockInSearchHits();
-  const matches = findProductsByQuery(query).filter((p) => stockInLineQty(p) <= 0);
-  if (matches.length === 1) applyStockInBarcode(query);
+  stockInApplySearchQuery(query, { fromScan: false });
 }
 function stockInBarcodeKeydown(e) {
   if (e.key !== "Enter") return;
@@ -15036,51 +15091,44 @@ function stockOutScanDraft(el) {
   stockOutScanFocus();
   patchStockOutSearchHits();
 }
-function applyStockOutBarcode(code) {
+function stockOutApplySearchQuery(code, { fromScan = false } = {}) {
   ensureStockOutSession();
   if (!canManageStockOut()) {
     alertModal("Эрхгүй", "Зарлага бүртгэх эрхгүй.");
     return false;
   }
   const query = String(code || "").trim();
-  const matches = findProductsByQuery(query);
-  if (!matches.length) {
-    alert("Бараа олдсонгүй");
-    return false;
-  }
-  if (matches.length > 1) {
-    const sample = matches
-      .slice(0, 5)
-      .map((p) => p.name)
-      .join(", ");
-    alert(
-      `Олон бараа олдлоо (${matches.length}): ${sample}${matches.length > 5 ? "…" : ""}.\nНэрийг илүү тодорхой бичнэ үү.`,
-    );
-    return false;
-  }
-  const product = matches[0];
-  state.stockOutDone = false;
-  state.stockOutReceipt = null;
-  state.stockOutHighlightId = product.id;
-  state.stockOutScanQuery = "";
-  state.searches.inventory = "";
+  state.stockOutScanQuery = query;
+  state.searches.inventory = query;
   const input = document.getElementById("stockOutBarcodeInput");
-  if (input) input.value = "";
-  if (barcodeScanning && barcodeScanTarget === "stockOut") {
+  if (input) input.value = query;
+  patchStockOutSearchHits();
+  if (fromScan && barcodeScanning && barcodeScanTarget === "stockOut") {
     stopBarcodeScan();
   }
-  stockOutModal(product.id);
-  return true;
+  if (!query) return false;
+  const matches = stockOutUnusedSearchHits(query);
+  if (matches.length === 1) {
+    const product = matches[0];
+    state.stockOutDone = false;
+    state.stockOutReceipt = null;
+    state.stockOutHighlightId = product.id;
+    state.stockOutScanQuery = "";
+    state.searches.inventory = "";
+    if (input) input.value = "";
+    patchStockOutSearchHits();
+    stockOutModal(product.id);
+    return true;
+  }
+  return matches.length > 0;
+}
+function applyStockOutBarcode(code) {
+  return stockOutApplySearchQuery(code, { fromScan: true });
 }
 function stockOutScanSubmit() {
   const input = document.getElementById("stockOutBarcodeInput");
   const query = String(input?.value || state.stockOutScanQuery || "").trim();
-  state.stockOutScanQuery = query;
-  state.searches.inventory = query;
-  if (input) input.value = query;
-  patchStockOutSearchHits();
-  const matches = findProductsByQuery(query).filter((p) => stockOutLineQty(p) <= 0);
-  if (matches.length === 1) applyStockOutBarcode(query);
+  stockOutApplySearchQuery(query, { fromScan: false });
 }
 function stockOutBarcodeKeydown(e) {
   if (e.key !== "Enter") return;
@@ -15604,9 +15652,7 @@ function stockInDraftStats(list = state.products) {
 function stockInSearchHitProducts() {
   const q = String(state.stockInScanQuery || "").trim();
   if (!q) return [];
-  return findProductsByQuery(q)
-    .filter((p) => stockInLineQty(p) <= 0)
-    .slice(0, 24);
+  return stockInUnusedSearchHits(q).slice(0, 24);
 }
 function stockInSearchHitsWindowHtml(hits, { emptyMsg, pickFn, closeFn }) {
   const head = `<div class="stock-in-search-window__head"><p>Олдсон бараа</p><button type="button" class="stock-in-search-window__close" onclick="${closeFn}()" aria-label="Хайх цонх хаах">✕</button></div>`;
@@ -15713,9 +15759,7 @@ function stockOutDraftStats(list = state.products) {
 function stockOutSearchHitProducts() {
   const q = String(state.stockOutScanQuery || "").trim();
   if (!q) return [];
-  return findProductsByQuery(q)
-    .filter((p) => stockOutLineQty(p) <= 0)
-    .slice(0, 24);
+  return stockOutUnusedSearchHits(q).slice(0, 24);
 }
 function stockOutSearchHitsContentHtml() {
   const q = String(state.stockOutScanQuery || "").trim();
@@ -28046,14 +28090,32 @@ async function startNativeBarcodeScan(video, status) {
   await video.play();
   barcodeScanning = true;
   const detector = new BarcodeDetector({
-    formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
+    formats: [
+      "ean_13",
+      "ean_8",
+      "upc_a",
+      "upc_e",
+      "code_128",
+      "code_39",
+      "codabar",
+      "itf",
+      "qr_code",
+    ],
   });
+  let lastRaw = "";
+  let lastAt = 0;
   const scan = async () => {
     if (!barcodeScanning) return;
     try {
       const codes = await detector.detect(video);
       if (codes.length) {
-        handleScannedBarcode(codes[0].rawValue);
+        const raw = String(codes[0].rawValue || "").trim();
+        const now = Date.now();
+        if (raw && (raw !== lastRaw || now - lastAt > 1200)) {
+          lastRaw = raw;
+          lastAt = now;
+          handleScannedBarcode(raw);
+        }
         return;
       }
       status.textContent = "Баркодоо камер руу ойртуулна уу";
@@ -28069,11 +28131,19 @@ async function startZxingBarcodeScan(video, status) {
   zxingReader = new BrowserMultiFormatReader();
   barcodeScanning = true;
   status.textContent = "Баркодоо камер руу ойртуулна уу";
+  let lastRaw = "";
+  let lastAt = 0;
   zxingControls = await zxingReader.decodeFromVideoDevice(
     undefined,
     video,
     (result) => {
-      if (result) handleScannedBarcode(result.getText());
+      if (!result) return;
+      const raw = String(result.getText() || "").trim();
+      const now = Date.now();
+      if (!raw || (raw === lastRaw && now - lastAt < 1200)) return;
+      lastRaw = raw;
+      lastAt = now;
+      handleScannedBarcode(raw);
     },
   );
 }
