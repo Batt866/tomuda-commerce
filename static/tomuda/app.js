@@ -28790,29 +28790,39 @@ function closePickerQtySheet() {
   unmountPickerQtySheet();
   if (id) setWorkerQty(id, revertQty ?? 0);
 }
+function pickerQtySheetRowHead(label, hint = "") {
+  const hintHtml = hint
+    ? `<span class="picker-qty-sheet__row-hint">${esc(hint)}</span>`
+    : "";
+  return `<div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">${esc(label)}</span>${hintHtml}</div>`;
+}
 function pickerQtySheetHtml(productId) {
   const p = state.products.find((x) => x.id === productId);
   if (!p) return "";
   const id = esc(p.id);
   const q = getWorkerQty(p.id);
   const packSize = productPackSize(p);
+  const largeCount = productLargeBoxCount(p);
   const largePieces = productLargeBoxPieceCount(p);
   const { largePacks, packs, pieces } = pickerQtyToParts(q, p);
   let qtyBody;
   if (packSize || largePieces) {
     const rows = [];
     if (largePieces) {
+      const largeHint = largeCount
+        ? `1 том = ${largeCount} жижиг (${largePieces} ш)`
+        : `${largePieces} ш`;
       rows.push(
-        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Том хайрцаг</span></div>${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces, packs), sheet: true })}</div>`,
+        `<div class="picker-qty-sheet__row">${pickerQtySheetRowHead("Том хайрцаг", largeHint)}${pickerPartStepperHtml(p, largePacks, { kind: "large", max: pickerLargeMax(p, pieces, packs), sheet: true })}</div>`,
       );
     }
     if (packSize) {
       rows.push(
-        `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Жижиг хайрцаг</span></div>${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces, largePacks), sheet: true })}</div>`,
+        `<div class="picker-qty-sheet__row">${pickerQtySheetRowHead("Жижиг хайрцаг", `1 жижиг = ${packSize} ш`)}${pickerPartStepperHtml(p, packs, { kind: "pack", max: pickerPackMax(p, pieces, largePacks), sheet: true })}</div>`,
       );
     }
     rows.push(
-      `<div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Задгай ширхэг</span></div>${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs, largePacks), sheet: true })}</div>`,
+      `<div class="picker-qty-sheet__row">${pickerQtySheetRowHead("Задгай ширхэг")}${pickerPartStepperHtml(p, pieces, { kind: "piece", max: pickerPieceMax(p, packs, largePacks), sheet: true })}</div>`,
     );
     const partsLabel = prepareQtyColsHtml(
       { largePacks, packs, pieces },
@@ -28820,7 +28830,7 @@ function pickerQtySheetHtml(productId) {
     );
     qtyBody = `<div class="picker-qty-sheet__qty">${rows.join("")}<p class="picker-qty-sheet__total" data-picker-qty-parts>${partsLabel}<span class="picker-qty-sheet__total-sep">·</span>Нийт <b data-picker-qty-total>${q} ш</b></p></div>`;
   } else {
-    qtyBody = `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row"><div class="picker-qty-sheet__row-head"><span class="picker-qty-sheet__row-label">Тоо ширхэг</span></div>${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
+    qtyBody = `<div class="picker-qty-sheet__qty"><div class="picker-qty-sheet__row">${pickerQtySheetRowHead("Тоо ширхэг")}${pickerQtyStepperHtml(p, q, { sheet: true })}</div><p class="picker-qty-sheet__total">Нийт: <b data-picker-qty-total>${q} ш</b></p></div>`;
   }
   const promoHtml = pickerQtySheetPromoHtml(p);
   const stockHave = productStockWithEditCredit(p.id);
