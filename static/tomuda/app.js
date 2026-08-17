@@ -12906,7 +12906,8 @@ function inventoryExcelDataRows(products = inventoryStockExportList()) {
       continue;
     }
     if (item.type === "catTotal") {
-      const row = ["", `${item.name} нийт`, "", item.salesTotal];
+      // Excel shows only the top-left cell of a merge, so the label must be in A.
+      const row = [`${item.name} нийт`, "", "", item.salesTotal];
       if (showCost) row.push(item.costTotal);
       row.push("", "");
       rows.push(row);
@@ -12945,7 +12946,7 @@ function confirmInventoryExport() {
           0,
         )
       : 0;
-    const grandRow = ["", "Нийт дүн", "", salesGrand];
+    const grandRow = ["Нийт дүн", "", "", salesGrand];
     if (showCost) grandRow.push(costGrand);
     grandRow.push("", "");
     const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`];
@@ -12976,10 +12977,9 @@ function confirmInventoryExport() {
       {
         sheetName: "Үлдэгдэл",
         freezeHeaderRow: 4,
-        // Keep existing column widths unchanged.
         colWidths: showCost
-          ? [3, 32, 16, 14, 12, 10, 8]
-          : [3, 32, 16, 14, 10, 8],
+          ? [3, 32, 16, 18, 12, 10, 8]
+          : [3, 32, 16, 18, 10, 8],
         merges,
       },
     );
@@ -17518,7 +17518,7 @@ function buildProductSheetXml() {
   }
   const lastRow = rowNum - 1;
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
-  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${PRODUCT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="6" customWidth="1"/><col min="2" max="2" width="16" customWidth="1"/><col min="3" max="3" width="28" customWidth="1"/><col min="4" max="4" width="16" customWidth="1"/><col min="5" max="5" width="14" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="10" customWidth="1"/><col min="8" max="8" width="12" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${PRODUCT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="13.5"/><cols><col min="1" max="1" width="6" customWidth="1"/><col min="2" max="2" width="16" customWidth="1"/><col min="3" max="3" width="28" customWidth="1"/><col min="4" max="4" width="16" customWidth="1"/><col min="5" max="5" width="18" customWidth="1"/><col min="6" max="6" width="12" customWidth="1"/><col min="7" max="7" width="10" customWidth="1"/><col min="8" max="8" width="12" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><mergeCells count="${merges.length}">${mergeXml}</mergeCells><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>`;
   return { sharedStringsXml: xlsxSharedStringsXml(strings), sheetXml };
 }
 async function exportProductsExcelXlsx() {
