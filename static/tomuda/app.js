@@ -12932,62 +12932,315 @@ function inventoryExcelDataRows(products = inventoryStockExportList()) {
   }
   return rows;
 }
+const INVENTORY_STOCK_REPORT_TITLE = "Агуулахын барааны үлдэгдэл";
+const INVENTORY_STOCK_REPORT_TITLE_ROW_H = 24;
+const INVENTORY_STOCK_REPORT_META_ROW_H = 18;
+const INVENTORY_STOCK_REPORT_HEADER_ROW_H = 20;
+const INVENTORY_STOCK_REPORT_DATA_ROW_H = 18;
+const INVENTORY_STOCK_REPORT_SPACER_ROW_H = 10;
+function inventoryExportPrintedDateText() {
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+function inventoryExportEmployeeName() {
+  const emp = state.currentEmployee;
+  return String(emp?.name || "").trim() || "-";
+}
+function inventoryExportAccountLabel() {
+  const emp = state.currentEmployee;
+  const name = String(emp?.name || "").trim();
+  const email = String(emp?.email || "").trim();
+  const roleLabel = emp?.role ? role(emp.role) : "";
+  if (name && roleLabel) return `${name} (${roleLabel})`;
+  if (name) return name;
+  if (email) return email;
+  return "-";
+}
+function inventoryStockReportColumns(showCost) {
+  if (showCost) {
+    return {
+      lastCol: "J",
+      costPriceCol: "G",
+      salesPriceCol: "H",
+      costTotalCol: "I",
+      salesTotalCol: "J",
+      labelMergeEnd: "H",
+    };
+  }
+  return {
+    lastCol: "H",
+    costPriceCol: "",
+    salesPriceCol: "G",
+    costTotalCol: "",
+    salesTotalCol: "H",
+    labelMergeEnd: "F",
+  };
+}
+function inventoryStockReportColWidths(showCost) {
+  return showCost
+    ? [5, 30, 14, 14, 10, 8, 12, 12, 14, 14]
+    : [5, 32, 14, 14, 10, 8, 12, 14];
+}
+function inventoryStockReportHeaders(showCost) {
+  const headers = ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"];
+  if (showCost) headers.push("Өртөг үнэ");
+  headers.push("Нэгж үнэ");
+  if (showCost) headers.push("Өртөг үнийн нийлбэр");
+  headers.push("Нэгж үнийн нийлбэр");
+  return headers;
+}
+function inventoryStockReportWorksheetXml(rows, merges, lastRow, lastCol, colWidths) {
+  const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
+  const mergeCellsXml = merges.length
+    ? `<mergeCells count="${merges.length}">${mergeXml}</mergeCells>`
+    : "";
+  const colsXml = (colWidths || []).map(
+    (width, index) =>
+      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+  ).join("");
+  const endRef = `${lastCol || "J"}${Math.max(1, lastRow)}`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${endRef}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.35" right="0.35" top="0.45" bottom="0.4" header="0.12" footer="0.12"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+}
+function buildInventoryStockSheetXml(products) {
+  const showCost = canViewProductCost();
+  const cols = inventoryStockReportColumns(showCost);
+  const lastCol = cols.lastCol;
+  const s = STOCK_IN_LIST_REPORT_STYLES;
+  const colWidths = inventoryStockReportColWidths(showCost);
+  const headers = inventoryStockReportHeaders(showCost);
+  const strings = [];
+  const strIndex = new Map();
+  const si = (text) => {
+    const key = String(text ?? "");
+    if (strIndex.has(key)) return strIndex.get(key);
+    const idx = strings.length;
+    strings.push(key);
+    strIndex.set(key, idx);
+    return idx;
+  };
+  const merges = [`A1:${lastCol}1`];
+  const rows = [];
+  let rowNum = 1;
+  const pushRow = (height, cells) => {
+    rows.push(
+      xlsxRowXml(
+        rowNum,
+        height,
+        filterXlsxCellsOutsideMerges(cells, merges),
+        lastCol,
+      ),
+    );
+    rowNum += 1;
+  };
+  const pushSpacerRow = (height = INVENTORY_STOCK_REPORT_SPACER_ROW_H) => {
+    const r = rowNum;
+    merges.push(`A${r}:${lastCol}${r}`);
+    pushRow(height, [xlsxCellXml(`A${r}`, 0, null, "empty")]);
+  };
+  pushRow(INVENTORY_STOCK_REPORT_TITLE_ROW_H, [
+    xlsxCellXml("A1", s.title, si(INVENTORY_STOCK_REPORT_TITLE), "s"),
+  ]);
+  pushSpacerRow();
+  const pushMetaRow = (text) => {
+    const r = rowNum;
+    merges.push(`A${r}:${lastCol}${r}`);
+    pushRow(INVENTORY_STOCK_REPORT_META_ROW_H, [
+      xlsxCellXml(`A${r}`, s.metaValue, si(text), "s"),
+    ]);
+  };
+  pushMetaRow(`Хэвлэсэн огноо: ${inventoryExportPrintedDateText()}`);
+  pushMetaRow(`Хэвлэсэн ажилтан: ${inventoryExportEmployeeName()}`);
+  pushMetaRow(`Нэвтэрсэн бүртгэл: ${inventoryExportAccountLabel()}`);
+  pushSpacerRow();
+  const headerRow = rowNum;
+  pushRow(INVENTORY_STOCK_REPORT_HEADER_ROW_H, headers.map((label, index) =>
+    xlsxCellXml(
+      `${xlsxColName(index + 1)}${headerRow}`,
+      s.tableHeader,
+      si(label),
+      "s",
+    ),
+  ));
+  let salesGrand = 0;
+  let costGrand = 0;
+  for (const item of inventoryExcelGroupedItems(products)) {
+    if (item.type === "cat") {
+      const r = rowNum;
+      merges.push(`A${r}:${lastCol}${r}`);
+      pushRow(INVENTORY_STOCK_REPORT_DATA_ROW_H, [
+        xlsxCellXml(`A${r}`, s.tableHeader, si(item.name), "s"),
+      ]);
+      continue;
+    }
+    if (item.type === "catTotal") continue;
+    const p = item.product;
+    const r = rowNum;
+    const stock = Number(p.stock) || 0;
+    const salesPrice = productSalesPrice(p);
+    const costPrice = productCostPrice(p);
+    const salesTotal = inventoryProductLineSalesTotal(p);
+    const costTotal = inventoryProductLineCostTotal(p);
+    salesGrand += salesTotal;
+    costGrand += costTotal;
+    const sku = String(p.barcode || "").trim();
+    const unit = String(p.unit || "ширхэг").trim() || "ширхэг";
+    const cat = String(p.category || "Бусад").trim() || "Бусад";
+    const cells = [
+      xlsxCellXml(`A${r}`, s.noCenter, item.index, "n"),
+      xlsxCellXml(`B${r}`, s.textLeft, si(p.name || ""), "s"),
+      xlsxCellXml(`C${r}`, s.textCenter, si(cat), "s"),
+      sku
+        ? xlsxBarcodeCell(`D${r}`, s.barcode, sku, si)
+        : xlsxCellXml(`D${r}`, s.barcode, si("—"), "s"),
+      xlsxCellXml(`E${r}`, s.intRight, stock, "n"),
+      xlsxCellXml(`F${r}`, s.textCenter, si(unit), "s"),
+    ];
+    if (showCost) {
+      cells.push(xlsxCellXml(`G${r}`, s.intRight, costPrice, "n"));
+      cells.push(xlsxCellXml(`H${r}`, s.intRight, salesPrice, "n"));
+      cells.push(
+        xlsxCellXml(
+          `I${r}`,
+          s.intRight,
+          { f: `E${r}*G${r}`, v: costTotal },
+          "f",
+        ),
+      );
+      cells.push(
+        xlsxCellXml(
+          `J${r}`,
+          s.intRight,
+          { f: `E${r}*H${r}`, v: salesTotal },
+          "f",
+        ),
+      );
+    } else {
+      cells.push(xlsxCellXml(`G${r}`, s.intRight, salesPrice, "n"));
+      cells.push(
+        xlsxCellXml(
+          `H${r}`,
+          s.intRight,
+          { f: `E${r}*G${r}`, v: salesTotal },
+          "f",
+        ),
+      );
+    }
+    pushRow(INVENTORY_STOCK_REPORT_DATA_ROW_H, cells);
+  }
+  pushSpacerRow();
+  const totalRow = rowNum;
+  merges.push(`A${totalRow}:${cols.labelMergeEnd}${totalRow}`);
+  const totalCells = [
+    xlsxCellXml(`A${totalRow}`, s.summaryText, si("Нийт дүн"), "s"),
+  ];
+  if (showCost) {
+    totalCells.push(
+      xlsxCellXml(
+        `${cols.costTotalCol}${totalRow}`,
+        s.summaryInt,
+        costGrand,
+        "n",
+      ),
+    );
+  }
+  totalCells.push(
+    xlsxCellXml(
+      `${cols.salesTotalCol}${totalRow}`,
+      s.summaryInt,
+      salesGrand,
+      "n",
+    ),
+  );
+  pushRow(INVENTORY_STOCK_REPORT_HEADER_ROW_H, totalCells);
+  const lastRow = Math.max(1, rowNum - 1);
+  const printArea = `$A$1:$${lastCol}$${lastRow}`;
+  return {
+    sharedStringsXml: xlsxSharedStringsXml(strings),
+    sheetXml: inventoryStockReportWorksheetXml(
+      rows,
+      merges,
+      lastRow,
+      lastCol,
+      colWidths,
+    ),
+    printArea,
+  };
+}
+function inventoryExcelFallback(products) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const showCost = canViewProductCost();
+  const lastCol = inventoryExcelLastCol();
+  const grouped = inventoryExcelGroupedItems(products);
+  const dataRows = inventoryExcelDataRows(products);
+  const salesGrand = products.reduce(
+    (sum, p) => sum + inventoryProductLineSalesTotal(p),
+    0,
+  );
+  const costGrand = showCost
+    ? products.reduce((sum, p) => sum + inventoryProductLineCostTotal(p), 0)
+    : 0;
+  const grandRow = ["Нийт дүн", "", "", fmtExcelNumber(salesGrand)];
+  if (showCost) grandRow.push(fmtExcelNumber(costGrand));
+  grandRow.push("", "");
+  const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`, `B3:${lastCol}3`, `B4:${lastCol}4`];
+  let excelRow = 7;
+  for (const item of grouped) {
+    if (item.type === "cat") {
+      merges.push(`A${excelRow}:${lastCol}${excelRow}`);
+    } else if (item.type === "catTotal") {
+      merges.push(`A${excelRow}:C${excelRow}`);
+    }
+    excelRow += 1;
+  }
+  excelRow += 1;
+  merges.push(`A${excelRow}:C${excelRow}`);
+  excel(
+    `Үлдэгдэл-${stamp}.xlsx`,
+    [
+      ["", INVENTORY_STOCK_REPORT_TITLE],
+      ["", `Хэвлэсэн огноо: ${inventoryExportPrintedDateText()}`],
+      ["", `Хэвлэсэн ажилтан: ${inventoryExportEmployeeName()}`],
+      ["", `Нэвтэрсэн бүртгэл: ${inventoryExportAccountLabel()}`],
+      [],
+      inventoryExcelHeaders(),
+      ...dataRows,
+      [],
+      grandRow,
+    ],
+    {
+      sheetName: "Үлдэгдэл",
+      freezeHeaderRow: 6,
+      colWidths: showCost
+        ? [3, 32, 16, 18, 12, 10, 8]
+        : [3, 32, 16, 18, 10, 8],
+      merges,
+    },
+  );
+}
+async function exportInventoryExcelXlsx(products) {
+  if (typeof JSZip === "undefined") {
+    throw new Error("JSZip missing");
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  const { sharedStringsXml, sheetXml, printArea } =
+    buildInventoryStockSheetXml(products);
+  const zip = await assembleStockInReportXlsxZip({
+    sharedStringsXml,
+    sheetXml,
+    printArea,
+    sheetName: "Үлдэгдэл",
+    stylesXml: stockInListReportStylesXml(),
+  });
+  const blob = await zipToExcelBlob(zip);
+  await downloadBlobFile(blob, `Үлдэгдэл-${stamp}.xlsx`);
+}
 function confirmInventoryExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   const products = inventoryStockExportList();
   if (!products.length) return alert("Үлдэгдэл байхгүй");
   confirmDataExport("Мэдээлэл татах", () => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    const showCost = canViewProductCost();
-    const lastCol = inventoryExcelLastCol();
-    const grouped = inventoryExcelGroupedItems(products);
-    const dataRows = inventoryExcelDataRows(products);
-    const salesGrand = products.reduce(
-      (sum, p) => sum + inventoryProductLineSalesTotal(p),
-      0,
-    );
-    const costGrand = showCost
-      ? products.reduce(
-          (sum, p) => sum + inventoryProductLineCostTotal(p),
-          0,
-        )
-      : 0;
-    const grandRow = ["Нийт дүн", "", "", fmtExcelNumber(salesGrand)];
-    if (showCost) grandRow.push(fmtExcelNumber(costGrand));
-    grandRow.push("", "");
-    const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`];
-    // Data starts at Excel row 5 (title / date / blank / header).
-    let excelRow = 5;
-    for (const item of grouped) {
-      if (item.type === "cat") {
-        merges.push(`A${excelRow}:${lastCol}${excelRow}`);
-      } else if (item.type === "catTotal") {
-        merges.push(`A${excelRow}:C${excelRow}`);
-      }
-      excelRow += 1;
-    }
-    // Blank spacer + grand total
-    excelRow += 1;
-    merges.push(`A${excelRow}:C${excelRow}`);
-    excel(
-      `Үлдэгдэл-${stamp}.xlsx`,
-      [
-        ["", "Үлдэгдэл"],
-        ["", `${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
-        [],
-        inventoryExcelHeaders(),
-        ...dataRows,
-        [],
-        grandRow,
-      ],
-      {
-        sheetName: "Үлдэгдэл",
-        freezeHeaderRow: 4,
-        colWidths: showCost
-          ? [3, 32, 16, 18, 12, 10, 8]
-          : [3, 32, 16, 18, 10, 8],
-        merges,
-      },
+    void exportInventoryExcelXlsx(products).catch(() =>
+      inventoryExcelFallback(products),
     );
   });
 }
