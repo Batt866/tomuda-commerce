@@ -1599,10 +1599,13 @@ a.customer-card__line .customer-card__icon {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0;
+  padding: 0 0 4px;
   border: none;
   border-radius: 0;
-  background: transparent;
+  background: var(--hex-page, var(--hex-secondary, #f5f7f9));
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .worker-pick__search {

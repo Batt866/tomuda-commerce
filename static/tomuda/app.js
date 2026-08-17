@@ -373,6 +373,8 @@ let stockInScanRenderPending = false;
 let stockInScanBlurTimer = null;
 let stockInScanForceRender = false;
 let barcodeScanRenderPending = false;
+let workerStoreSearchRenderPending = false;
+let workerStoreSearchBlurTimer = null;
 let loginFormActiveUntil = 0;
 let loginFormGuardBound = false;
 let tombudaHistoryDepth = 0;
@@ -2571,6 +2573,28 @@ function initStockInSearchHandlers() {
       return;
     }
     run(el);
+  };
+  ["input", "compositionend", "paste", "keydown"].forEach((type) =>
+    document.addEventListener(type, onEvent, true),
+  );
+}
+function initWorkerStoreSearchHandlers() {
+  if (initWorkerStoreSearchHandlers._bound) return;
+  initWorkerStoreSearchHandlers._bound = true;
+  const isWorkerSearch = (el) =>
+    el?.matches?.("[data-focus='workerStore'], .worker-pick__search");
+  const onEvent = (e) => {
+    const el = e.target;
+    if (!isWorkerSearch(el)) return;
+    if (e.type === "keydown") {
+      if (e.key === "Enter") e.preventDefault();
+      return;
+    }
+    if (e.type === "paste") {
+      setTimeout(() => search("workerStore", el.value), 0);
+      return;
+    }
+    search("workerStore", el.value);
   };
   ["input", "compositionend", "paste", "keydown"].forEach((type) =>
     document.addEventListener(type, onEvent, true),
@@ -5500,6 +5524,7 @@ function shouldDeferBackendSync() {
   if (isWarehouseDateEditing()) return true;
   if (isEditingSettlementText()) return true;
   if (isEditingStockInScan()) return true;
+  if (isEditingWorkerStoreSearch()) return true;
   if (isWhReceiptPickerOpen()) return true;
   if (isReceiptStatusSelecting()) return true;
   if (isToolbarSelectActive()) return true;
@@ -5653,6 +5678,33 @@ function isEditingStockInScan() {
   return !!el?.matches?.(
     "#stockInBarcodeInput, [data-focus='stockInScan'], #stockOutBarcodeInput, [data-focus='stockOutScan']",
   );
+}
+function isEditingWorkerStoreSearch() {
+  const el = document.activeElement;
+  return !!el?.matches?.(
+    "[data-focus='workerStore'], .worker-pick__search, [data-store-search]",
+  );
+}
+function isOnWorkerStorePickScreen() {
+  return (
+    state.currentView === "worker" &&
+    state.filters.worker === "new" &&
+    !state.workerStoreReady &&
+    !!document.querySelector(".worker-pick")
+  );
+}
+function workerStoreSearchFocus() {
+  clearTimeout(workerStoreSearchBlurTimer);
+}
+function workerStoreSearchBlur() {
+  clearTimeout(workerStoreSearchBlurTimer);
+  workerStoreSearchBlurTimer = setTimeout(flushPendingWorkerStoreSearchRender, 180);
+}
+function flushPendingWorkerStoreSearchRender() {
+  if (isEditingWorkerStoreSearch()) return;
+  if (!workerStoreSearchRenderPending) return;
+  workerStoreSearchRenderPending = false;
+  if (!patchWorkerStorePickList()) render();
 }
 function stockInScanFocus() {
   clearTimeout(stockInScanBlurTimer);
@@ -5900,6 +5952,11 @@ function safeRender() {
     stockInScanRenderPending = true;
     return;
   }
+  if (isEditingWorkerStoreSearch()) {
+    workerStoreSearchRenderPending = true;
+    patchWorkerStorePickList();
+    return;
+  }
   if (barcodeScanning) {
     barcodeScanRenderPending = true;
     return;
@@ -5965,14 +6022,18 @@ function applyRemoteState(payload, opts = {}) {
     updatedAt: payload.updatedAt || "",
   });
   if (!state.isLoggedIn) return true;
-  if (
+  if (isEditingWorkerStoreSearch() || isOnWorkerStorePickScreen()) {
+    workerStoreSearchRenderPending = isEditingWorkerStoreSearch();
+    patchWorkerStorePickList();
+  } else if (
     forceRender ||
     grew ||
     customersChanged ||
     !shouldDeferBackendSync()
   ) {
     safeRender();
-  }  if (reopenPicker && pickerCategory) {
+  }
+  if (reopenPicker && pickerCategory) {
     state.filters.workerCategory = pickerCategory;
     pickerModal();
   }
@@ -6076,6 +6137,7 @@ function completeBootUiInit(options = {}) {
   initCountInputHandlers();
   initExcelImportHandlers();
   initStockInSearchHandlers();
+  initWorkerStoreSearchHandlers();
   initConfirmCard();
   initConfirmDeleteActions();
   initStockSwipeRows();
@@ -8453,12 +8515,13 @@ function go(view, opts = {}) {
   saveAuthSession();
   render();
   if (view === "customers" || view === "products" || view === "worker") {
-    pullBackendStateNow();
+    pullBackendStateNow({ forceRender: false });
   }
   if (changed && !opts.silent && !suppressHistoryPush) pushAppHistory();
 }
 function search(key, value) {
   state.searches[key] = value;
+  if (key === "workerStore" && patchWorkerStorePickList()) return;
   clearTimeout(searchRenderTimer);
   searchRenderTimer = setTimeout(() => {
     if (patchLiveSearch(key)) return;
@@ -12085,42 +12148,76 @@ function findCustomerByRegistrationNumber(registrationNumber, excludeId = "") {
     }) || null
   );
 }
+function customerNameMatchesNeedle(name, needle) {
+  const q = searchQueryMild(needle);
+  const hay = searchQueryMild(name);
+  if (!q || !hay) return false;
+  if (q.length <= 2) {
+    const words = hay.split(/[\s\-_/.,;:()+]+/).filter(Boolean);
+    return hay.startsWith(q) || words.some((w) => w.startsWith(q));
+  }
+  if (hay.includes(q)) return true;
+  return searchTextMatches(name, needle);
+}
 function customerMatchesQuery(c, q) {
-  const parsedQ = parseRegistrationNumber(q);
-  const needle = String(q || "")
-    .trim()
-    .toLowerCase();
+  const needle = String(q || "").trim();
   if (!needle) return true;
-  const nameMatch = String(c.name || "")
-    .toLowerCase()
-    .includes(needle);
-  const companyMatch = String(c.companyName || "")
-    .toLowerCase()
-    .includes(needle);
+  if (
+    customerNameMatchesNeedle(c.name || "", needle) ||
+    customerNameMatchesNeedle(customerDisplayName(c), needle)
+  ) {
+    return true;
+  }
+  // Company is subtitle-only. Match it only for longer queries so
+  // "тур" does not hit "Ренессанс турс" / "Алтай натур".
+  const company = String(c.companyName || "").trim();
+  if (
+    needle.length >= 4 &&
+    company &&
+    company !== String(c.name || "").trim() &&
+    customerNameMatchesNeedle(company, needle)
+  ) {
+    return true;
+  }
+  if (/\d/.test(needle)) {
+    const phoneNeedle = needle.replace(/\s+/g, "");
+    if (
+      customerPhonesList(c).some((phone) =>
+        String(phone || "")
+          .replace(/\s+/g, "")
+          .toLowerCase()
+          .includes(phoneNeedle.toLowerCase()),
+      )
+    ) {
+      return true;
+    }
+  }
+  const parsedQ = parseRegistrationNumber(q);
   const stored = parseRegistrationNumber(c.registrationNumber);
-  const rdDigitsMatch =
-    !!parsedQ.digits &&
-    !!stored.digits &&
-    (stored.digits.includes(parsedQ.digits) ||
-      parsedQ.digits.includes(stored.digits));
-  const rdFullMatch =
-    !!parsedQ.full &&
-    !!stored.full &&
-    (stored.full.toLowerCase().includes(parsedQ.full.toLowerCase()) ||
-      parsedQ.full.toLowerCase().includes(stored.full.toLowerCase()));
-  const rdPrefixMatch =
-    !!parsedQ.prefix &&
+  if (parsedQ.digits && parsedQ.digits.length >= 3 && stored.digits) {
+    if (
+      stored.digits.includes(parsedQ.digits) ||
+      parsedQ.digits.includes(stored.digits)
+    )
+      return true;
+  }
+  // Mongolian RD letter prefix is 2 chars. A single typed letter must not
+  // match every customer whose RD starts with that letter.
+  if (
+    parsedQ.prefix &&
+    parsedQ.prefix.length >= 2 &&
     !parsedQ.digits &&
-    !!stored.prefix &&
-    stored.prefix.toLowerCase() === parsedQ.prefix.toLowerCase();
-  return (
-    nameMatch ||
-    companyMatch ||
-    rdDigitsMatch ||
-    rdFullMatch ||
-    rdPrefixMatch ||
-    customerPhonesList(c).some((phone) => phone.toLowerCase().includes(needle))
-  );
+    stored.prefix &&
+    stored.prefix.toLowerCase() === parsedQ.prefix.toLowerCase()
+  ) {
+    return true;
+  }
+  if (parsedQ.full && parsedQ.full.length >= 3 && stored.full) {
+    const qf = parsedQ.full.toLowerCase();
+    const sf = stored.full.toLowerCase();
+    if (sf.includes(qf)) return true;
+  }
+  return false;
 }
 function sortCustomersByName(customers) {
   return [...(customers || [])].sort((a, b) =>
@@ -12749,13 +12846,70 @@ function inventoryExcelColCount() {
 function inventoryExcelLastCol() {
   return xlsxColName(inventoryExcelColCount());
 }
+function inventoryExcelBlankCells(count) {
+  return Array.from({ length: Math.max(0, count) }, () => "");
+}
+function inventoryProductLineSalesTotal(p) {
+  return (Number(p.stock) || 0) * productSalesPrice(p);
+}
+function inventoryProductLineCostTotal(p) {
+  return (Number(p.stock) || 0) * productCostPrice(p);
+}
+/** Category blocks + money subtotals (same for filtered type or all). */
+function inventoryExcelGroupedItems(products = inventoryStockExportList()) {
+  const showCost = canViewProductCost();
+  const items = [];
+  let index = 0;
+  let cur = "";
+  let catProducts = [];
+  const flushCat = () => {
+    if (!cur) return;
+    const salesTotal = catProducts.reduce(
+      (sum, p) => sum + inventoryProductLineSalesTotal(p),
+      0,
+    );
+    const costTotal = showCost
+      ? catProducts.reduce(
+          (sum, p) => sum + inventoryProductLineCostTotal(p),
+          0,
+        )
+      : 0;
+    items.push({
+      type: "catTotal",
+      name: cur,
+      salesTotal,
+      costTotal,
+    });
+    catProducts = [];
+  };
+  for (const p of products) {
+    const cat = p.category || "Бусад";
+    if (cat !== cur) {
+      flushCat();
+      cur = cat;
+      items.push({ type: "cat", name: cat });
+    }
+    index += 1;
+    catProducts.push(p);
+    items.push({ type: "product", product: p, index });
+  }
+  flushCat();
+  return items;
+}
 function inventoryExcelDataRows(products = inventoryStockExportList()) {
   const showCost = canViewProductCost();
   const colCount = inventoryExcelColCount();
   const rows = [];
-  for (const item of productSheetProductsGrouped(products)) {
+  for (const item of inventoryExcelGroupedItems(products)) {
     if (item.type === "cat") {
-      rows.push([item.name, ...Array.from({ length: colCount - 1 }, () => "")]);
+      rows.push([item.name, ...inventoryExcelBlankCells(colCount - 1)]);
+      continue;
+    }
+    if (item.type === "catTotal") {
+      const row = ["", `${item.name} нийт`, "", item.salesTotal];
+      if (showCost) row.push(item.costTotal);
+      row.push("", "");
+      rows.push(row);
       continue;
     }
     const p = item.product;
@@ -12779,14 +12933,35 @@ function confirmInventoryExport() {
     const stamp = new Date().toISOString().slice(0, 10);
     const showCost = canViewProductCost();
     const lastCol = inventoryExcelLastCol();
+    const grouped = inventoryExcelGroupedItems(products);
     const dataRows = inventoryExcelDataRows(products);
+    const salesGrand = products.reduce(
+      (sum, p) => sum + inventoryProductLineSalesTotal(p),
+      0,
+    );
+    const costGrand = showCost
+      ? products.reduce(
+          (sum, p) => sum + inventoryProductLineCostTotal(p),
+          0,
+        )
+      : 0;
+    const grandRow = ["", "Нийт дүн", "", salesGrand];
+    if (showCost) grandRow.push(costGrand);
+    grandRow.push("", "");
     const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`];
-    // Category section rows start at Excel row 5 (after title/date/blank/header).
+    // Data starts at Excel row 5 (title / date / blank / header).
     let excelRow = 5;
-    for (const item of productSheetProductsGrouped(products)) {
-      if (item.type === "cat") merges.push(`A${excelRow}:${lastCol}${excelRow}`);
+    for (const item of grouped) {
+      if (item.type === "cat") {
+        merges.push(`A${excelRow}:${lastCol}${excelRow}`);
+      } else if (item.type === "catTotal") {
+        merges.push(`A${excelRow}:C${excelRow}`);
+      }
       excelRow += 1;
     }
+    // Blank spacer + grand total
+    excelRow += 1;
+    merges.push(`A${excelRow}:C${excelRow}`);
     excel(
       `Үлдэгдэл-${stamp}.xlsx`,
       [
@@ -12795,10 +12970,13 @@ function confirmInventoryExport() {
         [],
         inventoryExcelHeaders(),
         ...dataRows,
+        [],
+        grandRow,
       ],
       {
         sheetName: "Үлдэгдэл",
         freezeHeaderRow: 4,
+        // Keep existing column widths unchanged.
         colWidths: showCost
           ? [3, 32, 16, 14, 12, 10, 8]
           : [3, 32, 16, 14, 10, 8],
@@ -24293,6 +24471,12 @@ function patchWorkerStorePickList() {
   const listHost = document.querySelector(".worker-pick");
   const toolbar = listHost?.querySelector(".worker-pick__toolbar");
   if (!toolbar) return false;
+  const input = toolbar.querySelector(
+    "[data-focus='workerStore'], .worker-pick__search",
+  );
+  if (input && document.activeElement === input) {
+    state.searches.workerStore = input.value;
+  }
   let node = toolbar.nextSibling;
   while (node) {
     const next = node.nextSibling;
@@ -24304,7 +24488,7 @@ function patchWorkerStorePickList() {
 }
 function workerStorePickStep() {
   const q = state.searches.workerStore || "";
-  return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх"></div>${workerStorePickRestHtml()}</section>`;
+  return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" onfocus="workerStoreSearchFocus()" onblur="workerStoreSearchBlur()" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх"></div>${workerStorePickRestHtml()}</section>`;
 }
 function pickWorkerStore(id) {
   const nextId = state.workerCustomer === id ? "" : id;
@@ -24705,6 +24889,12 @@ function render() {
   }
   if (isEditingStockInScan() && !stockInScanForceRender) {
     stockInScanRenderPending = true;
+    if (localStateDirty()) scheduleBackendSave();
+    return;
+  }
+  if (isEditingWorkerStoreSearch()) {
+    workerStoreSearchRenderPending = true;
+    patchWorkerStorePickList();
     if (localStateDirty()) scheduleBackendSave();
     return;
   }
@@ -29425,6 +29615,8 @@ Object.assign(window, {
   stockOutScanFocus,
   stockOutScanBlur,
   stockOutScanDraft,
+  workerStoreSearchFocus,
+  workerStoreSearchBlur,
   fillProductFromBarcode,
   fillCustomerFromRegistration,
   scheduleCustomerRegistryLookup,
@@ -29490,6 +29682,8 @@ Object.assign(window, {
   stockOutBarcodeKeydown,
   stockInScanDraft,
   stockOutScanDraft,
+  workerStoreSearchFocus,
+  workerStoreSearchBlur,
   stockInScanSubmit,
   stockOutScanSubmit,
   clearStockInSearch,
