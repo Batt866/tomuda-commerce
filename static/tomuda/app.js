@@ -12935,7 +12935,7 @@ function inventoryExcelDataRows(products = inventoryStockExportList()) {
 const INVENTORY_STOCK_REPORT_TITLE = "Агуулахын барааны үлдэгдэл";
 const INVENTORY_STOCK_REPORT_TITLE_ROW_H = 24;
 const INVENTORY_STOCK_REPORT_META_ROW_H = 18;
-const INVENTORY_STOCK_REPORT_HEADER_ROW_H = 28;
+const INVENTORY_STOCK_REPORT_HEADER_ROW_H = 34;
 const INVENTORY_STOCK_REPORT_DATA_ROW_H = 18;
 const INVENTORY_STOCK_REPORT_SPACER_ROW_H = 10;
 function inventoryExportPrintedDateText() {
@@ -12978,8 +12978,17 @@ function inventoryStockReportColumns(showCost) {
 }
 function inventoryStockReportColWidths(showCost) {
   return showCost
-    ? [5, 28, 14, 14, 10, 9, 13, 13, 24, 24]
-    : [5, 32, 14, 14, 10, 9, 13, 24];
+    ? [4, 20, 10, 11, 7, 6, 9, 9, 10, 10]
+    : [4, 22, 10, 11, 7, 6, 9, 10];
+}
+function inventoryStockReportHeaderLabel(label) {
+  const splits = {
+    "Өртөг үнэ": "Өртөг\nүнэ",
+    "Нэгж үнэ": "Нэгж\nүнэ",
+    "Өртөг үнийн нийлбэр": "Өртөг үнийн\nнийлбэр",
+    "Нэгж үнийн нийлбэр": "Нэгж үнийн\nнийлбэр",
+  };
+  return splits[label] || label;
 }
 function inventoryStockReportHeaders(showCost) {
   const headers = ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"];
@@ -13073,7 +13082,7 @@ function buildInventoryStockSheetXml(products) {
     xlsxCellXml(
       `${xlsxColName(index + 1)}${headerRow}`,
       s.tableHeader,
-      si(label),
+      si(inventoryStockReportHeaderLabel(label)),
       "s",
     ),
   ));
