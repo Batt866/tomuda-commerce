@@ -5621,6 +5621,53 @@ button:focus-visible,
   display: none !important;
 }
 
+/* Product add/edit: keep Хадгалах pinned while the form body scrolls. */
+.modal-panel.product-form-modal {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: min(90vh, 920px) !important;
+  overflow: hidden !important;
+}
+
+.modal-panel.product-form-modal .modal-panel__head {
+  flex-shrink: 0;
+}
+
+.modal-panel.product-form-modal .product-form {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+.modal-panel.product-form-modal .product-form__body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-panel.product-form-modal .product-form__foot {
+  flex-shrink: 0 !important;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: 0 !important;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  background: var(--hex-card, #fff);
+  border-top: 1px solid var(--hex-border, #d8dee6);
+  box-shadow: 0 -8px 18px rgba(16, 22, 35, 0.06);
+}
+
+.modal-panel.product-form-modal .product-form__foot .btn,
+.modal-panel.product-form-modal .product-form__foot button[type="submit"] {
+  min-height: 48px;
+  width: 100%;
+}
+
 .confirm-card-overlay[hidden] {
   display: none !important;
 }
@@ -6048,6 +6095,10 @@ button:focus-visible,
     max-height: var(--sheet-max-h) !important;
     margin: 0 !important;
     border-radius: var(--phi-2) var(--phi-2) 0 0 !important;
+  }
+
+  .modal-panel.product-form-modal {
+    max-height: var(--sheet-max-h) !important;
   }
 
   .modal-panel__head {

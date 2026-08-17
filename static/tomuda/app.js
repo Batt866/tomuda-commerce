@@ -12737,34 +12737,72 @@ function inventoryStockExportList() {
         ) || String(a.name || "").localeCompare(String(b.name || ""), "mn"),
     );
 }
+function inventoryExcelHeaders() {
+  const headers = ["№", "Бараа", "Баркод", "Борлуулалтын үнэ"];
+  if (canViewProductCost()) headers.push("Өртөг үнэ");
+  headers.push("Үлдэгдэл", "Нэгж");
+  return headers;
+}
+function inventoryExcelColCount() {
+  return inventoryExcelHeaders().length;
+}
+function inventoryExcelLastCol() {
+  return xlsxColName(inventoryExcelColCount());
+}
+function inventoryExcelDataRows(products = inventoryStockExportList()) {
+  const showCost = canViewProductCost();
+  const colCount = inventoryExcelColCount();
+  const rows = [];
+  for (const item of productSheetProductsGrouped(products)) {
+    if (item.type === "cat") {
+      rows.push([item.name, ...Array.from({ length: colCount - 1 }, () => "")]);
+      continue;
+    }
+    const p = item.product;
+    const row = [
+      item.index,
+      p.name || "",
+      p.barcode || "-",
+      productSalesPrice(p),
+    ];
+    if (showCost) row.push(productCostPrice(p));
+    row.push(Number(p.stock) || 0, p.unit || "ширхэг");
+    rows.push(row);
+  }
+  return rows;
+}
 function confirmInventoryExport() {
   if (!canExportExcel()) return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   const products = inventoryStockExportList();
   if (!products.length) return alert("Үлдэгдэл байхгүй");
   confirmDataExport("Мэдээлэл татах", () => {
     const stamp = new Date().toISOString().slice(0, 10);
+    const showCost = canViewProductCost();
+    const lastCol = inventoryExcelLastCol();
+    const dataRows = inventoryExcelDataRows(products);
+    const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`];
+    // Category section rows start at Excel row 5 (after title/date/blank/header).
+    let excelRow = 5;
+    for (const item of productSheetProductsGrouped(products)) {
+      if (item.type === "cat") merges.push(`A${excelRow}:${lastCol}${excelRow}`);
+      excelRow += 1;
+    }
     excel(
       `Үлдэгдэл-${stamp}.xlsx`,
       [
-        // Title/date in column B so № (A) stays narrow.
         ["", "Үлдэгдэл"],
-        ["", productSheetDateLabel()],
+        ["", `${productSheetDateLabel()} · Нийт: ${products.length} бараа`],
         [],
-        ["№", "Бараа", "Төрөл", "Баркод", "Үлдэгдэл", "Нэгж"],
-        ...products.map((p, i) => [
-          i + 1,
-          p.name || "",
-          p.category || "",
-          p.barcode || "-",
-          Number(p.stock) || 0,
-          p.unit || "ш",
-        ]),
+        inventoryExcelHeaders(),
+        ...dataRows,
       ],
       {
         sheetName: "Үлдэгдэл",
         freezeHeaderRow: 4,
-        colWidths: [3, 36, 16, 16, 11, 8],
-        merges: ["B1:F1", "B2:F2"],
+        colWidths: showCost
+          ? [3, 32, 16, 14, 12, 10, 8]
+          : [3, 32, 16, 14, 10, 8],
+        merges,
       },
     );
   });
@@ -18853,7 +18891,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si, styleId = null) {
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** Uniform body row height for prepare sheet (category + product lines). */
 const WAREHOUSE_PREPARE_BODY_ROW_HEIGHT = 15;
-const WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT = 22;
+const WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT = 30;
 const WAREHOUSE_PREPARE_META_ROW_HEIGHT = 16;
 const WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT = 18;
 const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 22;
@@ -26257,7 +26295,7 @@ function productModal(id) {
     )}</select>${categoryAddBtn}</div><div class="product-form__category-new" id="productNewCategoryField"${showNewCat ? "" : " hidden"}><input name="newCategoryName" type="text" autocomplete="off" placeholder="Шинэ төрлийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="button" class="btn btn--primary shrink-0" onclick="addCategoryFromProductForm()">Нэмэх</button></div></label>`;
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>${categoryHtml}<label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>${categoryHtml}<label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
     { panelClass: "product-form-modal", closeAsBack: true },
   );
