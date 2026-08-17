@@ -1021,7 +1021,7 @@ function receiptUpperFooterRows(o) {
   const note = receiptNoteText(o);
   if (!note) return "";
   const spacer = `<tr class="receipt-grid__spacer receipt-grid__spacer--note"><td colspan="11"></td></tr>`;
-  return `${spacer}<tr class="receipt-grid__return"><td></td><td></td><td colspan="8" class="receipt-grid__return-label">${esc(note)}</td><td></td></tr>`;
+  return `${spacer}<tr class="receipt-grid__return"><td></td><td colspan="10" class="receipt-grid__return-label">${esc(note)}</td></tr>`;
 }
 function receiptLowerFooterRows(o, opts = {}) {
   const f = receiptPartyFields(o);
@@ -10958,8 +10958,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
   if (orderNote) {
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
     const noteRow = rowNum;
-    merges.push(`C${noteRow}:J${noteRow}`);
-    const noteColW = RECEIPT_XLSX_COL_WIDTHS.slice(2, 10).reduce(
+    merges.push(`B${noteRow}:K${noteRow}`);
+    const noteColW = RECEIPT_XLSX_COL_WIDTHS.slice(1, 11).reduce(
       (sum, width) => sum + width,
       0,
     );
@@ -10973,10 +10973,8 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
       }),
     );
     pushRow(noteH, [
-      ...emptyCells(noteRow, "B", "B", 1),
-      xlsxCellXml(`C${noteRow}`, 16, si(orderNote), "s"),
-      ...emptyCells(noteRow, "D", "J", 16),
-      ...emptyCells(noteRow, "K", "K", 1),
+      xlsxCellXml(`B${noteRow}`, 16, si(orderNote), "s"),
+      ...emptyCells(noteRow, "C", "K", 16),
     ]);
   }
 
