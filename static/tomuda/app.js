@@ -7050,16 +7050,8 @@ function pickerPackMax(p, pieces = 0, largePacks = 0) {
   const largePieces = productLargeBoxPieceCount(p);
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
-  const usedLarge = largePieces ? lp * largePieces : 0;
+  const used = (largePieces ? lp * largePieces : 0) + pc;
   const maxTotal = maxWorkerPaidQty(p.id);
-  const targetTotal = getWorkerQty(p.id);
-  if (targetTotal > 0) {
-    return Math.max(
-      0,
-      Math.floor(Math.min(maxTotal, targetTotal) - usedLarge - pc),
-    );
-  }
-  const used = usedLarge + pc;
   return Math.floor(Math.max(0, maxTotal - used) / packSize);
 }
 function pickerLargeMax(p, pieces = 0, packs = 0) {
@@ -7070,11 +7062,6 @@ function pickerLargeMax(p, pieces = 0, packs = 0) {
   const pc = Math.max(0, Math.floor(Number(pieces) || 0));
   const used = (packSize ? pk * packSize : 0) + pc;
   const maxTotal = maxWorkerPaidQty(p.id);
-  const targetTotal = getWorkerQty(p.id);
-  if (targetTotal > 0) {
-    const room = Math.max(0, Math.min(maxTotal, targetTotal) - used);
-    return Math.floor(room / largePieces);
-  }
   return Math.floor(Math.max(0, maxTotal - used) / largePieces);
 }
 function pickerPieceMax(p, packs = 0, largePacks = 0) {
@@ -7083,16 +7070,8 @@ function pickerPieceMax(p, packs = 0, largePacks = 0) {
   const pk = Math.max(0, Math.floor(Number(packs) || 0));
   const lp = Math.max(0, Math.floor(Number(largePacks) || 0));
   const maxTotal = maxWorkerPaidQty(p.id);
-  const targetTotal = getWorkerQty(p.id);
-  const usedLarge = largePieces ? lp * largePieces : 0;
-  if (targetTotal > 0 && pk > 0) {
-    return Math.max(
-      0,
-      Math.min(maxTotal, targetTotal) - usedLarge - pk,
-    );
-  }
   const used =
-    usedLarge + (packSize ? pk * packSize : 0);
+    (largePieces ? lp * largePieces : 0) + (packSize ? pk * packSize : 0);
   return Math.max(0, maxTotal - used);
 }
 function readPickerQtyParts(id) {
