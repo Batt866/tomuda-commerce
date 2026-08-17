@@ -23074,9 +23074,20 @@ function findProductByIdLoose(id) {
     state.products.find((p) => String(p?.id ?? "").trim() === want) || null
   );
 }
+
+function productStockLeftAfterLines(productId, lines) {
+  const have = productStockWithEditCredit(productId);
+  const used = (lines || [])
+    .filter((l) => String(l.productId) === String(productId))
+    .reduce(
+      (sum, l) => sum + Math.max(0, Math.floor(Number(l.quantity) || 0)),
+      0,
+    );
+  return Math.max(0, have - used);
+}
 /**
- * Add free promo lines for the full grant qty.
- * Stock is NOT truncated here — paid+promo must fit warehouse via orderStockIssues / maxWorkerPaidQty.
+ * Add free promo lines, truncated to leftover warehouse stock so a
+ * missing gift never blocks selling the paid product.
  */
 function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
   const grantWanted = Math.max(0, Math.floor(Number(freeQty) || 0));
@@ -23095,8 +23106,12 @@ function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
     if (remaining < 1) break;
     const product = findProductByIdLoose(freeId);
     if (!product) continue;
-    const addQty = remaining;
-    remaining = 0;
+    const addQty = Math.min(
+      remaining,
+      productStockLeftAfterLines(product.id, result),
+    );
+    if (addQty < 1) continue;
+    remaining -= addQty;
     const existing = result.find(
       (l) => String(l.productId) === String(product.id) && l.isPromoFree,
     );
@@ -28391,33 +28406,14 @@ function getWorkerQtyRaw(productId) {
   return Math.floor(n);
 }
 /**
- * Largest paid qty for a product such that paid + багц урамшуулал still fits stock.
- * Нийт дүн / төлбөрийн үнэгүй бэлгийг энд тооцохгүй (хадгалах үед шалгана).
+ * Largest paid qty this product can take from warehouse.
+ * Quantity-promo free gifts are truncated separately — they must not
+ * disable том/жижиг хайрцаг steppers for every product in the cart.
  */
 function maxWorkerPaidQty(productId) {
   const p = state.products.find((x) => x.id === productId);
   if (!p) return 0;
-  const stockHave = productStockWithEditCredit(productId);
-  if (stockHave < 1) return 0;
-  let lo = 0;
-  let hi = stockHave;
-  let best = 0;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const issues = orderStockIssues(
-      workerLinesWithPaidQty(productId, mid, { includeAmountPromos: false }),
-      {
-        stockCredit: editingOrderStockCreditMap(),
-      },
-    );
-    if (!issues.length) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return best;
+  return productStockWithEditCredit(productId);
 }
 function getWorkerQty(productId) {
   const raw = getWorkerQtyRaw(productId);
