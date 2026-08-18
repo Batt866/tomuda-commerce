@@ -21248,24 +21248,42 @@ function promoPickCategoryKey(pickKey) {
 function promoPickCategory(pickKey) {
   return state.searches[promoPickCategoryKey(pickKey)] || "all";
 }
+function promoPickHasActiveFilters(pickKey) {
+  const searchKey = promoPickSearchKey(pickKey);
+  const rawQ = (searchKey && state.searches[searchKey]) || "";
+  return !!(String(rawQ).trim() || promoPickCategory(pickKey) !== "all");
+}
+function promoPickEmptyStateHtml(pickKey) {
+  if (promoPickHasActiveFilters(pickKey)) {
+    return `<p class="promo-product-empty">Бараа олдсонгүй</p>`;
+  }
+  return `<p class="promo-product-empty">Хайлт хийнэ үү эсвэл төрөл сонгоно уу</p>`;
+}
 function promoFilteredProducts(pickKey, excludeIds = []) {
-  const searchKey = promoPickSearchKey(pickKey),
-    rawQ = (searchKey && state.searches[searchKey]) || "",
-    q = rawQ.toLowerCase().trim(),
-    category = promoPickCategory(pickKey),
-    exclude = new Set(excludeIds.filter(Boolean));
-  return state.products.filter((p) => {
-    if (exclude.has(p.id)) return false;
-    if (category !== "all" && p.category !== category) return false;
-    if (!q) return true;
-    return (
-      p.name.toLowerCase().includes(q) ||
-      String(p.barcode || "").includes(q) ||
-      String(p.category || "")
-        .toLowerCase()
-        .includes(q)
-    );
-  });
+  const searchKey = promoPickSearchKey(pickKey);
+  const rawQ = (searchKey && state.searches[searchKey]) || "";
+  const q = String(rawQ || "").trim();
+  const category = promoPickCategory(pickKey);
+  const exclude = new Set(excludeIds.filter(Boolean));
+  if (!q && category === "all") return [];
+  return state.products
+    .filter((p) => {
+      if (exclude.has(p.id)) return false;
+      if (category !== "all" && p.category !== category) return false;
+      if (!q) return true;
+      if (productTextMatchesQuery(p, q)) return true;
+      return (
+        searchTextMatches(p.category || "", q) ||
+        searchTokensMatch(p.category || "", q)
+      );
+    })
+    .sort((a, b) => {
+      const byRank = pickerProductSearchRank(a, q) - pickerProductSearchRank(b, q);
+      if (byRank) return byRank;
+      const byCat = (a.category || "").localeCompare(b.category || "", "mn");
+      if (byCat) return byCat;
+      return (a.name || "").localeCompare(b.name || "", "mn");
+    });
 }
 function promoCategoryFilterHtml(pickKey) {
   const active = promoPickCategory(pickKey);
@@ -21339,7 +21357,7 @@ function promoProductGridInnerHtml({
       browseProducts.length,
   );
   if (!products.length) {
-    return `<p class="promo-product-empty">Бараа олдсонгүй</p>`;
+    return promoPickEmptyStateHtml(pickKey);
   }
   return `<div class="promo-product-grid" data-promo-pick-list="${esc(pickKey)}">${products
     .map((p) =>
@@ -21469,7 +21487,7 @@ function promoProductSearchListInnerHtml({
     shown = products.slice(0, 40),
     more = Math.max(0, products.length - shown.length);
   if (!shown.length) {
-    return `<p class="promo-product-empty">Бараа олдсонгүй</p>`;
+    return promoPickEmptyStateHtml(pickKey);
   }
   return `<div class="promo-product-list promo-product-list--search" data-promo-pick-list="${esc(pickKey)}">${shown
     .map((p) => {
