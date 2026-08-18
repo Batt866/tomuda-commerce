@@ -16338,6 +16338,51 @@ textarea::placeholder {
   line-height: 1.2;
 }
 
+.modal-panel--promo-qty .promo-product-card__hit,
+.modal-panel--promo-sheet .promo-product-card__hit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+  color: inherit;
+}
+
+.modal-panel--promo-qty .promo-product-card--with-qty,
+.modal-panel--promo-sheet .promo-product-card--with-qty {
+  min-height: 138px;
+  padding-bottom: 8px;
+  cursor: default;
+}
+
+.modal-panel--promo-qty .promo-qty-stepper--mini,
+.modal-panel--promo-sheet .promo-qty-stepper--mini {
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+  justify-content: center;
+}
+
+.modal-panel--promo-qty .promo-qty-stepper--mini .promo-qty-stepper__btn,
+.modal-panel--promo-sheet .promo-qty-stepper--mini .promo-qty-stepper__btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  font-size: 16px;
+}
+
+.modal-panel--promo-qty .promo-qty-stepper--mini .promo-qty-stepper__input,
+.modal-panel--promo-sheet .promo-qty-stepper--mini .promo-qty-stepper__input {
+  width: 28px;
+  min-height: 26px;
+  font-size: 14px;
+}
+
 .modal-panel--promo-qty .promo-product-more,
 .modal-panel--promo-sheet .promo-product-more {
   grid-column: 1 / -1;
