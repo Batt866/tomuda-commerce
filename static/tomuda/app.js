@@ -21078,12 +21078,12 @@ function promoQtyModeMeta(mode) {
 }
 function promoQtyModeHelperText(mode) {
   if (mode === "total") {
-    return "Жишээ: 7 бараа сонгоод босго 10 болговол тэднээс аль бараанаас ч байсан нийлээд 10 (ширхэг/хайрцаг) авахад урамшуулал олгоно.";
+    return "Жишээ: 5 өнгөнөөс дурын хослол нийлээд 5 ш (3+2 ч байсан) бол урамшуулал олгоно. Том/жижиг хайрцаг захиалгад автоматаар ширхэг болно. Босгонд хэдэн удаа хүрвэл урамшуулал тэр тоогоор үржигдэнэ.";
   }
   if (mode === "any") {
-    return "Сонгосон бараануудаас аль нэг нь тусдаа босгонд хүрэхэд урамшуулал бодогдоно.";
+    return "Сонгосон бараануудаас аль нэг нь тусдаа босгонд хүрэхэд урамшуулал бодогдоно. Хайрцаг захиалга ширхэг рүү хөрвөж, босгонд хүрсэн тоогоор урамшуулал үржигдэнэ.";
   }
-  return "Сонгосон бүх бараа тус бүрдээ босгонд хүрсэн үед урамшуулал бодогдоно.";
+  return "Сонгосон бүх бараа тус бүрдээ босгонд хүрсэн үед урамшуулал бодогдоно. Хайрцаг захиалга ширхэг рүү хөрвөж, хэдэн удаа хүрснээр үржигдэнэ.";
 }
 function promoQtyModePickerHtml(buyMode) {
   const modes = ["total", "any", "each"].map(promoQtyModeMeta);
@@ -21125,33 +21125,13 @@ function promoQtyPreviewSentence(buyMode, buyQty, freeQty) {
   const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
   const free = Math.max(0, Math.floor(Number(freeQty) || 0));
   if (buy < 1 || free < 1) return "";
-  const unit = state.promoQtyBuyUnit || "piece";
-  const unitLabel = quantityPromoUnitLabel(unit);
   if (buyMode === "total") {
-    if (unit === "pack") {
-      return `Сонгосон бараануудын нийлбэр ${buy} хайрцаг болоход ${free} ш урамшуулал авна.`;
-    }
-    if (unit === "large") {
-      return `Сонгосон бараануудын нийлбэр ${buy} том хайрцаг болоход ${free} ш урамшуулал авна.`;
-    }
-    return `Сонгосон бараануудын нийлбэр ${buy} ширхэг болоход ${free} ш урамшуулал авна.`;
+    return `Сонгосон бараануудын нийлбэр ${buy} ширхэг болоход ${free} ш урамшуулал авна. ${buy * 2} ш бол ${free * 2} ш.`;
   }
   if (buyMode === "any") {
-    if (unit === "pack") {
-      return `Сонгосон бараанаас аль нэг нь ${buy} хайрцаг болоход ${free} ш урамшуулал авна.`;
-    }
-    if (unit === "large") {
-      return `Сонгосон бараанаас аль нэг нь ${buy} том хайрцаг болоход ${free} ш урамшуулал авна.`;
-    }
-    return `Сонгосон бараанаас аль нэг нь ${buy} ширхэг болоход ${free} ш урамшуулал авна.`;
+    return `Сонгосон бараанаас аль нэг нь ${buy} ширхэг болоход ${free} ш урамшуулал авна. Босгонд хэдэн удаа хүрвэл тэр тоогоор үржигдэнэ.`;
   }
-  if (unit === "pack") {
-    return `Сонгосон бүх бараа тус бүр ${buy} хайрцаг болоход ${free} ш урамшуулал авна.`;
-  }
-  if (unit === "large") {
-    return `Сонгосон бүх бараа тус бүр ${buy} том хайрцаг болоход ${free} ш урамшуулал авна.`;
-  }
-  return `Сонгосон бүх бараа тус бүр ${buy} ширхэг болоход ${free} ш урамшуулал авна.`;
+  return `Сонгосон бүх бараа тус бүр ${buy} ширхэг болоход ${free} ш урамшуулал авна. Босгонд хэдэн удаа хүрвэл тэр тоогоор үржигдэнэ.`;
 }
 function setPromotionQtyBuyUnit(unit) {
   capturePromoFormDraft();
@@ -21162,11 +21142,8 @@ function setPromotionQtyBuyUnit(unit) {
 function promoQtyLiveText(buyMode, buyQty, freeQty, buyCount = 0, freeCount = 0) {
   const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
   const free = Math.max(0, Math.floor(Number(freeQty) || 0));
-  const unit = quantityPromoUnitLabel(state.promoQtyBuyUnit || "piece", {
-    short: true,
-  });
   if (buyMode === "total") {
-    if (buy > 0 && free > 0) return `${buy} ${unit} → ${free} ш урамшуулал`;
+    if (buy > 0 && free > 0) return `${buy} ш → ${free} ш урамшуулал`;
     return "";
   }
   if (buyMode === "each") {
@@ -21445,15 +21422,14 @@ function promotionSheetPickerBlock({
   const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
-function promoQtySetupCardHtml(buyMode, buyUnit, buyQtyDefault, freeQtyDefault) {
+function promoQtySetupCardHtml(buyMode, buyQtyDefault, freeQtyDefault) {
   const modeBlock = promoQtyModeCardsHtml(buyMode);
-  const unitBlock = promoQtyUnitTabsHtml(buyUnit);
   const livePreview = promoQtyLivePreviewHtml(
     buyMode,
     buyQtyDefault,
     freeQtyDefault,
   );
-  return `<div class="promo-qty-setup-card">${modeBlock}${unitBlock}${livePreview}</div>`;
+  return `<div class="promo-qty-setup-card">${modeBlock}${livePreview}</div>`;
 }
 function promoProductSearchListInnerHtml({
   pickKey,
@@ -21689,7 +21665,7 @@ function normalizeQuantityPromotionRule(rule) {
   const mode =
     rule.buyMode === "total" || rule.buyMode === "any" || rule.buyMode === "each"
       ? rule.buyMode
-      : "each";
+      : "total";
   if (rule.buyQtyByProduct && typeof rule.buyQtyByProduct === "object") {
     return { ...rule, buyMode: mode };
   }
@@ -21823,24 +21799,20 @@ function quantityPromoBuyMode(rule) {
   ) {
     return rule.buyMode;
   }
-  const buyIds = promotionBuyProductIds(rule);
-  if (rule?.buyQtyByProduct && buyIds.length > 1) return "each";
-  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
-  if (buyIds.length > 1 && buyQty === 1) return "each";
   return "total";
 }
 function quantityPromoSets(rule, qtyByProduct) {
   const buyIds = promotionBuyProductIds(rule);
   if (!buyIds.length) return 0;
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
+  const haveOf = (id) => promoMixQtyOf(counts, id);
   const buyMode = quantityPromoBuyMode(rule);
   if (buyMode === "any") {
     // Сонгосон бараа бүр бие даан тоологдоно — аль нэг нь босгонд хүрвэл олгоно.
     return buyIds.reduce((sum, id) => {
       const th = quantityPromoBuyQtyForProduct(rule, id);
       if (th < 1) return sum;
-      const have = Number(counts[String(id)]) || 0;
-      return sum + Math.floor(have / th);
+      return sum + Math.floor(haveOf(id) / th);
     }, 0);
   }
   if (buyMode === "each") {
@@ -21851,17 +21823,13 @@ function quantityPromoSets(rule, qtyByProduct) {
     return Math.min(
       ...buyIds.map((id) => {
         const th = quantityPromoBuyQtyForProduct(rule, id);
-        const have = Number(counts[String(id)]) || 0;
-        return Math.floor(have / th);
+        return Math.floor(haveOf(id) / th);
       }),
     );
   }
   const buyQty = Math.floor(Number(rule.buyQty) || 0);
   if (buyQty < 1) return 0;
-  const combinedQty = buyIds.reduce(
-    (sum, id) => sum + (Number(counts[String(id)]) || 0),
-    0,
-  );
+  const combinedQty = buyIds.reduce((sum, id) => sum + haveOf(id), 0);
   return Math.floor(combinedQty / buyQty);
 }
 function quantityPromoOrderQty(rule, sets = 1) {
@@ -22866,23 +22834,17 @@ function promotionQtyModal() {
       ? state.promoQtyBuyMode
       : "any";
   state.promoQtyBuyMode = buyMode;
-  const buyUnit =
-    state.promoQtyBuyUnit === "pack" || state.promoQtyBuyUnit === "large"
-      ? state.promoQtyBuyUnit
-      : "piece";
-  state.promoQtyBuyUnit = buyUnit;
+  state.promoQtyBuyUnit = "piece";
+  const buyUnit = "piece";
   const buyIds = state.promoPick.buyProductIds,
     freeIds = state.promoPick.freeProductIds;
-  const buyQtyDefault =
-    promoFormDraftVal("buyQty", buyUnit === "piece" ? "8" : "6") ||
-    (buyUnit === "piece" ? "8" : "6");
+  const buyQtyDefault = promoFormDraftVal("buyQty", "8") || "8";
   const freeQtyDefault = promoFormDraftVal("freeQty", "1") || "1";
-  const buyUnitTitle = promoQtyUnitMeta(buyUnit).title;
   const buyQtyStepper = {
     name: "buyQty",
     defaultValue: buyQtyDefault,
     label: promoQtyBuyFieldLabel(buyUnit),
-    caption: `Нийлбэр босго · ${buyUnitTitle}`,
+    caption: "Нийлбэр босго · ширхэг",
     min: 0,
   };
   const freeQtyStepper = {
@@ -22894,7 +22856,6 @@ function promotionQtyModal() {
   };
   const setupCard = promoQtySetupCardHtml(
     buyMode,
-    buyUnit,
     buyQtyDefault,
     freeQtyDefault,
   );
@@ -22905,7 +22866,7 @@ function promotionQtyModal() {
       fieldName: "buyProductIds",
       selectedIds: buyIds,
       title: "Бараа сонгох",
-      hint: "Сонгосон бараануудаас ямар ч хослол нийлээд босгонд хүрвэл урамшуулал олгоно",
+      hint: "Сонгосон бараануудаас ямар ч хослол нийлээд босгонд хүрвэл урамшуулал олгоно. Том/жижиг хайрцаг автоматаар ширхэг рүү хөрвөнө.",
       placeholder: "Хайх...",
       variant: "buy",
       qtyStepper: buyQtyStepper,
@@ -22919,13 +22880,13 @@ function promotionQtyModal() {
     fieldName: "freeProductIds",
     selectedIds: freeIds,
     title: "Урамшуулал",
-    hint: "Олон бараа сонгож болно — үргэлж ширхэгээр олгоно",
+    hint: "Олон бараа сонгож болно. Босгонд хэдэн удаа хүрвэл энд бичсэн тоогоор үржигдэнэ.",
     placeholder: "Хайх...",
     variant: "free",
     qtyStepper: freeQtyStepper,
     compact: true,
   });
-  const bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="${buyUnit}">${setupCard}${buySection}${freeSection}`;
+  const bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="piece">${setupCard}${buySection}${freeSection}`;
   box(
     promotionPageTitle("quantity"),
     promoFormShell(
@@ -23121,11 +23082,7 @@ function savePromotionQty(e) {
     const buyModeRaw = String(f.get("buyMode") || state.promoQtyBuyMode || "any");
     const buyMode =
       buyModeRaw === "each" || buyModeRaw === "total" ? buyModeRaw : "any";
-    const buyUnitRaw = String(
-      f.get("buyUnit") || state.promoQtyBuyUnit || "piece",
-    ).toLowerCase();
-    const buyUnit =
-      buyUnitRaw === "pack" || buyUnitRaw === "large" ? buyUnitRaw : "piece";
+    const buyUnit = "piece";
     const buyQtyByProduct = {};
     let buyQtyNum = 0;
     if (buyMode === "total") {
