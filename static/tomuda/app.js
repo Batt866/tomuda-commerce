@@ -7068,14 +7068,28 @@ function pickerPieceMax(p, packs = 0, largePacks = 0) {
     (largePieces ? lp * largePieces : 0) + (packSize ? pk * packSize : 0);
   return Math.max(0, maxTotal - used);
 }
+function pickerQtyPartsScope(id) {
+  if (state.pickerQtyProductId === id) {
+    const sheet = modal.querySelector("[data-picker-qty-sheet]");
+    if (sheet) return sheet;
+  }
+  if (state.workerOrderActiveId === id) {
+    const workerEdit = document.querySelector(
+      `[data-worker-pack-edit="${CSS.escape(id)}"]`,
+    );
+    if (workerEdit) return workerEdit;
+  }
+  return document;
+}
 function readPickerQtyParts(id) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return { largePacks: 0, packs: 0, pieces: 0 };
   const packSize = productPackSize(p);
   const largeCount = productLargeBoxCount(p);
   const fallback = pickerQtyToParts(getWorkerQty(id), p);
+  const scope = pickerQtyPartsScope(id);
   if (!packSize && !productLargeBoxPieceCount(p)) {
-    const input = document.querySelector(
+    const input = scope.querySelector(
       `[data-picker-qty-input][data-product-id="${id}"]`,
     );
     return {
@@ -7086,13 +7100,13 @@ function readPickerQtyParts(id) {
         : fallback.pieces,
     };
   }
-  const largeInput = document.querySelector(
+  const largeInput = scope.querySelector(
     `[data-picker-large-input][data-product-id="${id}"]`,
   );
-  const packInput = document.querySelector(
+  const packInput = scope.querySelector(
     `[data-picker-pack-input][data-product-id="${id}"]`,
   );
-  const pieceInput = document.querySelector(
+  const pieceInput = scope.querySelector(
     `[data-picker-piece-input][data-product-id="${id}"]`,
   );
   return {
@@ -7282,14 +7296,18 @@ function pickerPieceCommit(el) {
 function syncPickerQtySheetUi(id) {
   const q = getWorkerQty(id);
   const p = state.products.find((x) => x.id === id);
-  const totalEl = document.querySelector("[data-picker-qty-total]");
+  const sheet =
+    state.pickerQtyProductId === id
+      ? modal.querySelector("[data-picker-qty-sheet]")
+      : null;
+  const totalEl = sheet?.querySelector("[data-picker-qty-total]");
   if (totalEl) totalEl.textContent = `${q} ш`;
-  const partsWrap = document.querySelector("[data-picker-qty-parts]");
+  const partsWrap = sheet?.querySelector("[data-picker-qty-parts]");
   if (partsWrap && p) {
     const parts = pickerQtyToParts(q, p);
     partsWrap.innerHTML = `${prepareQtyColsHtml(parts, { product: p })}<span class="picker-qty-sheet__total-sep">·</span>Нийт <b data-picker-qty-total>${q} ш</b>`;
   }
-  const promoWrap = document.querySelector(".picker-qty-sheet__promo-wrap");
+  const promoWrap = sheet?.querySelector(".picker-qty-sheet__promo-wrap");
   if (promoWrap && p) {
     const next = pickerQtySheetPromoHtml(p);
     if (next) {
@@ -7303,7 +7321,7 @@ function syncPickerQtySheetUi(id) {
   } else if (!promoWrap && p) {
     const next = pickerQtySheetPromoHtml(p);
     if (next) {
-      const head = document.querySelector(".picker-qty-sheet__head");
+      const head = sheet?.querySelector(".picker-qty-sheet__head");
       head?.insertAdjacentHTML("afterend", next);
     }
   }
