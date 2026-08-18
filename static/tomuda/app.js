@@ -7210,6 +7210,33 @@ function pickerPartStepperApply(btn, kind) {
     return;
   }
   syncWorkerQtyParts(id, parts);
+  // #region agent log
+  fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "018544",
+    },
+    body: JSON.stringify({
+      sessionId: "018544",
+      runId: "pre-fix",
+      hypothesisId: "H1-H2-H5-stepper",
+      location: "app.js:7212",
+      message: "picker part stepper apply",
+      data: {
+        id,
+        kind,
+        action,
+        parts,
+        currentTotal,
+        nextTotal,
+        workerQtyBefore: getWorkerQty(id),
+        storedParts: state.workerQtyParts?.[id] || null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   pickerQtyChange(id, nextTotal);
 }
 function pickerPartDraft(el, kind) {
@@ -21361,6 +21388,34 @@ function promoProductGridInnerHtml({
     filtered.filter((p) => !selectedSet.has(String(p.id))).length -
       browseProducts.length,
   );
+  // #region agent log
+  if (pickKey === "buyProductIds" && perProductQty) {
+    fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "018544",
+      },
+      body: JSON.stringify({
+        sessionId: "018544",
+        runId: "pre-fix",
+        hypothesisId: "UX-selected-vs-browse",
+        location: "app.js:21380",
+        message: "each/any grid composition",
+        data: {
+          pickKey,
+          perProductQty,
+          selectedCount: selectedProducts.length,
+          browseCount: browseProducts.length,
+          filteredCount: filtered.length,
+          firstSelected: selectedProducts.slice(0, 4).map((p) => p?.name || ""),
+          firstBrowse: browseProducts.slice(0, 4).map((p) => p?.name || ""),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  }
+  // #endregion
   if (!products.length) {
     return `<p class="promo-product-empty">Бараа олдсонгүй</p>`;
   }
@@ -22838,6 +22893,28 @@ function openPromotionQtyModal() {
   state.searches.promo_freeProductIds = "";
   state.searches.promo_buyProductIds_category = "all";
   state.searches.promo_freeProductIds_category = "all";
+  // #region agent log
+  fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "018544",
+    },
+    body: JSON.stringify({
+      sessionId: "018544",
+      runId: "pre-fix",
+      hypothesisId: "A-E-openPromotionQtyModal",
+      location: "app.js:22830",
+      message: "open promotion qty modal",
+      data: {
+        buyMode: state.promoQtyBuyMode,
+        buyIds: state.promoPick.buyProductIds.length,
+        freeIds: state.promoPick.freeProductIds.length,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   promotionQtyModal();
 }
 function setPromotionQtyBuyMode(mode) {
@@ -22944,6 +23021,45 @@ function promotionQtyModal() {
     "max-w-2xl",
     { panelClass: "modal-panel--promo modal-panel--promo-qty modal-panel--promo-sheet" },
   );
+  // #region agent log
+  requestAnimationFrame(() => {
+    const collect = (root, scope) => {
+      const nodes = [
+        ...((root || document).querySelectorAll("input, select, textarea") || []),
+      ];
+      const missing = nodes.filter((el) => !el.getAttribute("name") && !el.id);
+      const samples = missing.slice(0, 12).map((el) => ({
+        tag: el.tagName,
+        type: el.getAttribute("type") || "",
+        className: String(el.className || "").slice(0, 80),
+        inModal: !!(el.closest("#modal") || el.closest("[data-promo-modal]")),
+      }));
+      fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "018544",
+        },
+        body: JSON.stringify({
+          sessionId: "018544",
+          runId: "pre-fix",
+          hypothesisId: scope,
+          location: "app.js:promotionQtyModal",
+          message: "nameless form fields",
+          data: {
+            scope,
+            total: nodes.length,
+            missing: missing.length,
+            samples,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    };
+    collect(document, "A-E-document");
+    collect(document.querySelector("[data-promo-modal]"), "A-B-D-promo-form");
+  });
+  // #endregion
 }
 function openPromotionPriceModal() {
   state.promoModalKind = "price";
@@ -28904,12 +29020,58 @@ function openPickerQtySheet(productId) {
   state.pickerQtyProductId = productId;
   state.pickerActiveId = productId;
   state.pickerQtyRevertQty = getWorkerQty(productId);
+  // #region agent log
+  fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "018544",
+    },
+    body: JSON.stringify({
+      sessionId: "018544",
+      runId: "pre-fix",
+      hypothesisId: "H4-open",
+      location: "app.js:28967",
+      message: "open picker qty sheet",
+      data: {
+        productId,
+        revertQty: state.pickerQtyRevertQty,
+        currentQty: getWorkerQty(productId),
+        storedParts: state.workerQtyParts?.[productId] || null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   if (pickerOpen() && mountPickerQtySheet(productId)) return;
   pickerModal();
 }
 function closePickerQtySheet() {
   const id = state.pickerQtyProductId;
   const revertQty = state.pickerQtyRevertQty;
+  // #region agent log
+  fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "018544",
+    },
+    body: JSON.stringify({
+      sessionId: "018544",
+      runId: "pre-fix",
+      hypothesisId: "H4-close",
+      location: "app.js:28973",
+      message: "close picker qty sheet",
+      data: {
+        id,
+        revertQty,
+        currentQty: id ? getWorkerQty(id) : null,
+        storedParts: id ? state.workerQtyParts?.[id] || null : null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   state.pickerQtyProductId = "";
   state.pickerActiveId = "";
   state.pickerQtyRevertQty = null;
