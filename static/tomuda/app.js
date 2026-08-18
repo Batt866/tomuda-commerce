@@ -69,6 +69,7 @@ const state = {
   deliveryPhone: "",
   workerQty: {},
   workerQtyParts: {},
+  pickerShowAll: false,
   pickerActiveId: "",
   pickerQtyProductId: "",
   pickerQtyRevertQty: null,
@@ -28303,7 +28304,8 @@ function applyStock(id, type, qty, costPrice) {
 function pickerHasActiveFilters() {
   return !!(
     String(state.searches.workerProduct || "").trim() ||
-    String(state.filters.workerCategory || "").trim()
+    String(state.filters.workerCategory || "").trim() ||
+    state.pickerShowAll
   );
 }
 function pickerEmptyStateHtml() {
@@ -28332,7 +28334,8 @@ function pickerProductSearchRank(p, rawQuery) {
 function pickerProductsInView() {
   const q = String(state.searches.workerProduct || "").trim();
   const cat = state.filters.workerCategory || "";
-  if (!q && !cat) return [];
+  const showAll = !!state.pickerShowAll;
+  if (!q && !cat && !showAll) return [];
   return state.products
     .filter((p) => {
       if (cat && p.category !== cat) return false;
@@ -28599,6 +28602,7 @@ function getWorkerQty(productId) {
 function resetWorkerCart() {
   state.workerQty = {};
   state.workerQtyParts = {};
+  state.pickerShowAll = false;
   state.pickerActiveId = "";
   state.pickerQtyProductId = "";
   state.pickerQtyRevertQty = null;
@@ -28687,6 +28691,7 @@ function applyPickerBarcode(value, scanned = false) {
 function clearPickerFilter() {
   state.searches.workerProduct = "";
   state.filters.workerCategory = "";
+  state.pickerShowAll = false;
   state.pickerStatus = "";
   state.pickerBarcode = "";
   if (refreshPickerList()) {
@@ -28884,6 +28889,7 @@ function stopBarcodeScan(opts = {}) {
 }
 function openPickerModal() {
   stopBarcodeScan();
+  state.pickerShowAll = false;
   state.filters.workerCategory = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
@@ -28990,18 +28996,32 @@ function pickerQtySheetHtml(productId) {
   const stockHave = productStockWithEditCredit(p.id);
   return `<div class="picker-qty-sheet" data-picker-qty-sheet role="dialog" aria-modal="true" aria-labelledby="picker-qty-title"><button type="button" class="picker-qty-sheet__backdrop" data-picker-qty-close aria-label="Хаах"></button><div class="picker-qty-sheet__panel"><div class="picker-qty-sheet__head"><img src="${productImageSrcAttr(p)}" referrerpolicy="no-referrer" data-product-img alt="" class="picker-qty-sheet__thumb product-thumb"><div class="picker-qty-sheet__info"><h4 id="picker-qty-title" class="picker-qty-sheet__name">${esc(p.name)}</h4><p class="picker-qty-sheet__meta">${fmt(p.price)} · Үлд ${stockHave} ${esc(p.unit || "ш")}</p></div></div>${promoHtml}${qtyBody}<div class="picker-qty-sheet__actions"><button type="button" data-picker-qty-close class="btn btn--secondary btn--block">Буцах</button><button type="button" data-picker-qty-done data-product-id="${id}" class="btn btn--primary btn--block">Болсон</button></div></div></div>`;
 }
+function pickerRowQtyBadgeText(p, q) {
+  const total = Math.max(0, Math.floor(Number(q) || 0));
+  if (!total) return "";
+  if (!productPackSize(p) && !productLargeBoxPieceCount(p)) return `${total} ш`;
+  const parts = workerQtyPartsForProduct(p, total);
+  const bits = [];
+  if (parts.largePacks) bits.push(`${parts.largePacks} том хайрцаг`);
+  if (parts.packs) bits.push(`${parts.packs} жижиг хайрцаг`);
+  if (parts.loosePieces) bits.push(`${parts.loosePieces} ш`);
+  return bits.join(" · ") || `${total} ш`;
+}
 function pickerRow(p) {
   const q = getWorkerQty(p.id),
     inCart = q > 0,
     left = productStockWithEditCredit(p.id) - q,
     promoHint = pickerProductPromoHintHtml(p),
+    qtyLabel = pickerRowQtyBadgeText(p, q),
     qtyBadge = inCart
-      ? `<span class="picker-row__qty" aria-label="Сонгосон ${q} ш">${q} ш</span>`
+      ? `<span class="picker-row__qty" aria-label="Сонгосон ${esc(qtyLabel)}">${esc(qtyLabel)}</span>`
       : "";
   return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="picker-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${promoHint}</span></div>${qtyBadge}</button>`;
 }
 function setPickerCategory(cat) {
-  state.filters.workerCategory = cat || "";
+  const next = String(cat || "").trim();
+  state.filters.workerCategory = next;
+  state.pickerShowAll = !next;
   state.pickerActiveId = "";
   state.pickerQtyProductId = "";
   if (refreshPickerList()) return;
