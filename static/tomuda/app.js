@@ -28301,26 +28301,52 @@ function applyStock(id, type, qty, costPrice) {
   criticalBackendSave();
   return true;
 }
+function pickerHasActiveFilters() {
+  return !!(
+    String(state.searches.workerProduct || "").trim() ||
+    String(state.filters.workerCategory || "").trim()
+  );
+}
+function pickerEmptyStateHtml() {
+  if (pickerHasActiveFilters()) {
+    return `<div class="picker-panel__empty">Бараа олдсонгүй</div>`;
+  }
+  return `<div class="picker-panel__empty">Хайлт хийнэ үү эсвэл төрөл сонгоно уу</div>`;
+}
+function pickerProductSearchRank(p, rawQuery) {
+  const q = String(rawQuery || "").trim();
+  if (!q) return 0;
+  const name = String(p?.name || "").trim();
+  const category = String(p?.category || "").trim();
+  const barcode = String(p?.barcode || "").trim();
+  const nameMild = searchQueryMild(name);
+  const catMild = searchQueryMild(category);
+  const qMild = searchQueryMild(q);
+  if (barcode && barcodesLooselyEqual(barcode, q)) return 0;
+  if (nameMild && qMild && nameMild === qMild) return 1;
+  if (nameMild && qMild && nameMild.startsWith(qMild)) return 2;
+  if (catMild && qMild && catMild === qMild) return 3;
+  if (productTextMatchesQuery(p, q)) return 4;
+  if (searchTextMatches(category, q) || searchTokensMatch(category, q)) return 5;
+  return 6;
+}
 function pickerProductsInView() {
-  const q = (state.searches.workerProduct || "").toLowerCase().trim(),
-    cat = state.filters.workerCategory || "";
+  const q = String(state.searches.workerProduct || "").trim();
+  const cat = state.filters.workerCategory || "";
+  if (!q && !cat) return [];
   return state.products
     .filter((p) => {
       if (cat && p.category !== cat) return false;
       if (!q) return true;
+      if (productTextMatchesQuery(p, q)) return true;
       return (
-        String(p.name || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(p.barcode || "")
-          .toLowerCase()
-          .includes(q) ||
-        String(p.category || "")
-          .toLowerCase()
-          .includes(q)
+        searchTextMatches(p.category || "", q) ||
+        searchTokensMatch(p.category || "", q)
       );
     })
     .sort((a, b) => {
+      const byRank = pickerProductSearchRank(a, q) - pickerProductSearchRank(b, q);
+      if (byRank) return byRank;
       const byCat = (a.category || "").localeCompare(b.category || "", "mn");
       if (byCat) return byCat;
       return (a.name || "").localeCompare(b.name || "", "mn");
@@ -28493,7 +28519,7 @@ function refreshPickerList(opts = {}) {
   }
   list.innerHTML = products.length
     ? products.map((p) => pickerRow(p)).join("")
-    : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`;
+    : pickerEmptyStateHtml();
   updatePickerClearBtn();
   updatePickerCartSummary();
   restorePickerScroll(scrollSnap);
@@ -28877,7 +28903,7 @@ function pickerModal() {
     : "";
   box(
     pickerModalTitleHtml(),
-    `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerSearchToolsHtml()}${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : `<div class="picker-panel__empty">Бараа олдсонгүй</div>`}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions">${pickerCartSummaryBarHtml()}<div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
+    `<div class="picker-step2 picker-panel${state.pickerQtyProductId ? " picker-step2--qty-open" : ""}" data-picker-root><div class="picker-step2__toolbar">${pickerSearchToolsHtml()}${pickerCategoryChipsHtml()}</div><div class="picker-step2__scroll"><div class="picker-list" data-picker-products>${products.length ? products.map((p) => pickerRow(p)).join("") : pickerEmptyStateHtml()}</div></div><footer class="picker-step2__bottom picker-step2__bottom--actions">${pickerCartSummaryBarHtml()}<div class="picker-footer"><button type="button" data-picker-clear-cart class="btn btn--secondary btn--block${hasSelected ? "" : " is-disabled"}" ${hasSelected ? "" : "disabled"}>Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="btn btn--primary btn--block">Дуусгах</button></div></footer>${qtySheet}</div>`,
     "max-w-2xl",
     {
       titleId: "picker-order-title",
