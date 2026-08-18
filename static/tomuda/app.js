@@ -21056,28 +21056,16 @@ function promoQtyModeMeta(mode) {
     return {
       id: "each",
       title: "Бүгд",
-      hint: "Бүх бараа тус бүрдээ босгонд хүрнэ",
     };
   if (mode === "total")
     return {
       id: "total",
       title: "Нийлбэр",
-      hint: "Аль бараанаас ч нийлээд босгонд хүрвэл",
     };
   return {
     id: "any",
     title: "Аль нэг",
-    hint: "Нэг бараа тусдаа босгонд хүрвэл",
   };
-}
-function promoQtyModeHelperText(mode) {
-  if (mode === "total") {
-    return "Дурын хослол нийлээд босгонд хүрвэл урамшуулал. Жишээ: 5 өнгөнөөс 3+2=5 ш.";
-  }
-  if (mode === "any") {
-    return "Сонгосон бараанаас аль нэг нь тусдаа босгонд хүрэхэд урамшуулал олгоно.";
-  }
-  return "Сонгосон бараа бүр тус бүрийн босгонд хүрсэн үед урамшуулал олгоно.";
 }
 function promoQtyModePickerHtml(buyMode) {
   const modes = ["total", "any", "each"].map(promoQtyModeMeta);
@@ -21113,19 +21101,7 @@ function promoQtyUnitTabsHtml(buyUnit) {
       return `<button type="button" role="tab" aria-selected="${on ? "true" : "false"}" onclick="setPromotionQtyBuyUnit('${u.id}')" class="seg-tab${on ? " is-active" : ""}">${esc(u.title)}</button>`;
     })
     .join("")}</div>`;
-  return `<div class="promo-qty-unit"><p class="promo-qty-unit__label">Нэгж сонгох</p>${tabs}<p class="promo-qty-unit__note">Босгыг энэ нэгжээр тоолно. Урамшууллын бараа үргэлж <b>ширхэгээр</b> олгогдоно.</p></div>`;
-}
-function promoQtyPreviewSentence(buyMode, buyQty, freeQty) {
-  const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
-  const free = Math.max(0, Math.floor(Number(freeQty) || 0));
-  if (buy < 1 || free < 1) return "";
-  if (buyMode === "total") {
-    return `Сонгосон бараануудын нийлбэр ${buy} ширхэг болоход ${free} ш урамшуулал авна. ${buy * 2} ш бол ${free * 2} ш.`;
-  }
-  if (buyMode === "any") {
-    return `Сонгосон бараанаас аль нэг нь ${buy} ширхэг болоход ${free} ш урамшуулал авна. Босгонд хэдэн удаа хүрвэл тэр тоогоор үржигдэнэ.`;
-  }
-  return `Сонгосон бүх бараа тус бүр ${buy} ширхэг болоход ${free} ш урамшуулал авна. Босгонд хэдэн удаа хүрвэл тэр тоогоор үржигдэнэ.`;
+  return `<div class="promo-qty-unit"><p class="promo-qty-unit__label">Нэгж сонгох</p>${tabs}</div>`;
 }
 function setPromotionQtyBuyUnit(unit) {
   capturePromoFormDraft();
@@ -21148,26 +21124,7 @@ function promoQtyLiveText(buyMode, buyQty, freeQty, buyCount = 0, freeCount = 0)
   return `${buyCount} бараанаас аль нэг → ${free || "?"} ш урамшуулал`;
 }
 function promoQtyLivePreviewHtml(buyMode, buyQty, freeQty) {
-  const buyCount = (state.promoPick?.buyProductIds || []).length;
-  const freeCount = (state.promoPick?.freeProductIds || []).length;
-  const shortText = promoQtyLiveText(buyMode, buyQty, freeQty, buyCount, freeCount);
-  const fullText = promoQtyPreviewSentence(buyMode, buyQty, freeQty);
-  if (!shortText && !fullText) {
-    return `<div class="promo-qty-preview is-empty" data-promo-bundle-summary data-promo-live-preview hidden>
-  <span data-promo-live-text></span>
-  <span data-promo-preview-full></span>
-  <span data-promo-sum-buy hidden>${esc(String(Math.max(0, Math.floor(Number(buyQty) || 0))))}</span>
-  <span data-promo-sum-free hidden>${esc(String(Math.max(0, Math.floor(Number(freeQty) || 0))))}</span>
-  <span data-promo-sum-tip hidden></span>
-</div>`;
-  }
-  return `<div class="promo-qty-preview" data-promo-bundle-summary data-promo-live-preview>
-  <p class="promo-qty-preview__short" data-promo-live-text>${esc(shortText)}</p>
-  <p class="promo-qty-preview__full" data-promo-preview-full hidden></p>
-  <span data-promo-sum-buy hidden>${esc(String(Math.max(0, Math.floor(Number(buyQty) || 0))))}</span>
-  <span data-promo-sum-free hidden>${esc(String(Math.max(0, Math.floor(Number(freeQty) || 0))))}</span>
-  <span data-promo-sum-tip hidden></span>
-</div>`;
+  return "";
 }
 function syncPromoBundleSummary() {
   const buy =
@@ -21204,8 +21161,7 @@ function syncPromoBundleSummary() {
   const buyCount = (state.promoPick?.buyProductIds || []).length;
   const freeCount = (state.promoPick?.freeProductIds || []).length;
   const liveText = promoQtyLiveText(buyMode, buy, free, buyCount, freeCount);
-  const fullText = promoQtyPreviewSentence(buyMode, buy, free);
-  if (tipEl) tipEl.textContent = fullText || liveText;
+  if (tipEl) tipEl.textContent = "";
   const liveEl = document.querySelector("[data-promo-live-text]");
   if (liveEl) liveEl.textContent = liveText;
   const fullEl = document.querySelector("[data-promo-preview-full]");
@@ -21215,9 +21171,8 @@ function syncPromoBundleSummary() {
   }
   const preview = document.querySelector("[data-promo-live-preview]");
   if (preview) {
-    const hasText = !!(liveText || fullText);
-    preview.hidden = !hasText;
-    preview.classList.toggle("is-empty", !hasText);
+    preview.hidden = true;
+    preview.classList.add("is-empty");
   }
 }
 function promoBundleConditionFormulaHtml(buyDefault = "8", freeDefault = "1") {
