@@ -21323,3 +21323,60 @@ label.excel-import-toolbar__upload {
     grid-template-columns: 1fr;
   }
 }
+
+/* Promo search dropdown */
+.promo-search-dropdown {
+  position: relative;
+  z-index: 5;
+}
+.promo-search-dropdown:empty {
+  display: none;
+}
+.promo-search-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--hex-border, #e5e7eb);
+  background: var(--hex-card, #fff);
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.promo-search-dropdown__item:last-child {
+  border-bottom: none;
+}
+.promo-search-dropdown__item:active {
+  background: var(--hex-tint, #e0f2fe);
+}
+.promo-search-dropdown__img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.promo-search-dropdown__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.promo-search-dropdown__price {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--hex-primary, #0891b2);
+}
+.promo-search-dropdown__empty {
+  margin: 0;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--hex-muted, #9ca3af);
+  text-align: center;
+}
+.promo-sheet-filters {
+  position: relative;
+}

@@ -21117,10 +21117,10 @@ function promoQtyModePickerHtml(buyMode) {
   const cards = modes
     .map((m) => {
       const on = buyMode === m.id;
-      return `<button type="button" role="tab" aria-selected="${on ? "true" : "false"}" onclick="setPromotionQtyBuyMode('${m.id}')" class="promo-mode-card${on ? " is-active" : ""}"><span class="promo-mode-card__title">${esc(m.title)}</span><span class="promo-mode-card__hint">${esc(m.hint)}</span></button>`;
+      return `<button type="button" role="tab" aria-selected="${on ? "true" : "false"}" onclick="setPromotionQtyBuyMode('${m.id}')" class="promo-mode-card${on ? " is-active" : ""}"><span class="promo-mode-card__title">${esc(m.title)}</span></button>`;
     })
     .join("");
-  return `<div class="promo-qty-mode"><p class="promo-qty-mode__label">Горим сонгох</p><div class="promo-mode-picker" role="tablist" aria-label="Горим">${cards}</div><p class="promo-mode-helper" data-promo-mode-helper>${esc(promoQtyModeHelperText(buyMode))}</p></div>`;
+  return `<div class="promo-qty-mode"><p class="promo-qty-mode__label">Горим сонгох</p><div class="promo-mode-picker" role="tablist" aria-label="Горим">${cards}</div></div>`;
 }
 function promoQtyModeCardsHtml(buyMode) {
   return promoQtyModePickerHtml(buyMode);
@@ -21196,10 +21196,10 @@ function promoQtyLivePreviewHtml(buyMode, buyQty, freeQty) {
   }
   return `<div class="promo-qty-preview" data-promo-bundle-summary data-promo-live-preview>
   <p class="promo-qty-preview__short" data-promo-live-text>${esc(shortText)}</p>
-  ${fullText ? `<p class="promo-qty-preview__full" data-promo-preview-full>${esc(fullText)}</p>` : `<p class="promo-qty-preview__full" data-promo-preview-full hidden></p>`}
+  <p class="promo-qty-preview__full" data-promo-preview-full hidden></p>
   <span data-promo-sum-buy hidden>${esc(String(Math.max(0, Math.floor(Number(buyQty) || 0))))}</span>
   <span data-promo-sum-free hidden>${esc(String(Math.max(0, Math.floor(Number(freeQty) || 0))))}</span>
-  <span data-promo-sum-tip hidden>${esc(fullText || shortText)}</span>
+  <span data-promo-sum-tip hidden></span>
 </div>`;
 }
 function syncPromoBundleSummary() {
@@ -21243,11 +21243,9 @@ function syncPromoBundleSummary() {
   if (liveEl) liveEl.textContent = liveText;
   const fullEl = document.querySelector("[data-promo-preview-full]");
   if (fullEl) {
-    fullEl.textContent = fullText;
-    fullEl.hidden = !fullText;
+    fullEl.textContent = "";
+    fullEl.hidden = true;
   }
-  const helperEl = document.querySelector("[data-promo-mode-helper]");
-  if (helperEl) helperEl.textContent = promoQtyModeHelperText(buyMode);
   const preview = document.querySelector("[data-promo-live-preview]");
   if (preview) {
     const hasText = !!(liveText || fullText);
@@ -21378,6 +21376,18 @@ function promoProductGridInnerHtml({
   const selectedProducts = selectedIds
     .map((id) => state.products.find((p) => String(p.id) === String(id)))
     .filter(Boolean);
+
+  if (perProductQty) {
+    if (!selectedProducts.length) {
+      return `<p class="promo-product-empty">Дээрх хайлтаас бараа сонгоно уу</p>`;
+    }
+    return `<div class="promo-product-grid" data-promo-pick-list="${esc(pickKey)}">${selectedProducts
+      .map((p) =>
+        promoProductCardHtml(p, { pickKey, selected: true, perProductQty }),
+      )
+      .join("")}</div>`;
+  }
+
   const filtered = promoFilteredProducts(pickKey, []);
   const browseProducts = filtered
     .filter((p) => !selectedSet.has(String(p.id)))
@@ -21388,34 +21398,6 @@ function promoProductGridInnerHtml({
     filtered.filter((p) => !selectedSet.has(String(p.id))).length -
       browseProducts.length,
   );
-  // #region agent log
-  if (pickKey === "buyProductIds" && perProductQty) {
-    fetch("http://127.0.0.1:7251/ingest/fcc8206a-f672-4112-bac3-d209b7a3d5a6", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "018544",
-      },
-      body: JSON.stringify({
-        sessionId: "018544",
-        runId: "pre-fix",
-        hypothesisId: "UX-selected-vs-browse",
-        location: "app.js:21380",
-        message: "each/any grid composition",
-        data: {
-          pickKey,
-          perProductQty,
-          selectedCount: selectedProducts.length,
-          browseCount: browseProducts.length,
-          filteredCount: filtered.length,
-          firstSelected: selectedProducts.slice(0, 4).map((p) => p?.name || ""),
-          firstBrowse: browseProducts.slice(0, 4).map((p) => p?.name || ""),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  }
-  // #endregion
   if (!products.length) {
     return `<p class="promo-product-empty">Бараа олдсонгүй</p>`;
   }
@@ -21504,7 +21486,10 @@ function promotionSheetPickerBlock({
     : "";
   const extraHtml = extraBeforeStepper || "";
   const head = `<div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}${countBadge}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>`;
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
+  const dropdownHtml = perProductQty
+    ? `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown">${promoSearchDropdownInnerHtml(pickKey, ids)}</div>`
+    : "";
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}${dropdownHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoQtySetupCardHtml(buyMode, buyQtyDefault, freeQtyDefault) {
@@ -21515,6 +21500,22 @@ function promoQtySetupCardHtml(buyMode, buyQtyDefault, freeQtyDefault) {
     freeQtyDefault,
   );
   return `<div class="promo-qty-setup-card">${modeBlock}${livePreview}</div>`;
+}
+function promoSearchDropdownInnerHtml(pickKey, selectedIds) {
+  const searchKey = promoPickSearchKey(pickKey);
+  const rawQ = (searchKey && state.searches[searchKey]) || "";
+  if (!rawQ.trim()) return "";
+  const selectedSet = new Set((selectedIds || []).map(String));
+  const filtered = promoFilteredProducts(pickKey, [])
+    .filter((p) => !selectedSet.has(String(p.id)))
+    .slice(0, 20);
+  if (!filtered.length) return `<p class="promo-search-dropdown__empty">Олдсонгүй</p>`;
+  return filtered
+    .map((p) => {
+      const img = p.image ? `<img src="${esc(p.image)}" class="promo-search-dropdown__img" alt="">` : "";
+      return `<button type="button" class="promo-search-dropdown__item" onclick="addPromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})">${img}<span class="promo-search-dropdown__name">${esc(p.name)}</span><span class="promo-search-dropdown__price">₮${numFmt(p.price || 0)}</span></button>`;
+    })
+    .join("");
 }
 function promoProductSearchListInnerHtml({
   pickKey,
@@ -21595,11 +21596,16 @@ function patchPromoPickSearchList(pickKey, opts = {}) {
       ? opts.scrollTop
       : (prevList?.scrollTop ?? state.promoPickListScroll?.[pickKey] ?? 0);
   if (addAction === "toggle") {
+    const ppq = mount.getAttribute("data-promo-per-product-qty") === "1";
     mount.innerHTML = promoProductGridInnerHtml({
       pickKey,
       selectedIds,
-      perProductQty: mount.getAttribute("data-promo-per-product-qty") === "1",
+      perProductQty: ppq,
     });
+    if (ppq) {
+      const dd = mount.closest(".promo-sheet-section")?.querySelector(`[data-promo-search-dropdown="${pickKey}"]`);
+      if (dd) dd.innerHTML = promoSearchDropdownInnerHtml(pickKey, selectedIds);
+    }
   } else {
     let selectedId = "";
     if (addAction === "select") {
@@ -22977,17 +22983,14 @@ function promotionQtyModal() {
       fieldName: "buyProductIds",
       selectedIds: buyIds,
       title: "Бараа сонгох",
-      hint: "Сонгосон бараануудаас ямар ч хослол нийлээд босгонд хүрвэл урамшуулал олгоно. Том/жижиг хайрцаг автоматаар ширхэг рүү хөрвөнө.",
+      hint: "",
       placeholder: "Хайх...",
       variant: "buy",
       qtyStepper: buyQtyStepper,
       compact: true,
     });
   } else {
-    const eachHint =
-      buyMode === "each"
-        ? "Бараа бүр тус бүрийн босгонд хүрнэ. Сонгосон card дээр босгыг тохируулна."
-        : "Аль нэг бараа тус бүрийн босгонд хүрвэл урамшуулал олгоно. Сонгосон card дээр босгыг тохируулна.";
+    const eachHint = "";
     buySection = promotionSheetPickerBlock({
       pickKey: "buyProductIds",
       fieldName: "buyProductIds",
@@ -23005,7 +23008,7 @@ function promotionQtyModal() {
     fieldName: "freeProductIds",
     selectedIds: freeIds,
     title: "Урамшуулал",
-    hint: "Олон бараа сонгож болно. Босгонд хэдэн удаа хүрвэл энд бичсэн тоогоор үржигдэнэ.",
+    hint: "",
     placeholder: "Хайх...",
     variant: "free",
     qtyStepper: freeQtyStepper,
@@ -28719,7 +28722,12 @@ function setWorkerQty(id, qty) {
   }
   if (q > 0 && (productPackSize(p) || productLargeBoxPieceCount(p))) {
     if (state.pickerQtyProductId === id) {
-      syncWorkerQtyParts(id, readPickerQtyParts(id));
+      const alreadyStored = state.workerQtyParts?.[id];
+      if (alreadyStored && partsMatchTotal(p, normalizeQtyParts(alreadyStored), q)) {
+        // parts already saved by pickerPartStepperApply — don't overwrite from stale DOM
+      } else {
+        syncWorkerQtyParts(id, readPickerQtyParts(id));
+      }
     } else {
       const stored = state.workerQtyParts?.[id];
       if (stored) {
