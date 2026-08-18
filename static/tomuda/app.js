@@ -21470,13 +21470,7 @@ function promotionSheetPickerBlock({
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoQtySetupCardHtml(buyMode, buyQtyDefault, freeQtyDefault) {
-  const modeBlock = promoQtyModeCardsHtml(buyMode);
-  const livePreview = promoQtyLivePreviewHtml(
-    buyMode,
-    buyQtyDefault,
-    freeQtyDefault,
-  );
-  return `<div class="promo-qty-setup-card">${modeBlock}${livePreview}</div>`;
+  return "";
 }
 function promoSearchDropdownInnerHtml(pickKey, selectedIds) {
   const searchKey = promoPickSearchKey(pickKey);
