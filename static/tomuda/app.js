@@ -21078,7 +21078,7 @@ function promoQtyModeMeta(mode) {
 }
 function promoQtyModeHelperText(mode) {
   if (mode === "total") {
-    return "Жишээ: 5 бараа сонгоод босго 5 болговол тэднээс аль бараанаас ч байсан нийлээд 5 ш авахад урамшуулал олгоно.";
+    return "Жишээ: 7 бараа сонгоод босго 10 болговол тэднээс аль бараанаас ч байсан нийлээд 10 (ширхэг/хайрцаг) авахад урамшуулал олгоно.";
   }
   if (mode === "any") {
     return "Сонгосон бараануудаас аль нэг нь тусдаа босгонд хүрэхэд урамшуулал бодогдоно.";
@@ -21099,7 +21099,7 @@ function promoQtyModeCardsHtml(buyMode) {
   return promoQtyModePickerHtml(buyMode);
 }
 function promoQtyBuyFieldLabel(unit = state.promoQtyBuyUnit || "piece") {
-  if (unit === "pack") return "Авах (хайрцаг)";
+  if (unit === "pack") return "Авах (жижиг хайрцаг)";
   if (unit === "large") return "Авах (том хайрцаг)";
   return "Авах (ш)";
 }
@@ -21107,7 +21107,7 @@ function promoQtyFreeFieldLabel() {
   return "Урамшуулал (ш)";
 }
 function promoQtyUnitMeta(unit) {
-  if (unit === "pack") return { id: "pack", title: "Хайрцаг" };
+  if (unit === "pack") return { id: "pack", title: "Жижиг хайрцаг" };
   if (unit === "large") return { id: "large", title: "Том хайрцаг" };
   return { id: "piece", title: "Ширхэг" };
 }
@@ -21119,7 +21119,7 @@ function promoQtyUnitTabsHtml(buyUnit) {
       return `<button type="button" role="tab" aria-selected="${on ? "true" : "false"}" onclick="setPromotionQtyBuyUnit('${u.id}')" class="seg-tab${on ? " is-active" : ""}">${esc(u.title)}</button>`;
     })
     .join("")}</div>`;
-  return `<div class="promo-qty-unit"><p class="promo-qty-unit__label">Нэгж сонгох</p>${tabs}<p class="promo-qty-unit__note">Урамшууллын бараа үргэлж <b>ширхэгээр</b> олгогдоно.</p></div>`;
+  return `<div class="promo-qty-unit"><p class="promo-qty-unit__label">Нэгж сонгох</p>${tabs}<p class="promo-qty-unit__note">Босгыг энэ нэгжээр тоолно. Урамшууллын бараа үргэлж <b>ширхэгээр</b> олгогдоно.</p></div>`;
 }
 function promoQtyPreviewSentence(buyMode, buyQty, freeQty) {
   const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
@@ -21417,6 +21417,7 @@ function promotionSheetPickerBlock({
   qtyStepper = null,
   showCategory = true,
   compact = false,
+  extraBeforeStepper = "",
 }) {
   const ids = Array.isArray(selectedIds) ? selectedIds : [];
   const searchKey = promoPickSearchKey(pickKey);
@@ -21433,19 +21434,18 @@ function promotionSheetPickerBlock({
   const searchInput = `<input data-promo-pick="${pickKey}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input promo-sheet-search" autocomplete="off">`;
   const categoryHtml = showCategory ? promoCategorySelectHtml(pickKey) : "";
   const gridHtml = promoProductGridHtml({ pickKey, selectedIds: ids });
-  const stepperHtml = qtyStepper
-    ? `<div class="promo-sheet-stepper">${promoQtyStepperHtml(qtyStepper.name, qtyStepper.defaultValue, { min: qtyStepper.min ?? 0, label: qtyStepper.label || "" })}</div>`
+  const stepperCaption = qtyStepper?.caption
+    ? `<p class="promo-sheet-stepper__label">${esc(qtyStepper.caption)}</p>`
     : "";
+  const stepperHtml = qtyStepper
+    ? `<div class="promo-sheet-stepper">${stepperCaption}${promoQtyStepperHtml(qtyStepper.name, qtyStepper.defaultValue, { min: qtyStepper.min ?? 0, label: qtyStepper.label || "" })}</div>`
+    : "";
+  const extraHtml = extraBeforeStepper || "";
   const head = `<div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}${countBadge}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>`;
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}</div>${gridHtml}${stepperHtml}`;
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
-function promoQtyAdvancedSettingsHtml(
-  buyMode,
-  buyUnit,
-  buyQtyDefault,
-  freeQtyDefault,
-) {
+function promoQtySetupCardHtml(buyMode, buyUnit, buyQtyDefault, freeQtyDefault) {
   const modeBlock = promoQtyModeCardsHtml(buyMode);
   const unitBlock = promoQtyUnitTabsHtml(buyUnit);
   const livePreview = promoQtyLivePreviewHtml(
@@ -21453,7 +21453,7 @@ function promoQtyAdvancedSettingsHtml(
     buyQtyDefault,
     freeQtyDefault,
   );
-  return `<details class="promo-qty-advanced"><summary class="promo-qty-advanced__summary">Нэмэлт тохиргоо</summary><div class="promo-qty-advanced__body">${modeBlock}${unitBlock}${livePreview}</div></details>`;
+  return `<div class="promo-qty-setup-card">${modeBlock}${unitBlock}${livePreview}</div>`;
 }
 function promoProductSearchListInnerHtml({
   pickKey,
@@ -22877,19 +22877,22 @@ function promotionQtyModal() {
     promoFormDraftVal("buyQty", buyUnit === "piece" ? "8" : "6") ||
     (buyUnit === "piece" ? "8" : "6");
   const freeQtyDefault = promoFormDraftVal("freeQty", "1") || "1";
+  const buyUnitTitle = promoQtyUnitMeta(buyUnit).title;
   const buyQtyStepper = {
     name: "buyQty",
     defaultValue: buyQtyDefault,
     label: promoQtyBuyFieldLabel(buyUnit),
+    caption: `Нийлбэр босго · ${buyUnitTitle}`,
     min: 0,
   };
   const freeQtyStepper = {
     name: "freeQty",
     defaultValue: freeQtyDefault,
     label: promoQtyFreeFieldLabel(),
+    caption: "Урамшуулал · ширхэг",
     min: 0,
   };
-  const advancedBlock = promoQtyAdvancedSettingsHtml(
+  const setupCard = promoQtySetupCardHtml(
     buyMode,
     buyUnit,
     buyQtyDefault,
@@ -22916,13 +22919,13 @@ function promotionQtyModal() {
     fieldName: "freeProductIds",
     selectedIds: freeIds,
     title: "Урамшуулал",
-    hint: "Олон бараа сонгож болно",
+    hint: "Олон бараа сонгож болно — үргэлж ширхэгээр олгоно",
     placeholder: "Хайх...",
     variant: "free",
     qtyStepper: freeQtyStepper,
     compact: true,
   });
-  const bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="${buyUnit}">${buySection}${freeSection}${advancedBlock}`;
+  const bodyHtml = `<input type="hidden" name="buyMode" value="${buyMode}"><input type="hidden" name="buyUnit" value="${buyUnit}">${setupCard}${buySection}${freeSection}`;
   box(
     promotionPageTitle("quantity"),
     promoFormShell(

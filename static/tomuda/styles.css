@@ -16361,10 +16361,20 @@ textarea::placeholder {
 .modal-panel--promo-qty .promo-sheet-stepper,
 .modal-panel--promo-sheet .promo-sheet-stepper {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   padding: 12px 0 4px;
   border-top: 1px solid var(--promo-sheet-line);
   margin-top: 10px;
+}
+
+.modal-panel--promo-qty .promo-sheet-stepper__label,
+.modal-panel--promo-sheet .promo-sheet-stepper__label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--promo-sheet-muted);
 }
 
 .modal-panel--promo-qty .promo-qty-stepper,
