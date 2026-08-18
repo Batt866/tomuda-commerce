@@ -7019,7 +7019,9 @@ function pickerQtyToParts(q, p, { preferStored = true } = {}) {
     if (stored) {
       const parts = normalizeQtyParts(stored);
       if (partsMatchTotal(p, parts, total)) {
-        return exclusiveOrderQtyParts(parts, largeCount);
+        const splitPack =
+          effectivePackSizeFromParts(p, parts, total) || packSize;
+        return rollUpQtyParts(parts, splitPack, largeCount);
       }
     }
   }
