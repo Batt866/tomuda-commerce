@@ -21334,18 +21334,6 @@ function promoProductGridInnerHtml({
   const selectedProducts = selectedIds
     .map((id) => state.products.find((p) => String(p.id) === String(id)))
     .filter(Boolean);
-
-  if (perProductQty) {
-    if (!selectedProducts.length) {
-      return `<p class="promo-product-empty">Дээрх хайлтаас бараа сонгоно уу</p>`;
-    }
-    return `<div class="promo-product-grid" data-promo-pick-list="${esc(pickKey)}">${selectedProducts
-      .map((p) =>
-        promoProductCardHtml(p, { pickKey, selected: true, perProductQty }),
-      )
-      .join("")}</div>`;
-  }
-
   const filtered = promoFilteredProducts(pickKey, []);
   const browseProducts = filtered
     .filter((p) => !selectedSet.has(String(p.id)))
@@ -21444,10 +21432,7 @@ function promotionSheetPickerBlock({
     : "";
   const extraHtml = extraBeforeStepper || "";
   const head = `<div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}${countBadge}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>`;
-  const dropdownHtml = perProductQty
-    ? `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown">${promoSearchDropdownInnerHtml(pickKey, ids)}</div>`
-    : "";
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}${dropdownHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoQtySetupCardHtml(buyMode, buyQtyDefault, freeQtyDefault) {
@@ -21560,10 +21545,6 @@ function patchPromoPickSearchList(pickKey, opts = {}) {
       selectedIds,
       perProductQty: ppq,
     });
-    if (ppq) {
-      const dd = mount.closest(".promo-sheet-section")?.querySelector(`[data-promo-search-dropdown="${pickKey}"]`);
-      if (dd) dd.innerHTML = promoSearchDropdownInnerHtml(pickKey, selectedIds);
-    }
   } else {
     let selectedId = "";
     if (addAction === "select") {
