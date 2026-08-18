@@ -13,12 +13,18 @@ if [ -d ".venv" ]; then
   source .venv/bin/activate
 fi
 
+# Local files must be served as-is; do not inherit a production DEBUG=0.
+export DEBUG=1
+export ALLOWED_HOSTS="${ALLOWED_HOSTS:-*,localhost,127.0.0.1,.trycloudflare.com}"
+export CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://*.trycloudflare.com,http://127.0.0.1:$PORT,http://localhost:$PORT}"
+
 wait_http_ok() {
   local url="$1"
   local tries="${2:-30}"
   local i
   for i in $(seq 1 "$tries"); do
-    if curl -sf --max-time 20 "$url" >/dev/null 2>&1; then
+    if curl -sfL --max-time 20 --doh-url https://1.1.1.1/dns-query -A "Mozilla/5.0 TomudaMiniDeploy" "$url" >/dev/null 2>&1 \
+      || curl -sfL --max-time 20 -A "Mozilla/5.0 TomudaMiniDeploy" "$url" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
@@ -37,6 +43,46 @@ local_lan_url() {
   fi
 }
 
+# Survive the parent shell exiting (Cursor/agent process-group teardown).
+detach_run() {
+  local pidfile="$1"
+  local logfile="$2"
+  shift 2
+  python3 - "$pidfile" "$logfile" "$@" <<'PY'
+import os
+import subprocess
+import sys
+
+pidfile, logfile, *cmd = sys.argv[1:]
+os.makedirs(os.path.dirname(pidfile) or ".", exist_ok=True)
+log = open(logfile, "ab", buffering=0)
+proc = subprocess.Popen(
+    cmd,
+    stdin=subprocess.DEVNULL,
+    stdout=log,
+    stderr=subprocess.STDOUT,
+    start_new_session=True,
+    cwd=os.getcwd(),
+    env=os.environ.copy(),
+)
+with open(pidfile, "w", encoding="utf-8") as fh:
+    fh.write(str(proc.pid))
+PY
+}
+
+stop_pidfile() {
+  local pidfile="$1"
+  if [ ! -f "$pidfile" ]; then
+    return 0
+  fi
+  local pid
+  pid="$(cat "$pidfile" 2>/dev/null || true)"
+  if [ -n "${pid:-}" ]; then
+    kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+  fi
+  rm -f "$pidfile"
+}
+
 echo "=== ТОМУДА mini deploy ==="
 echo ""
 
@@ -45,33 +91,27 @@ if ! command -v cloudflared >/dev/null 2>&1; then
   exit 1
 fi
 
-export ALLOWED_HOSTS="${ALLOWED_HOSTS:-*,localhost,127.0.0.1,.trycloudflare.com}"
-export CSRF_TRUSTED_ORIGINS="${CSRF_TRUSTED_ORIGINS:-https://*.trycloudflare.com,http://127.0.0.1:$PORT,http://localhost:$PORT}"
-
-if curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-  echo "✓ Backend аль хэдийн ажиллаж байна (port $PORT)"
-else
-  echo "→ Backend асааж байна..."
-  nohup python3 manage.py runserver "0.0.0.0:$PORT" >>"$LOG_DIR/backend.log" 2>&1 &
-  echo $! >"$LOG_DIR/backend.pid"
-  if ! wait_http_ok "http://127.0.0.1:$PORT/api/health" 20; then
-    echo "✗ Backend асахгүй байна. logs/backend.log шалгана уу"
-    exit 1
-  fi
-  echo "✓ Backend амжилттай ассан"
+echo "→ Backend дахин асааж байна..."
+stop_pidfile "$LOG_DIR/backend.pid"
+pkill -f "manage.py runserver 0.0.0.0:$PORT" 2>/dev/null || true
+pkill -f "manage.py runserver .*:$PORT" 2>/dev/null || true
+sleep 1
+detach_run "$LOG_DIR/backend.pid" "$LOG_DIR/backend.log" \
+  python3 manage.py runserver "0.0.0.0:$PORT"
+if ! wait_http_ok "http://127.0.0.1:$PORT/api/health" 20; then
+  echo "✗ Backend асахгүй байна. logs/backend.log шалгана уу"
+  exit 1
 fi
+echo "✓ Backend амжилттай ассан"
 
-if [ -f "$LOG_DIR/tunnel.pid" ]; then
-  kill "$(cat "$LOG_DIR/tunnel.pid")" 2>/dev/null || true
-fi
+echo "→ HTTPS tunnel дахин асааж байна (1-2 минут хүлээнэ үү)..."
+stop_pidfile "$LOG_DIR/tunnel.pid"
 pkill -f "cloudflared tunnel --url http://127.0.0.1:$PORT" 2>/dev/null || true
 pkill -f "cloudflared tunnel --protocol http2 --url http://127.0.0.1:$PORT" 2>/dev/null || true
 sleep 1
-
-echo "→ HTTPS tunnel асааж байна (1-2 минут хүлээнэ үү)..."
 : >"$LOG_DIR/tunnel.log"
-nohup cloudflared tunnel --protocol http2 --url "http://127.0.0.1:$PORT" >>"$LOG_DIR/tunnel.log" 2>&1 &
-echo $! >"$LOG_DIR/tunnel.pid"
+detach_run "$LOG_DIR/tunnel.pid" "$LOG_DIR/tunnel.log" \
+  cloudflared tunnel --protocol http2 --url "http://127.0.0.1:$PORT"
 
 TUNNEL_URL=""
 for _ in $(seq 1 45); do
@@ -125,9 +165,15 @@ $LAN_URL
 EOF
 fi
 
-if [ -n "$TUNNEL_URL" ]; then
+if $TUNNEL_OK; then
   cat >> "$ROOT/DEPLOY-LINK.txt" <<EOF
 🔧 MINI DEPLOY (локал tunnel — Mac асаалттай үед):
+$TUNNEL_URL
+
+EOF
+elif [ -n "$TUNNEL_URL" ]; then
+  cat >> "$ROOT/DEPLOY-LINK.txt" <<EOF
+🔧 MINI DEPLOY (оролдож байна — хэдэн минут хүлээнэ үү):
 $TUNNEL_URL
 
 EOF
@@ -147,8 +193,12 @@ echo "  Production:     $PRODUCTION_URL"
 if [ -n "$LAN_URL" ]; then
   echo "  Wi‑Fi (утас):   $LAN_URL"
 fi
-if [ -n "$TUNNEL_URL" ]; then
+if $TUNNEL_OK; then
   echo "  Mini deploy:    $TUNNEL_URL"
+elif [ -n "$TUNNEL_URL" ]; then
+  echo "  Mini deploy:    $TUNNEL_URL  (DNS хүлээж байна)"
+else
+  echo "  Mini deploy:    (ассангүй)"
 fi
 echo "  DEPLOY-LINK.txt шинэчлэгдлээ"
 echo "============================================"

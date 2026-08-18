@@ -5,12 +5,17 @@ LINK_FILE="DEPLOY-LINK.txt"
 PORT=8011
 PRODUCTION_URL="${PRODUCTION_URL:-https://tomudagroup.mn}"
 
+curl_get() {
+  curl -sfL --max-time 25 --doh-url https://1.1.1.1/dns-query -A "Mozilla/5.0 TomudaMiniDeploy" "$1" 2>/dev/null \
+    || curl -sfL --max-time 25 -A "Mozilla/5.0 TomudaMiniDeploy" "$1"
+}
+
 wait_http_ok() {
   local url="$1"
   local tries="${2:-5}"
   local i
   for i in $(seq 1 "$tries"); do
-    if curl -sf --max-time 25 "$url" >/dev/null 2>&1; then
+    if curl_get "$url" >/dev/null 2>&1; then
       return 0
     fi
     sleep 3
@@ -45,7 +50,7 @@ if [ -n "$TUNNEL_URL" ]; then
   echo "Mini deploy: $TUNNEL_URL"
   if wait_http_ok "$TUNNEL_URL/api/health" 3; then
     echo "✓ Mini deploy link — OK"
-    curl -sS "$TUNNEL_URL/api/health"
+    curl_get "$TUNNEL_URL/api/health"
     echo ""
   else
     echo "✗ Mini deploy link — ажиллахгүй (tunnel хаагдсан эсвэл DNS хараахан бэлэн биш)"
@@ -57,7 +62,7 @@ echo ""
 echo "Production: $PRODUCTION_URL"
 if wait_http_ok "$PRODUCTION_URL/api/health" 6; then
   echo "✓ Production deploy — OK"
-  curl -sS "$PRODUCTION_URL/api/health"
+  curl_get "$PRODUCTION_URL/api/health"
   echo ""
 else
   echo "✗ Production — хариулахгүй байна"

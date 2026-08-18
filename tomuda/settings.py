@@ -115,3 +115,8 @@ if module_available("whitenoise.storage"):
             "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
         },
     }
+
+# Mini deploy / runserver must serve live files from static/, not a stale
+# collectstatic copy in staticfiles/.
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_AUTOREFRESH = DEBUG

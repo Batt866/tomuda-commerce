@@ -4032,6 +4032,10 @@ img[data-product-img],
   bottom: calc(var(--mobile-nav-offset) + 14px);
 }
 
+.app-shell--bottom-nav:has(.worker-view--ordering) .scroll-top-fab {
+  bottom: calc(var(--mobile-nav-offset) + 76px);
+}
+
 .pwa-install-inner {
   display: flex;
   flex-direction: column;
@@ -4641,6 +4645,7 @@ button.tone:active:not(:disabled) {
 
 .worker-order-add-btn:active {
   background: var(--hex-primary-active);
+  color: var(--hex-primary-foreground);
 }
 
 .qty-stepper__btn:active:not(:disabled) {
@@ -5930,6 +5935,9 @@ button:focus-visible,
   .app-shell--bottom-nav .app-main:has(.worker-view--ordering) {
     overflow-x: hidden;
     overflow-y: auto;
+    padding-bottom: calc(
+      var(--mobile-nav-offset) + var(--worker-savebar-h, 72px) + var(--phi-1)
+    ) !important;
   }
 
   .app-shell--bottom-nav .app-main__inner:has(.worker-view--ordering) {
@@ -7816,14 +7824,14 @@ textarea::placeholder {
   width: 100%;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid color-mix(in srgb, var(--hex-primary) 35%, var(--hex-border));
+  border: none;
   border-radius: 12px;
-  background: var(--hex-card);
-  color: var(--hex-primary);
+  background: var(--hex-primary);
+  color: var(--hex-primary-foreground);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgba(16, 22, 35, 0.12);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -8052,6 +8060,10 @@ textarea::placeholder {
   border-bottom: 1px solid var(--hex-border);
 }
 
+.worker-order-savebar {
+  margin-top: 12px;
+}
+
 .worker-order-options {
   display: flex;
   flex-direction: column;
@@ -8234,6 +8246,16 @@ textarea::placeholder {
 .worker-payment-tabs .seg-tab {
   min-height: 44px;
   font-size: 14px;
+}
+
+.worker-payment-tabs--idle {
+  opacity: 0.42;
+}
+
+.worker-payment-tabs--idle .seg-tab.is-active {
+  background: color-mix(in srgb, var(--hex-primary) 18%, var(--hex-secondary));
+  color: color-mix(in srgb, var(--hex-primary) 55%, var(--hex-muted-foreground));
+  box-shadow: none;
 }
 
 .btn.is-disabled,
@@ -9520,6 +9542,14 @@ textarea::placeholder {
   line-height: 1.3;
   color: var(--hex-foreground);
   font-variant-numeric: tabular-nums;
+}
+
+.promo-rule-card__lane .promo-qty-chips {
+  margin-top: 8px;
+}
+
+.promo-rule-card__lane .promo-rule-card__amount + .promo-qty-chips {
+  margin-top: 10px;
 }
 
 .promo-rule-card__amount--solo {
@@ -12194,6 +12224,19 @@ textarea::placeholder {
     padding: 0 0 10px;
     background: var(--hex-background);
     box-shadow: none;
+  }
+
+  .app-shell--bottom-nav .worker-order-savebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--mobile-nav-offset);
+    z-index: 40;
+    margin: 0;
+    padding: 10px var(--app-gutter) 10px;
+    background: var(--hex-card);
+    border-top: 1px solid var(--hex-border);
+    box-shadow: 0 -8px 20px rgba(16, 22, 35, 0.08);
   }
 
   .worker-selected-row {
