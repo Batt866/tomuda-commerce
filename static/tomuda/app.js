@@ -21520,46 +21520,20 @@ function promoProductGridInnerHtml({
   selectedIds = [],
   perProductQty = false,
 }) {
-  const selectedSet = new Set(selectedIds.map(String));
   const selectedProducts = selectedIds
     .map((id) => state.products.find((p) => String(p.id) === String(id)))
     .filter(Boolean);
 
-  if (perProductQty) {
-    if (!selectedProducts.length) {
-      return `<p class="promo-product-empty">Дээрх хайлтаас бараа сонгоно уу</p>`;
-    }
-    return `<div class="promo-product-grid" data-promo-pick-list="${esc(pickKey)}">${selectedProducts
-      .map((p) =>
-        promoProductCardHtml(p, { pickKey, selected: true, perProductQty }),
-      )
-      .join("")}</div>`;
-  }
-
-  const filtered = promoFilteredProducts(pickKey, []);
-  const browseProducts = filtered
-    .filter((p) => !selectedSet.has(String(p.id)))
-    .slice(0, 40);
-  const products = [...selectedProducts, ...browseProducts];
-  const more = Math.max(
-    0,
-    filtered.filter((p) => !selectedSet.has(String(p.id))).length -
-      browseProducts.length,
-  );
-  if (!products.length) {
-    return promoPickEmptyStateHtml(pickKey);
-  }
-  return `<div class="promo-product-grid" data-promo-pick-list="${esc(pickKey)}">${products
+  if (!selectedProducts.length) return "";
+  return `<div class="promo-product-grid" data-promo-pick-list="${esc(pickKey)}">${selectedProducts
     .map((p) =>
       promoProductCardHtml(p, {
         pickKey,
-        selected: selectedSet.has(String(p.id)),
+        selected: true,
         perProductQty,
       }),
     )
-    .join(
-      "",
-    )}${more ? `<p class="promo-product-more">+${more} бараа. Хайлтаа нарийсгана уу.</p>` : ""}</div>`;
+    .join("")}</div>`;
 }
 function promoProductGridHtml({
   pickKey,
@@ -21634,10 +21608,8 @@ function promotionSheetPickerBlock({
     : "";
   const extraHtml = extraBeforeStepper || "";
   const head = `<div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}${countBadge}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>`;
-  const dropdownHtml = perProductQty
-    ? `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown">${promoSearchDropdownInnerHtml(pickKey, ids)}</div>`
-    : "";
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters">${searchInput}${categoryHtml}${dropdownHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
+  const dropdownHtml = `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown">${promoSearchDropdownInnerHtml(pickKey, ids)}</div>`;
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo">${searchInput}${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoSheetSectionHtml({ variant = "condition", title, hint = "", body = "" }) {
@@ -21694,7 +21666,7 @@ function promoSearchDropdownInnerHtml(pickKey, selectedIds) {
   if (!filtered.length) return `<p class="promo-search-dropdown__empty">Олдсонгүй</p>`;
   return filtered
     .map((p) => {
-      const img = p.image ? `<img src="${esc(p.image)}" class="promo-search-dropdown__img" alt="">` : "";
+      const img = `<span class="promo-search-dropdown__img-wrap"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-search-dropdown__img" width="36" height="36" loading="lazy" decoding="async" alt=""></span>`;
       return `<button type="button" class="promo-search-dropdown__item" onclick="addPromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})">${img}<span class="promo-search-dropdown__name">${esc(p.name)}</span><span class="promo-search-dropdown__price">${fmt(Number(p.price ?? p.sellPrice ?? 0) || 0)}</span></button>`;
     })
     .join("");
@@ -21784,12 +21756,10 @@ function patchPromoPickSearchList(pickKey, opts = {}) {
       selectedIds,
       perProductQty: ppq,
     });
-    if (ppq) {
-      const dd = mount
-        .closest(".promo-sheet-section")
-        ?.querySelector(`[data-promo-search-dropdown="${pickKey}"]`);
-      if (dd) dd.innerHTML = promoSearchDropdownInnerHtml(pickKey, selectedIds);
-    }
+    const dd = mount
+      .closest(".promo-sheet-section")
+      ?.querySelector(`[data-promo-search-dropdown="${pickKey}"]`);
+    if (dd) dd.innerHTML = promoSearchDropdownInnerHtml(pickKey, selectedIds);
   } else {
     let selectedId = "";
     if (addAction === "select") {
@@ -22790,6 +22760,8 @@ function addPromoPickProduct(pickKey, id) {
     ids = [...promotionPickIds(pick, pickKey)];
   const idStr = String(id || "").trim();
   if (!idStr || ids.includes(idStr)) return;
+  const searchKey = promoPickSearchKey(pickKey);
+  if (searchKey) state.searches[searchKey] = "";
   state.promoPick = { ...pick, [pickKey]: [...ids, idStr] };
   if (pickKey === "buyProductIds") {
     state.promoFormDraft = state.promoFormDraft || {};

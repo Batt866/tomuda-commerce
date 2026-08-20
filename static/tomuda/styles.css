@@ -21423,9 +21423,22 @@ label.excel-import-toolbar__upload {
 }
 
 /* Promo search dropdown */
-.promo-search-dropdown {
+.promo-search-combo {
   position: relative;
-  z-index: 5;
+  z-index: 6;
+}
+.promo-search-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 8;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--hex-card, #fff);
+  border: 1px solid var(--hex-border, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(16, 22, 35, 0.12);
 }
 .promo-search-dropdown:empty {
   display: none;
@@ -21448,6 +21461,14 @@ label.excel-import-toolbar__upload {
 }
 .promo-search-dropdown__item:active {
   background: var(--hex-tint, #e0f2fe);
+}
+.promo-search-dropdown__img-wrap {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .promo-search-dropdown__img {
   width: 36px;

@@ -1,15 +1,1 @@
-ТОМУДА — Deploy link
-
-✅ ҮНДСЭН:
-https://tomudagroup.mn
-
-API health:
-https://tomudagroup.mn/api/health
-
-Нэвтрэх (seed):
-admin@tomuda.mn / admin
-
-⚠ Хуучин: https://tomuda.jobbox.mn
-
-🔧 Локал хөгжүүлэлт:
-./scripts/start-tomuda.sh
+https://sixth-major-pin-euros.trycloudflare.com
