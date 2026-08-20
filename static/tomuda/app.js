@@ -19436,7 +19436,7 @@ function warehousePrepareBarcodeCell(ref, barcode, si, styleId = null) {
 const WAREHOUSE_PREPARE_CAT_HEIGHTS = [24, 24.75, 27.75];
 /** Uniform body row height for prepare sheet (category + product lines). */
 const WAREHOUSE_PREPARE_BODY_ROW_HEIGHT = 15;
-const WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT = 30;
+const WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT = 38;
 const WAREHOUSE_PREPARE_META_ROW_HEIGHT = 16;
 const WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT = 18;
 const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 22;
@@ -19579,7 +19579,7 @@ function warehousePreparePrintPatchStylesXml(stylesXml) {
   if (out.includes(WAREHOUSE_PREPARE_PRINT_BORDER_MARKER)) return out;
 
   const titleFont =
-    `<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+    `<font><b/><sz val="16"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
   const bodyFont =
     `<font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
   const boldFont =
@@ -19995,15 +19995,16 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(12, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
   const pushWarehousePrepareSignatureBlock = (role) => {
     const r = rowNum;
-    merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
+    merges.push(`C${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
     pushRow(WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT, [
+      ...emptyCells(r, "A", "B", s.spacer),
       xlsxCellXml(
-        `A${r}`,
+        `C${r}`,
         s.signLine,
         si(`${role} ____________________`),
         "s",
       ),
-      ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
+      ...emptyCells(r, "D", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
     ]);
   };
   pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_HANDED_LABEL);
@@ -20105,7 +20106,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .prepare td.unit,
 .prepare td.barcode { text-align: left; white-space: nowrap; overflow: hidden; font-size: 11px; font-weight: 400; }
 .prepare td.unit { text-align: left; }
-.title { height: 44px; text-align: center; font-size: 20px; font-weight: 800; border: none !important; }
+.title { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: none !important; }
 .meta-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
 .meta-value { font-weight: 400; white-space: nowrap; border: none !important; }
 .date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
@@ -20128,7 +20129,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .num.qty-piece:empty { font-weight: 400; }
 .stock { font-weight: 700; background: #fff; white-space: nowrap; }
 .spacer td { height: 18px; border: none !important; }
-.sign-label { text-align: center; font-weight: 400; border: none !important; white-space: nowrap; }
+.sign-label { text-align: left; font-weight: 400; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
 .sign-gap td { height: 18px; border: none !important; }
 </style></head><body><table class="prepare">
@@ -20140,9 +20141,9 @@ ${workerRows}
 <tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
 <tr class="spacer"><td colspan="7"></td></tr>
-<tr><td colspan="7" class="sign-label">${RECEIPT_SIGN_HANDED_LABEL} _____________________</td></tr>
+<tr><td colspan="2" style="border:none"></td><td colspan="5" class="sign-label">${RECEIPT_SIGN_HANDED_LABEL} _____________________</td></tr>
 <tr class="sign-gap"><td colspan="7"></td></tr>
-<tr><td colspan="7" class="sign-label">${RECEIPT_SIGN_RECEIVED_LABEL} _____________________</td></tr>
+<tr><td colspan="2" style="border:none"></td><td colspan="5" class="sign-label">${RECEIPT_SIGN_RECEIVED_LABEL} _____________________</td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`Агуулах-бэлдэх-${stamp}.xls`, html);
 }
