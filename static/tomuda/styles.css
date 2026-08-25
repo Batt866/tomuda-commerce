@@ -17465,6 +17465,12 @@ textarea::placeholder {
 
 .sales-report-dash__filters .page-toolbar__search {
   width: 100%;
+  flex: none;
+  height: var(--field-h);
+  min-height: var(--field-h);
+  max-height: var(--field-h);
+  box-sizing: border-box;
+  align-self: stretch;
 }
 
 .sales-report-dash__filter-actions {
