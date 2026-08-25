@@ -22103,10 +22103,10 @@ function quantityPromoBuyMode(rule) {
 }
 function quantityPromoCombinedThreshold(rule) {
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
-  if (buyQty >= 1) return buyQty;
   const map = quantityPromoBuyQtyMap(rule);
   const vals = Object.values(map).filter((q) => q >= 1);
-  return vals.length ? Math.min(...vals) : 0;
+  const fromMap = vals.length ? Math.max(...vals) : 0;
+  return Math.max(buyQty, fromMap);
 }
 function quantityPromoSets(rule, qtyByProduct) {
   const buyIds = promotionBuyProductIds(rule);
@@ -23505,9 +23505,14 @@ function applyQuantityPromotions(lines) {
     qtyByProduct[id] = (qtyByProduct[id] || 0) + (Number(line.quantity) || 0);
   });
   (state.promotionRules.quantity || []).forEach((rule) => {
-    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
-    if (!prog || prog.sets < 1) return;
-    appendPromoFreeLines(result, prog.freeIds, prog.grantedFree);
+    const sets = quantityPromoSets(rule, qtyByProduct);
+    const freeQty = Math.floor(Number(rule.freeQty) || 0);
+    if (sets < 1 || freeQty < 1) return;
+    appendPromoFreeLines(
+      result,
+      promotionFreeProductIds(rule),
+      sets * freeQty,
+    );
   });
   return result;
 }
@@ -23569,8 +23574,11 @@ function syncOrderPromoItemsFromRules(o, { adjustStock = true } = {}) {
   const paid = orderPaidItems(o);
   if (!paid.length) return false;
   const generated = orderPromotionLines(paid, o.paymentTerm || "cash");
-  // Дүрэм одоогоор юу ч олгохгүй бол хуучин бэлгийг бүү устга (дүрэм ачаалаагүй байж болно).
-  if (!generated.length) return false;
+  const rulesReady =
+    (state.promotionRules?.quantity || []).length > 0 ||
+    (state.promotionRules?.price || []).length > 0 ||
+    (state.promotionRules?.payment || []).length > 0;
+  if (!generated.length && !rulesReady) return false;
   const next = [...paid, ...generated];
   const nextFp = promoItemsFingerprint(next);
   if (promoItemsFingerprint(o.items) === nextFp) {
@@ -28803,17 +28811,12 @@ function setWorkerQty(id, qty) {
     delete state.workerQtyParts[id];
   }
   const keepPicker = pickerOpen();
+  const keepQtySheet = !!(keepPicker && state.pickerQtyProductId);
   scheduleBackendSave();
   saveAuthSession();
-  if (keepPicker) {
-    if (state.pickerQtyProductId) {
-      syncPickerQtySheetUi(id);
-      return;
-    }
-    if (refreshPickerList({ singleProductId: id })) return;
-  }
   render();
   if (keepPicker) pickerModal();
+  if (keepQtySheet) syncPickerQtySheetUi(id);
 }
 function applyPickerBarcode(value, scanned = false) {
   const code = String(value || "").trim();
