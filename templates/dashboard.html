@@ -15,10 +15,7 @@
     />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="default"
-    />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="ТОМУДА" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link
@@ -274,12 +271,12 @@
     </style>
     <link
       rel="preload"
-      href="{% static 'tomuda/styles.css' %}?v=20260825-img-fix"
+      href="{% static 'tomuda/styles.css' %}?v=20260825-pay-cash"
       as="style"
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260825-img-fix"
+      href="{% static 'tomuda/app.js' %}?v=20260825-pay-cash"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -317,7 +314,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260825-img-fix"
+      href="{% static 'tomuda/styles.css' %}?v=20260825-pay-cash"
     />
   </head>
   <body>
@@ -449,7 +446,7 @@
       };
       window.__loadTomudaApp = function () {
         var sources = [
-          "{% static 'tomuda/app.js' %}?v=20260825-img-fix",
+          "{% static 'tomuda/app.js' %}?v=20260825-pay-cash",
           "{% static 'tomuda/app.js' %}?v=" + Date.now(),
           "{% static 'tomuda/app.js' %}",
         ];
@@ -510,7 +507,7 @@
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
-    <script src="{% static 'tomuda/permissions.js' %}?v=20260825-img-fix"></script>
+    <script src="{% static 'tomuda/permissions.js' %}?v=20260825-pay-cash"></script>
     <script src="{% static 'tomuda/capacitor-geolocation.js' %}?v=20260705-promo-labels"></script>
     <script>
       __loadTomudaApp();

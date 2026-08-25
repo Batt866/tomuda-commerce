@@ -123,7 +123,8 @@ const API_BASE = window.TOMUDA_API_BASE || "/api";
 const BRAND = {
   logoWhite: "/static/tomuda/branding/logo-white.png",
   logoBlue: "/static/tomuda/branding/logo-blue.png",
-  receiptLogo: "/static/tomuda/branding/receipt-logo.png?v=20260803-logo-restore",
+  receiptLogo:
+    "/static/tomuda/branding/receipt-logo.png?v=20260803-logo-restore",
 };
 const RECEIPT_LOGO_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAABWGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kLFLw1AQxr9WpaB1EB0cHDKJQ5SSCro4tBVEcQhVweqUvqapkMZHkiIFN/+Bgv+BCs5uFoc6OjgIopPo5uSk4KLleS+JpCJ6j+N+fO+74zggOW5wbvcDqDu+W1zKK5ulLSX1jAS9IAzm8Zyur0r+rj/j/T703k7LWb///43Biukxqp+UGcZdH0ioxPqezyXvE4+5tBRxS7IV8onkcsjngWe9WCC+JlZYzagQvxCr5R7d6uG63WDRDnL7tOlsrMk5lBNYxA48cNgw0IQCHdk//LOBv4BdcjfhUp+FGnzqyZEiJ5jEy3DAMAOVWEOGUpN3ju53F91PjbWDJ2ChI4S4iLWVDnA2Rydrx9rUPDAyBFy1ueEagdRHmaxWgddTYLgEjN5Qz7ZXzWrh9uk8MPAoxNskkDoEui0hPo6E6B5T8wNw6XwBA6diE8HYWhMAABZrSURBVHja7V1rkBzVdf7Ovbd7ZiWE7YoeBvzC2BFeSSshmTdiJaVIORWXi5TdqpBAAZJYacWjjMuOnTjJqFOJK47jyC4BktYCQmJjlzp+JHGc4KQCg3nIYAUjwQIJBhNbFojwEkg73X3vOfnRPdrVapbHzO5qdrZP1dRu7W5tP+53zvnOud+9lxb1r38BRCeAWQCwoLBONwIUiAiCxIhIiYh80gpkTPbrwjraxFoIM0QRGSJiIoI4d1BcbTdBTbO3cTTm1TR4XlGyhJR+BxyzERFRRoOde+yRbTtWFf7R+bao/6ofauNdZF3Mpo5+ItKoVNSi5/bdBr+0VFLrC0nHO4SaDilPIEqbmJ17Yu/ceZ+Q5/aZ+q/MUX8YhowNaxcqpbqdwqMQ0tMiBXT+QzII3QB3IQwZ/VfJKAAMe4EQMcfxzx7ZOrCwCJadYz396/YAauaxEfDYIkFJ9vOiHOiYqg8EQEuD8VbTPThOn1qHxuBAhU1rKwBQAKCwAgCFFQAorABAYQUACisAUFgBgMIKABRWAKCwAgCFFQAorABAYQUACisAUFgBgMIKABTWYWYm+XrUW+mdUkrjuYNzJQKA7m5BGAo6TCo32QCQali1U/yd5SBegSrACEMuAPAmXhoAmf+ZNbPMYf+3RYSIqE08yQEYIygxiwFeI+iXqEwHPKsPPLBly8EMxNUjf9ZbqZipCoZJAUBvb6+uVqt2xmt8Ec3q+qaLUxC1h+pcYEbpZWnkLyEiYGFw7KyFe2HRxr5nCLQHmu7Xiu5/6KtbH6uGYRbVRChYvVpFUcRTJVVMTgRYsQKoViGsV3DinEvSFIA3JeJ9NrCKiAwpNY+0nkdKnQXIOpekrmfjhodZ0w+0o28/TPTTKAspCIJAR1HkCgAAqIahA0BW6eWKnSYRAtHUqUAoh4FzEGYWEQGIiKCVMUuN0UvZJZ9ffPXGOxX4ayrlb0cDAykAoFJR7ZwaJn4QKhUFQHrWrXsfEXWLtWib+P9Wg0F235qIDBE0AOE0ZTtUsyJC0GqVGO+b1jc/OWPjhssAAGHIQRBotOlKqwkHQG9+DTFyrvZ8XxgOnbPsjECkiMgAAKeps3HiQNQjnvd3PVdvuGfRNRuW56lAcmeYto2gVfVQ2sF9FU0EzWnKNk4caXM+gao91/Rvnr9mzSyEIfdWKmZaAaAahjYIAi2kl7NzIHT+ngNZVIB2aerEMpTnf9KfUbpvUf+6ZdUwtO0EgokdjDzkPTl79q8rUqeJtTKlyF/rFYQGgezQkFWkFpL2716ycf0l7QSCCR2Mev5nTi/Qvq9FxGEaGhEZZ60T5hniebf39K/5dLuAYEIBMHfBoAAAK6yS0bsxTTcQABrMwknqVHnmlxavv2pTO4BgIgFA0erIfeTaj5RI6Fy20yT/v0EoAKBsLbE0o6vS03/VHx5vEEzcgASBAoB98XsWQOv3iHPTKv+/LgwAbWuxVaWuLyzcsGZNBoJe01EA6O3uzuK94guV79N0zf9jgkBEuyRx2isN9PRdeUE1rNq8YdQZAKgOZvnfKqwES72dWtiIdCDMJEJavNK3llx75Zyou3vSm0UTdTFCFLnujcEJhulsthYk0hjdJEd/phcGFFtrteef4lJvAGHIweAgTX0A5Plf89sWkjGzmTkVwImIFYz6CEZ95KjPpL0JERYce/3snuEgwhMEAmNrNavL5YsXbVj7e1EUuclMBRNCPHq7u6maJbqLvVmztD00pEnRmPVR4wHJvrgkAUQmctCZiAx5ntJKqYapSgTsHMQ6EYjLGjzjl9MIUGwtQ+svL+rv/9do7txXkM2YypQEQHXTJocwBBTdmQwN/cKxs2T5LUUbJUIgpGD3x2T894h1AhqnRkI2n8vKGK2NVi5JwC59Qhz2kND/sMhzICRE1AWWk6FkPgn1kKffq7VnOE3BzjnKqhoahzCg2Fprurremca1zyIMPxcMDuq6tmDKAaCO3D037rgDwB3N/psl66/sFq88j51jjNM25iLilNZae552Sfq0xPHXS2K/O/Oxn+2tVsfWK55z/fVdh4Ze/bBj/gQJXWLK5TkuSSDMTONQ3hKRdnHMCrhm8fr1W6Lt2381GVqCia09g0AfKQffgu178UV9xrPP2ifIfEUZryS25sYj4oqIM6WSdi59VpL4r2bV0h333XLLq8O3G+gDDe63OjgouzZvHgLwIwA/Ovu6tV8YSuk6UrhOGf8ElySOqOV9lUmYnSmXZ7ra4U8C+EywYIGKpmQEqFsUuWoToEEUxSdcc+ViQP+Gi2Meh5cLAM6Uy5rT5B/8lK/bPTCwHzhK0ClvIOEiBIHq7T5A1fDm5wB8/oz+tV9noQFTLl9ga7Elau19EpHmNBUoWnv61Zf9ZbR69Qt5ipkwLtB2nbne7gMEAM6qtco3Slpn3wKQU76vXVL7sz03bgt2Dwzsz9uvVA1Dm4dZecP/E0Uul7VTb6ViHtp682Mmdas4SW8z5ZIRtFy1EDvHutT1Dp9LQQ7QCa0I2g0AVA2rdllf3wyAPs6Jzc63aW30nfY9zUn8ub03DVSCINCoVFSu5JXXJ+dj/9tqGFoEgd69fbvdc9PWKzhNvmZKZdNqxzM7vYVFRF0KIFt7MF0AEOT9g9S4C1XJP5ktcyvzB3nONy6ubdm7deCLy/r6vCiKGuv3JfPqETW41HnBmJq+KHLYtImCINB7btzW5+L4DlMqtTrtrTlNCURnL1l/xQcRhjyR3cG2AsARAib4KCkjAHGrnu/i+Cenv/Dy9cHOnXr3wEBDrw+CQIMyr67zgN7ebIYuiiJX1/Q1bNCEIUfd3QKAtEkuczZ5VmlNrTSORMTqUskI+b8JDOsqph4JfKv9gzB0qEDRAeoV6yibPm6O/RNAws6SpH1RFLkgW/5zbMivVFQUhm5Z3yWzrTnx46zkIhL54Eu8f+bi7r6DotSjiuQH5ede/F4URUM5SXWjQdBbqZhqGD7fs+Gq61XJ/6Zldk3XLZTxPiG5CMCN9XmVzo4AuXx8ybNXnCZQp7N1TcvHRWB1qaTYutv3bLvlod5KxTRg+FSvs3uu7etP/LfvIb+8TRv/46S9Hhh9Gox3hvL8S2H824fmzX5o8fp1v4MxWrV17eOebV/7lo3jH2vP02iykUMiiq0DBEt7L7+8nAOOOhoA9TDnyD9PlUpGhG2zD50rc12J6a8BUAMPoiAIFMKQF23s26G8rptIcJKtDVlbSx0nliV1zGnKtlZzthY7IZpPXV3fWbSh74/G6tcfyCsYD/Kl7FzG5juD4hxEqVNenumdljtIZwNg7oIFkt/RqhbB7pTnETt3/+6Bgb2oVGh0yA6CQEVR5Bb2r/kb0zVjrR2qpeIcH1nwQaTqHyLSRKQltezixOoZXX+xqH9dXyMQVMOqA0Clrpd/YOPaPqW1boELOOX5yoqaDwC9d92lOhkAFK1e7Zb19XlgnJ/Jx5u7NxEIaQUC/1MjAlVfs7f46rUrtN91fTpUSwkwb1htECmIKFeLmUh/5ax1606Nomg0Q5dg5061a3M0RER3KGMgTZZxIhBSgAF/EEC2vrJjAZCHtwTJ6aTUqa3Ix4mgJUmhUqkCwNxR4T9n7HCi/xRQAuY3P6FDpISZVanc9VpJPg1ARgPswKOPUnYbXG2tgSeAEAT63R3fB6i/RFL+Bcr3VdN1tAiT1sTO7us6eHBvXsbxUUQzDHlR/5XvJ6gLOEnwVtvMBChOUlGsLl7W1zcjbygdAVDON0Q7HuTUovk2NtWfaU4jIHcUAOoPJworW/EaAbEyGkS4f1cUDeU5WkYDTYtarn3PE2kiPBMpZgdN5mSyWX4+iqDlEUYn/Jw4V8srGWli/ElEQKATASDq4AhAURS53ssvL7PIuWxbaf9maw8UcOdRjaVRRJNJrRjZ7WvCNxlGIzE8DwCOknFl+wjhsNaHQBhqdhaThktCfySwOg8Aefv3tbLpMVq/Syy3kP9Jc5Iwi74bOKaPPkw0hcZlnaJ9gzJfpP1XwigSHCW5mmxtZl0vYIl6lWcgaCH/G03C/NQ75s17fKQ3Hk00cToUnZopjJqeZ1BiLXwy+0cSy5HX6dL6BAK6pEk5mwx/jQEArYpFR6CR2ikC1L1USK0UznJfs/mftIYQ31sNQxvsbJz/oWW5LpVaJ5rMvyzPePG/jwFaPlCW6J1kdAkZAqiZCxERmOggAASTxwEIk7iGjxCGfNa1v38iBGeKZZA0nf+JQCBRWf5/dFT+rxNNYKW0IDIVyoimIuzatbkB0cwiGgnxQmU8NA+0+jd8oBGfaZ5VHP29ep0rT0L6z/I/W/8M5ZnZ7Cw32/8npbSLY2uUubdh/o8id04QdCmhc7J1ik0CLdseCAJ6PaIpBPSOxzvSoGcmvg9wnKhK/eUlolfAGEiz078irLSGQB5/aM6cp+qRZTTRrM1++0Jo/a5W1ilm4s2EfSc/GotoXnTppTOZ6KK8ommuD5CtHIITfrJj+wDD+Z9WCDOo6fyPPP/LPfnUrG5ENAHXq/xWwnJGNMH2aQDHEM36NrjPzTIf1SX/JLbONR3RAC1pyr6oJ44hmh0CAEIY8rK+S2ZDsFSsbf5+iAgi8IT/8/WAxlArhbn5aWaAlTYA6N7dAwNpriuUYZ4xV7JCyvuMcAvLITOiCRH+xftPOumpY4hmJwCgnv8TdcKZyvdPZMfcZDISItIuiWt+Wru/UVhGGPJ5a9bMYtCZ0tI+BXlTTx8LtLrmoGfDVZfqUtcyl6SvswftmwMaER6MwjDBKKLZEQCo538iXklKZw7anLEyBhDsfWDHN345Ov/XgXawJEu1MXPEuWZ9U0iRcXFijeBoopmLTLs3Xv5OaPoypylTq8yKACL8x9EprEWTNgJAddMml9fvF2b5v1n1jwhpBRDfnXuibgQ0wPSSp5uenoWIkNYA+PGPzXnXMNHMp4MrFSiD0u3KeHPYOWlhJZMQKcNJnLDYf28Q0cbVjo8msFJRIOLF69ef4gQ93Er+B5Q4hkJW/49my/WXR0IrxKGl/K+1VpLinjDXAM4dHJQo2wYX3+2/6uu6VF6Z1mJb3ziy6YjmGSVJvGvvtlufmujlYccFAMGCQYoAiJKztV/ucknsmiyXRCmtOE1e1SZ9ABg1/Zt76ZlXX/ZrQ4yl0kr9nxNNiNyZef3PTRRFtWV9H52Reiffqr3yalurtTr4EBGQUsSgv693MCcyAhyXFDDcpeOVivKnbtJbyGgI5KGfbrn1+bqwdHT+j8U/U3ve27L83zzR5CROxOFBhCFXw9tqy66+Yqn1TrmbvPLqtBZbtDj4gIjSWrm49gLotW8DRzbaRkcBoBqGrlKpKCF1YWvyryz/Sz79e4w6Z3idwSrSLeT/nGgy8OM9O3Y8fcbGNe9dcs36zSnK90HrZa4Wu1bXBeZNRqd8jwC3Y+/W218aXWZ2BgByL/3+/v2ngvAhds3vHk6AEusApe4ChvclGgm0bPz1heJaIJrDV3ytp79viyN/L0zpk8IoucRyvnN4y+NPWikX1171nf4qAJroZWHHBQB1L02NnKd93xOWZjXvQlorTtMXyqk8hIwA8GigLV6//hQBelppNBGgOU2glPotVSpfI4JZtlZz+YzduO1boP2SEue27B4Y2B/sDMaf/FEbAOCI/FuwKu/HSJNemdX/RA/uHhh4ZXT+70Umoxbic4xf6mKRFhdXEIRZbC22yA49Gr8zAERYGaNtcnjf4bcf/CtUKioKovH3/nboA0SrV7veSq+ByPniWpqVEygFjJH/gRU5S+SVUNQK0RxdCxiM8/RZDmaCyKee+mL0SjA4SKDJmZadXADkTZOXn3/vfJA+jVuRf4M0pykg7u4x878IKdHLWyr/JthExJqusnFxLXrkph07J/usoUl9KcNe6l2gWlXlGEVi01/N7Jr18Fj5/8Mb15wqRB9i59rymBoRYeV5xiXxM67sNqBSURM169cWAKh7KQtWtbRkgrL8r4BduzZvHsIY8u9DpnS+KpU8YW6/Y2qyElYATuFqvzu4+eYXg8FBmtBNoY4zCSTk8m8ROldakX9LNlPihLP8P8ZkiXGyksakP8d38EHKKc9oTuIr9267bdcYK5g7KALkatmDJb1Qae/dralyoDlORMANVTlHdt8WOZ+dba/8LyIgcrrkGwwNfeqR7bd8I99b4LgcqTtpL+bI8m+tLlRei6ocrQnCT8uLrz0GoKH8++V9750PwgdalH+P9+AziESXfONqh//g4e03bz6egz+pADgyKwdama1DaEGVYwwgct9gFCXBzp2N5d++d4Eu+UoErk0c35HWioxWLq5dvXfbji8d78EHJvPw6DDk7o0bT3CSnqWsRfPbv+SqHOdy+fejDeXfDrLSCLXJ2IvTvm+Y3ctIDl+xd/vf/mM7DP7kRYB8Vs7ALlHGmyvONS//JhiXJA6+uqdR/o+iyH3g2mtLxOa4H1OTRx8yXWUjzj6o09r57TT4kwaAIyyd3UqlTSuqnCz8Mz8x/8ArP8MY8u9Z8aFFpPW7j9sxNdku5E6XfE1KJWzjPz+sfr78p9tvHQyCQLfL4E8aAOpe6kityHgQtST/hlJ3R1HkxpJ/O60uVL5Hk5z/pX6ugPJ9ZXxPw9k7BEPn7tmy/U+e3PJvMSoVdVxPFJfjwwFGqHJoGVvXNPCyDfQFFln+H6vRJKD68i+ahFfKkk0OGeP7WsAQ53YB+OLDN2z9HgAEO3fqaPVqbsdTxCccAPUNmWKnP6x9720uSZvdXl2gSHMtjonVrkb5H1HkzluzZtarwFktNZrGun420oL68fGKtDJak9bgJEnE2R+KUtv33LD1+3lMIGzaRNHq1W17YNaEA6CuylEwy6G0A1IrTVyXAEdaaxHZOziw/X/RQP4dRZE7XNKLSOvZ7DgFQVGL7k3ZyR0KRERak1IKpFTm+klcE+f+y0H+GWS+98gNNzw+4n50ROTQ5odlTzgAqptCB1SUO7D/YmO01r6vm2kBCLM2M7oQHzx4H5DJv0eSqTrQGPZj3sxZKj0UK9KqYRE5yq1fv+BkgTBDmIeE+XkwP80KeyDYBVG79ty09akRTSgVDA7SiO1l294mngMQJNg5qB47MPuz6dBhH6wEzG8dAUokrpESb+gnGbDyY2lGAi0ESKvvpLWhB4TJsSRvIgWMNU4aisVC1CF4eKnE6v9mzjn8fDW8rTb6CXsrFZ2fOcARppZNSiMoWh05AP8yvsAatY9JLqB4+IabHwDwwIQ9TKWism7jXahiBWcK4fYp69q1E4hxOQotAKJgJ7/uaVqVigoWDNJ4bqt1ZI4+DAVhyMPks4qpbpMGgHHJidGbqOymYBieNGsHUWhh7WUFAAoAFFYAoLACAIUVACisAEBhBQAKKwBQWAGAwgoAFFYAoLACAIUVACisAEBhBQAKKwBQWAGAwgoAFNZJdowmkCAMCBevpmMsF9CKQ4NFuQ1EoWR0uXzaov6+p9BgB285BjBT/e3QdMAAk196H8fxM28EABKiex3LqyDyG6WIjgPANBh/JSQC/hUpPDl6yMzwqBIDkL1bBzYWUbOzjUbsmkqL+tcfJKVmsXOHCBhs4aiTwqaGOQhOJ6VOFObYSJ7nldYzSeszOyKuF/YGdNBBRCBE2hDwKphZRJDvqFnYdCj/RYiIkv8HAYwQoyyFb50AAAAASUVORK5CYII=";
@@ -580,7 +581,10 @@ function receiptInfoFieldRow(label, value, valueClass = "") {
 }
 /** Soft-wrap address for Excel/print — prefer breaks after commas, then spaces. */
 function receiptWrapAddressLines(text, maxChars = 32) {
-  const raw = String(text || "-").replace(/\s+/g, " ").trim() || "-";
+  const raw =
+    String(text || "-")
+      .replace(/\s+/g, " ")
+      .trim() || "-";
   // Split into comma chunks first (matches screenshot line breaks).
   const chunks = raw.includes(",")
     ? raw.split(/,\s*/).map((c, i, arr) => (i < arr.length - 1 ? `${c},` : c))
@@ -679,7 +683,11 @@ function receiptPaymentTermReceiptText(o) {
   return o?.paymentTerm === "credit" ? "Зээлээр" : "Шууд төлөх";
 }
 function receiptPaymentChecksHtml(paid, bank, o) {
-  const text = o ? receiptPaymentTermReceiptText(o) : bank ? "Зээлээр" : "Шууд төлөх";
+  const text = o
+    ? receiptPaymentTermReceiptText(o)
+    : bank
+      ? "Зээлээр"
+      : "Шууд төлөх";
   return { cash: text, bank: "" };
 }
 function receiptPaymentChecksText(paid, bank, o) {
@@ -687,7 +695,8 @@ function receiptPaymentChecksText(paid, bank, o) {
 }
 /** ҮНДСЭН sample: cash → Шууд төлөх, credit → Зээлээр. */
 function receiptPaymentTermDisplay(o) {
-  const term = o?.paymentTerm || (receiptPartyFields(o).bank ? "credit" : "cash");
+  const term =
+    o?.paymentTerm || (receiptPartyFields(o).bank ? "credit" : "cash");
   if (term === "credit") return "Зээлээр";
   return "Шууд төлөх";
 }
@@ -1743,9 +1752,7 @@ function canViewCustomerOrderHistory() {
 function customerAllOrders(customerId) {
   if (!customerId) return [];
   return retainedOrders(state.orders || [])
-    .filter(
-      (o) => o.customerId === customerId && o.status !== "cancelled",
-    )
+    .filter((o) => o.customerId === customerId && o.status !== "cancelled")
     .sort(compareOrdersNewestFirst);
 }
 function customerHistoryFromDay() {
@@ -1806,8 +1813,7 @@ function setCustomerHistoryPreset(days) {
   refreshCustomerDetailModal();
 }
 function customerHistoryItemLine(item) {
-  const p =
-    state.products.find((x) => x.id === item?.productId) || null;
+  const p = state.products.find((x) => x.id === item?.productId) || null;
   const name =
     String(item?.productName || p?.name || "Бараа").trim() || "Бараа";
   const qty = orderLineQtyLabel(item, p);
@@ -1850,9 +1856,7 @@ function customerHistorySectionHtml(customerId) {
     ? `Сүүлийн ${retention} хоногийн түүх`
     : `${from ? dte(from) : "…"} – ${to ? dte(to) : "…"}`;
   const list = orders.length
-    ? orders
-        .map((o, i) => customerHistoryOrderRow(o, i === 0))
-        .join("")
+    ? orders.map((o, i) => customerHistoryOrderRow(o, i === 0)).join("")
     : `<p class="customer-history__empty">Энэ хугацаанд захиалга олдсонгүй</p>`;
   return `<section class="customer-history" aria-label="Захиалгын түүх"><div class="customer-history__head"><h4 class="customer-history__title">Захиалгын түүх</h4><p class="customer-history__hint">${esc(rangeHint)} · ${orders.length} баримт</p></div><div class="customer-history__filters"><div class="customer-history__presets"><button type="button" class="customer-history__chip${live ? " is-active" : ""}" onclick="clearCustomerHistoryRange()">Бүгд</button><button type="button" class="customer-history__chip${presetDays === 7 ? " is-active" : ""}" onclick="setCustomerHistoryPreset(7)">7 хоног</button><button type="button" class="customer-history__chip${presetDays === 30 ? " is-active" : ""}" onclick="setCustomerHistoryPreset(30)">30 хоног</button><button type="button" class="customer-history__chip${presetDays === 90 ? " is-active" : ""}" onclick="setCustomerHistoryPreset(90)">90 хоног</button></div><div class="customer-history__range">${customerHistoryDateFieldHtml("Эхлэх", from, "setCustomerHistoryFrom(this.value)", "Эхлэх огноо")}${customerHistoryDateFieldHtml("Дуусах", to, "setCustomerHistoryTo(this.value)", "Дуусах огноо")}</div></div><div class="customer-history__list">${list}</div></section>`;
 }
@@ -2032,9 +2036,7 @@ function nextOrderId() {
 function buildNewOrder(fields) {
   const createdAt = fields.createdAt || new Date().toISOString();
   const takenDay =
-    normalizeIsoDateInput(fields.takenDay) ||
-    isoDay(createdAt) ||
-    todayIso();
+    normalizeIsoDateInput(fields.takenDay) || isoDay(createdAt) || todayIso();
   const receiptMonth = receiptMonthKey({ createdAt, takenDay });
   const created = takenDay;
   const stored = isoDay(fields.deliveryDate);
@@ -3079,11 +3081,16 @@ function canAccessView(viewId) {
   const r = currentRole();
   if (r === "admin") return true;
   if (r === "delivery") return viewId === "delivery";
-  if (r === "warehouse") return viewId === "warehouse" || viewId === "inventory";
+  if (r === "warehouse")
+    return viewId === "warehouse" || viewId === "inventory";
   if (r === "sales")
-    return ["worker", "customers", "products", "warehouse", "inventory"].includes(
-      viewId,
-    );
+    return [
+      "worker",
+      "customers",
+      "products",
+      "warehouse",
+      "inventory",
+    ].includes(viewId);
   return false;
 }
 function allowedNavIds() {
@@ -3428,9 +3435,7 @@ function deliveryUndeliveredBanner(scope = "all") {
 }
 function deliveryScopedToAssignee() {
   return (
-    currentRole() === "delivery" &&
-    !hasPermission("orders.edit") &&
-    !isAdmin()
+    currentRole() === "delivery" && !hasPermission("orders.edit") && !isAdmin()
   );
 }
 function canMarkOrderDelivered(o) {
@@ -3458,11 +3463,7 @@ function canMarkOrderDelivered(o) {
 }
 function canConfirmOrderDelivery(o) {
   if (!hasPermission("orders.confirmDelivery")) return false;
-  if (
-    !o ||
-    !isOrderReadyForDeliveryMark(o) ||
-    !isOrderDeliveryMarked(o)
-  ) {
+  if (!o || !isOrderReadyForDeliveryMark(o) || !isOrderDeliveryMarked(o)) {
     return false;
   }
   return true;
@@ -3555,17 +3556,19 @@ function canPageBack() {
   if (state.currentView === "promotions" && state.filters.promotionDetail) {
     return true;
   }
-  return [
-    "employees",
-    "employeePermissions",
-    "inventory",
-    "warehouse",
-    "reports",
-    "stockReports",
-    "promotions",
-    "warehouseReceipts",
-    "count",
-  ].includes(state.currentView) && canAccessView("admin");
+  return (
+    [
+      "employees",
+      "employeePermissions",
+      "inventory",
+      "warehouse",
+      "reports",
+      "stockReports",
+      "promotions",
+      "warehouseReceipts",
+      "count",
+    ].includes(state.currentView) && canAccessView("admin")
+  );
 }
 const pageHead = (title, action = "", opts = {}) => {
   const showBack = opts.back !== false && (opts.back === true || canPageBack());
@@ -3656,10 +3659,7 @@ function sidebarNavForRole(role) {
   // Admin: Нярав (үлдэгдэл) is under Админ hub — keep Агуулах on menu.
   if (nav.some(([id]) => id === "admin")) {
     nav = nav.filter(([id]) => id !== "inventory");
-    if (
-      canAccessView("warehouse") &&
-      !nav.some(([id]) => id === "warehouse")
-    ) {
+    if (canAccessView("warehouse") && !nav.some(([id]) => id === "warehouse")) {
       const adminIdx = nav.findIndex(([id]) => id === "admin");
       const item = ["warehouse", "Агуулах"];
       if (adminIdx >= 0) nav.splice(adminIdx, 0, item);
@@ -3670,8 +3670,7 @@ function sidebarNavForRole(role) {
 }
 function bottomNavForRole(role) {
   const canWh = canViewWarehousePrepare();
-  const canInv =
-    canAccessView("inventory") || hasPermission("warehouse.view");
+  const canInv = canAccessView("inventory") || hasPermission("warehouse.view");
   const specs = {
     admin: [
       ["worker", "Захиалга"],
@@ -4096,7 +4095,10 @@ function productImageFallbackList(p = {}, { thumb = false } = {}) {
   }
   if (thumb && id) {
     PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
-      pushUniqueProductImage(list, productImageMediaUrl(`${id}_t`, ext, version));
+      pushUniqueProductImage(
+        list,
+        productImageMediaUrl(`${id}_t`, ext, version),
+      );
     });
   }
   list.push(productImagePlaceholder(p));
@@ -4144,7 +4146,9 @@ function applyProductImageFallback(img, product) {
   if (!candidates.length) return;
   const current = String(img.getAttribute("src") || "");
   const currentKey = productImageUrlKey(current);
-  let index = candidates.findIndex((url) => productImageUrlKey(url) === currentKey);
+  let index = candidates.findIndex(
+    (url) => productImageUrlKey(url) === currentKey,
+  );
   if (index < 0) index = 0;
   img.onerror = () => {
     const failed = productImageUrlKey(img.currentSrc || img.src);
@@ -4214,8 +4218,7 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   // Honor preferRemote (peer pull): stale local must not overwrite server
   // employees/permissions or wipe peer product/customer fields.
   const preferRemote =
-    !!opts.preferRemote &&
-    (!!opts.pullFromServer || !businessEntityDirty());
+    !!opts.preferRemote && (!!opts.pullFromServer || !businessEntityDirty());
   // Customers, employees, and products stamp updatedAt on edit so a
   // in-flight peer pull cannot wipe this device's just-saved row
   // (e.g. жижиг хайрцаг) with an older server blob.
@@ -4605,7 +4608,12 @@ function readLocalPendingStateMeta() {
     return null;
   }
 }
-function shouldUsePendingAtBoot(serverUpdatedAt, pendingMeta, pendingState, serverState) {
+function shouldUsePendingAtBoot(
+  serverUpdatedAt,
+  pendingMeta,
+  pendingState,
+  serverState,
+) {
   // Never drop never-POSTed local rows just because the server clock is newer.
   if (
     pendingState &&
@@ -4649,8 +4657,7 @@ function serverSnapshotLooksFresherThanLocal(serverState, serverUpdatedAt) {
   return (
     entityIdCount(serverState, "customers") >
       entityIdCount(local, "customers") ||
-    entityIdCount(serverState, "products") >
-      entityIdCount(local, "products") ||
+    entityIdCount(serverState, "products") > entityIdCount(local, "products") ||
     entityIdCount(serverState, "orders") > entityIdCount(local, "orders") ||
     entityIdCount(serverState, "stockInReceipts") >
       entityIdCount(local, "stockInReceipts") ||
@@ -4658,8 +4665,7 @@ function serverSnapshotLooksFresherThanLocal(serverState, serverUpdatedAt) {
       entityIdCount(local, "stockOutReceipts") ||
     entityIdCount(serverState, "inventoryLogs") >
       entityIdCount(local, "inventoryLogs") ||
-    entityIdCount(serverState, "employees") >
-      entityIdCount(local, "employees")
+    entityIdCount(serverState, "employees") > entityIdCount(local, "employees")
   );
 }
 function peerCollectionsGrew(prevState, nextState) {
@@ -4811,7 +4817,9 @@ function normalizeDeletionLog(log = []) {
   if (!Array.isArray(log)) return [];
   const seen = new Set();
   return log
-    .filter((entry) => entry && entry.type && entry.id != null && entry.id !== "")
+    .filter(
+      (entry) => entry && entry.type && entry.id != null && entry.id !== "",
+    )
     .map((entry) => ({
       ...entry,
       type: String(entry.type),
@@ -4839,8 +4847,7 @@ function mergedDeletionLog(remote = {}, local = {}) {
 function mergeArrayById(remote = [], local = [], opts = {}) {
   // Prefer remote on conflicts when pulling peers, or when entity data is clean.
   const preferRemote =
-    !!opts.preferRemote &&
-    (!!opts.pullFromServer || !businessEntityDirty());
+    !!opts.preferRemote && (!!opts.pullFromServer || !businessEntityDirty());
   const map = new Map();
   const first = preferRemote ? local : remote;
   const second = preferRemote ? remote : local;
@@ -5454,9 +5461,7 @@ function pendingLocalStockProductIds(serverState = {}) {
       .filter(Boolean),
   );
   const remoteOrderIds = new Set(
-    (serverState.orders || [])
-      .map((r) => String(r?.id ?? ""))
-      .filter(Boolean),
+    (serverState.orders || []).map((r) => String(r?.id ?? "")).filter(Boolean),
   );
   const remoteLogIds = new Set(
     (serverState.inventoryLogs || [])
@@ -5520,7 +5525,10 @@ function localOnlyEntityIds(serverState = {}, localState = persistentState()) {
 function hasLocalOnlyEntities(serverState = {}) {
   return localOnlyEntityIds(serverState).length > 0;
 }
-function hasUnsyncedDeletions(serverState = {}, localState = persistentState()) {
+function hasUnsyncedDeletions(
+  serverState = {},
+  localState = persistentState(),
+) {
   const remoteLog = normalizeDeletionLog(serverState.deletionLog || []);
   return normalizeDeletionLog(localState.deletionLog || []).some(
     (entry) => !deletionLogHas(remoteLog, entry.type, entry.id),
@@ -5533,10 +5541,7 @@ function hasUnsyncedDeletions(serverState = {}, localState = persistentState()) 
 function reconcileBackendMarkerFromServer(serverState, updatedAt = "") {
   if (updatedAt) serverUpdatedAt = updatedAt;
   if (!serverState || typeof serverState !== "object") return false;
-  if (
-    hasLocalOnlyEntities(serverState) ||
-    hasUnsyncedDeletions(serverState)
-  ) {
+  if (hasLocalOnlyEntities(serverState) || hasUnsyncedDeletions(serverState)) {
     syncBackendSaveMarker(serverState);
     if (canAutoSaveBackendState()) scheduleBackendSave();
     return true;
@@ -5725,7 +5730,10 @@ function workerStoreSearchFocus() {
 }
 function workerStoreSearchBlur() {
   clearTimeout(workerStoreSearchBlurTimer);
-  workerStoreSearchBlurTimer = setTimeout(flushPendingWorkerStoreSearchRender, 180);
+  workerStoreSearchBlurTimer = setTimeout(
+    flushPendingWorkerStoreSearchRender,
+    180,
+  );
 }
 function flushPendingWorkerStoreSearchRender() {
   if (isEditingWorkerStoreSearch()) return;
@@ -5743,7 +5751,9 @@ function stockInScanBlur() {
 function flushPendingStockInScanRender() {
   if (isEditingStockInScan()) return;
   if (
-    document.querySelector("[data-stock-in-live-hits], [data-stock-out-live-hits]")
+    document.querySelector(
+      "[data-stock-in-live-hits], [data-stock-out-live-hits]",
+    )
   ) {
     stockInScanRenderPending = false;
     return;
@@ -6036,10 +6046,7 @@ function applyRemoteState(payload, opts = {}) {
     !backendSaveFailedMessage &&
     !hasLocalOnlyEntities(payload.state) &&
     !hasUnsyncedDeletions(payload.state) &&
-    serverSnapshotLooksFresherThanLocal(
-      payload.state,
-      payload.updatedAt || "",
-    )
+    serverSnapshotLooksFresherThanLocal(payload.state, payload.updatedAt || "")
   ) {
     clearLocalPendingState();
   }
@@ -6273,10 +6280,7 @@ function canAppBack() {
     "warehouseReceipts",
     "count",
   ];
-  if (
-    subAdminViews.includes(state.currentView) &&
-    canAccessView("admin")
-  ) {
+  if (subAdminViews.includes(state.currentView) && canAccessView("admin")) {
     return true;
   }
   const defaultView = defaultViewForRole(currentRole());
@@ -6417,10 +6421,7 @@ function handleAppBack() {
     "warehouseReceipts",
     "count",
   ];
-  if (
-    subAdminViews.includes(state.currentView) &&
-    canAccessView("admin")
-  ) {
+  if (subAdminViews.includes(state.currentView) && canAccessView("admin")) {
     go("admin", { silent: true });
     return true;
   }
@@ -6553,10 +6554,7 @@ function productLargeBoxPieceCount(p) {
   if (!small || !large) return 0;
   return small * large;
 }
-function productBoxQtyTotal(
-  p,
-  { largePacks = 0, packs = 0, qty = 0 } = {},
-) {
+function productBoxQtyTotal(p, { largePacks = 0, packs = 0, qty = 0 } = {}) {
   const small = productPackSize(p);
   const largeCount = productLargeBoxCount(p);
   const largePieces = productLargeBoxPieceCount(p);
@@ -6638,9 +6636,7 @@ function partsMatchTotal(p, parts, totalQty, item) {
   const small = effectivePackSizeFromParts(p, normalized, total, item);
   if (!small) {
     return (
-      !normalized.largePacks &&
-      !normalized.packs &&
-      normalized.pieces === total
+      !normalized.largePacks && !normalized.packs && normalized.pieces === total
     );
   }
   return (
@@ -6684,10 +6680,11 @@ function exclusiveOrderQtyParts(parts, largeCount = 0) {
  * Old orders often stored only small packs (e.g. 125 жижиг) with largePacks=0.
  */
 function rollUpQtyParts(parts, packSize = 0, largeCount = 0) {
-  let { largePacks: lp, packs: pk, pieces: loose } = exclusiveOrderQtyParts(
-    parts,
-    largeCount,
-  );
+  let {
+    largePacks: lp,
+    packs: pk,
+    pieces: loose,
+  } = exclusiveOrderQtyParts(parts, largeCount);
   const small = Math.max(0, Math.floor(Number(packSize) || 0));
   const lc = Math.max(0, Math.floor(Number(largeCount) || 0));
   if (small > 1 && loose >= small) {
@@ -6714,7 +6711,10 @@ function formatOrderQtyParts(
   return bits.join(" · ");
 }
 /** Захиалгын тоо (сонгогч UI): «Жижиг/х 3 · Тоо/ш 16» гэх мэт. */
-function prepareQtyColsHtml(parts, { largeCount = 0, product = null, unit = "ш" } = {}) {
+function prepareQtyColsHtml(
+  parts,
+  { largeCount = 0, product = null, unit = "ш" } = {},
+) {
   return `<span class="order-qty-parts">${esc(
     formatOrderQtyParts(parts, { largeCount, product, unit }),
   )}</span>`;
@@ -6757,8 +6757,7 @@ function workerQtyPartsForProduct(p, qty) {
   if (stored) {
     const parts = normalizeQtyParts(stored);
     if (partsMatchTotal(p, parts, total)) {
-      const splitPack =
-        effectivePackSizeFromParts(p, parts, total) || packSize;
+      const splitPack = effectivePackSizeFromParts(p, parts, total) || packSize;
       const rolled = rollUpQtyParts(parts, splitPack, largeCount);
       return {
         largePacks: rolled.largePacks,
@@ -6796,12 +6795,9 @@ function resolveWarehousePrepareParts(
         (loosePieces != null &&
           loosePieces !== "" &&
           Number(loosePieces) >= 0))) ||
-    (largePacks != null &&
-      largePacks !== "" &&
-      Number(largePacks) > 0);
+    (largePacks != null && largePacks !== "" && Number(largePacks) > 0);
   if (hasExplicit) {
-    const largeCount =
-      large > 1 && small > 1 ? Math.floor(large / small) : 0;
+    const largeCount = large > 1 && small > 1 ? Math.floor(large / small) : 0;
     const rolled = rollUpQtyParts(
       {
         largePacks,
@@ -6955,7 +6951,10 @@ function orderItemPrepareParts(item, product) {
   );
 }
 function warehousePreparePackSize(item, product) {
-  const totalQty = Math.max(0, Math.floor(Number(item?.qty ?? item?.quantity) || 0));
+  const totalQty = Math.max(
+    0,
+    Math.floor(Number(item?.qty ?? item?.quantity) || 0),
+  );
   const hasExplicit =
     (item?.packs != null && item.packs !== "") ||
     (item?.largePacks != null && Number(item.largePacks) > 0) ||
@@ -7009,7 +7008,11 @@ function productPackLabel(p) {
 function pickerQtyFromParts(packsOrParts, piecesOrProduct, maybeProduct) {
   let parts;
   let p;
-  if (packsOrParts && typeof packsOrParts === "object" && "packs" in packsOrParts) {
+  if (
+    packsOrParts &&
+    typeof packsOrParts === "object" &&
+    "packs" in packsOrParts
+  ) {
     parts = normalizeQtyParts(packsOrParts);
     p = piecesOrProduct;
   } else {
@@ -7279,10 +7282,7 @@ function pickerPartStepperApply(btn, kind) {
   const p = state.products.find((x) => x.id === id);
   if (!p) return;
   let { largePacks, packs, pieces } = readPickerQtyParts(id);
-  const currentTotal = pickerQtyFromParts(
-    { largePacks, packs, pieces },
-    p,
-  );
+  const currentTotal = pickerQtyFromParts({ largePacks, packs, pieces }, p);
   if (kind === "large") {
     if (action === "inc") {
       const max = pickerLargeMax(p, pieces, packs);
@@ -7314,8 +7314,7 @@ function pickerPartStepperApply(btn, kind) {
   else return;
   const rolled = pickerApplyRolledParts(id, { largePacks, packs, pieces });
   const nextTotal =
-    rolled?.total ??
-    pickerQtyFromParts({ largePacks, packs, pieces }, p);
+    rolled?.total ?? pickerQtyFromParts({ largePacks, packs, pieces }, p);
   if (action === "inc" && nextTotal < currentTotal) {
     showStockLimitToast();
     return;
@@ -7564,7 +7563,8 @@ function qtyDraft(el) {
   if (!digits) return;
   const n = Number(digits);
   const maxOk = maxWorkerPaidQty(id);
-  if (n > maxOk) showStockLimitToast(`${p.name}: урамшуулалтай нийт үлдэгдлээс хэтэрнэ`);
+  if (n > maxOk)
+    showStockLimitToast(`${p.name}: урамшуулалтай нийт үлдэгдлээс хэтэрнэ`);
   const capped = Math.min(n, maxOk);
   if (capped < min) return;
   state.workerQty[id] = capped;
@@ -7583,7 +7583,8 @@ function qtyCommit(el) {
   const digits = String(el.value || "").replace(/\D/g, "");
   let v = digits ? Number(digits) : 0;
   const maxOk = maxWorkerPaidQty(id);
-  if (v > maxOk) showStockLimitToast(`${p.name}: урамшуулалтай нийт үлдэгдлээс хэтэрнэ`);
+  if (v > maxOk)
+    showStockLimitToast(`${p.name}: урамшуулалтай нийт үлдэгдлээс хэтэрнэ`);
   if (v < min) v = min;
   v = Math.min(v, maxOk);
   el.value = String(v);
@@ -8223,14 +8224,17 @@ function warehouseLiveFilterBannerHtml() {
   ensureWarehouseDateDefault();
   const day = normalizeIsoDateInput(state.filters.warehouseDate) || todayIso();
   const today = todayIso();
-  const total = (state.orders || []).filter((o) => o.status !== "cancelled")
-    .length;
+  const total = (state.orders || []).filter(
+    (o) => o.status !== "cancelled",
+  ).length;
   const visible = filterWarehouseOrders(
     (state.orders || []).filter((o) => o.status !== "cancelled"),
   ).length;
   const hidden = Math.max(0, total - visible);
   const dayLabel =
-    day === today ? "Өнөөдөр авсан" : `${warehouseDateDisplayText(day)} өдөр авсан`;
+    day === today
+      ? "Өнөөдөр авсан"
+      : `${warehouseDateDisplayText(day)} өдөр авсан`;
   return `<div class="wh-date-banner" role="status"><strong>${dayLabel} захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Календараас өдөр сонгоод бараа бэлдэнэ.</span></div>`;
 }
 async function mergeServerStateBeforeSave() {
@@ -8408,10 +8412,14 @@ async function saveBackendState(retry = 0, opts = {}) {
           const beforeSnapshot = backendStateSnapshot();
           const session = captureSessionSnapshot();
           const keepStockIds = pendingLocalStockProductIds(payload.state);
-          const merged = mergePersistentStates(payload.state, persistentState(), {
-            pullFromServer: keepStockIds.size > 0,
-            keepLocalProductStockIds: keepStockIds,
-          });
+          const merged = mergePersistentStates(
+            payload.state,
+            persistentState(),
+            {
+              pullFromServer: keepStockIds.size > 0,
+              keepLocalProductStockIds: keepStockIds,
+            },
+          );
           applyPersistentState(merged);
           restoreSessionSnapshot(session);
           appliedServerState = backendStateSnapshot() !== beforeSnapshot;
@@ -8814,7 +8822,11 @@ function adminHubHtml() {
       "reports",
     ]);
   }
-  if (canManageStockAlert() || canManageOrderHistorySettings() || canViewDeletionLog()) {
+  if (
+    canManageStockAlert() ||
+    canManageOrderHistorySettings() ||
+    canViewDeletionLog()
+  ) {
     settings.push(["deletionLogModal()", "Устгасан бүртгэл", "inventory"]);
   }
   const settingsHtml = settings.length
@@ -8823,12 +8835,18 @@ function adminHubHtml() {
   if (!main.length && !settingsHtml) {
     return `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`;
   }
-  return `<section class="admin-hub">${main.length ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main.map(([id, label, icon]) => {
-    if (id === "stockReports") {
-      return adminHubActionCard("openStockReportsHub()", label, icon);
-    }
-    return adminHubCard(id, label, icon);
-  }).join("")}</div>` : ""}${settingsHtml}</section>`;
+  return `<section class="admin-hub">${
+    main.length
+      ? `<h3 class="admin-hub__heading">Удирдлага</h3><div class="admin-hub__settings">${main
+          .map(([id, label, icon]) => {
+            if (id === "stockReports") {
+              return adminHubActionCard("openStockReportsHub()", label, icon);
+            }
+            return adminHubCard(id, label, icon);
+          })
+          .join("")}</div>`
+      : ""
+  }${settingsHtml}</section>`;
 }
 function adminView() {
   ensureSettings();
@@ -9016,9 +9034,7 @@ function stockAlertChangeSummary(data) {
     Math.floor(Number(state.settings.stockAlertMin) || 0),
   );
   if (nextDefault !== prevDefault) {
-    lines.push(
-      `<p>Ерөнхий доод: <b>${prevDefault} → ${nextDefault}</b></p>`,
-    );
+    lines.push(`<p>Ерөнхий доод: <b>${prevDefault} → ${nextDefault}</b></p>`);
   }
   state.products.forEach((p) => {
     const raw = data.get(`minStock_${p.id}`);
@@ -9142,7 +9158,9 @@ function buildOrderReceiptExcelRows(o) {
   if (promoItems.length) {
     rows.push([]);
     rows.push(["Урамшуулал", "Бараа", "Тоо", "Дүн"]);
-    promoItems.forEach((i) => rows.push(["", receiptProductNameText(i.productName), i.quantity, 0]));
+    promoItems.forEach((i) =>
+      rows.push(["", receiptProductNameText(i.productName), i.quantity, 0]),
+    );
   }
   rows.push([]);
   if (receiptShouldShowGross(o)) {
@@ -10216,7 +10234,11 @@ const RECEIPT_XLSX_COL_WIDTHS = [
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
 const RECEIPT_XLSX_PAGE_ROWS = 52;
 /** True when keep-together block starting at keepStartRow would not fit on its page. */
-function receiptXlsxNeedsBreakBefore(keepStartRow, keepRows, pageRows = RECEIPT_XLSX_PAGE_ROWS) {
+function receiptXlsxNeedsBreakBefore(
+  keepStartRow,
+  keepRows,
+  pageRows = RECEIPT_XLSX_PAGE_ROWS,
+) {
   const start = Math.max(1, Number(keepStartRow) || 1);
   const need = Math.max(1, Number(keepRows) || 1);
   const pos = (start - 1) % Math.max(1, pageRows);
@@ -10386,7 +10408,14 @@ function xlsxStylesCountPart(stylesXml, tag) {
   const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`);
   const body = String(stylesXml || "").match(re);
   if (!body) return 0;
-  const innerTag = tag === "fonts" ? "font" : tag === "fills" ? "fill" : tag === "borders" ? "border" : "xf";
+  const innerTag =
+    tag === "fonts"
+      ? "font"
+      : tag === "fills"
+        ? "fill"
+        : tag === "borders"
+          ? "border"
+          : "xf";
   return (body[1].match(new RegExp(`<${innerTag}\\b`, "g")) || []).length;
 }
 function xlsxStylesAppendPart(stylesXml, tag, xmlChunks) {
@@ -10512,12 +10541,9 @@ function stockReceiptPatchStylesXml(stylesXml) {
   let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
   if (out.includes(stockReceiptBorderInnerXml())) return out;
 
-  const titleFont =
-    `<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
-  const bodyFont =
-    `<font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
-  const boldFont =
-    `<font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const titleFont = `<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const bodyFont = `<font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const boldFont = `<font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
   out = xlsxStylesAppendPart(out, "fonts", [titleFont, bodyFont, boldFont]);
   const fontCount = xlsxStylesCountPart(out, "fonts");
   const fontTitle = Math.max(0, fontCount - 3);
@@ -10576,7 +10602,9 @@ async function sanitizeWarehouseXlsxZip(zip) {
   if (wbRels) {
     zip.file(
       "xl/_rels/workbook.xml.rels",
-      stockReceiptWorkbookRelsXml({ hasTheme: !!zip.file("xl/theme/theme1.xml") }),
+      stockReceiptWorkbookRelsXml({
+        hasTheme: !!zip.file("xl/theme/theme1.xml"),
+      }),
       zipFileOptions({ binary: false }),
     );
   }
@@ -10584,7 +10612,9 @@ async function sanitizeWarehouseXlsxZip(zip) {
   if (ctFile) {
     zip.file(
       "[Content_Types].xml",
-      stockReceiptContentTypesXml({ hasTheme: !!zip.file("xl/theme/theme1.xml") }),
+      stockReceiptContentTypesXml({
+        hasTheme: !!zip.file("xl/theme/theme1.xml"),
+      }),
       zipFileOptions({ binary: false }),
     );
   }
@@ -10764,7 +10794,14 @@ function xlsxZipWriteUtf8(zip, path, xml) {
 }
 // Appends one receipt's rows/merges starting at startRow; returns next free row.
 // Layout mirrors zarlaga-receipt-undsen.xls (11 cols A–K) exactly.
-function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = null) {
+function appendReceiptSheetRows(
+  o,
+  ctx,
+  rows,
+  merges,
+  startRow = 1,
+  rowBreaks = null,
+) {
   const { si, siRich } = ctx;
   let rowNum = startRow;
   let footerKeepStart = 0;
@@ -10862,7 +10899,13 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
     ...emptyCells(hr3, "C", "K", 40),
   ]);
 
-  const pushMetaPairRow = (leftLabel, leftValue, rightLabel, rightValue, { rightBold = false, singleLine = false } = {}) => {
+  const pushMetaPairRow = (
+    leftLabel,
+    leftValue,
+    rightLabel,
+    rightValue,
+    { rightBold = false, singleLine = false } = {},
+  ) => {
     const r = rowNum;
     const left = plain(leftValue);
     const right = plain(rightValue);
@@ -10901,17 +10944,36 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
       ),
     ]);
   };
-  pushMetaPairRow("Худалдааны төлөөлөгч:", f.salesName, "Харилцагч:", f.customerName, { rightBold: true });
-  pushMetaPairRow("Худалдааны төлөөлөгчийн утас:", f.salesPhone, "Регистерийн дугаар:", f.customerReg);
-  pushMetaPairRow("Түгээгчийн нэр:", f.deliveryName, "Компаний нэр:", f.companyName);
-  pushMetaPairRow("Түгээгчийн утас:", f.deliveryPhone, "Утасны дугаар:", f.customerPhone);
+  pushMetaPairRow(
+    "Худалдааны төлөөлөгч:",
+    f.salesName,
+    "Харилцагч:",
+    f.customerName,
+    { rightBold: true },
+  );
+  pushMetaPairRow(
+    "Худалдааны төлөөлөгчийн утас:",
+    f.salesPhone,
+    "Регистерийн дугаар:",
+    f.customerReg,
+  );
+  pushMetaPairRow(
+    "Түгээгчийн нэр:",
+    f.deliveryName,
+    "Компаний нэр:",
+    f.companyName,
+  );
+  pushMetaPairRow(
+    "Түгээгчийн утас:",
+    f.deliveryPhone,
+    "Утасны дугаар:",
+    f.customerPhone,
+  );
   // Always show И-мэйл row (blank when no customer email)
   {
     const r = rowNum;
     const emailVal =
-      f.customerEmail && f.customerEmail !== "-"
-        ? plain(f.customerEmail)
-        : "";
+      f.customerEmail && f.customerEmail !== "-" ? plain(f.customerEmail) : "";
     merges.push(`B${r}:E${r}`, `F${r}:H${r}`, `I${r}:K${r}`);
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.metaNormal, null, "empty"),
@@ -10944,7 +11006,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
     `D${bankR5}:E${bankR5}`,
   );
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-    xlsxCellXml(`B${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("Дансны нэр:"), "s"),
+    xlsxCellXml(
+      `B${bankR1}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("Дансны нэр:"),
+      "s",
+    ),
     xlsxCellXml(`D${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("ТОМУДА"), "s"),
     xlsxCellXml(
       `F${bankR1}`,
@@ -10965,14 +11032,34 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
       si("Регистрийн дугаар:"),
       "s",
     ),
-    xlsxCellXml(`D${bankR2}`, RECEIPT_XLSX_STYLE.metaNormal, si("5397987"), "s"),
-    xlsxCellXml(`F${bankR2}`, RECEIPT_XLSX_STYLE.metaNormal, si(addressText), "s"),
+    xlsxCellXml(
+      `D${bankR2}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("5397987"),
+      "s",
+    ),
+    xlsxCellXml(
+      `F${bankR2}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si(addressText),
+      "s",
+    ),
     ...emptyCells(bankR2, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR2, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(`B${bankR3}`, RECEIPT_XLSX_STYLE.metaNormal, si("Банкны нэр:"), "s"),
-    xlsxCellXml(`D${bankR3}`, RECEIPT_XLSX_STYLE.metaNormal, si("Хаан банк"), "s"),
+    xlsxCellXml(
+      `B${bankR3}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("Банкны нэр:"),
+      "s",
+    ),
+    xlsxCellXml(
+      `D${bankR3}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("Хаан банк"),
+      "s",
+    ),
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
@@ -11094,7 +11181,12 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
     // Label B→E: gray, no borders. F→K: gray amount area, no underline.
     merges.push(`B${grossRow}:E${grossRow}`);
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-      xlsxCellXml(`B${grossRow}`, 19, si("Хувь хасагдаагүй нийт үнийн дүн"), "s"),
+      xlsxCellXml(
+        `B${grossRow}`,
+        19,
+        si("Хувь хасагдаагүй нийт үнийн дүн"),
+        "s",
+      ),
       xlsxCellXml(`F${grossRow}`, 31, null, "empty"),
       xlsxCellXml(`G${grossRow}`, 31, null, "empty"),
       xlsxCellXml(`H${grossRow}`, 31, null, "empty"),
@@ -11157,7 +11249,11 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
   }
 
   if (!footerKeepStart) footerKeepStart = rowNum;
-  const pushSummaryAmountRow = (label, amount, { grand = false, decimals = false, note = "" } = {}) => {
+  const pushSummaryAmountRow = (
+    label,
+    amount,
+    { grand = false, decimals = false, note = "" } = {},
+  ) => {
     const r = rowNum;
     // Non-grand: label B:D, amount E:K.
     // Grand: same span B:D / E:K; label right (58), note centered (60), amount (50).
@@ -11179,7 +11275,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
     if (grand) {
       cells.push(...emptyCells(r, "C", "D", labelStyle));
       if (note) {
-        cells.push(xlsxCellXml(`E${r}`, midStyle, siRich([{ t: note, sz: 8 }]), "s"));
+        cells.push(
+          xlsxCellXml(`E${r}`, midStyle, siRich([{ t: note, sz: 8 }]), "s"),
+        );
         cells.push(...emptyCells(r, "F", "J", midStyle));
         cells.push(xlsxCellXml(`K${r}`, valueStyle, Number(amount) || 0, "n"));
       } else {
@@ -11254,7 +11352,9 @@ function appendReceiptSheetRows(o, ctx, rows, merges, startRow = 1, rowBreaks = 
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
     const warnH =
-      index === 0 ? RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT : RECEIPT_XLSX_ROW_HEIGHT;
+      index === 0
+        ? RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT
+        : RECEIPT_XLSX_ROW_HEIGHT;
     const value = richParts ? siRich(richParts) : si(text);
     pushRow(warnH, [
       xlsxCellXml(`B${r}`, style, value, "s"),
@@ -11347,7 +11447,9 @@ function buildReceiptsCombinedSheetXml(
   let rowNum = 1;
   orders.forEach((o, index) => {
     if (index > 0) {
-      rows.push(xlsxRowXml(rowNum, RECEIPT_XLSX_ROW_HEIGHT, [], RECEIPT_XLSX_LAST_COL));
+      rows.push(
+        xlsxRowXml(rowNum, RECEIPT_XLSX_ROW_HEIGHT, [], RECEIPT_XLSX_LAST_COL),
+      );
       rowNum += 1;
     }
     rowNum = appendReceiptSheetRows(o, ctx, rows, merges, rowNum, rowBreaks);
@@ -12071,9 +12173,7 @@ function customerDetailHtml(c) {
     ),
     customerDetailRow(
       "И-мэйл",
-      c.email
-        ? esc(c.email)
-        : `<span class="customer-detail__muted">—</span>`,
+      c.email ? esc(c.email) : `<span class="customer-detail__muted">—</span>`,
       customerDetailEmailIcon(),
     ),
     customerDetailRow(
@@ -12475,12 +12575,8 @@ function receiptPrintDeliverySelected() {
 function requireReceiptPrintDelivery(action = "татах") {
   if (receiptPrintDeliverySelected()) return true;
   if (action === "татах" && currentRole() === "warehouse") return true;
-  const step =
-    action === "хэвлэх" ? "Баримт хэвлэхийн" : "Баримт татахын";
-  alertModal(
-    "Түгээгч сонгох",
-    `${step} өмнө түгээгч сонгоно уу.`,
-  );
+  const step = action === "хэвлэх" ? "Баримт хэвлэхийн" : "Баримт татахын";
+  alertModal("Түгээгч сонгох", `${step} өмнө түгээгч сонгоно уу.`);
   return false;
 }
 function receiptPrintWorkerOrders(workerIds = receiptPrintWorkerIds()) {
@@ -12519,20 +12615,30 @@ function receiptPrintDisplayOrders(
   searchKey = "warehouseOrders",
   employeeIds = [],
 ) {
-  const rows = orderReceiptRowsFiltered(searchKey, employeeIds, receiptFilterOptions());
+  const rows = orderReceiptRowsFiltered(
+    searchKey,
+    employeeIds,
+    receiptFilterOptions(),
+  );
   const workerIds = receiptPrintWorkerIds();
-  const sourceRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows;
+  const sourceRows = workerIds.length
+    ? receiptPrintWorkerOrders(workerIds)
+    : rows;
   return sourceRows.filter(
     (o) =>
       o.status !== "delivered" &&
       String(o.status || "").toLowerCase() !== "cancelled",
   );
 }
-function selectAllReceiptPrintOrders(searchKey = "warehouseOrders", employeeIds = []) {
+function selectAllReceiptPrintOrders(
+  searchKey = "warehouseOrders",
+  employeeIds = [],
+) {
   if (!receiptPrintWorkerIds().length) return;
-  state.receiptPrintOrderIds = receiptPrintDisplayOrders(searchKey, employeeIds).map(
-    (o) => String(o.id),
-  );
+  state.receiptPrintOrderIds = receiptPrintDisplayOrders(
+    searchKey,
+    employeeIds,
+  ).map((o) => String(o.id));
   render();
 }
 function clearReceiptPrintOrders() {
@@ -13094,15 +13200,23 @@ const INVENTORY_STOCK_REPORT_STYLES = {
 function inventoryStockReportStylesXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0&quot; \u20ae&quot;"/></numFmts><fonts count="3"><font><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFCBD5E1"/></left><right style="thin"><color rgb="FFCBD5E1"/></right><top style="thin"><color rgb="FFCBD5E1"/></top><bottom style="thin"><color rgb="FFCBD5E1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="16"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" indent="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="164" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
-function inventoryStockReportWorksheetXml(rows, merges, lastRow, lastCol, colWidths) {
+function inventoryStockReportWorksheetXml(
+  rows,
+  merges,
+  lastRow,
+  lastCol,
+  colWidths,
+) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
   const mergeCellsXml = merges.length
     ? `<mergeCells count="${merges.length}">${mergeXml}</mergeCells>`
     : "";
-  const colsXml = (colWidths || []).map(
-    (width, index) =>
-      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
-  ).join("");
+  const colsXml = (colWidths || [])
+    .map(
+      (width, index) =>
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+    )
+    .join("");
   const endRef = `${lastCol || "J"}${Math.max(1, lastRow)}`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${endRef}"/><sheetViews><sheetView showGridLines="0" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1" gridLines="0"/><pageMargins left="0.35" right="0.35" top="0.45" bottom="0.4" header="0.12" footer="0.12"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
@@ -13158,14 +13272,17 @@ function buildInventoryStockSheetXml(products) {
   pushMetaRow(`Нэвтэрсэн бүртгэл: ${inventoryExportAccountLabel()}`);
   pushSpacerRow();
   const headerRow = rowNum;
-  pushRow(INVENTORY_STOCK_REPORT_HEADER_ROW_H, headers.map((label, index) =>
-    xlsxCellXml(
-      `${xlsxColName(index + 1)}${headerRow}`,
-      s.tableHeader,
-      si(inventoryStockReportHeaderLabel(label)),
-      "s",
+  pushRow(
+    INVENTORY_STOCK_REPORT_HEADER_ROW_H,
+    headers.map((label, index) =>
+      xlsxCellXml(
+        `${xlsxColName(index + 1)}${headerRow}`,
+        s.tableHeader,
+        si(inventoryStockReportHeaderLabel(label)),
+        "s",
+      ),
     ),
-  ));
+  );
   let salesGrand = 0;
   let costGrand = 0;
   for (const item of inventoryExcelGroupedItems(products)) {
@@ -13287,7 +13404,12 @@ function inventoryExcelFallback(products) {
   const grandRow = ["Нийт дүн", "", "", fmtExcelNumber(salesGrand)];
   if (showCost) grandRow.push(fmtExcelNumber(costGrand));
   grandRow.push("", "");
-  const merges = [`B1:${lastCol}1`, `B2:${lastCol}2`, `B3:${lastCol}3`, `B4:${lastCol}4`];
+  const merges = [
+    `B1:${lastCol}1`,
+    `B2:${lastCol}2`,
+    `B3:${lastCol}3`,
+    `B4:${lastCol}4`,
+  ];
   let excelRow = 7;
   for (const item of grouped) {
     if (item.type === "cat") {
@@ -13315,9 +13437,7 @@ function inventoryExcelFallback(products) {
     {
       sheetName: "Үлдэгдэл",
       freezeHeaderRow: 6,
-      colWidths: showCost
-        ? [3, 32, 16, 18, 12, 10, 8]
-        : [3, 32, 16, 18, 10, 8],
+      colWidths: showCost ? [3, 32, 16, 18, 12, 10, 8] : [3, 32, 16, 18, 10, 8],
       merges,
     },
   );
@@ -13410,15 +13530,7 @@ function buildSalesReportExcelRows(orders, customers, meta) {
     ]),
     salesReportExcelBlankRow(),
     ["ЗАХИАЛГУУД", "", "", "", "", "", ""],
-    [
-      "Баримт №",
-      "Огноо",
-      "Ажилтан",
-      "Харилцагч",
-      "Төлбөр",
-      "Дүн",
-      "Төлөв",
-    ],
+    ["Баримт №", "Огноо", "Ажилтан", "Харилцагч", "Төлбөр", "Дүн", "Төлөв"],
     ...orders.map((o) => [
       formatReceiptNumber(o) || o.receiptNumber || "",
       orderCreatedDay(o) || orderTakenDay(o) || "",
@@ -13481,17 +13593,35 @@ function buildSalesReportProductExcelRows(orders, meta) {
   const totalQty = products.reduce((s, r) => s + r.qty, 0);
   const totalSales = products.reduce((s, r) => s + r.sales, 0);
   const totalProfit = products.reduce((s, r) => s + r.profit, 0);
-  const totalMargin = totalSales ? ((totalProfit / totalSales) * 100).toFixed(1) + "%" : "0%";
+  const totalMargin = totalSales
+    ? ((totalProfit / totalSales) * 100).toFixed(1) + "%"
+    : "0%";
   return [
     ["Борлуулалтын тайлан (Бараагаар)", "", "", "", "", "", ""],
     salesReportExcelBlankRow(),
     ["Ажилтан", emp, "", "Хугацаа", period, "", ""],
     salesReportExcelBlankRow(),
     ["Нийт борлуулалт", "Нийт ашиг", "Ашгийн хувь", "Нийт тоо", "", "", ""],
-    [fmtExcelMoney(totalSales), fmtExcelMoney(totalProfit), totalMargin, totalQty, "", "", ""],
+    [
+      fmtExcelMoney(totalSales),
+      fmtExcelMoney(totalProfit),
+      totalMargin,
+      totalQty,
+      "",
+      "",
+      "",
+    ],
     salesReportExcelBlankRow(),
     ["БАРААНУУД", "", "", "", "", "", ""],
-    ["Барааны нэр", "Ангилал", "Тоо (ш)", "Борлуулалт", "Өртөг", "Ашиг", "Ашиг %"],
+    [
+      "Барааны нэр",
+      "Ангилал",
+      "Тоо (ш)",
+      "Борлуулалт",
+      "Өртөг",
+      "Ашиг",
+      "Ашиг %",
+    ],
     ...products.map((r) => [
       r.productName,
       r.category || "-",
@@ -13511,16 +13641,24 @@ function confirmReportExport() {
     const stamp = reportExcelStamp();
     const tab = state.filters.salesReportTab || "products";
     if (tab === "products") {
-      excel(`Борлуулалт-бараагаар-${stamp}.xlsx`, buildSalesReportProductExcelRows(orders, meta), {
-        sheetName: "Бараагаар",
-        colWidths: SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS,
-      });
+      excel(
+        `Борлуулалт-бараагаар-${stamp}.xlsx`,
+        buildSalesReportProductExcelRows(orders, meta),
+        {
+          sheetName: "Бараагаар",
+          colWidths: SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS,
+        },
+      );
     } else {
       const customers = salesReportCustomerRows(orders);
-      excel(`Борлуулалтын-тайлан-${stamp}.xlsx`, buildSalesReportExcelRows(orders, customers, meta), {
-        sheetName: "Борлуулалтын тайлан",
-        colWidths: SALES_REPORT_XLSX_COL_WIDTHS,
-      });
+      excel(
+        `Борлуулалтын-тайлан-${stamp}.xlsx`,
+        buildSalesReportExcelRows(orders, customers, meta),
+        {
+          sheetName: "Борлуулалтын тайлан",
+          colWidths: SALES_REPORT_XLSX_COL_WIDTHS,
+        },
+      );
     }
   });
 }
@@ -13530,10 +13668,14 @@ function confirmSalesInfoExport() {
     const orders = salesReportOrdersFiltered();
     const meta = salesReportExportMeta(orders);
     const stamp = reportExcelStamp();
-    excel(`Борлуулалтын-мэдээ-${stamp}.xlsx`, buildSalesInfoExcelRows(orders, meta), {
-      sheetName: "Борлуулалтын мэдээ",
-      colWidths: SALES_INFO_XLSX_COL_WIDTHS,
-    });
+    excel(
+      `Борлуулалтын-мэдээ-${stamp}.xlsx`,
+      buildSalesInfoExcelRows(orders, meta),
+      {
+        sheetName: "Борлуулалтын мэдээ",
+        colWidths: SALES_INFO_XLSX_COL_WIDTHS,
+      },
+    );
   });
 }
 function confirmEmployeeExcel() {
@@ -13541,7 +13683,11 @@ function confirmEmployeeExcel() {
   if (canPickWarehouseWorkers() && !state.selectedWorkers.length)
     return alert("Ажилтан сонгоно уу");
   if (!warehouseScopeWorkerIds().length) return alert("Ажилтан сонгоно уу");
-  confirmDataExport("Бараа бэлдэх", employeeExcel, "Бараа бэлдэх хуудас татах уу?");
+  confirmDataExport(
+    "Бараа бэлдэх",
+    employeeExcel,
+    "Бараа бэлдэх хуудас татах уу?",
+  );
 }
 function openWarehousePrepare() {
   if (!canViewWarehousePrepare()) {
@@ -13674,8 +13820,7 @@ function orderCustomerName(o) {
     if (live) return live;
   }
   const snap =
-    String(o?.customerName || "").trim() ||
-    String(o?.companyName || "").trim();
+    String(o?.customerName || "").trim() || String(o?.companyName || "").trim();
   return snap || "Харилцагч";
 }
 function syncOrdersCustomerName(customer) {
@@ -13934,9 +14079,7 @@ function productCard(p, active = false) {
   return `<article class="product-card product-card--clickable${active ? " product-card--active" : ""}" data-product-card-id="${esc(p.id)}" role="button" tabindex="0" onclick="productDetail('${esc(p.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();productDetail('${esc(p.id)}')}"><div class="product-card__name"><span class="product-card__media" aria-hidden="true"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-card__img" width="72" height="72" loading="lazy" decoding="async" alt=""></span><div class="product-card__copy"><p class="product-card__title">${esc(p.name)}</p><p class="product-card__subtitle">${esc(catLine)}</p></div></div><div class="product-card__fields"><p class="product-card__cat">${esc(catLine)}</p>${packCell}<div class="product-card__facts">${costCell}<span class="product-card__price">${fmt(p.price)}</span><span class="product-card__stock${low ? " is-low" : ""}" title="Үлдэгдэл"><span class="product-card__stock-label">Үлд</span>${stock} ${unit}</span></div><span class="product-card__barcode">${esc(p.barcode || "—")}</span></div>${adminActions}</article>`;
 }
 function productMatchCodes(p) {
-  return [p.barcode, p.sku]
-    .map((v) => String(v || "").trim())
-    .filter(Boolean);
+  return [p.barcode, p.sku].map((v) => String(v || "").trim()).filter(Boolean);
 }
 function productMatchesInventoryQuery(p, q) {
   const query = String(q || "").trim();
@@ -14502,12 +14645,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
   const costExceeds = !isOut
     ? stockInCostExceedsSalesPrice(costVal || d.costPrice, p)
     : false;
-  const initialTotal = stockInEntryTotalQty(
-    largeVal,
-    d.packs,
-    d.qty,
-    p,
-  );
+  const initialTotal = stockInEntryTotalQty(largeVal, d.packs, d.qty, p);
   const fromLarge = largeCount && lpN > 0 ? lpN * largeCount : 0;
   const largeHint = fromLarge
     ? `= ${fromLarge} жижиг хайрцаг`
@@ -14554,7 +14692,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
         oninput: "stockInLargePacksInput(this)",
         ariaLabel: `${p.name} том хайрцаг`,
         hint: largeHint,
-        hintAttr: 'data-stock-in-large-preview',
+        hintAttr: "data-stock-in-large-preview",
       }),
     );
   }
@@ -14568,7 +14706,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
         oninput: "stockInSmallPacksInput(this)",
         ariaLabel: `${p.name} жижиг хайрцаг`,
         hint: packHint,
-        hintAttr: 'data-stock-in-pack-preview',
+        hintAttr: "data-stock-in-pack-preview",
       }),
     );
   }
@@ -14591,7 +14729,7 @@ function stockTakeEntryFormHtml(p, d = {}, mode = "in") {
       accent: true,
       placeholder: "0",
       ariaLabel: "Нийт тоо ширхэг",
-      extraInputAttrs: 'data-stock-in-total-qty',
+      extraInputAttrs: "data-stock-in-total-qty",
       hint:
         smallSize || largePieces
           ? "Жишээ: 10000 — хайрцагт автоматаар хуваана"
@@ -14924,7 +15062,10 @@ function buildStockOutReceiptSnapshot(productIds = null) {
     recipientNote: String(state.stockOutRecipientNote || "").trim(),
     warehouseName: String(state.stockOutWarehouseName || "").trim(),
     lines,
-    totalAmount: lines.reduce((sum, line) => sum + (Number(line.totalPrice) || 0), 0),
+    totalAmount: lines.reduce(
+      (sum, line) => sum + (Number(line.totalPrice) || 0),
+      0,
+    ),
   };
 }
 function applyStockOutReceipt(receipt) {
@@ -14938,9 +15079,7 @@ function applyStockOutReceipt(receipt) {
     if (qty <= 0) continue;
     const stockNow = Number(p.stock) || 0;
     if (qty > stockNow) {
-      throw new Error(
-        `${p.name}: үлдэгдэл хүрэлцэхгүй (${stockNow} / ${qty})`,
-      );
+      throw new Error(`${p.name}: үлдэгдэл хүрэлцэхгүй (${stockNow} / ${qty})`);
     }
   }
   state.stockOutReceipts.push({
@@ -15009,10 +15148,7 @@ function confirmFinishStockOut() {
       }),
   });
 }
-async function finishStockOutReceipt(
-  receipt,
-  { downloadExcel = false } = {},
-) {
+async function finishStockOutReceipt(receipt, { downloadExcel = false } = {}) {
   if (!receipt?.lines?.length || stockOutSaveLock) return;
   stockOutSaveLock = true;
   let saved;
@@ -15037,7 +15173,8 @@ async function finishStockOutReceipt(
   });
 }
 function confirmNewStockOut() {
-  const hasData = stockOutHasEntries() || (state.stockOutDone && state.stockOutReceipt);
+  const hasData =
+    stockOutHasEntries() || (state.stockOutDone && state.stockOutReceipt);
   if (!hasData) {
     resetStockOutSession();
     return;
@@ -15543,9 +15680,7 @@ function searchTextMatches(haystack, needle) {
   const hForms = searchTextForms(haystack);
   return qForms.some((q) =>
     hForms.some(
-      (h) =>
-        h.includes(q) ||
-        (q.length >= 3 && h.length >= 3 && q.includes(h)),
+      (h) => h.includes(q) || (q.length >= 3 && h.length >= 3 && q.includes(h)),
     ),
   );
 }
@@ -15593,12 +15728,16 @@ function findProductsByQuery(code) {
   if (!value) return [];
   const products = state.products || [];
   const exactCode = products.filter((p) =>
-    productMatchCodes(p).some((c) => c === value || barcodesLooselyEqual(c, value)),
+    productMatchCodes(p).some(
+      (c) => c === value || barcodesLooselyEqual(c, value),
+    ),
   );
   if (exactCode.length) return exactCode;
   const qMild = searchQueryMild(value);
   const exactName = products.filter(
-    (p) => searchQueryMild(p.name) === qMild || searchQueryLookalike(p.name) === searchQueryLookalike(value),
+    (p) =>
+      searchQueryMild(p.name) === qMild ||
+      searchQueryLookalike(p.name) === searchQueryLookalike(value),
   );
   if (exactName.length) return exactName;
   const textHits = products.filter((p) => productTextMatchesQuery(p, value));
@@ -15857,11 +15996,7 @@ function confirmRemoveStockDraft(id, mode = "in") {
   const p = state.products.find((x) => String(x.id) === String(id));
   const name = p?.name || "Бараа";
   const isOut = mode === "out";
-  const qty = p
-    ? isOut
-      ? stockOutLineQty(p)
-      : stockInLineQty(p)
-    : 0;
+  const qty = p ? (isOut ? stockOutLineQty(p) : stockInLineQty(p)) : 0;
   if (qty <= 0) return;
   confirmModal(
     isOut ? "Зарлагаас буцаах уу?" : "Орлогоос буцаах уу?",
@@ -15965,7 +16100,11 @@ function initStockSwipeRows() {
   document.addEventListener(
     "pointerdown",
     (e) => {
-      if (e.target?.closest?.("[data-stock-entry-return], [data-worker-entry-return]"))
+      if (
+        e.target?.closest?.(
+          "[data-stock-entry-return], [data-worker-entry-return]",
+        )
+      )
         return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       const stockDelete = e.target?.closest?.("[data-stock-swipe-delete]");
@@ -16368,7 +16507,9 @@ function stockOutDraftStats(list = state.products) {
   const filled = (list || []).filter((p) => stockOutLineQty(p) > 0);
   const pieceQty = filled.reduce((sum, p) => sum + stockOutLineQty(p), 0);
   const totalSales = filled.reduce(
-    (sum, p) => sum + stockOutLineQty(p) * (productSalesPrice(p) || productCostPrice(p) || 0),
+    (sum, p) =>
+      sum +
+      stockOutLineQty(p) * (productSalesPrice(p) || productCostPrice(p) || 0),
     0,
   );
   return { filled, skuCount: filled.length, pieceQty, totalSales };
@@ -16538,7 +16679,12 @@ function stockInReceiptOrgName(receipt) {
   void receipt;
   return STOCK_IN_COMPANY_NAME;
 }
-function stockInReceiptMetaGridRow(leftLabel, leftValue, rightLabel, rightValue) {
+function stockInReceiptMetaGridRow(
+  leftLabel,
+  leftValue,
+  rightLabel,
+  rightValue,
+) {
   return `<div class="stock-in-receipt-doc__meta-row"><div class="stock-in-receipt-doc__meta-pair"><dt class="stock-in-receipt-doc__meta-label">${esc(leftLabel)}</dt><dd class="stock-in-receipt-doc__meta-value">${esc(leftValue)}</dd></div><div class="stock-in-receipt-doc__meta-pair"><dt class="stock-in-receipt-doc__meta-label">${esc(rightLabel)}</dt><dd class="stock-in-receipt-doc__meta-value">${esc(rightValue)}</dd></div></div>`;
 }
 function stockInReceiptSimpleTableRow(line, index) {
@@ -16567,7 +16713,9 @@ function stockInReceiptPanel(receipt) {
     })
     .filter(Boolean)
     .join("");
-  const receiptNoRaw = receipt.receiptNumber ? String(receipt.receiptNumber) : "";
+  const receiptNoRaw = receipt.receiptNumber
+    ? String(receipt.receiptNumber)
+    : "";
   const receiptNoDisplay = receiptNoRaw
     ? receiptNoRaw.startsWith("#")
       ? receiptNoRaw.slice(1)
@@ -17784,14 +17932,11 @@ function xlsxCellXml(ref, styleId, value, kind) {
   }
   // Excel formula with optional cached value (opens correctly before recalc).
   if (kind === "f") {
-    const formula =
-      value && typeof value === "object" ? value.f : value;
+    const formula = value && typeof value === "object" ? value.f : value;
     const cached =
       value && typeof value === "object" && value.v != null ? value.v : null;
     const vXml =
-      cached != null && cached !== ""
-        ? `<v>${xlsxSafeNumber(cached)}</v>`
-        : "";
+      cached != null && cached !== "" ? `<v>${xlsxSafeNumber(cached)}</v>` : "";
     return `<c r="${ref}" s="${styleId}"><f>${xlsxEscapeText(formula)}</f>${vXml}</c>`;
   }
   return `<c r="${ref}" s="${styleId}"/>`;
@@ -18316,12 +18461,7 @@ function buildStockInReportListSheetXml(receipts, { day, kind = "in" } = {}) {
     xlsxCellXml(`A${headerRow}`, s.tableHeader, si("№"), "s"),
     xlsxCellXml(`B${headerRow}`, s.tableHeader, si("Огноо"), "s"),
     xlsxCellXml(`C${headerRow}`, s.tableHeader, si(copy.partyHeader), "s"),
-    xlsxCellXml(
-      `D${headerRow}`,
-      s.tableHeader,
-      si("Бүртгэсэн ажилтан"),
-      "s",
-    ),
+    xlsxCellXml(`D${headerRow}`, s.tableHeader, si("Бүртгэсэн ажилтан"), "s"),
     xlsxCellXml(`E${headerRow}`, s.tableHeader, si("Бараа"), "s"),
     xlsxCellXml(`F${headerRow}`, s.tableHeader, si("Barcode"), "s"),
     xlsxCellXml(`G${headerRow}`, s.tableHeader, si("Хэмжих нэгж"), "s"),
@@ -18434,7 +18574,8 @@ function buildStockInSimpleReportSheetXml(receipt) {
   receipt = normalizeStockInReceiptTotals(receipt);
   const s = STOCK_IN_REPORT_STYLES;
   const lastCol = STOCK_IN_SIMPLE_REPORT_LAST_COL;
-  const { activeLines, pieceQty, totalAmount } = stockInReceiptLineStats(receipt);
+  const { activeLines, pieceQty, totalAmount } =
+    stockInReceiptLineStats(receipt);
   const strings = [];
   const strIndex = new Map();
   const si = (text) => {
@@ -18531,9 +18672,7 @@ function buildStockInSimpleReportSheetXml(receipt) {
       "s",
     ),
   ]);
-  pushRow(18, [
-    xlsxCellXml(`A3`, s.dateMeta, si(dateLong), "s"),
-  ]);
+  pushRow(18, [xlsxCellXml(`A3`, s.dateMeta, si(dateLong), "s")]);
   pushRow(STOCK_IN_PARTY_VALUE_ROW_HEIGHT, [
     xlsxCellXml(`A4`, s.partyValue, si(orgName), "s"),
     ...emptyCells(4, "B", "G", s.partyValue),
@@ -18597,12 +18736,16 @@ function buildStockInSimpleReportSheetXml(receipt) {
     const nameText = receiptProductNameText(line.productName || "");
     const rowH = Math.max(
       STOCK_IN_REPORT_TABLE_ROW_HEIGHT,
-      receiptXlsxWrappedRowHeight(nameText, STOCK_IN_SIMPLE_REPORT_COL_WIDTHS[1], {
-        min: STOCK_IN_REPORT_TABLE_ROW_HEIGHT,
-        linePt: 11,
-        pad: 4,
-        max: 40,
-      }),
+      receiptXlsxWrappedRowHeight(
+        nameText,
+        STOCK_IN_SIMPLE_REPORT_COL_WIDTHS[1],
+        {
+          min: STOCK_IN_REPORT_TABLE_ROW_HEIGHT,
+          linePt: 11,
+          pad: 4,
+          max: 40,
+        },
+      ),
     );
     pushRow(rowH, [
       xlsxCellXml(`A${r}`, s.no, index + 1, "n"),
@@ -18675,13 +18818,16 @@ function buildStockMovementReportSheetXml(
     strIndex.set(key, idx);
     return idx;
   };
-  const day = receipt.createdAt ? isoDay(receipt.createdAt) || todayIso() : todayIso();
+  const day = receipt.createdAt
+    ? isoDay(receipt.createdAt) || todayIso()
+    : todayIso();
   const dateText = warehouseSheetDateValue(day);
   const receiptNo = receipt.receiptNumber
     ? `#${receipt.receiptNumber}`
     : "Дугааргүй";
   const party = getPartyValue(receipt);
-  const warehouse = String(receipt.warehouseName || "").trim() || "Үндсэн Агуулах";
+  const warehouse =
+    String(receipt.warehouseName || "").trim() || "Үндсэн Агуулах";
   const employee = String(receipt.employeeName || "").trim() || "—";
   const headers = [
     "Огноо",
@@ -18722,9 +18868,7 @@ function buildStockMovementReportSheetXml(
       .split("")
       .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
-  pushRow(20, [
-    xlsxCellXml("A1", s.title, si(titleText), "s"),
-  ]);
+  pushRow(20, [xlsxCellXml("A1", s.title, si(titleText), "s")]);
   pushRow(18, [
     xlsxCellXml(
       "A2",
@@ -18737,10 +18881,13 @@ function buildStockMovementReportSheetXml(
   ]);
   pushRow(6, [xlsxCellXml("A3", 0, null, "empty")]);
   const headerRow = rowNum;
-  pushRow(STOCK_IN_REPORT_TABLE_ROW_HEIGHT, headers.map((label, index) => {
-    const col = colLetters[index];
-    return xlsxCellXml(`${col}${headerRow}`, s.tableHeader, si(label), "s");
-  }));
+  pushRow(
+    STOCK_IN_REPORT_TABLE_ROW_HEIGHT,
+    headers.map((label, index) => {
+      const col = colLetters[index];
+      return xlsxCellXml(`${col}${headerRow}`, s.tableHeader, si(label), "s");
+    }),
+  );
   const dataRows = [];
   for (const line of receipt.lines || []) {
     const totalQty = Math.max(0, Math.floor(Number(line.quantity) || 0));
@@ -18767,19 +18914,9 @@ function buildStockMovementReportSheetXml(
       xlsxPrepareQtyCell(`I${r}`, s.qty, parts.pieces),
       xlsxPrepareQtyCell(`J${r}`, s.qty, totalQty),
       xlsxCellXml(`K${r}`, s.money, costPrice, "n"),
-      xlsxCellXml(
-        `L${r}`,
-        s.money,
-        { f: `J${r}*K${r}`, v: costTotal },
-        "f",
-      ),
+      xlsxCellXml(`L${r}`, s.money, { f: `J${r}*K${r}`, v: costTotal }, "f"),
       xlsxCellXml(`M${r}`, s.money, salesPrice, "n"),
-      xlsxCellXml(
-        `N${r}`,
-        s.money,
-        { f: `J${r}*M${r}`, v: salesTotal },
-        "f",
-      ),
+      xlsxCellXml(`N${r}`, s.money, { f: `J${r}*M${r}`, v: salesTotal }, "f"),
     ]);
   }
   const totalRow = rowNum;
@@ -18867,11 +19004,7 @@ async function assembleStockInReportXlsxZip({
   stylesXml = null,
 }) {
   const zip = new JSZip();
-  xlsxZipWriteUtf8(
-    zip,
-    "[Content_Types].xml",
-    stockReceiptContentTypesXml(),
-  );
+  xlsxZipWriteUtf8(zip, "[Content_Types].xml", stockReceiptContentTypesXml());
   xlsxZipWriteUtf8(zip, "_rels/.rels", xlsxPackageRootRelsXml());
   xlsxZipWriteUtf8(zip, "docProps/core.xml", xlsxPackageCoreXml());
   xlsxZipWriteUtf8(zip, "docProps/app.xml", xlsxPackageAppXml(1));
@@ -18885,21 +19018,20 @@ async function assembleStockInReportXlsxZip({
     "xl/_rels/workbook.xml.rels",
     stockReceiptWorkbookRelsXml({ hasTheme: false }),
   );
-  xlsxZipWriteUtf8(
-    zip,
-    "xl/styles.xml",
-    stylesXml || stockInReportStylesXml(),
-  );
+  xlsxZipWriteUtf8(zip, "xl/styles.xml", stylesXml || stockInReportStylesXml());
   xlsxZipWriteUtf8(zip, "xl/sharedStrings.xml", sharedStringsXml);
   xlsxZipWriteUtf8(zip, "xl/worksheets/sheet1.xml", sheetXml);
   return zip;
 }
 /** Stock-in Excel uses the same sheet layout/fonts as stock-out. */
-function buildStockInSheetXml(receipt, {
-  titleText = null,
-  receivedLabel = "Орлого авсан огноо:",
-  styleIds = null,
-} = {}) {
+function buildStockInSheetXml(
+  receipt,
+  {
+    titleText = null,
+    receivedLabel = "Орлого авсан огноо:",
+    styleIds = null,
+  } = {},
+) {
   return buildStockOutSheetXmlLegacy(receipt, {
     titleText: titleText || stockInReceiptTitle(receipt),
     receivedLabel,
@@ -18946,7 +19078,8 @@ function confirmStockInReportExport() {
     return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   }
   ensureStockReportDateDefault();
-  const day = normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
+  const day =
+    normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
   const receipts = stockReportReceiptsForDay("in", day);
   if (!receipts.length) {
     return alert("Орлогын бүртгэл байхгүй");
@@ -18978,7 +19111,8 @@ function confirmStockOutReportExport() {
     return alertModal("Эрхгүй", "Мэдээлэл татах эрхгүй.");
   }
   ensureStockReportDateDefault();
-  const day = normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
+  const day =
+    normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
   const receipts = stockReportReceiptsForDay("out", day);
   if (!receipts.length) {
     return alert("Зарлагын бүртгэл байхгүй");
@@ -19006,11 +19140,14 @@ function buildStockOutSheetXml(receipt, { styleIds = null } = {}) {
     styleIds,
   });
 }
-function buildStockOutSheetXmlLegacy(receipt, {
-  titleText = null,
-  receivedLabel = "Зарлага гарсан огноо:",
-  styleIds = null,
-} = {}) {
+function buildStockOutSheetXmlLegacy(
+  receipt,
+  {
+    titleText = null,
+    receivedLabel = "Зарлага гарсан огноо:",
+    styleIds = null,
+  } = {},
+) {
   receipt = normalizeStockInReceiptTotals(receipt);
   const s = styleIds || stockReceiptQtyStyleIds("");
   const lastCol = "I";
@@ -19425,9 +19562,7 @@ function xlsxBarcodeCell(ref, styleId, barcode, si) {
   if (!text) return xlsxCellXml(ref, styleId, null, "empty");
   // Use caller style when provided (warehouse template). Receipt sheets pass 34 (@).
   const style =
-    styleId == null || styleId === ""
-      ? XLSX_BARCODE_CELL_STYLE
-      : styleId;
+    styleId == null || styleId === "" ? XLSX_BARCODE_CELL_STYLE : styleId;
   return xlsxCellXml(ref, style, text, "inlineStr");
 }
 function warehousePrepareBarcodeCell(ref, barcode, si, styleId = null) {
@@ -19584,12 +19719,9 @@ function warehousePreparePrintPatchStylesXml(stylesXml) {
   let out = warehousePreparePatchStylesXml(stylesXml, { fillCategory: false });
   if (out.includes(WAREHOUSE_PREPARE_PRINT_BORDER_MARKER)) return out;
 
-  const titleFont =
-    `<font><b/><sz val="16"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
-  const bodyFont =
-    `<font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
-  const boldFont =
-    `<font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const titleFont = `<font><b/><sz val="16"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const bodyFont = `<font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
+  const boldFont = `<font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>`;
   out = xlsxStylesAppendPart(out, "fonts", [titleFont, bodyFont, boldFont]);
   const fontCount = xlsxStylesCountPart(out, "fonts");
   const fontTitle = Math.max(0, fontCount - 3);
@@ -19663,9 +19795,9 @@ function warehousePrepareFillIdForSpec(stylesXml, spec) {
     /<fills count="\d+">([\s\S]*?)<\/fills>/,
   );
   if (!fillsBlock) return 2;
-  const fills = [
-    ...fillsBlock[1].matchAll(/<fill>[\s\S]*?<\/fill>/g),
-  ].map((m) => m[0]);
+  const fills = [...fillsBlock[1].matchAll(/<fill>[\s\S]*?<\/fill>/g)].map(
+    (m) => m[0],
+  );
   const themeNeedle =
     spec?.theme != null && spec?.tint
       ? `theme="${spec.theme}" tint="${spec.tint}"`
@@ -19681,7 +19813,10 @@ function warehousePrepareFillIdForSpec(stylesXml, spec) {
 function warehousePrepareFillIdForRgb(stylesXml, rgb) {
   return warehousePrepareFillIdForSpec(stylesXml, { rgb });
 }
-function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {}) {
+function warehousePreparePatchStylesXml(
+  stylesXml,
+  { fillCategory = true } = {},
+) {
   let out = String(stylesXml || "");
 
   // Gray Accent 3 Lighter 80/60/40 — same theme fills as the Excel sample.
@@ -19723,7 +19858,8 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
   const headerXfSingle =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>';
-  if (out.includes(headerXfPlain)) out = out.replace(headerXfPlain, headerXfSingle);
+  if (out.includes(headerXfPlain))
+    out = out.replace(headerXfPlain, headerXfSingle);
 
   // Qty / stock numbers: center (sample).
   const numStyleLeft =
@@ -19732,7 +19868,8 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top" /></xf>';
   const numStyleCenter =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>';
-  if (out.includes(numStyleLeft)) out = out.replace(numStyleLeft, numStyleCenter);
+  if (out.includes(numStyleLeft))
+    out = out.replace(numStyleLeft, numStyleCenter);
   else if (out.includes(numStyleRight))
     out = out.replace(numStyleRight, numStyleCenter);
 
@@ -19742,7 +19879,8 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
   const textCellSingle =
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>';
-  if (out.includes(textCellLeft)) out = out.replace(textCellLeft, textCellSingle);
+  if (out.includes(textCellLeft))
+    out = out.replace(textCellLeft, textCellSingle);
   // Older builds patched shrinkToFit on; strip it so re-exports stay uniform.
   out = out.replace(
     /(<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0") shrinkToFit="1"(\/>)/g,
@@ -19764,7 +19902,8 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
     '<border><left /><right /><top style="thin"><color indexed="64" /></top><bottom style="thin"><color indexed="64" /></bottom><diagonal /></border>';
   const hairCatBorder =
     '<border><left /><right /><top style="hair"><color rgb="FFB0B0B0"/></top><bottom style="hair"><color rgb="FFB0B0B0"/></bottom><diagonal /></border>';
-  if (out.includes(hairCatBorder)) out = out.replace(hairCatBorder, thinCatBorder);
+  if (out.includes(hairCatBorder))
+    out = out.replace(hairCatBorder, thinCatBorder);
 
   // Signature underline: thinnest hairline bottom border.
   const signBorderHair =
@@ -19789,8 +19928,7 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
   if (fillCategory) {
     const catXfPlain =
       '<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
-    const catXfFilled =
-      `<xf numFmtId="0" fontId="2" fillId="${categoryFillId}" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>`;
+    const catXfFilled = `<xf numFmtId="0" fontId="2" fillId="${categoryFillId}" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>`;
     if (out.includes(catXfPlain)) out = out.replace(catXfPlain, catXfFilled);
   }
   const qtyHeadXf = (fillId) =>
@@ -19818,10 +19956,12 @@ function warehousePreparePatchStylesXml(stylesXml, { fillCategory = true } = {})
 }
 /** cellXfs index after warehousePreparePatchStylesXml appends the sign-line xf. */
 function warehousePrepareColsXml(widths = WAREHOUSE_PREPARE_COL_WIDTHS) {
-  return widths.map(
-    (width, index) =>
-      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
-  ).join("");
+  return widths
+    .map(
+      (width, index) =>
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+    )
+    .join("");
 }
 function warehousePrepareWorksheetXml(rows, merges, lastRow, colWidths) {
   const mergeXml = merges.map((ref) => `<mergeCell ref="${ref}"/>`).join("");
@@ -19862,9 +20002,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   let rowNum = 1;
   const pushRow = (height, cells) => {
     const filtered = filterXlsxCellsOutsideMerges(cells, merges);
-    rows.push(
-      xlsxRowXml(rowNum, height, filtered, WAREHOUSE_PREPARE_LAST_COL),
-    );
+    rows.push(xlsxRowXml(rowNum, height, filtered, WAREHOUSE_PREPARE_LAST_COL));
     rowNum += 1;
   };
   const emptyCells = (
@@ -20004,12 +20142,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(`C${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
     pushRow(WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT, [
       ...emptyCells(r, "A", "B", s.spacer),
-      xlsxCellXml(
-        `C${r}`,
-        s.signLine,
-        si(`${role} ____________________`),
-        "s",
-      ),
+      xlsxCellXml(`C${r}`, s.signLine, si(`${role} ____________________`), "s"),
       ...emptyCells(r, "D", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
     ]);
   };
@@ -20035,10 +20168,8 @@ async function exportWarehousePrepareExcelXlsx(orders, workerIds) {
     throw new Error("JSZip missing");
   }
   const stamp = new Date().toISOString().slice(0, 10);
-  const { sharedStringsXml, sheetXml, printArea } = buildWarehousePrepareSheetXml(
-    orders,
-    workerIds,
-  );
+  const { sharedStringsXml, sheetXml, printArea } =
+    buildWarehousePrepareSheetXml(orders, workerIds);
   const tpl = await fetch(staticAssetUrl(WAREHOUSE_PREPARE_TEMPLATE)).then(
     (r) => {
       if (!r.ok) throw new Error("template missing");
@@ -20383,7 +20514,9 @@ function setReportYear(year) {
 }
 function setReportMonth(month) {
   const raw = String(month || "").trim();
-  state.filters.reportMonth = raw ? String(Math.max(1, Math.min(12, Number(raw) || 0))) : "";
+  state.filters.reportMonth = raw
+    ? String(Math.max(1, Math.min(12, Number(raw) || 0)))
+    : "";
   render();
 }
 function clearReportDate() {
@@ -20475,8 +20608,7 @@ function salesReportEmployeeRows(orders) {
     }))
     .sort(
       (a, b) =>
-        b.sales - a.sales ||
-        String(a.name).localeCompare(String(b.name), "mn"),
+        b.sales - a.sales || String(a.name).localeCompare(String(b.name), "mn"),
     );
 }
 function salesReportCustomerRowHtml(row) {
@@ -20492,7 +20624,8 @@ function salesReportSummaryHtml({
   orderCount,
   periodLabel = "",
 }) {
-  const receivableClass = receivable > 0 ? " sales-report-summary__value--debt" : "";
+  const receivableClass =
+    receivable > 0 ? " sales-report-summary__value--debt" : "";
   return `<section class="sales-report-summary" aria-label="Тайлангийн нэгтгэл">${periodLabel ? `<p class="sales-report-summary__period">${esc(periodLabel)}</p>` : ""}<dl class="sales-report-summary__stats"><div class="sales-report-summary__stat"><dt>Борлуулалт</dt><dd>${fmt(total)}</dd></div><div class="sales-report-summary__stat"><dt>Авлага</dt><dd class="sales-report-summary__value${receivableClass}">${fmt(receivable)}</dd></div><div class="sales-report-summary__stat"><dt>Захиалга</dt><dd>${orderCount}</dd></div></dl></section>`;
 }
 function salesReportFiltersHtml(exportOnclick = "confirmReportExport()") {
@@ -20530,10 +20663,15 @@ function salesReportFiltersHtml(exportOnclick = "confirmReportExport()") {
     const cid = String(o.customerId || "");
     if (cid && !custMap.has(cid)) custMap.set(cid, orderCustomerName(o) || "-");
   }
-  const custList = [...custMap.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), "mn"));
+  const custList = [...custMap.entries()].sort((a, b) =>
+    String(a[1]).localeCompare(String(b[1]), "mn"),
+  );
   const custOpts = [
     `<option value="" ${!custId ? "selected" : ""}>Бүгд</option>`,
-    ...custList.map(([id, name]) => `<option value="${esc(id)}" ${custId === id ? "selected" : ""}>${esc(name)}</option>`),
+    ...custList.map(
+      ([id, name]) =>
+        `<option value="${esc(id)}" ${custId === id ? "selected" : ""}>${esc(name)}</option>`,
+    ),
   ].join("");
   const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Хайх..." })}<div class="sales-report-filters sales-report-filters--compact"><label class="sales-report-filters__field"><span class="sales-report-filters__label">Ажилтан</span><select onchange="setReportEmployee(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Ажилтан">${empOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Харилцагч</span><select onchange="setReportCustomer(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Харилцагч">${custOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Жил</span><select onchange="setReportYear(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Жил">${yearOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Сар</span><select onchange="setReportMonth(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Сар">${monthOpts}</select></label></div>`;
   return pageToolbarHtml({
@@ -20544,9 +20682,7 @@ function salesReportFiltersHtml(exportOnclick = "confirmReportExport()") {
 }
 function salesReportEmployeeBlockHtml(row) {
   const customers = row.customers.length
-    ? row.customers
-        .map((c) => salesReportCustomerRowHtml(c))
-        .join("")
+    ? row.customers.map((c) => salesReportCustomerRowHtml(c)).join("")
     : `<p class="line-panel__empty">Харилцагч байхгүй</p>`;
   return `<div class="sales-report-emp"><div class="sales-report-emp__head"><div><p class="sales-report-emp__name">${esc(row.name)}</p><p class="line-list__meta">${row.orderCount} захиалга · ${row.customers.length} харилцагч</p></div><div class="sales-report-emp__totals"><b>${fmt(row.sales)}</b><span class="${row.receivable > 0 ? "text-tone-danger" : "text-muted-foreground"}">Авлага ${fmt(row.receivable)}</span></div></div><div class="line-list">${customers}</div></div>`;
 }
@@ -20588,11 +20724,20 @@ function salesReportProductRows(orders) {
     }
   }
   return [...map.values()]
-    .map((r) => ({ ...r, profit: r.sales - r.cost, margin: r.sales ? ((r.sales - r.cost) / r.sales) * 100 : 0 }))
-    .sort((a, b) => b.sales - a.sales || String(a.productName).localeCompare(String(b.productName), "mn"));
+    .map((r) => ({
+      ...r,
+      profit: r.sales - r.cost,
+      margin: r.sales ? ((r.sales - r.cost) / r.sales) * 100 : 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.sales - a.sales ||
+        String(a.productName).localeCompare(String(b.productName), "mn"),
+    );
 }
 function salesReportProductRowHtml(row) {
-  const profitClass = row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
+  const profitClass =
+    row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
   const marginStr = row.margin.toFixed(1) + "%";
   return `<div class="line-list__row line-list__row--static sales-report-product" role="listitem"><div class="sales-report-product__main"><p class="sales-report-product__name">${esc(row.productName)}</p><p class="sales-report-product__meta">${row.qty} ш · ${row.category ? esc(row.category) : ""}</p></div><div class="sales-report-product__amounts"><b class="sales-report-product__sales">${fmt(row.sales)}</b><span class="sales-report-product__profit ${profitClass}">${fmt(row.profit)} (${marginStr})</span></div></div>`;
 }
@@ -20601,7 +20746,9 @@ function salesReportProductsBodyHtml(filtered, q) {
   const totalQty = products.reduce((s, r) => s + r.qty, 0);
   const totalSales = products.reduce((s, r) => s + r.sales, 0);
   const totalProfit = products.reduce((s, r) => s + r.profit, 0);
-  const totalMargin = totalSales ? ((totalProfit / totalSales) * 100).toFixed(1) + "%" : "0%";
+  const totalMargin = totalSales
+    ? ((totalProfit / totalSales) * 100).toFixed(1) + "%"
+    : "0%";
   return `<section class="sales-report-product-summary"><dl class="sales-report-summary__stats"><div class="sales-report-summary__stat"><dt>Нийт тоо</dt><dd>${totalQty} ш</dd></div><div class="sales-report-summary__stat"><dt>Борлуулалт</dt><dd>${fmt(totalSales)}</dd></div><div class="sales-report-summary__stat"><dt>Ашиг</dt><dd class="${totalProfit >= 0 ? "" : "sales-report-summary__value--debt"}">${fmt(totalProfit)} (${totalMargin})</dd></div></dl></section><section class="line-panel sales-report-panel"><h2 class="line-panel__section-title">Бараанууд · ${products.length}</h2><div class="line-list sales-report-list" role="list">${products.length ? products.map((r) => salesReportProductRowHtml(r)).join("") : `<p class="line-panel__empty">${q ? "Олдсонгүй" : "Борлуулалт байхгүй"}</p>`}</div></section>`;
 }
 function salesReportCustomersBodyHtml(filtered, q) {
@@ -20689,8 +20836,7 @@ function openStockReport(kind) {
 }
 function setStockReportDate(day) {
   commitDatePickerChange(() => {
-    state.filters.stockReportDate =
-      normalizeIsoDateInput(day) || todayIso();
+    state.filters.stockReportDate = normalizeIsoDateInput(day) || todayIso();
   });
 }
 function selectStockReportToday() {
@@ -20768,7 +20914,10 @@ function stockReportAggregateLines(kind, receipts) {
     }
   }
   return [...map.values()].sort((a, b) =>
-    String(a.productName || "").localeCompare(String(b.productName || ""), "mn"),
+    String(a.productName || "").localeCompare(
+      String(b.productName || ""),
+      "mn",
+    ),
   );
 }
 function openStockReportReceipt(kind, id) {
@@ -20777,9 +20926,7 @@ function openStockReportReceipt(kind, id) {
   const receipt = list.find((r) => r.id === id);
   if (!receipt) return;
   const title =
-    kind === "out"
-      ? stockOutReceiptTitle(receipt)
-      : "БАРААНЫ ОРЛОГЫН ТАЙЛАН";
+    kind === "out" ? stockOutReceiptTitle(receipt) : "БАРААНЫ ОРЛОГЫН ТАЙЛАН";
   const body =
     kind === "out"
       ? stockOutReceiptPanel(receipt)
@@ -20825,9 +20972,7 @@ function stockMovementReportReceiptListRow(kind, receipt) {
   const stats = stockInReceiptLineStats(receipt);
   const copy = stockMovementListReportCopy(kind);
   const day = stockReportShortDate(isoDay(receipt.createdAt));
-  const no = receipt.receiptNumber
-    ? esc(String(receipt.receiptNumber))
-    : "—";
+  const no = receipt.receiptNumber ? esc(String(receipt.receiptNumber)) : "—";
   const party = esc(copy.getParty(receipt));
   const employee = esc(receipt.employeeName || "—");
   return `<tr class="stock-in-report-list__row" tabindex="0" role="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openStockReportReceipt('${kind}','${esc(receipt.id)}')}"><td>${day}</td><td>${no}</td><td>${party}</td><td>${employee}</td><td class="stock-in-report-list__num">${stats.skuCount}</td><td class="stock-in-report-list__num">${stats.pieceQty.toLocaleString()}</td><td class="stock-in-report-list__amount">${fmt(stats.totalAmount)}</td></tr>`;
@@ -20853,7 +20998,10 @@ function stockReportReceiptBlockHeader(kind, receipt) {
   const total = stockReportReceiptTotal(kind, receipt);
   const { no, metaParts, excelFn } = stockReportReceiptMeta(kind, receipt);
   const chips = metaParts
-    .map((part) => `<span class="stock-report-receipt-block__chip">${esc(part)}</span>`)
+    .map(
+      (part) =>
+        `<span class="stock-report-receipt-block__chip">${esc(part)}</span>`,
+    )
     .join("");
   return `<div class="stock-report-receipt-block__head"><button type="button" onclick="openStockReportReceipt('${kind}','${esc(receipt.id)}')" class="stock-report-receipt-block__main"><div class="stock-report-receipt-block__info"><span class="stock-report-receipt-block__no">${no}</span><div class="stock-report-receipt-block__chips">${chips}</div></div><b class="stock-report-receipt-block__total">${fmt(total)}</b></button><button type="button" class="btn btn--secondary btn--sm stock-report-receipt-block__excel" onclick="${excelFn}" title="Excel татах">Excel</button></div>`;
 }
@@ -20905,7 +21053,9 @@ function stockReportDetailLines(kind, receipts) {
         : "Баримт";
     const party =
       kind === "out"
-        ? String(receipt.recipientNote || receipt.warehouseLocation || "").trim()
+        ? String(
+            receipt.recipientNote || receipt.warehouseLocation || "",
+          ).trim()
         : String(receipt.supplierName || "").trim();
     for (const line of receipt.lines || []) {
       const qty = Math.max(0, Math.floor(Number(line.quantity) || 0));
@@ -20945,9 +21095,8 @@ function stockReportsMenuHtml() {
   if (salesItems.length) {
     sections.push(
       `<h3 class="admin-hub__heading">Борлуулалт</h3><div class="admin-hub__settings">${salesItems
-        .map(
-          ([kind, label, icon]) =>
-            adminHubActionCard(`openStockReport('${kind}')`, label, icon),
+        .map(([kind, label, icon]) =>
+          adminHubActionCard(`openStockReport('${kind}')`, label, icon),
         )
         .join("")}</div>`,
     );
@@ -20959,19 +21108,22 @@ function stockReportsMenuHtml() {
     ];
     sections.push(
       `<h3 class="admin-hub__heading">Орлого / Зарлага</h3><div class="admin-hub__settings">${items
-        .map(
-          ([kind, label, icon]) =>
-            adminHubActionCard(`openStockReport('${kind}')`, label, icon),
+        .map(([kind, label, icon]) =>
+          adminHubActionCard(`openStockReport('${kind}')`, label, icon),
         )
         .join("")}</div>`,
     );
   }
-  return sections.join("") || `<p class="text-sm text-muted-foreground">Харах эрхтэй тайлан байхгүй.</p>`;
+  return (
+    sections.join("") ||
+    `<p class="text-sm text-muted-foreground">Харах эрхтэй тайлан байхгүй.</p>`
+  );
 }
 function stockReportDetailView(kind) {
   const flow = stockReportFlowKind(kind);
   ensureStockReportDateDefault();
-  const day = normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
+  const day =
+    normalizeIsoDateInput(state.filters.stockReportDate) || todayIso();
   const receipts = stockReportReceiptsForDay(flow, day);
   const copy = stockMovementListReportCopy(flow);
   const emptyDay =
@@ -21002,16 +21154,21 @@ function stockReportDetailView(kind) {
 }
 function salesReportOrdersFiltered() {
   const orders = reportOrdersFiltered();
-  const q = String(state.searches.reports || "").trim().toLowerCase();
+  const q = String(state.searches.reports || "")
+    .trim()
+    .toLowerCase();
   if (!q) return orders;
   return orders.filter((o) => {
-    const hay = `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
+    const hay =
+      `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
     return hay.includes(q);
   });
 }
 function salesReportDetailView() {
   const filtered = salesReportFilteredWithCustomer();
-  const q = String(state.searches.reports || "").trim().toLowerCase();
+  const q = String(state.searches.reports || "")
+    .trim()
+    .toLowerCase();
   const orderCount = filtered.length;
   const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
   const receivable = filtered
@@ -21024,14 +21181,17 @@ function salesReportDetailView() {
     periodLabel: reportPeriodHint(),
   });
   const tab = state.filters.salesReportTab || "products";
-  const body = tab === "products"
-    ? salesReportProductsBodyHtml(filtered, q)
-    : salesReportCustomersBodyHtml(filtered, q);
+  const body =
+    tab === "products"
+      ? salesReportProductsBodyHtml(filtered, q)
+      : salesReportCustomersBodyHtml(filtered, q);
   return `<div class="space-y-4 sales-report-view">${pageHead("Борлуулалтын тайлан")}${salesReportFiltersHtml()}${summary}${salesReportTabsHtml()}${body}</div>`;
 }
 function salesInfoDetailView() {
   const filtered = salesReportOrdersFiltered();
-  const q = String(state.searches.reports || "").trim().toLowerCase();
+  const q = String(state.searches.reports || "")
+    .trim()
+    .toLowerCase();
   const orderCount = filtered.length;
   const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
   const receivable = filtered
@@ -21052,9 +21212,16 @@ function stockReportsView() {
     } else if (!canViewSalesReport()) {
       return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Борлуулалтын тайлан харах эрхгүй.</p></div>`;
     }
-    return kind === "salesInfo" ? salesInfoDetailView() : salesReportDetailView();
+    return kind === "salesInfo"
+      ? salesInfoDetailView()
+      : salesReportDetailView();
   }
-  if (kind === "in" || kind === "out" || kind === "inProducts" || kind === "outProducts") {
+  if (
+    kind === "in" ||
+    kind === "out" ||
+    kind === "inProducts" ||
+    kind === "outProducts"
+  ) {
     if (!canViewStockReports()) {
       return `<div class="space-y-4">${pageHead("Тайлан")}<p class="text-sm text-muted-foreground">Тайлан харах эрхгүй.</p></div>`;
     }
@@ -21154,9 +21321,7 @@ function promoPanelAddButton(onclick) {
   return `<button type="button" onclick="${onclick}" class="promo-panel__add"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Дүрэм нэмэх</span></button>`;
 }
 function promoPanelShell({ lead = "", addOnclick, listHtml, type = "" }) {
-  const leadHtml = lead
-    ? `<p class="promo-panel__lead">${lead}</p>`
-    : "";
+  const leadHtml = lead ? `<p class="promo-panel__lead">${lead}</p>` : "";
   return `<div class="promo-panel${type ? ` promo-panel--${type}` : ""}">${leadHtml}<div class="promo-panel__toolbar">${promoPanelAddButton(addOnclick)}</div><div class="promo-rule-list">${listHtml}</div></div>`;
 }
 function promoRuleListEmpty() {
@@ -21222,7 +21387,16 @@ function promotionSearchQtyRow(searchInputHtml, qtyOpts) {
   );
   return `<div class="promo-toolbar">${search}<div class="promo-toolbar__qty">${qtyHtml}</div></div>`;
 }
-function promoProductRowHtml(p, { onclick, active = false, selected = false, qtyHtml = "", removeHtml = "" } = {}) {
+function promoProductRowHtml(
+  p,
+  {
+    onclick,
+    active = false,
+    selected = false,
+    qtyHtml = "",
+    removeHtml = "",
+  } = {},
+) {
   const cls = [
     "promo-product-row",
     active ? "is-active" : "",
@@ -21319,11 +21493,16 @@ function promoQtyUnitTabsHtml(buyUnit) {
 }
 function setPromotionQtyBuyUnit(unit) {
   capturePromoFormDraft();
-  state.promoQtyBuyUnit =
-    unit === "pack" || unit === "large" ? unit : "piece";
+  state.promoQtyBuyUnit = unit === "pack" || unit === "large" ? unit : "piece";
   promotionQtyModal();
 }
-function promoQtyLiveText(buyMode, buyQty, freeQty, buyCount = 0, freeCount = 0) {
+function promoQtyLiveText(
+  buyMode,
+  buyQty,
+  freeQty,
+  buyCount = 0,
+  freeCount = 0,
+) {
   const buy = Math.max(0, Math.floor(Number(buyQty) || 0));
   const free = Math.max(0, Math.floor(Number(freeQty) || 0));
   if (buyMode === "total") {
@@ -21455,7 +21634,11 @@ function promoPickEmptyStateHtml(pickKey) {
   }
   return `<p class="promo-product-empty">Хайлт хийнэ үү эсвэл төрөл сонгоно уу</p>`;
 }
-function promoFilteredProducts(pickKey, excludeIds = [], { requireFilter = false } = {}) {
+function promoFilteredProducts(
+  pickKey,
+  excludeIds = [],
+  { requireFilter = false } = {},
+) {
   const searchKey = promoPickSearchKey(pickKey);
   const rawQ = (searchKey && state.searches[searchKey]) || "";
   const q = String(rawQ || "").trim();
@@ -21474,7 +21657,8 @@ function promoFilteredProducts(pickKey, excludeIds = [], { requireFilter = false
       );
     })
     .sort((a, b) => {
-      const byRank = pickerProductSearchRank(a, q) - pickerProductSearchRank(b, q);
+      const byRank =
+        pickerProductSearchRank(a, q) - pickerProductSearchRank(b, q);
       if (byRank) return byRank;
       const byCat = (a.category || "").localeCompare(b.category || "", "mn");
       if (byCat) return byCat;
@@ -21499,7 +21683,10 @@ function promoCategorySelectHtml(pickKey) {
     .join("")}`;
   return `<label class="promo-category-select-wrap"><span class="sr-only">Төрөл</span><select class="promo-category-select" onchange="setPromoPickCategory(${jsStringArg(pickKey)}, this.value)">${opts}</select></label>`;
 }
-function promoProductCardHtml(p, { pickKey, selected = false, perProductQty = false } = {}) {
+function promoProductCardHtml(
+  p,
+  { pickKey, selected = false, perProductQty = false } = {},
+) {
   const withQty = selected && perProductQty;
   const cls = [
     "promo-product-card",
@@ -21548,7 +21735,11 @@ function promoProductGridHtml({
 }) {
   return `<div data-promo-pick-list-mount="${esc(pickKey)}" data-promo-pick-action="toggle" data-promo-per-product-qty="${perProductQty ? "1" : "0"}">${promoProductGridInnerHtml({ pickKey, selectedIds, perProductQty })}</div>`;
 }
-function promoQtyStepperHtml(name, defaultValue = "0", { min = 0, label = "", compact = false } = {}) {
+function promoQtyStepperHtml(
+  name,
+  defaultValue = "0",
+  { min = 0, label = "", compact = false } = {},
+) {
   const draftVal = promoFormDraftVal(name, defaultValue);
   const v = Math.max(min, Math.floor(Number(draftVal) || 0));
   const aria = label ? ` aria-label="${esc(label)}"` : "";
@@ -21591,9 +21782,7 @@ function promotionSheetPickerBlock({
   const searchKey = promoPickSearchKey(pickKey);
   const rawQ = (searchKey && state.searches[searchKey]) || "";
   const hiddenInputs = ids
-    .map(
-      (id) => `<input type="hidden" name="${fieldName}" value="${esc(id)}">`,
-    )
+    .map((id) => `<input type="hidden" name="${fieldName}" value="${esc(id)}">`)
     .join("");
   const countBadge =
     ids.length > 0
@@ -21621,7 +21810,12 @@ function promotionSheetPickerBlock({
   const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo${searchOpen ? " is-open" : ""}" data-promo-search-combo="${esc(pickKey)}"><div class="promo-search-combo__field">${searchIcon}${searchInput}${chevron}</div>${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
-function promoSheetSectionHtml({ variant = "condition", title, hint = "", body = "" }) {
+function promoSheetSectionHtml({
+  variant = "condition",
+  title,
+  hint = "",
+  body = "",
+}) {
   return `<div class="promo-sheet-section promo-sheet-section--${esc(variant)}"><div class="promo-sheet-section__body"><div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>${body}</div></div>`;
 }
 function promoRewardTypeTabsHtml(active, setFn) {
@@ -21674,7 +21868,9 @@ function setPromoSearchDropdown(pickKey, open) {
   };
 }
 function patchPromoSearchDropdown(pickKey) {
-  const combo = document.querySelector(`[data-promo-search-combo="${pickKey}"]`);
+  const combo = document.querySelector(
+    `[data-promo-search-combo="${pickKey}"]`,
+  );
   if (!combo) return false;
   const ids = promotionPickIds(state.promoPick || {}, pickKey);
   const open = promoSearchDropdownOpen(pickKey);
@@ -21722,21 +21918,24 @@ function initPromoSearchDropdownDismiss() {
   document.addEventListener(
     "pointerdown",
     (e) => {
-      document.querySelectorAll(".promo-search-combo.is-open").forEach((combo) => {
-        const filters = combo.closest(".promo-sheet-filters");
-        if (filters ? filters.contains(e.target) : combo.contains(e.target)) return;
-        const pickKey = combo.getAttribute("data-promo-search-combo");
-        if (pickKey) closePromoSearchDropdown(pickKey);
-      });
+      document
+        .querySelectorAll(".promo-search-combo.is-open")
+        .forEach((combo) => {
+          const filters = combo.closest(".promo-sheet-filters");
+          if (filters ? filters.contains(e.target) : combo.contains(e.target))
+            return;
+          const pickKey = combo.getAttribute("data-promo-search-combo");
+          if (pickKey) closePromoSearchDropdown(pickKey);
+        });
     },
     true,
   );
 }
 function promoSearchDropdownInnerHtml(pickKey, selectedIds) {
   const selectedSet = new Set((selectedIds || []).map(String));
-  const products = promoFilteredProducts(pickKey, [], { requireFilter: false }).filter(
-    (p) => !selectedSet.has(String(p.id)),
-  );
+  const products = promoFilteredProducts(pickKey, [], {
+    requireFilter: false,
+  }).filter((p) => !selectedSet.has(String(p.id)));
   const shown = products.slice(0, 40);
   const more = Math.max(0, products.length - shown.length);
   if (!shown.length) {
@@ -21991,7 +22190,9 @@ function normalizeQuantityPromotionRule(rule) {
   const buyIds = promotionBuyProductIds(rule);
   if (buyIds.length <= 1) return rule;
   const mode =
-    rule.buyMode === "total" || rule.buyMode === "any" || rule.buyMode === "each"
+    rule.buyMode === "total" ||
+    rule.buyMode === "any" ||
+    rule.buyMode === "each"
       ? rule.buyMode
       : "total";
   if (rule.buyQtyByProduct && typeof rule.buyQtyByProduct === "object") {
@@ -22057,9 +22258,10 @@ function promotionProductLabels(ids) {
 function quantityPromoBuyQtyMap(rule) {
   const buyIds = promotionBuyProductIds(rule);
   const fallback = Math.floor(Number(rule?.buyQty) || 0);
-  const raw = rule?.buyQtyByProduct && typeof rule.buyQtyByProduct === "object"
-    ? rule.buyQtyByProduct
-    : {};
+  const raw =
+    rule?.buyQtyByProduct && typeof rule.buyQtyByProduct === "object"
+      ? rule.buyQtyByProduct
+      : {};
   const map = {};
   buyIds.forEach((id) => {
     const key = Object.keys(raw).find((k) => String(k) === String(id));
@@ -22213,7 +22415,8 @@ function quantityPromoRuleFormulaExtended(rule) {
   }
   if (buyMode === "each" && buyIds.length > 1) {
     const qtys = buyIds.map((id) => quantityPromoBuyQtyForProduct(rule, id));
-    const allSame = qtys.length && qtys.every((q) => q === qtys[0]) && qtys[0] >= 1;
+    const allSame =
+      qtys.length && qtys.every((q) => q === qtys[0]) && qtys[0] >= 1;
     if (allSame) {
       return [1, 2, 3]
         .map((sets) => {
@@ -22249,7 +22452,8 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
   const qtyOf = (id) => promoMixQtyOf(counts, id);
   const buyQty = quantityPromoCombinedThreshold(rule);
-  if (!buyIds.length || !freeIds.length || freeQty < 1 || buyQty < 1) return null;
+  if (!buyIds.length || !freeIds.length || freeQty < 1 || buyQty < 1)
+    return null;
   const combinedQty = buyIds.reduce((sum, id) => sum + qtyOf(id), 0);
   const sets = quantityPromoSets(rule, qtyByProduct);
   const grantedFree = sets * freeQty;
@@ -22259,11 +22463,7 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   const missingTypes = Math.max(0, buyIds.length - readyTypes);
   const remainder = buyQty > 0 ? combinedQty % buyQty : 0;
   const needForNext =
-    remainder === 0
-      ? combinedQty > 0
-        ? buyQty
-        : buyQty
-      : buyQty - remainder;
+    remainder === 0 ? (combinedQty > 0 ? buyQty : buyQty) : buyQty - remainder;
   return {
     rule,
     buyIds,
@@ -22299,7 +22499,11 @@ function quantityPromoProgressMeter(prog, qtyByProduct) {
   const combined = Math.max(0, Math.floor(Number(prog.combinedQty) || 0));
   const rem = buyQty > 0 ? combined % buyQty : 0;
   const current =
-    rem === 0 && sets > 0 ? buyQty : rem === 0 ? Math.min(combined, buyQty) : rem;
+    rem === 0 && sets > 0
+      ? buyQty
+      : rem === 0
+        ? Math.min(combined, buyQty)
+        : rem;
   return {
     current,
     goal: buyQty,
@@ -22349,19 +22553,21 @@ function bumpPromoMixQty(productId, delta) {
   if (!id) return;
   const rules = state.promotionRules?.quantity || [];
   const idx = Math.floor(Number(state.promoMixRuleIndex));
-  const rule =
-    Number.isFinite(idx) && idx >= 0 ? rules[idx] : null;
+  const rule = Number.isFinite(idx) && idx >= 0 ? rules[idx] : null;
   const unit = quantityPromoBuyUnit(rule);
   const p = findProductByIdLoose(id);
   let step = 1;
   if (unit === "pack") step = Math.max(1, productPackSize(p));
-  else if (unit === "large")
-    step = Math.max(1, productLargeBoxPieceCount(p));
+  else if (unit === "large") step = Math.max(1, productLargeBoxPieceCount(p));
   const cur = getWorkerQty(id);
   const d = (Number(delta) || 0) * step;
   setWorkerQty(id, Math.max(0, cur + d));
 }
-function promoMixProductTileHtml(p, qty, { threshold = 0, unitLabel = "ш" } = {}) {
+function promoMixProductTileHtml(
+  p,
+  qty,
+  { threshold = 0, unitLabel = "ш" } = {},
+) {
   const maxOk = maxWorkerPaidQty(p.id);
   const pieceQty = getWorkerQty(p.id);
   const decDisabled = pieceQty <= 0;
@@ -22611,7 +22817,11 @@ function promoPickChipsHtml(selectedProducts, pickKey, perProductQty) {
     .map((p) => promoPickChipHtml(p, pickKey, { perProductQty }))
     .join("")}</div>`;
 }
-function promotionSelectedProductRowHtml(p, pickKey, { perProductQty = false } = {}) {
+function promotionSelectedProductRowHtml(
+  p,
+  pickKey,
+  { perProductQty = false } = {},
+) {
   return promoPickChipHtml(p, pickKey, { perProductQty });
 }
 function promotionMultiProductPickerBlock({
@@ -22876,12 +23086,16 @@ function promotionQtyRuleText(r) {
 }
 function promoQtyProductChipHtml(p, qty = 0) {
   const qtyBadge =
-    qty > 0
-      ? `<span class="promo-qty-chip__qty">${qty} ш</span>`
-      : "";
+    qty > 0 ? `<span class="promo-qty-chip__qty">${qty} ш</span>` : "";
   return `<div class="promo-qty-chip"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-qty-chip__img" width="40" height="40" loading="lazy" decoding="async" alt=""><span class="promo-qty-chip__name">${esc(p.name)}</span>${qtyBadge}</div>`;
 }
-function promoApprovedRuleCard({ kind, index, formula, conditionHtml, rewardHtml }) {
+function promoApprovedRuleCard({
+  kind,
+  index,
+  formula,
+  conditionHtml,
+  rewardHtml,
+}) {
   const deleteBtn = promoRuleDeleteBtn(kind, index);
   return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${index + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__lane-label">Нөхцөл</p>${conditionHtml}</section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">Урамшуулал</p>${rewardHtml}</section></div></article>`;
 }
@@ -23045,8 +23259,7 @@ function openPromotionQtyModal() {
 }
 function setPromotionQtyBuyMode(mode) {
   capturePromoFormDraft();
-  state.promoQtyBuyMode =
-    mode === "each" || mode === "total" ? mode : "any";
+  state.promoQtyBuyMode = mode === "each" || mode === "total" ? mode : "any";
   promotionQtyModal();
 }
 function promotionQtyModal() {
@@ -23141,7 +23354,10 @@ function promotionQtyModal() {
       bodyHtml,
     ),
     "max-w-2xl",
-    { panelClass: "modal-panel--promo modal-panel--promo-qty modal-panel--promo-sheet" },
+    {
+      panelClass:
+        "modal-panel--promo modal-panel--promo-qty modal-panel--promo-sheet",
+    },
   );
 }
 function openPromotionPriceModal() {
@@ -23211,13 +23427,9 @@ function setPromotionPaymentRuleType(type) {
   state.promoPaymentRuleType = type === "percent" ? "percent" : "free";
   promotionPaymentModal();
 }
-function setPromotionPaymentTerm(term) {
-  capturePromoFormDraft();
-  state.promoPaymentTerm = term === "credit" ? "credit" : "cash";
-  promotionPaymentModal();
-}
 function promotionPaymentModal() {
   state.promoModalKind = "payment";
+  state.promoPaymentTerm = "cash";
   state.promoPick = state.promoPick || {};
   if (!Array.isArray(state.promoPick.paymentFreeProductIds)) {
     state.promoPick.paymentFreeProductIds = promotionPickIds(
@@ -23225,9 +23437,7 @@ function promotionPaymentModal() {
       "paymentFreeProductIds",
     );
   }
-  const term = state.promoPaymentTerm === "credit" ? "credit" : "cash",
-    type = state.promoPaymentRuleType === "percent" ? "percent" : "free",
-    termToggle = `<div class="seg-tabs"><button type="button" onclick="setPromotionPaymentTerm('cash')" class="seg-tab ${term === "cash" ? "is-active" : ""}">Шууд төлөх</button><button type="button" onclick="setPromotionPaymentTerm('credit')" class="seg-tab ${term === "credit" ? "is-active" : ""}">Зээлээр</button></div>`,
+  const type = state.promoPaymentRuleType === "percent" ? "percent" : "free",
     typeBar = promoRewardTypeTabsHtml(type, "setPromotionPaymentRuleType"),
     minField = promoFormFieldHtml(
       "Доод дүн (₮)",
@@ -23242,8 +23452,8 @@ function promotionPaymentModal() {
     condition = promoSheetSectionHtml({
       variant: "condition",
       title: "Нөхцөл",
-      hint: "Төлбөрийн хэлбэр",
-      body: `${termToggle}${minField}`,
+      hint: "Шууд төлөх",
+      body: minField,
     }),
     reward =
       type === "free"
@@ -23253,7 +23463,7 @@ function promotionPaymentModal() {
     promotionPageTitle("payment"),
     promoFormShell(
       `data-promo-modal="payment" onsubmit="savePromotionPayment(event)"`,
-      `<input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="${term}">${condition}${reward}`,
+      `<input type="hidden" name="type" value="${type}"><input type="hidden" name="paymentTerm" value="cash">${condition}${reward}`,
     ),
     "max-w-2xl",
     { panelClass: "modal-panel--promo modal-panel--promo-sheet" },
@@ -23286,7 +23496,9 @@ function savePromotionQty(e) {
       return;
     }
     const draft = state.promoFormDraft || {};
-    const buyModeRaw = String(f.get("buyMode") || state.promoQtyBuyMode || "total");
+    const buyModeRaw = String(
+      f.get("buyMode") || state.promoQtyBuyMode || "total",
+    );
     const buyMode =
       buyModeRaw === "each" || buyModeRaw === "any" ? buyModeRaw : "total";
     const buyUnit = "piece";
@@ -23531,11 +23743,7 @@ function applyQuantityPromotions(lines) {
     const sets = quantityPromoSets(rule, qtyByProduct);
     const freeQty = Math.floor(Number(rule.freeQty) || 0);
     if (sets < 1 || freeQty < 1) return;
-    appendPromoFreeLines(
-      result,
-      promotionFreeProductIds(rule),
-      sets * freeQty,
-    );
+    appendPromoFreeLines(result, promotionFreeProductIds(rule), sets * freeQty);
   });
   return result;
 }
@@ -23696,7 +23904,8 @@ function savePromotionPrice(e) {
         freeProductIds = promotionPickIds(
           state.promoPick,
           "priceFreeProductIds",
-        ).map((id) => String(id || "").trim())
+        )
+          .map((id) => String(id || "").trim())
           .filter(Boolean);
       }
       if (!freeProductIds.length) {
@@ -23738,7 +23947,7 @@ function savePromotionPayment(e) {
     }
     const type = f.type === "percent" ? "percent" : "free",
       rule = {
-        paymentTerm: f.paymentTerm === "credit" ? "credit" : "cash",
+        paymentTerm: "cash",
         minAmount,
         type,
       };
@@ -25282,8 +25491,7 @@ function seedWorkerCartFromOrder(order) {
     if (stored) {
       if (partsMatchTotal(p, stored, qty[id])) {
         const splitPack =
-          effectivePackSizeFromParts(p, stored, qty[id]) ||
-          productPackSize(p);
+          effectivePackSizeFromParts(p, stored, qty[id]) || productPackSize(p);
         const rolled = rollUpQtyParts(
           stored,
           splitPack,
@@ -25396,12 +25604,11 @@ function workerOrderSaveBarHtml(cart) {
 }
 function workerPromoRow(line) {
   const p = findProductByIdLoose(line.productId) || {};
-  const kind =
-    line.isPricePromo
-      ? "Нийт дүнгийн урамшуулал"
-      : line.isPaymentPromo
-        ? "Төлбөрийн урамшуулал"
-        : "Урамшуулал";
+  const kind = line.isPricePromo
+    ? "Нийт дүнгийн урамшуулал"
+    : line.isPaymentPromo
+      ? "Төлбөрийн урамшуулал"
+      : "Урамшуулал";
   return `<div class="worker-selected-row worker-promo-row"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="min-w-0"><p class="font-medium truncate">${esc(line.productName)}</p><p class="worker-promo-row__label">${line.quantity} ш · ${esc(kind)}</p></div><b class="text-sm">${line.quantity} ш</b></div>`;
 }
 function paymentTermPicker() {
@@ -25565,7 +25772,10 @@ function render() {
   maybeShowPwaInstallBanner();
   if (state.currentView === "delivery" && state.deliveryStoreReady) {
     requestAnimationFrame(() => {
-      if (savedDeliveryMapHost && restoreDeliveryMapHost(savedDeliveryMapHost)) {
+      if (
+        savedDeliveryMapHost &&
+        restoreDeliveryMapHost(savedDeliveryMapHost)
+      ) {
         return;
       }
       if (savedDeliveryMapHost) {
@@ -26570,7 +26780,10 @@ function stashCustomerFormDraft() {
   const captured = captureCustomerForm();
   if (!captured) return;
   if (!customerDraftHasContent(captured)) {
-    if (String(customerFormDraft?.customerId || "") === String(captured.customerId || "")) {
+    if (
+      String(customerFormDraft?.customerId || "") ===
+      String(captured.customerId || "")
+    ) {
       customerFormDraft = null;
     }
     return;
@@ -26669,8 +26882,7 @@ function customerModal(id, draft = null) {
   const cid = String(id || "").trim();
   const cidAttr = esc(cid);
   const matchingStored =
-    customerFormDraft &&
-    String(customerFormDraft.customerId || "") === cid;
+    customerFormDraft && String(customerFormDraft.customerId || "") === cid;
   const useDraft = draft || (matchingStored ? customerFormDraft : null);
   const c = customerFromDraft(cid, useDraft);
   const receivableHost = id
@@ -26830,12 +27042,16 @@ async function upsertCustomerOnServer(customer) {
     }
   }
   const raw = String(lastError?.message || lastError || "").trim();
-  if (/failed to fetch|networkerror|load failed|network request failed/i.test(raw)) {
+  if (
+    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
+  ) {
     throw new Error(
       "Сервертэй холбогдож чадсангүй. Интернетээ шалгаад дахин оролдоно уу.",
     );
   }
-  throw lastError instanceof Error ? lastError : new Error(raw || "Хадгалах амжилтгүй");
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(raw || "Хадгалах амжилтгүй");
 }
 async function applyCustomerSave(data, id) {
   const incomingImage = String(data.image || "").trim();
@@ -27699,7 +27915,9 @@ function addCategoryFromProductForm() {
   }
   if (select) select.value = chosen;
   if (input) input.value = "";
-  document.getElementById("productNewCategoryField")?.setAttribute("hidden", "");
+  document
+    .getElementById("productNewCategoryField")
+    ?.setAttribute("hidden", "");
 }
 function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
@@ -28081,9 +28299,7 @@ function receiptEditDraftOrder() {
   return recalcOrderTotals(draft);
 }
 function orderReceiptEditRows() {
-  const order = state.orders.find(
-    (x) => x.id === state.receiptEditOrderId,
-  );
+  const order = state.orders.find((x) => x.id === state.receiptEditOrderId);
   const editable = canEditWorkerOrder(order);
   return (state.receiptEditItems || [])
     .map((i, idx) => {
@@ -28141,9 +28357,7 @@ function receiptEditQtyDraft(el) {
 }
 function receiptEditQtyCommit(el) {
   if (receiptEditQtyConfirmOpen) return;
-  const order = state.orders.find(
-    (x) => x.id === state.receiptEditOrderId,
-  );
+  const order = state.orders.find((x) => x.id === state.receiptEditOrderId);
   if (!canEditWorkerOrder(order)) return;
   const idx = Number(el.getAttribute("data-receipt-qty"));
   const item = state.receiptEditItems?.[idx];
@@ -28518,7 +28732,8 @@ function pickerProductSearchRank(p, rawQuery) {
   if (nameMild && qMild && nameMild.startsWith(qMild)) return 2;
   if (catMild && qMild && catMild === qMild) return 3;
   if (productTextMatchesQuery(p, q)) return 4;
-  if (searchTextMatches(category, q) || searchTokensMatch(category, q)) return 5;
+  if (searchTextMatches(category, q) || searchTokensMatch(category, q))
+    return 5;
   return 6;
 }
 function pickerProductsInView() {
@@ -28535,7 +28750,8 @@ function pickerProductsInView() {
       );
     })
     .sort((a, b) => {
-      const byRank = pickerProductSearchRank(a, q) - pickerProductSearchRank(b, q);
+      const byRank =
+        pickerProductSearchRank(a, q) - pickerProductSearchRank(b, q);
       if (byRank) return byRank;
       const byCat = (a.category || "").localeCompare(b.category || "", "mn");
       if (byCat) return byCat;
@@ -28644,7 +28860,10 @@ function updatePickerQtySteppers(id) {
     storedParts && partsMatchTotal(p, storedParts, q)
       ? storedParts
       : pickerQtyToParts(q, p);
-  const { largePacks, packs, pieces } = pickerRollUpPartsForProduct(p, rawParts);
+  const { largePacks, packs, pieces } = pickerRollUpPartsForProduct(
+    p,
+    rawParts,
+  );
   const packMax = pickerPackMax(p, pieces, largePacks);
   const pieceMax = pickerPieceMax(p, packs, largePacks);
   const largeMax = pickerLargeMax(p, pieces, packs);
@@ -28815,7 +29034,9 @@ function setWorkerQty(id, qty) {
   const q = Math.min(wanted, maxOk);
   if (wanted > maxOk) {
     const have = productStockWithEditCredit(id);
-    showStockLimitToast(`${p.name}: үлд ${have}, урамшуулалтай нийлээд хүрэхгүй`);
+    showStockLimitToast(
+      `${p.name}: үлд ${have}, урамшуулалтай нийлээд хүрэхгүй`,
+    );
   }
   if (q > 0) state.workerQty[id] = q;
   else {
@@ -28826,7 +29047,10 @@ function setWorkerQty(id, qty) {
   if (q > 0 && (productPackSize(p) || productLargeBoxPieceCount(p))) {
     if (state.pickerQtyProductId === id) {
       const alreadyStored = state.workerQtyParts?.[id];
-      if (alreadyStored && partsMatchTotal(p, normalizeQtyParts(alreadyStored), q)) {
+      if (
+        alreadyStored &&
+        partsMatchTotal(p, normalizeQtyParts(alreadyStored), q)
+      ) {
         // parts already saved by pickerPartStepperApply — don't overwrite from stale DOM
       } else {
         syncWorkerQtyParts(id, readPickerQtyParts(id));
@@ -29524,7 +29748,10 @@ async function saveWorkerOrderEdit() {
     order.settlementDay = "";
     recalcOrderTotals(order);
     const orderId = order.id;
-    const orderSnapshot = { ...order, items: (order.items || []).map((i) => ({ ...i })) };
+    const orderSnapshot = {
+      ...order,
+      items: (order.items || []).map((i) => ({ ...i })),
+    };
     clearWorkerOrderEditState();
     resetWorkerCart();
     state.workerStoreReady = false;
@@ -30077,7 +30304,11 @@ function simpleRootRelsXml() {
 function simpleContentTypesXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>`;
 }
-function simpleSheetColWidths(rows, colCount, { mins = [], maxWidth = 48 } = {}) {
+function simpleSheetColWidths(
+  rows,
+  colCount,
+  { mins = [], maxWidth = 48 } = {},
+) {
   const widths = Array.from({ length: colCount }, (_, i) =>
     Math.max(8, Number(mins[i]) || 10),
   );
@@ -30110,7 +30341,9 @@ function simpleSheetXml(rows, si, opts = {}) {
   const widths =
     Array.isArray(opts.colWidths) && opts.colWidths.length
       ? opts.colWidths.map((w, i) =>
-          Number(w) > 0 ? Number(w) : simpleSheetColWidths(normalizedRows, colCount)[i],
+          Number(w) > 0
+            ? Number(w)
+            : simpleSheetColWidths(normalizedRows, colCount)[i],
         )
       : simpleSheetColWidths(normalizedRows, colCount, {
           mins: opts.colMins || [],
@@ -30433,7 +30666,6 @@ Object.assign(window, {
   openPromotionPaymentModal,
   promotionPaymentModal,
   setPromotionPaymentRuleType,
-  setPromotionPaymentTerm,
   savePromotionQty,
   savePromotionPrice,
   savePromotionPayment,
