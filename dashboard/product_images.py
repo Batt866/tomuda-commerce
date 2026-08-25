@@ -21,10 +21,13 @@ DATA_URL_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 MAX_IMAGE_BYTES = 300_000
+FETCH_MAX_BYTES = 8_000_000
+FULL_MAX_EDGE = 1200
 THUMB_MAX_EDGE = 160
 THUMB_JPEG_QUALITY = 72
 THUMB_SUFFIX = "_t"
-OPENFOODFACTS_FIELDS = "image_url"
+IMAGE_EXTS = ("jpg", "jpeg", "png", "webp", "gif")
+OPENFOODFACTS_FIELDS = "image_url,image_front_url,image_front_small_url"
 IMAGE_MIME_TO_EXT = {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
@@ -60,13 +63,99 @@ def decode_data_url(data_url: str) -> tuple[bytes, str]:
     if not match:
         raise ValueError("Зурагны формат буруу байна")
     raw = base64.b64decode(match.group("data"), validate=True)
-    if len(raw) > MAX_IMAGE_BYTES:
-        raise ValueError("Зураг хэт том байна")
     if len(raw) < 32:
         raise ValueError("Зураг хоосон байна")
     fmt = match.group("fmt").lower()
     ext = "jpg" if fmt in {"jpg", "jpeg"} else fmt
-    return raw, ext
+    return prepare_product_image_bytes(raw, ext)
+
+
+def compress_product_image_bytes(raw: bytes) -> tuple[bytes, str] | None:
+    if not raw or len(raw) < 32:
+        return None
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            img = img.convert("RGB")
+            edge = FULL_MAX_EDGE
+            quality = 82
+            data = b""
+            while edge >= 320:
+                work = img.copy()
+                work.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+                q = quality
+                while q >= 40:
+                    out = io.BytesIO()
+                    work.save(out, format="JPEG", quality=q, optimize=True)
+                    data = out.getvalue()
+                    if 32 <= len(data) <= MAX_IMAGE_BYTES:
+                        return data, "jpg"
+                    q -= 8
+                edge = int(edge * 0.75)
+            if 32 <= len(data) <= MAX_IMAGE_BYTES:
+                return data, "jpg"
+    except Exception:
+        return None
+    return None
+
+
+def prepare_product_image_bytes(raw: bytes, ext: str) -> tuple[bytes, str]:
+    clean_ext = str(ext or "").lower()
+    if clean_ext not in IMAGE_EXT_TO_MIME:
+        raise ValueError("Зурагны формат буруу байна")
+    if len(raw) < 32:
+        raise ValueError("Зураг хоосон байна")
+    if len(raw) <= MAX_IMAGE_BYTES:
+        final_ext = "jpg" if clean_ext in {"jpg", "jpeg"} else clean_ext
+        return raw, final_ext
+    compressed = compress_product_image_bytes(raw)
+    if compressed:
+        return compressed
+    raise ValueError("Зураг хэт том байна")
+
+
+def iter_product_image_files(directory: Path, product_id: str, *, thumb: bool = False):
+    pid = str(product_id or "").strip().lower()
+    if not pid:
+        return
+    try:
+        entries = list(directory.iterdir())
+    except OSError:
+        return
+    for path in entries:
+        if not path.is_file():
+            continue
+        stem, dot, ext = path.name.rpartition(".")
+        if not dot:
+            continue
+        ext_l = ext.lower()
+        if ext_l not in IMAGE_EXT_TO_MIME:
+            continue
+        stem_l = stem.lower()
+        is_thumb = stem_l.endswith(THUMB_SUFFIX)
+        if thumb:
+            if is_thumb and stem_l[: -len(THUMB_SUFFIX)] == pid:
+                yield path, ext_l
+        elif not is_thumb and stem_l == pid:
+            yield path, ext_l
+
+
+def find_product_media_file(product_id: str, *, thumb: bool = False) -> tuple[Path | None, str]:
+    try:
+        pid = safe_product_id(product_id)
+        directory = product_image_dir()
+    except (OSError, ValueError):
+        return None, ""
+    for path, ext in iter_product_image_files(directory, pid, thumb=thumb):
+        try:
+            if path.stat().st_size > 32:
+                return path, ext
+        except OSError:
+            continue
+    return None, ""
 
 
 def make_product_thumb_bytes(raw: bytes) -> bytes | None:
@@ -135,18 +224,12 @@ def write_product_thumb_file(product_id: str, raw: bytes) -> Path | None:
 
 def load_product_image_bytes(product_id: str) -> bytes | None:
     pid = safe_product_id(product_id)
-    try:
-        directory = product_image_dir()
-    except OSError:
-        directory = None
-    if directory:
-        for ext in ("jpg", "jpeg", "png", "webp", "gif"):
-            path = directory / f"{pid}.{ext}"
-            try:
-                if path.is_file() and path.stat().st_size > 32:
-                    return path.read_bytes()
-            except OSError:
-                continue
+    path, _ext = find_product_media_file(pid, thumb=False)
+    if path is not None:
+        try:
+            return path.read_bytes()
+        except OSError:
+            pass
     image = get_stored_product_image(pid)
     if image and image.image and len(image.image) > 32:
         return bytes(image.image)
@@ -186,14 +269,7 @@ def product_thumb_url(product_id: str, version: int | None = None) -> str:
 
 def save_product_image_bytes(product_id: str, raw: bytes, ext: str) -> str:
     pid = safe_product_id(product_id)
-    clean_ext = str(ext or "").lower()
-    if clean_ext not in {"jpg", "jpeg", "png", "webp", "gif"}:
-        raise ValueError("Зурагны формат буруу байна")
-    if len(raw) > MAX_IMAGE_BYTES:
-        raise ValueError("Зураг хэт том байна")
-    if len(raw) < 32:
-        raise ValueError("Зураг хоосон байна")
-    final_ext = "jpg" if clean_ext in {"jpg", "jpeg"} else clean_ext
+    raw, final_ext = prepare_product_image_bytes(raw, ext)
     content_type = IMAGE_EXT_TO_MIME[final_ext]
 
     image, _ = ProductImage.objects.update_or_create(
@@ -232,32 +308,62 @@ def save_product_image(product_id: str, data_url: str) -> str:
     return save_product_image_bytes(product_id, raw, ext)
 
 
-def fetch_image_bytes(url: str, *, timeout: int = 20) -> tuple[bytes, str]:
+def ext_from_image_url(url: str) -> str:
+    path = urlparse(str(url or "")).path.lower()
+    for ext in IMAGE_EXTS:
+        if path.endswith(f".{ext}"):
+            return "jpg" if ext == "jpeg" else ext
+    return ""
+
+
+def candidate_image_urls(url: str) -> list[str]:
     source = str(url or "").strip()
-    if not source.startswith(("http://", "https://")):
+    if source.startswith("//"):
+        source = f"https:{source}"
+    urls: list[str] = []
+    if source.startswith("http://"):
+        urls.append("https://" + source[len("http://") :])
+        urls.append(source)
+    elif source.startswith("https://"):
+        urls.append(source)
+    return urls
+
+
+def fetch_image_bytes(url: str, *, timeout: int = 20) -> tuple[bytes, str]:
+    sources = candidate_image_urls(url)
+    if not sources:
         raise ValueError("Зурагны холбоос буруу байна")
-    req = Request(
-        source,
-        headers={
-            "Accept": "image/webp,image/jpeg,image/png,image/gif,*/*;q=0.8",
-            "User-Agent": "tomuda-image-sync/1.0",
-        },
-    )
-    try:
-        with urlopen(req, timeout=max(1, int(timeout or 20))) as response:
-            content_type = str(response.headers.get("Content-Type") or "")
-            mime = content_type.split(";", 1)[0].strip().lower()
-            ext = IMAGE_MIME_TO_EXT.get(mime, "")
-            if not ext:
-                raise ValueError("Зурагны формат буруу байна")
-            raw = response.read(MAX_IMAGE_BYTES + 1)
-    except (HTTPError, TimeoutError, URLError):
-        raise ValueError("Зураг татаж чадсангүй")
-    if len(raw) > MAX_IMAGE_BYTES:
-        raise ValueError("Зураг хэт том байна")
-    if len(raw) < 32:
-        raise ValueError("Зураг хоосон байна")
-    return raw, ext
+    last_error = "Зураг татаж чадсангүй"
+    for source in sources:
+        req = Request(
+            source,
+            headers={
+                "Accept": "image/webp,image/jpeg,image/png,image/gif,*/*;q=0.8",
+                "User-Agent": "tomuda-image-sync/1.0",
+            },
+        )
+        try:
+            with urlopen(req, timeout=max(1, int(timeout or 20))) as response:
+                content_type = str(response.headers.get("Content-Type") or "")
+                mime = content_type.split(";", 1)[0].strip().lower()
+                ext = IMAGE_MIME_TO_EXT.get(mime, "") or ext_from_image_url(
+                    str(response.url or source)
+                )
+                raw = response.read(FETCH_MAX_BYTES + 1)
+        except (HTTPError, TimeoutError, URLError, ValueError):
+            last_error = "Зураг татаж чадсангүй"
+            continue
+        if not ext:
+            last_error = "Зурагны формат буруу байна"
+            continue
+        if len(raw) > FETCH_MAX_BYTES:
+            last_error = "Зураг хэт том байна"
+            continue
+        if len(raw) < 32:
+            last_error = "Зураг хоосон байна"
+            continue
+        return prepare_product_image_bytes(raw, ext)
+    raise ValueError(last_error)
 
 
 def mirror_product_image(
@@ -288,8 +394,13 @@ def lookup_openfoodfacts_image(barcode: str, *, timeout: int = 20) -> str:
     except (HTTPError, TimeoutError, URLError, json.JSONDecodeError):
         return ""
     product = payload.get("product") if isinstance(payload, dict) else {}
-    image_url = str((product or {}).get("image_url") or "").strip()
-    return image_url if image_url.startswith(("http://", "https://")) else ""
+    for key in ("image_front_small_url", "image_url", "image_front_url"):
+        image_url = str((product or {}).get(key) or "").strip()
+        if image_url.startswith("//"):
+            image_url = f"https:{image_url}"
+        if image_url.startswith(("http://", "https://")):
+            return image_url
+    return ""
 
 
 def update_product_image_in_state(state: dict, product_id: str, url: str) -> bool:
@@ -305,20 +416,14 @@ def find_stored_product_image_url(product_id: str) -> str:
         pid = safe_product_id(product_id)
     except ValueError:
         return ""
-    try:
-        directory = product_image_dir()
-    except OSError:
-        directory = None
-    if directory:
-        for ext in ("jpg", "jpeg", "png", "webp", "gif"):
-            path = directory / f"{pid}.{ext}"
-            try:
-                if path.is_file() and path.stat().st_size > 32:
-                    version = int(path.stat().st_mtime)
-                    backfill_product_image_from_file(pid, path, ext)
-                    return product_image_url(pid, ext, version)
-            except OSError:
-                continue
+    path, ext = find_product_media_file(pid, thumb=False)
+    if path is not None:
+        try:
+            version = int(path.stat().st_mtime)
+            backfill_product_image_from_file(pid, path, ext)
+            return product_image_url(pid, ext, version)
+        except OSError:
+            pass
     image = ProductImage.objects.filter(product_id=pid).first()
     if image and image.image and len(image.image) > 32:
         version = int(image.updated_at.timestamp()) if image.updated_at else int(time.time())
@@ -337,7 +442,12 @@ def backfill_product_image_from_file(product_id: str, path: Path, ext: str) -> N
         raw = path.read_bytes()
     except OSError:
         return
-    if len(raw) < 32 or len(raw) > MAX_IMAGE_BYTES:
+    if len(raw) < 32:
+        return
+    try:
+        raw, clean_ext = prepare_product_image_bytes(raw, clean_ext)
+        content_type = IMAGE_EXT_TO_MIME[clean_ext]
+    except ValueError:
         return
     ProductImage.objects.update_or_create(
         product_id=product_id,

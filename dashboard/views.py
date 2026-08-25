@@ -11,6 +11,7 @@ from dashboard.product_images import (
     IMAGE_EXT_TO_MIME,
     THUMB_SUFFIX,
     ensure_product_thumb_bytes,
+    find_product_media_file,
     get_stored_product_image,
     safe_product_id,
 )
@@ -70,6 +71,26 @@ def entity_media(request, folder: str, filename: str):
             return response
     except OSError:
         pass
+
+    if folder == "products":
+        is_thumb = stem.endswith(THUMB_SUFFIX)
+        base_id = stem[: -len(THUMB_SUFFIX)] if is_thumb else stem
+        try:
+            alt_path, alt_ext = find_product_media_file(base_id, thumb=is_thumb)
+        except ValueError:
+            alt_path, alt_ext = None, ""
+        if alt_path is not None:
+            try:
+                response = FileResponse(
+                    alt_path.open("rb"),
+                    content_type=IMAGE_EXT_TO_MIME.get(
+                        alt_ext, IMAGE_EXT_TO_MIME[ext]
+                    ),
+                )
+                response["Cache-Control"] = "public, max-age=31536000, immutable"
+                return response
+            except OSError:
+                pass
 
     # List UIs request /media/products/{id}_t.jpg — build on demand from full image.
     if folder == "products" and stem.endswith(THUMB_SUFFIX):

@@ -116,7 +116,7 @@ server {
         expires 1y;
         add_header Cache-Control "public, immutable";
         access_log off;
-        try_files \$uri @tomuda_app;
+        error_page 404 = @tomuda_app;
     }
 
     location @tomuda_app {

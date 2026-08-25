@@ -3785,7 +3785,7 @@ function currentPageTitle(nav) {
 }
 const PRODUCT_IMAGE_FALLBACK =
   "/static/tomuda/icons/icon-192.png?v=20260630-logo";
-const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+const PRODUCT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif"];
 const brokenProductImageUrls = new Set();
 function productImagePlaceholder(p = {}) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="160" height="160" rx="18" fill="${p.category === "Ундаа" ? "#dff5fb" : p.category === "Чихэр" ? "#fff0d8" : p.category === "Excel бүртгэл" ? "#eaf3e6" : "#eef2f5"}"/><circle cx="118" cy="34" r="24" fill="#16899a" opacity=".18"/><rect x="42" y="28" width="76" height="92" rx="14" fill="#fff" stroke="#16899a" stroke-width="4"/><rect x="55" y="45" width="50" height="28" rx="6" fill="#16899a" opacity=".85"/><text x="80" y="91" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#182032">${esc((p.name || "Бараа").slice(0, 12))}</text><text x="80" y="110" text-anchor="middle" font-family="Arial" font-size="11" fill="#687386">${esc(p.category || "")}</text></svg>`)}`;
@@ -4072,22 +4072,31 @@ function isLocalProductImage(url) {
   const raw = String(url || "").trim();
   return !!productMediaPathFromUrl(raw) || raw.startsWith("data:image/");
 }
+function upgradeInsecureImageUrl(url) {
+  const raw = String(url || "").trim();
+  if (raw.startsWith("//")) return `${window.location.protocol}${raw}`;
+  if (raw.startsWith("http://")) return `https://${raw.slice(7)}`;
+  return raw;
+}
 function productImageFallbackList(p = {}, { thumb = false } = {}) {
   const list = [];
   const id = String(p?.id || "").trim();
   const stored = storedProductImage(p);
   const version = productImageVersion(stored);
 
-  if (thumb && id) {
-    PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
-      pushUniqueProductImage(list, productImageMediaUrl(`${id}_t`, ext, version));
-    });
-  }
   pushUniqueProductImage(list, stored);
+  if (/^https?:\/\//i.test(stored) || stored.startsWith("//")) {
+    pushUniqueProductImage(list, upgradeInsecureImageUrl(stored));
+  }
 
   if (id) {
     PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
       pushUniqueProductImage(list, productImageMediaUrl(id, ext, version));
+    });
+  }
+  if (thumb && id) {
+    PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
+      pushUniqueProductImage(list, productImageMediaUrl(`${id}_t`, ext, version));
     });
   }
   list.push(productImagePlaceholder(p));
@@ -4133,34 +4142,50 @@ function applyProductImageFallback(img, product) {
   const thumb = img?.dataset?.productImgThumb === "1";
   const candidates = productImageFallbackList(product, { thumb });
   if (!candidates.length) return;
-  let index = Number(img.dataset.imgFallbackIdx || "0");
   const current = String(img.getAttribute("src") || "");
-  if (!img.dataset.imgFallbackIdx) {
-    const found = candidates.findIndex((url) => url === current);
-    index = found >= 0 ? found : 0;
-  }
+  const currentKey = productImageUrlKey(current);
+  let index = candidates.findIndex((url) => productImageUrlKey(url) === currentKey);
+  if (index < 0) index = 0;
   img.onerror = () => {
     const failed = productImageUrlKey(img.currentSrc || img.src);
     if (failed) brokenProductImageUrls.add(failed);
-    index += 1;
-    if (index < candidates.length) {
-      img.dataset.imgFallbackIdx = String(index);
-      img.src = candidates[index];
+    const nextList = productImageFallbackList(product, { thumb });
+    const key = productImageUrlKey(img.getAttribute("src") || "");
+    let next = nextList.findIndex((url) => productImageUrlKey(url) === key);
+    if (next < 0) next = 0;
+    next += 1;
+    while (
+      next < nextList.length &&
+      brokenProductImageUrls.has(productImageUrlKey(nextList[next])) &&
+      !String(nextList[next] || "").startsWith("data:image/svg")
+    ) {
+      next += 1;
+    }
+    if (next < nextList.length) {
+      img.dataset.imgFallbackIdx = String(next);
+      img.src = nextList[next];
     } else {
       img.onerror = null;
     }
   };
   img.dataset.imgFallbackReady = "1";
-  if (
+  const failedNow =
     !current ||
     current === PRODUCT_IMAGE_FALLBACK ||
-    brokenProductImageUrls.has(productImageUrlKey(current)) ||
+    brokenProductImageUrls.has(currentKey) ||
     current.startsWith("data:image/svg") ||
-    (img.complete && img.naturalWidth === 0)
-  ) {
-    index = 0;
-    img.dataset.imgFallbackIdx = "0";
-    img.src = candidates[0];
+    (img.complete && img.naturalWidth === 0);
+  if (failedNow) {
+    let start = candidates.findIndex((url) => {
+      const key = productImageUrlKey(url);
+      if (String(url || "").startsWith("data:image/svg")) return true;
+      return !brokenProductImageUrls.has(key);
+    });
+    if (start < 0) start = candidates.length - 1;
+    img.dataset.imgFallbackIdx = String(start);
+    if (candidates[start] && candidates[start] !== current) {
+      img.src = candidates[start];
+    }
   }
 }
 function bindProductImages(root = document) {
@@ -25667,7 +25692,17 @@ function initProductImageFallback() {
       const candidates = productImageFallbackList(findProductForImage(img), {
         thumb,
       });
-      const next = Number(img.dataset.imgFallbackIdx || "0") + 1;
+      const key = productImageUrlKey(img.getAttribute("src") || "");
+      let next = candidates.findIndex((url) => productImageUrlKey(url) === key);
+      if (next < 0) next = 0;
+      next += 1;
+      while (
+        next < candidates.length &&
+        brokenProductImageUrls.has(productImageUrlKey(candidates[next])) &&
+        !String(candidates[next] || "").startsWith("data:image/svg")
+      ) {
+        next += 1;
+      }
       if (next < candidates.length) {
         img.dataset.imgFallbackIdx = String(next);
         img.src = candidates[next];
@@ -27229,7 +27264,7 @@ async function fillProductFromBarcode(code) {
   if (status) status.textContent = "Баркодоор мэдээлэл хайж байна...";
   try {
     const res = await fetch(
-      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_en,generic_name,brands,categories,categories_tags,countries,countries_tags,image_url,quantity`,
+      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_en,generic_name,brands,categories,categories_tags,countries,countries_tags,image_url,image_front_url,image_front_small_url,quantity`,
       { headers: { Accept: "application/json" } },
     );
     if (lookupId !== productBarcodeLookupId) return;
@@ -27257,7 +27292,11 @@ async function fillProductFromBarcode(code) {
       }
       form.elements[key].value = value;
     });
-    const image = product.image_url || "",
+    const image =
+        product.image_front_small_url ||
+        product.image_url ||
+        product.image_front_url ||
+        "",
       imageValue = document.getElementById("productImageValue"),
       imagePreview = document.getElementById("productImagePreview");
     if (imageValue && image) imageValue.value = image;

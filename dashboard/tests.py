@@ -63,6 +63,40 @@ class ProductImageStorageTests(TestCase):
                 self.assertGreater(len(rebuilt_body), 32)
                 self.assertTrue(thumb_file.is_file())
 
+    def test_oversized_jpeg_is_compressed_instead_of_rejected(self):
+        import os
+
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                buf = io.BytesIO()
+                Image.frombytes(
+                    "RGB", (1200, 1200), os.urandom(1200 * 1200 * 3)
+                ).save(buf, format="JPEG", quality=95)
+                raw = buf.getvalue()
+                self.assertGreater(len(raw), 300_000)
+                url = save_product_image_bytes("big-prod", raw, "jpg")
+                self.assertIn("/media/products/big-prod.jpg", url)
+                stored = ProductImage.objects.get(product_id="big-prod")
+                self.assertLessEqual(len(stored.image), 300_000)
+                self.assertGreater(len(stored.image), 32)
+
+    def test_serves_png_when_jpg_url_is_requested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                raw = b"png-bytes-for-ext-mismatch" * 3
+                save_product_image_bytes("ext-prod", raw, "png")
+                response = self.client.get("/media/products/ext-prod.jpg")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], "image/png")
+                body = (
+                    b"".join(response.streaming_content)
+                    if hasattr(response, "streaming_content")
+                    else response.content
+                )
+                self.assertEqual(body, raw)
+
     def test_product_image_serves_from_db_when_media_file_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
