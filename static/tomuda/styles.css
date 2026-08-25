@@ -9545,11 +9545,16 @@ textarea::placeholder {
 }
 
 .promo-rule-card__lane .promo-qty-chips {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
-.promo-rule-card__lane .promo-rule-card__amount + .promo-qty-chips {
+.promo-rule-card__lane .promo-qty-chips + .promo-rule-card__amount {
   margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-primary, #16899a) 10%, #fff);
+  color: var(--hex-primary, #16899a);
+  text-align: center;
 }
 
 .promo-rule-card__amount--solo {

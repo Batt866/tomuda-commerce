@@ -22103,10 +22103,21 @@ function quantityPromoBuyMode(rule) {
 }
 function quantityPromoCombinedThreshold(rule) {
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  const buyIds = promotionBuyProductIds(rule);
+  const buyMode = quantityPromoBuyMode(rule);
   const map = quantityPromoBuyQtyMap(rule);
   const vals = Object.values(map).filter((q) => q >= 1);
-  const fromMap = vals.length ? Math.max(...vals) : 0;
-  return Math.max(buyQty, fromMap);
+  const fromMapMax = vals.length ? Math.max(...vals) : 0;
+  const fromMapSum = vals.reduce((s, q) => s + q, 0);
+  if (
+    (buyMode === "each" || buyMode === "any") &&
+    buyIds.length > 1 &&
+    vals.length &&
+    vals.every((q) => q === vals[0])
+  ) {
+    return fromMapSum || Math.max(buyQty, fromMapMax);
+  }
+  return Math.max(buyQty, fromMapMax);
 }
 function quantityPromoSets(rule, qtyByProduct) {
   const buyIds = promotionBuyProductIds(rule);
@@ -22899,30 +22910,17 @@ function promotionQtyRuleCard(r, i) {
     buyProducts = buyIds
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
-    buyMode = quantityPromoBuyMode(r),
-    buyQty = Math.floor(Number(r.buyQty) || 0),
-    formula =
-      quantityPromoExampleLine(r, 1) ||
-      promotionQtyRuleText(r).replace(" (хуучин дүрэм)", ""),
-    qtyById =
-      buyMode === "each" || buyMode === "any"
-        ? Object.fromEntries(
-            buyIds.map((id) => [id, quantityPromoBuyQtyForProduct(r, id)]),
-          )
-        : null,
+    thresholdQty = quantityPromoCombinedThreshold(r),
+    formula = `${thresholdQty} ш захиалгад ${Math.floor(Number(r.freeQty) || 1)} ш урамшуулал`,
     threshold =
-      buyMode === "total" && buyQty > 0
-        ? promoRuleAmountHtml(`Нийт ${buyQty} ш`)
-        : buyMode === "any"
-          ? promoRuleAmountHtml("Аль нэг бараа")
-          : buyMode === "each"
-            ? promoRuleAmountHtml("Бараа бүрт")
-            : "";
+      thresholdQty > 0
+        ? promoRuleAmountHtml(`Нийлбэр босго · ${thresholdQty} ш`)
+        : "";
   return promoApprovedRuleCard({
     kind: "quantity",
     index: i,
     formula,
-    conditionHtml: `${threshold}${promoRuleProductsHtml(buyProducts, qtyById)}`,
+    conditionHtml: `${promoRuleProductsHtml(buyProducts)}${threshold}`,
     rewardHtml: promoRuleRewardHtml(r),
   });
 }
