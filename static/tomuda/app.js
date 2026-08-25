@@ -22032,23 +22032,20 @@ function promotionProductLabels(ids) {
 function quantityPromoBuyQtyMap(rule) {
   const buyIds = promotionBuyProductIds(rule);
   const fallback = Math.floor(Number(rule?.buyQty) || 0);
-  if (rule?.buyQtyByProduct && typeof rule.buyQtyByProduct === "object") {
-    const map = {};
-    buyIds.forEach((id) => {
-      const q = Math.floor(Number(rule.buyQtyByProduct[id]) || 0);
-      map[id] = q >= 1 ? q : fallback >= 1 ? fallback : 0;
-    });
-    return map;
-  }
+  const raw = rule?.buyQtyByProduct && typeof rule.buyQtyByProduct === "object"
+    ? rule.buyQtyByProduct
+    : {};
   const map = {};
   buyIds.forEach((id) => {
-    map[id] = fallback;
+    const key = Object.keys(raw).find((k) => String(k) === String(id));
+    const q = Math.floor(Number(key != null ? raw[key] : raw[id]) || 0);
+    map[String(id)] = q >= 1 ? q : fallback >= 1 ? fallback : 0;
   });
   return map;
 }
 function quantityPromoBuyQtyForProduct(rule, productId) {
   const map = quantityPromoBuyQtyMap(rule);
-  const q = Math.floor(Number(map[productId]) || 0);
+  const q = Math.floor(Number(promoMixQtyOf(map, productId)) || 0);
   if (q >= 1) return q;
   return Math.floor(Number(rule?.buyQty) || 0);
 }
@@ -22116,21 +22113,6 @@ function quantityPromoSets(rule, qtyByProduct) {
   if (!buyIds.length) return 0;
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
   const haveOf = (id) => promoMixQtyOf(counts, id);
-  const buyMode = quantityPromoBuyMode(rule);
-  if (buyMode === "each") {
-    const thresholds = buyIds.map((id) =>
-      quantityPromoBuyQtyForProduct(rule, id),
-    );
-    if (thresholds.some((q) => q < 1)) return 0;
-    return Math.min(
-      ...buyIds.map((id) => {
-        const th = quantityPromoBuyQtyForProduct(rule, id);
-        return Math.floor(haveOf(id) / th);
-      }),
-    );
-  }
-  // total + any: сонгосон бараанаас аль нь ч байсан нийлбэр босгонд хүрвэл олгоно
-  // (нэг бараанаас 5, эсвэл 2+2+1 гэх мэт хольж 5).
   const buyQty = quantityPromoCombinedThreshold(rule);
   if (buyQty < 1) return 0;
   const combinedQty = buyIds.reduce((sum, id) => sum + haveOf(id), 0);
@@ -22217,7 +22199,7 @@ function workerQtyByProduct() {
   const qtyByProduct = {};
   state.products.forEach((p) => {
     const q = getWorkerQty(p.id);
-    if (q > 0) qtyByProduct[p.id] = q;
+    if (q > 0) qtyByProduct[String(p.id)] = q;
   });
   return qtyByProduct;
 }
@@ -22229,23 +22211,9 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   const buyUnit = quantityPromoBuyUnit(rule);
   const buyQtyMap = quantityPromoBuyQtyMap(rule);
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
-  const qtyOf = (id) => Number(counts[String(id)]) || 0;
-  const buyQty =
-    buyMode === "each" || buyMode === "any"
-      ? Math.min(
-          ...buyIds
-            .map((id) => quantityPromoBuyQtyForProduct(rule, id))
-            .filter((q) => q >= 1),
-          Infinity,
-        ) || Math.floor(Number(rule.buyQty) || 0)
-      : Math.floor(Number(rule.buyQty) || 0);
-  if (!buyIds.length || !freeIds.length || freeQty < 1) return null;
-  if (buyMode === "each" || buyMode === "any") {
-    if (buyIds.some((id) => quantityPromoBuyQtyForProduct(rule, id) < 1))
-      return null;
-  } else if (buyQty < 1) {
-    return null;
-  }
+  const qtyOf = (id) => promoMixQtyOf(counts, id);
+  const buyQty = quantityPromoCombinedThreshold(rule);
+  if (!buyIds.length || !freeIds.length || freeQty < 1 || buyQty < 1) return null;
   const combinedQty = buyIds.reduce((sum, id) => sum + qtyOf(id), 0);
   const sets = quantityPromoSets(rule, qtyByProduct);
   const grantedFree = sets * freeQty;
@@ -22253,19 +22221,13 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
     (id) => qtyOf(id) >= quantityPromoBuyQtyForProduct(rule, id),
   ).length;
   const missingTypes = Math.max(0, buyIds.length - readyTypes);
-  let needForNext = 0;
-  if (buyMode === "each") {
-    needForNext = missingTypes > 0 ? missingTypes : buyQty;
-  } else {
-    const th = quantityPromoCombinedThreshold(rule) || buyQty;
-    const remainder = th > 0 ? combinedQty % th : 0;
-    needForNext =
-      remainder === 0
-        ? combinedQty > 0
-          ? th
-          : th - combinedQty
-        : th - remainder;
-  }
+  const remainder = buyQty > 0 ? combinedQty % buyQty : 0;
+  const needForNext =
+    remainder === 0
+      ? combinedQty > 0
+        ? buyQty
+        : buyQty
+      : buyQty - remainder;
   return {
     rule,
     buyIds,
@@ -22297,42 +22259,7 @@ function quantityPromoProgressMeter(prog, qtyByProduct) {
     short: true,
   });
   const counts = quantityPromoNormalizeQtyMap(prog?.rule, qtyByProduct);
-  const qtyOf = (id) => Number(counts[String(id)]) || 0;
-  if (prog.buyMode === "each") {
-    const goal = Math.max(1, buyIds.length);
-    const current = Math.min(goal, Math.max(0, Number(prog.readyTypes) || 0));
-    return {
-      current,
-      goal,
-      pct: Math.min(100, Math.round((current / goal) * 100)),
-      unit: "төрөл",
-    };
-  }
-  if (prog.buyMode === "any") {
-    let bestCur = 0;
-    let bestGoal = buyQty;
-    let bestRatio = -1;
-    buyIds.forEach((id) => {
-      const th = quantityPromoBuyQtyForProduct(prog.rule, id);
-      if (th < 1) return;
-      const have = qtyOf(id);
-      const cur = have <= 0 ? 0 : have % th === 0 ? th : have % th;
-      const ratio = cur / th;
-      if (ratio > bestRatio) {
-        bestRatio = ratio;
-        bestCur = cur;
-        bestGoal = th;
-      }
-    });
-    const goal = Math.max(1, bestGoal);
-    const current = Math.min(goal, bestCur);
-    return {
-      current,
-      goal,
-      pct: Math.min(100, Math.round((current / goal) * 100)),
-      unit: unitLabel,
-    };
-  }
+  const qtyOf = (id) => promoMixQtyOf(counts, id);
   const combined = Math.max(0, Math.floor(Number(prog.combinedQty) || 0));
   const rem = buyQty > 0 ? combined % buyQty : 0;
   const current =
@@ -22355,15 +22282,15 @@ function quantityPromoOfferText(prog) {
     if (prog.buyUnit === "large") {
       return `Том хайрцагнаас нийт ${prog.buyQty} авбал ${freeNames} ${freeQty} ш урамшуулал.`;
     }
-    return `Дурын төрлөөс ${prog.buyQty} ${unit} сонгоод ${freeNames} ${freeQty} ш урамшуулал аваарай!`;
+    return `Дурын төрлөөс нийт ${prog.buyQty} ${unit} (хольж эсвэл нэг бараанаас) захиалахад ${freeNames} ${freeQty} ш урамшуулал.`;
   }
   if (prog.buyMode === "each") {
-    return `Сонгосон бүх бараа тус бүртээ босгонд хүрвэл ${freeNames} ${freeQty} ш урамшуулал.`;
+    return `Дурын төрлөөс нийт ${prog.buyQty} ${unit} (хольж эсвэл нэг бараанаас) захиалахад ${freeNames} ${freeQty} ш урамшуулал.`;
   }
   if (prog.buyUnit === "large") {
     return `Том хайрцагнаас босгонд хүрвэл ${freeNames} ${freeQty} ш урамшуулал.`;
   }
-  return `Сонгосон бараанаас аль нэг нь босгонд хүрвэл ${freeNames} ${freeQty} ш урамшуулал.`;
+  return `Дурын төрлөөс нийт ${prog.buyQty} ${unit} (хольж эсвэл нэг бараанаас) захиалахад ${freeNames} ${freeQty} ш урамшуулал.`;
 }
 function quantityPromoDisplayTitle(prog) {
   const freeNames = promotionProductLabels(prog.freeIds);
@@ -23457,19 +23384,13 @@ function appendPromoFreeLines(result, freeIds, freeQty, extra = {}) {
     .filter(Boolean);
   if (!ids.length) return result;
   // Multiple freeProductIds are alternatives in one pool — grant total freeQty once.
-  const targets =
-    ids.length === 1
-      ? ids
-      : [ids.find((id) => !!findProductByIdLoose(id))].filter(Boolean);
+  const targets = ids.filter((id) => !!findProductByIdLoose(id));
   let remaining = grantWanted;
   for (const freeId of targets) {
     if (remaining < 1) break;
     const product = findProductByIdLoose(freeId);
     if (!product) continue;
-    const addQty = Math.min(
-      remaining,
-      productStockLeftAfterLines(product.id, result),
-    );
+    const addQty = remaining;
     if (addQty < 1) continue;
     remaining -= addQty;
     const existing = result.find(
