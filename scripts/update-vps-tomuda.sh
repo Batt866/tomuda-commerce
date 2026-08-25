@@ -44,6 +44,7 @@ fi
 pip install -q -r requirements.txt
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
+python manage.py sync_product_images --timeout 8 || true
 systemctl restart "$SERVICE"
 
 echo ""
@@ -56,3 +57,4 @@ grep -oE 'app\.js\?v=[^" ]+|styles\.css\?v=[^" ]+' templates/dashboard.html | he
 echo ""
 echo "✓ Update дууслаа. Утсан дээр hard refresh / апп дахин нээнэ үү."
 echo "  https://tomudagroup.mn"
+echo "  Nginx /media/ 404-ийг апп руу өгөх: error_page 404 = @tomuda_app;"

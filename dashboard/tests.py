@@ -5,6 +5,7 @@ import json
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
@@ -130,12 +131,73 @@ class ProductImageStorageTests(TestCase):
                     ]
                 }
 
-                next_state, changed = hydrate_product_images(state)
+                next_state, changed = hydrate_product_images(state, remirror=False)
 
                 self.assertFalse(changed)
                 self.assertEqual(
                     next_state["products"][0]["image"],
                     "/media/products/missing-prod.jpg?v=1",
+                )
+
+    def test_hydrate_remirrors_remote_url_when_local_image_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                state = {
+                    "products": [
+                        {
+                            "id": "septona",
+                            "barcode": "5201410013542",
+                            "name": "Septona",
+                            "image": "https://images.example/septona.jpg",
+                        }
+                    ]
+                }
+                with patch(
+                    "dashboard.product_images.mirror_product_image",
+                    return_value="/media/products/septona.jpg?v=9",
+                ) as mirror:
+                    next_state, changed = hydrate_product_images(state)
+
+                self.assertTrue(changed)
+                mirror.assert_called_once()
+                self.assertEqual(
+                    next_state["products"][0]["image"],
+                    "/media/products/septona.jpg?v=9",
+                )
+
+    def test_remirror_uses_barcode_when_media_file_missing(self):
+        from dashboard.product_images import remirror_missing_product_images
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=Path(tmp), MEDIA_URL="/media/"):
+                state = {
+                    "products": [
+                        {
+                            "id": "septona",
+                            "barcode": "5201410013542",
+                            "name": "Septona",
+                            "image": "/media/products/septona.jpg?v=1",
+                        }
+                    ]
+                }
+                with (
+                    patch(
+                        "dashboard.product_images.lookup_openfoodfacts_image",
+                        return_value="https://images.example/septona.jpg",
+                    ) as lookup,
+                    patch(
+                        "dashboard.product_images.mirror_product_image",
+                        return_value="/media/products/septona.jpg?v=9",
+                    ) as mirror,
+                ):
+                    next_state, report = remirror_missing_product_images(state)
+
+                self.assertEqual(report["mirrored"], 1)
+                lookup.assert_called_once()
+                mirror.assert_called_once()
+                self.assertEqual(
+                    next_state["products"][0]["image"],
+                    "/media/products/septona.jpg?v=9",
                 )
 
     def test_existing_media_file_is_backfilled_to_db(self):

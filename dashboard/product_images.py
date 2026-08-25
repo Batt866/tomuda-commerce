@@ -548,7 +548,93 @@ def persist_imported_product_images(
     }
 
 
-def hydrate_product_images(state: dict) -> tuple[dict, bool]:
+def remote_product_image_source(
+    product: dict, *, timeout: int = 8, allow_barcode: bool = True
+) -> str:
+    image_url = str((product or {}).get("image") or "").strip()
+    if image_url.startswith("//"):
+        image_url = f"https:{image_url}"
+    if product_media_path_from_url(image_url):
+        image_url = ""
+    if image_url.startswith("http://"):
+        image_url = "https://" + image_url[len("http://") :]
+    if image_url.startswith("https://"):
+        return image_url
+    if not allow_barcode:
+        return ""
+    return lookup_openfoodfacts_image(
+        (product or {}).get("barcode"),
+        timeout=timeout,
+    )
+
+
+def remirror_missing_product_images(
+    state: dict,
+    *,
+    timeout: int = 8,
+    limit: int = 0,
+    force: bool = False,
+    allow_barcode: bool = True,
+) -> tuple[dict, dict]:
+    mirrored = 0
+    skipped_existing = 0
+    skipped_no_source = 0
+    errors = 0
+    attempts = 0
+    mirrored_ids: list[str] = []
+
+    for product in state.get("products") or []:
+        if not isinstance(product, dict):
+            continue
+        pid = str(product.get("id") or "").strip()
+        if not pid:
+            skipped_no_source += 1
+            continue
+
+        existing_local = find_stored_product_image_url(pid)
+        if existing_local and not force:
+            if str(product.get("image") or "").strip() != existing_local:
+                product["image"] = existing_local
+            skipped_existing += 1
+            continue
+
+        if limit and attempts >= limit:
+            break
+        attempts += 1
+
+        image_url = remote_product_image_source(
+            product, timeout=timeout, allow_barcode=allow_barcode
+        )
+        if not image_url:
+            skipped_no_source += 1
+            continue
+        try:
+            local_url = mirror_product_image(pid, image_url, timeout=timeout)
+        except Exception:
+            errors += 1
+            continue
+        if str(product.get("image") or "").strip() != local_url:
+            product["image"] = local_url
+        mirrored += 1
+        mirrored_ids.append(pid)
+
+    return state, {
+        "processed": skipped_existing + attempts,
+        "mirrored": mirrored,
+        "mirroredIds": mirrored_ids,
+        "skippedExisting": skipped_existing,
+        "skippedNoSource": skipped_no_source,
+        "errors": errors,
+    }
+
+
+def hydrate_product_images(
+    state: dict,
+    *,
+    remirror: bool = True,
+    remirror_limit: int = 8,
+    remirror_timeout: int = 6,
+) -> tuple[dict, bool]:
     changed = False
     for product in state.get("products") or []:
         if not isinstance(product, dict):
@@ -576,4 +662,23 @@ def hydrate_product_images(state: dict) -> tuple[dict, bool]:
             str(settings.MEDIA_URL)
         ):
             continue
+    if remirror:
+        before = [
+            str(p.get("image") or "")
+            for p in (state.get("products") or [])
+            if isinstance(p, dict)
+        ]
+        state, report = remirror_missing_product_images(
+            state,
+            timeout=max(1, int(remirror_timeout or 6)),
+            limit=max(0, int(remirror_limit or 0)),
+            allow_barcode=False,
+        )
+        after = [
+            str(p.get("image") or "")
+            for p in (state.get("products") or [])
+            if isinstance(p, dict)
+        ]
+        if report.get("mirrored") or before != after:
+            changed = True
     return state, changed
