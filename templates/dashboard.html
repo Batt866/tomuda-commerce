@@ -274,12 +274,12 @@
     </style>
     <link
       rel="preload"
-      href="{% static 'tomuda/styles.css' %}?v=20260820-promo-search"
+      href="{% static 'tomuda/styles.css' %}?v=20260825-promo-dropdown"
       as="style"
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260820-promo-search"
+      href="{% static 'tomuda/app.js' %}?v=20260825-promo-dropdown"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -317,7 +317,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260820-promo-search"
+      href="{% static 'tomuda/styles.css' %}?v=20260825-promo-dropdown"
     />
   </head>
   <body>
@@ -449,7 +449,7 @@
       };
       window.__loadTomudaApp = function () {
         var sources = [
-          "{% static 'tomuda/app.js' %}?v=20260820-promo-search",
+          "{% static 'tomuda/app.js' %}?v=20260825-promo-dropdown",
           "{% static 'tomuda/app.js' %}?v=" + Date.now(),
           "{% static 'tomuda/app.js' %}",
         ];
@@ -510,7 +510,7 @@
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
-    <script src="{% static 'tomuda/permissions.js' %}?v=20260820-promo-search"></script>
+    <script src="{% static 'tomuda/permissions.js' %}?v=20260825-promo-dropdown"></script>
     <script src="{% static 'tomuda/capacitor-geolocation.js' %}?v=20260705-promo-labels"></script>
     <script>
       __loadTomudaApp();
