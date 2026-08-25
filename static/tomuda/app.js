@@ -22104,20 +22104,19 @@ function quantityPromoBuyMode(rule) {
   }
   return "total";
 }
+function quantityPromoCombinedThreshold(rule) {
+  const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  if (buyQty >= 1) return buyQty;
+  const map = quantityPromoBuyQtyMap(rule);
+  const vals = Object.values(map).filter((q) => q >= 1);
+  return vals.length ? Math.min(...vals) : 0;
+}
 function quantityPromoSets(rule, qtyByProduct) {
   const buyIds = promotionBuyProductIds(rule);
   if (!buyIds.length) return 0;
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
   const haveOf = (id) => promoMixQtyOf(counts, id);
   const buyMode = quantityPromoBuyMode(rule);
-  if (buyMode === "any") {
-    // Сонгосон бараа бүр бие даан тоологдоно — аль нэг нь босгонд хүрвэл олгоно.
-    return buyIds.reduce((sum, id) => {
-      const th = quantityPromoBuyQtyForProduct(rule, id);
-      if (th < 1) return sum;
-      return sum + Math.floor(haveOf(id) / th);
-    }, 0);
-  }
   if (buyMode === "each") {
     const thresholds = buyIds.map((id) =>
       quantityPromoBuyQtyForProduct(rule, id),
@@ -22130,7 +22129,9 @@ function quantityPromoSets(rule, qtyByProduct) {
       }),
     );
   }
-  const buyQty = Math.floor(Number(rule.buyQty) || 0);
+  // total + any: сонгосон бараанаас аль нь ч байсан нийлбэр босгонд хүрвэл олгоно
+  // (нэг бараанаас 5, эсвэл 2+2+1 гэх мэт хольж 5).
+  const buyQty = quantityPromoCombinedThreshold(rule);
   if (buyQty < 1) return 0;
   const combinedQty = buyIds.reduce((sum, id) => sum + haveOf(id), 0);
   return Math.floor(combinedQty / buyQty);
@@ -22253,28 +22254,17 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   ).length;
   const missingTypes = Math.max(0, buyIds.length - readyTypes);
   let needForNext = 0;
-  if (buyMode === "any") {
-    // Хамгийн ойрын дараагийн багц хүртэлх дутуу тоо.
-    let bestNeed = Infinity;
-    buyIds.forEach((id) => {
-      const th = quantityPromoBuyQtyForProduct(rule, id);
-      if (th < 1) return;
-      const have = qtyOf(id);
-      const rem = have % th;
-      const need = rem === 0 ? (have > 0 ? th : th) : th - rem;
-      if (need < bestNeed) bestNeed = need;
-    });
-    needForNext = Number.isFinite(bestNeed) ? bestNeed : buyQty;
-  } else if (buyMode === "each") {
+  if (buyMode === "each") {
     needForNext = missingTypes > 0 ? missingTypes : buyQty;
   } else {
-    const remainder = combinedQty % buyQty;
+    const th = quantityPromoCombinedThreshold(rule) || buyQty;
+    const remainder = th > 0 ? combinedQty % th : 0;
     needForNext =
       remainder === 0
         ? combinedQty > 0
-          ? buyQty
-          : buyQty - combinedQty
-        : buyQty - remainder;
+          ? th
+          : th - combinedQty
+        : th - remainder;
   }
   return {
     rule,
@@ -23346,9 +23336,9 @@ function savePromotionQty(e) {
       return;
     }
     const draft = state.promoFormDraft || {};
-    const buyModeRaw = String(f.get("buyMode") || state.promoQtyBuyMode || "any");
+    const buyModeRaw = String(f.get("buyMode") || state.promoQtyBuyMode || "total");
     const buyMode =
-      buyModeRaw === "each" || buyModeRaw === "total" ? buyModeRaw : "any";
+      buyModeRaw === "each" || buyModeRaw === "any" ? buyModeRaw : "total";
     const buyUnit = "piece";
     const buyQtyByProduct = {};
     let buyQtyNum = 0;
@@ -23589,8 +23579,9 @@ function applyQuantityPromotions(lines) {
   const qtyByProduct = {};
   result.forEach((line) => {
     if (line.isPromoFree) return;
-    qtyByProduct[line.productId] =
-      (qtyByProduct[line.productId] || 0) + (Number(line.quantity) || 0);
+    const id = String(line.productId || "");
+    if (!id) return;
+    qtyByProduct[id] = (qtyByProduct[id] || 0) + (Number(line.quantity) || 0);
   });
   (state.promotionRules.quantity || []).forEach((rule) => {
     const prog = quantityPromoRuleProgress(rule, qtyByProduct);
