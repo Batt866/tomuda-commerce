@@ -36,6 +36,10 @@ const state = {
     promotionDetail: "",
     salesReportTab: "products",
     reportCustomerId: "",
+    reportCategory: "all",
+    reportProductId: "",
+    reportOrderStatus: "all",
+    salesReportShowAll: { products: false, employees: false, customers: false },
   },
   promotionRules: { quantity: [], price: [], payment: [] },
   workerCustomer: "",
@@ -13485,48 +13489,49 @@ function salesReportExportMeta(orders) {
   const emp =
     salesOrderAgents().find((e) => e.id === state.filters.reportEmployeeId)
       ?.name || "Бүгд";
-  const total = orders.reduce((s, o) => s + orderAmount(o), 0);
-  const receivable = orders
-    .filter((o) => !orderIsPaid(o))
-    .reduce((s, o) => s + orderAmount(o), 0);
+  const kpi = salesReportKpiFromOrders(orders);
   return {
     emp,
     period: reportPeriodHint(),
-    total,
-    receivable,
+    total: kpi.sales,
+    cost: kpi.cost,
+    profit: kpi.profit,
+    margin: kpi.margin,
+    receivable: kpi.receivable,
+    orderCount: kpi.orderCount,
   };
 }
 function salesInfoPaymentStatus(o) {
   return orderIsPaid(o) ? "Тооцоо дууссан" : "Төлбөрийн үлдэгдэлтэй";
 }
 function buildSalesReportExcelRows(orders, customers, meta) {
-  const { emp, period, total, receivable } = meta;
+  const { emp, period, total } = meta;
   const rows = [
     ["Борлуулалтын тайлан", "", "", "", "", "", ""],
     salesReportExcelBlankRow(),
     ["Ажилтан", emp, "", "Хугацаа", period, "", ""],
     salesReportExcelBlankRow(),
-    ["Борлуулалт", "Авлага", "Захиалга", "Харилцагч", "", "", ""],
+    ["Борлуулалт", "Өртөг", "Ашиг", "Маржин", "Захиалга", "Харилцагч", ""],
     [
       fmtExcelMoney(total),
-      fmtExcelMoney(receivable),
+      fmtExcelMoney(meta.cost || 0),
+      fmtExcelMoney(meta.profit || 0),
+      (Number(meta.margin) || 0).toFixed(1) + "%",
       orders.length,
       customers.length,
-      "",
-      "",
       "",
     ],
     salesReportExcelBlankRow(),
     ["ХАРИЛЦАГЧИД", "", "", "", "", "", ""],
-    ["Харилцагч", "Захиалга", "Борлуулалт", "Авлага", "", "", ""],
+    ["Харилцагч", "Захиалга", "Борлуулалт", "Өртөг", "Ашиг", "Маржин", "Авлага"],
     ...customers.map((c) => [
       c.customerName,
       c.orderCount,
       fmtExcelMoney(c.sales),
+      fmtExcelMoney(c.cost || 0),
+      fmtExcelMoney(c.profit || 0),
+      (Number(c.margin) || 0).toFixed(1) + "%",
       c.receivable ? fmtExcelMoney(c.receivable) : "Авлагагүй",
-      "",
-      "",
-      "",
     ]),
     salesReportExcelBlankRow(),
     ["ЗАХИАЛГУУД", "", "", "", "", "", ""],
@@ -13588,26 +13593,28 @@ function buildSalesInfoExcelRows(orders, meta) {
 }
 const SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS = [30, 16, 12, 18, 18, 18, 14];
 function buildSalesReportProductExcelRows(orders, meta) {
-  const { emp, period, total, receivable } = meta;
+  const { emp, period } = meta;
   const products = salesReportProductRows(orders);
   const totalQty = products.reduce((s, r) => s + r.qty, 0);
-  const totalSales = products.reduce((s, r) => s + r.sales, 0);
-  const totalProfit = products.reduce((s, r) => s + r.profit, 0);
-  const totalMargin = totalSales
-    ? ((totalProfit / totalSales) * 100).toFixed(1) + "%"
-    : "0%";
+  const kpiSales = Number(meta.total) || 0;
+  const kpiCost = Number(meta.cost) || 0;
+  const kpiProfit = Number(meta.profit) || 0;
+  const kpiMargin =
+    Number.isFinite(Number(meta.margin))
+      ? Number(meta.margin).toFixed(1) + "%"
+      : "0%";
   return [
     ["Борлуулалтын тайлан (Бараагаар)", "", "", "", "", "", ""],
     salesReportExcelBlankRow(),
     ["Ажилтан", emp, "", "Хугацаа", period, "", ""],
     salesReportExcelBlankRow(),
-    ["Нийт борлуулалт", "Нийт ашиг", "Ашгийн хувь", "Нийт тоо", "", "", ""],
+    ["Нийт борлуулалт", "Нийт өртөг", "Нийт ашиг", "Маржин", "Нийт тоо", "", ""],
     [
-      fmtExcelMoney(totalSales),
-      fmtExcelMoney(totalProfit),
-      totalMargin,
+      fmtExcelMoney(kpiSales),
+      fmtExcelMoney(kpiCost),
+      fmtExcelMoney(kpiProfit),
+      kpiMargin,
       totalQty,
-      "",
       "",
       "",
     ],
@@ -13639,27 +13646,45 @@ function confirmReportExport() {
     const orders = salesReportFilteredWithCustomer();
     const meta = salesReportExportMeta(orders);
     const stamp = reportExcelStamp();
-    const tab = state.filters.salesReportTab || "products";
-    if (tab === "products") {
-      excel(
-        `Борлуулалт-бараагаар-${stamp}.xlsx`,
-        buildSalesReportProductExcelRows(orders, meta),
-        {
-          sheetName: "Бараагаар",
-          colWidths: SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS,
-        },
-      );
-    } else {
-      const customers = salesReportCustomerRows(orders);
-      excel(
-        `Борлуулалтын-тайлан-${stamp}.xlsx`,
-        buildSalesReportExcelRows(orders, customers, meta),
-        {
-          sheetName: "Борлуулалтын тайлан",
-          colWidths: SALES_REPORT_XLSX_COL_WIDTHS,
-        },
-      );
-    }
+    const employees = salesReportEmployeeRows(orders);
+    const customers = salesReportCustomerRows(orders);
+    const productRows = buildSalesReportProductExcelRows(orders, meta);
+    const empBlock = [
+      salesReportExcelBlankRow(),
+      ["АЖИЛТНУУД", "", "", "", "", "", ""],
+      ["Ажилтан", "Захиалга", "Тоо", "Өртөг", "Борлуулалт", "Ашиг", "Маржин"],
+      ...employees.map((r) => [
+        r.name,
+        r.orderCount,
+        r.qty || 0,
+        fmtExcelMoney(r.cost || 0),
+        fmtExcelMoney(r.sales),
+        fmtExcelMoney(r.profit || 0),
+        (Number(r.margin) || 0).toFixed(1) + "%",
+      ]),
+    ];
+    const customerBlock = [
+      salesReportExcelBlankRow(),
+      ["ХАРИЛЦАГЧИД", "", "", "", "", "", ""],
+      ["Харилцагч", "Захиалга", "Борлуулалт", "Өртөг", "Ашиг", "Маржин", "Авлага"],
+      ...customers.map((c) => [
+        c.customerName,
+        c.orderCount,
+        fmtExcelMoney(c.sales),
+        fmtExcelMoney(c.cost || 0),
+        fmtExcelMoney(c.profit || 0),
+        (Number(c.margin) || 0).toFixed(1) + "%",
+        c.receivable ? fmtExcelMoney(c.receivable) : "Авлагагүй",
+      ]),
+    ];
+    excel(`Борлуулалтын-тайлан-${stamp}.xlsx`, [
+      ...productRows,
+      ...empBlock,
+      ...customerBlock,
+    ], {
+      sheetName: "Борлуулалтын тайлан",
+      colWidths: SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS,
+    });
   });
 }
 function confirmSalesInfoExport() {
@@ -20427,16 +20452,31 @@ function setInventoryCategory(cat) {
   render();
   scrollAppMainToTop();
 }
-function reportOrdersFiltered() {
-  let list = retainedOrders(state.orders).filter(
-    (o) => o.status !== "cancelled",
-  );
+function reportOrdersFiltered(periodOverride = null) {
+  const statusFilter = String(state.filters.reportOrderStatus || "all").trim();
+  let list = retainedOrders(state.orders);
+  if (statusFilter === "cancelled") {
+    list = list.filter((o) => o.status === "cancelled");
+  } else {
+    list = list.filter((o) => o.status !== "cancelled");
+    if (statusFilter && statusFilter !== "all") {
+      list = list.filter((o) => String(o.status || "") === statusFilter);
+    }
+  }
   const empId = String(state.filters.reportEmployeeId || "").trim();
   if (empId) {
     list = list.filter((o) => String(o.employeeId || "") === empId);
   }
-  const year = String(state.filters.reportYear || "").trim();
-  const monthRaw = String(state.filters.reportMonth || "").trim();
+  const year = String(
+    periodOverride?.year !== undefined
+      ? periodOverride.year
+      : state.filters.reportYear || "",
+  ).trim();
+  const monthRaw = String(
+    periodOverride?.month !== undefined
+      ? periodOverride.month
+      : state.filters.reportMonth || "",
+  ).trim();
   const month = monthRaw ? monthRaw.padStart(2, "0") : "";
   if (year || month) {
     list = list.filter((o) => {
@@ -20469,6 +20509,31 @@ function reportPeriodHint() {
   if (year && !month) return `${year} оны бүх сар`;
   if (!year && month) return `${Number(month)}-р сар (бүх жил)`;
   return `${year} оны ${Number(month)}-р сар`;
+}
+function previousReportPeriod() {
+  const year = String(state.filters.reportYear || "").trim();
+  const month = String(state.filters.reportMonth || "").trim();
+  if (!year) return null;
+  if (month) {
+    let y = Number(year);
+    let m = Number(month) - 1;
+    if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+    return { year: String(y), month: String(m) };
+  }
+  const y = Number(year);
+  if (!Number.isFinite(y)) return null;
+  return { year: String(y - 1), month: "" };
+}
+function salesReportDeltaPct(curr, prev) {
+  const a = Number(curr) || 0;
+  const b = Number(prev);
+  if (!Number.isFinite(b)) return null;
+  if (b === 0) return a === 0 ? 0 : 100;
+  return ((a - b) / Math.abs(b)) * 100;
 }
 function reportDateFiltersHtml(exportOnclick = "confirmReportExport()") {
   const empId = String(state.filters.reportEmployeeId || "").trim();
@@ -20525,6 +20590,15 @@ function clearReportDate() {
   state.filters.reportMonth = "";
   state.filters.reportEmployeeId = "";
   state.filters.reportCustomerId = "";
+  state.filters.reportCategory = "all";
+  state.filters.reportProductId = "";
+  state.filters.reportOrderStatus = "all";
+  state.searches.reports = "";
+  state.filters.salesReportShowAll = {
+    products: false,
+    employees: false,
+    customers: false,
+  };
   render();
 }
 function setReportDate(day) {
@@ -20532,7 +20606,75 @@ function setReportDate(day) {
     state.filters.reportDate = day || "";
   });
 }
+function salesReportProductForItem(it) {
+  const pid = String(it?.productId || "").trim();
+  if (!pid) return null;
+  return state.products.find((x) => String(x.id) === pid) || null;
+}
+function salesReportItemQty(it) {
+  return Number(it?.quantity) || 0;
+}
+function salesReportItemSales(it) {
+  const q = salesReportItemQty(it);
+  return Number(it?.total) || q * (Number(it?.price) || 0);
+}
+function salesReportItemUnitCost(it, p) {
+  if (it && Object.prototype.hasOwnProperty.call(it, "costPrice")) {
+    const line = Number(it.costPrice);
+    if (Number.isFinite(line)) return line;
+  }
+  return productCostPrice(p);
+}
+function salesReportItemUnitPrice(it, p) {
+  const q = salesReportItemQty(it);
+  const sales = salesReportItemSales(it);
+  if (q > 0 && sales) return sales / q;
+  return Number(it?.price) || Number(p?.price) || 0;
+}
+function salesReportHasLineFilters() {
+  const cat = String(state.filters.reportCategory || "all");
+  const pid = String(state.filters.reportProductId || "").trim();
+  return (cat && cat !== "all") || !!pid;
+}
+function salesReportItemMatchesFilters(it, p) {
+  const cat = String(state.filters.reportCategory || "all");
+  const pid = String(state.filters.reportProductId || "").trim();
+  if (pid && String(it?.productId || "") !== pid) return false;
+  if (cat && cat !== "all") {
+    const itemCat = String(p?.category || it?.category || "").trim();
+    if (itemCat !== cat) return false;
+  }
+  return true;
+}
+function salesReportOrderMatchesLineFilters(o) {
+  if (!salesReportHasLineFilters()) return true;
+  return (o.items || []).some((it) =>
+    salesReportItemMatchesFilters(it, salesReportProductForItem(it)),
+  );
+}
+function salesReportAddItemTotals(row, it, p) {
+  if (!salesReportItemMatchesFilters(it, p)) return;
+  const q = salesReportItemQty(it);
+  const sales = salesReportItemSales(it);
+  const cost = q * salesReportItemUnitCost(it, p);
+  row.qty = (row.qty || 0) + q;
+  row.cost = (row.cost || 0) + cost;
+  row.itemSales = (row.itemSales || 0) + sales;
+}
+function salesReportFinishMoneyRow(row, lineFilter) {
+  const sales = lineFilter ? Number(row.itemSales) || 0 : Number(row.sales) || 0;
+  const cost = Number(row.cost) || 0;
+  const profit = sales - cost;
+  return {
+    ...row,
+    sales,
+    cost,
+    profit,
+    margin: sales ? (profit / sales) * 100 : 0,
+  };
+}
 function salesReportCustomerRows(orders) {
+  const lineFilter = salesReportHasLineFilters();
   const map = new Map();
   for (const o of orders) {
     const key = String(o.customerId || orderCustomerName(o) || "unknown");
@@ -20544,24 +20686,32 @@ function salesReportCustomerRows(orders) {
         customerName: orderCustomerName(o) || "-",
         orderCount: 0,
         sales: 0,
+        itemSales: 0,
+        cost: 0,
+        qty: 0,
         receivable: 0,
         employeeNames: new Set(),
       };
       map.set(key, row);
     }
-    const amt = orderAmount(o);
     row.orderCount += 1;
-    row.sales += amt;
-    if (!orderIsPaid(o)) row.receivable += amt;
+    if (!lineFilter) row.sales += orderAmount(o);
+    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderAmount(o);
     if (o.employeeName) row.employeeNames.add(String(o.employeeName));
+    for (const it of o.items || []) {
+      salesReportAddItemTotals(row, it, salesReportProductForItem(it));
+    }
   }
-  return [...map.values()].sort(
-    (a, b) =>
-      b.sales - a.sales ||
-      String(a.customerName).localeCompare(String(b.customerName), "mn"),
-  );
+  return [...map.values()]
+    .map((row) => salesReportFinishMoneyRow(row, lineFilter))
+    .sort(
+      (a, b) =>
+        b.sales - a.sales ||
+        String(a.customerName).localeCompare(String(b.customerName), "mn"),
+    );
 }
 function salesReportEmployeeRows(orders) {
+  const lineFilter = salesReportHasLineFilters();
   const map = new Map();
   for (const o of orders) {
     const id = String(o.employeeId || "_none");
@@ -20571,17 +20721,23 @@ function salesReportEmployeeRows(orders) {
       row = {
         employeeId: id === "_none" ? "" : id,
         name: emp?.name || o.employeeName || "-",
+        image: emp?.image || "",
         orderCount: 0,
         sales: 0,
+        itemSales: 0,
+        cost: 0,
+        qty: 0,
         receivable: 0,
         customers: new Map(),
       };
       map.set(id, row);
     }
-    const amt = orderAmount(o);
     row.orderCount += 1;
-    row.sales += amt;
-    if (!orderIsPaid(o)) row.receivable += amt;
+    if (!lineFilter) row.sales += orderAmount(o);
+    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderAmount(o);
+    for (const it of o.items || []) {
+      salesReportAddItemTotals(row, it, salesReportProductForItem(it));
+    }
     const cKey = String(o.customerId || orderCustomerName(o) || "unknown");
     let cust = row.customers.get(cKey);
     if (!cust) {
@@ -20589,22 +20745,30 @@ function salesReportEmployeeRows(orders) {
         customerName: orderCustomerName(o) || "-",
         orderCount: 0,
         sales: 0,
+        itemSales: 0,
+        cost: 0,
+        qty: 0,
         receivable: 0,
       };
       row.customers.set(cKey, cust);
     }
     cust.orderCount += 1;
-    cust.sales += amt;
-    if (!orderIsPaid(o)) cust.receivable += amt;
+    if (!lineFilter) cust.sales += orderAmount(o);
+    if (!orderIsPaid(o) && !lineFilter) cust.receivable += orderAmount(o);
+    for (const it of o.items || []) {
+      salesReportAddItemTotals(cust, it, salesReportProductForItem(it));
+    }
   }
   return [...map.values()]
     .map((row) => ({
-      ...row,
-      customers: [...row.customers.values()].sort(
-        (a, b) =>
-          b.sales - a.sales ||
-          String(a.customerName).localeCompare(String(b.customerName), "mn"),
-      ),
+      ...salesReportFinishMoneyRow(row, lineFilter),
+      customers: [...row.customers.values()]
+        .map((c) => salesReportFinishMoneyRow(c, lineFilter))
+        .sort(
+          (a, b) =>
+            b.sales - a.sales ||
+            String(a.customerName).localeCompare(String(b.customerName), "mn"),
+        ),
     }))
     .sort(
       (a, b) =>
@@ -20633,8 +20797,15 @@ function salesReportFiltersHtml(exportOnclick = "confirmReportExport()") {
   const year = String(state.filters.reportYear || "").trim();
   const month = String(state.filters.reportMonth || "").trim();
   const q = state.searches.reports || "";
+  const cat = String(state.filters.reportCategory || "all");
+  const productId = String(state.filters.reportProductId || "").trim();
+  const orderStatus = String(state.filters.reportOrderStatus || "all");
   const agents = salesOrderAgents();
   const years = reportFilterYears();
+  const field = (label, inner) =>
+    `<label class="sales-report-filters__field"><span class="sales-report-filters__label">${esc(label)}</span>${inner}</label>`;
+  const sel = (aria, onchange, opts) =>
+    `<select onchange="${onchange}"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="${esc(aria)}">${opts}</select>`;
   const empOpts = [
     `<option value="" ${!empId ? "selected" : ""}>Бүгд</option>`,
     ...agents.map(
@@ -20673,12 +20844,52 @@ function salesReportFiltersHtml(exportOnclick = "confirmReportExport()") {
         `<option value="${esc(id)}" ${custId === id ? "selected" : ""}>${esc(name)}</option>`,
     ),
   ].join("");
-  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Хайх..." })}<div class="sales-report-filters sales-report-filters--compact"><label class="sales-report-filters__field"><span class="sales-report-filters__label">Ажилтан</span><select onchange="setReportEmployee(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Ажилтан">${empOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Харилцагч</span><select onchange="setReportCustomer(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Харилцагч">${custOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Жил</span><select onchange="setReportYear(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Жил">${yearOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Сар</span><select onchange="setReportMonth(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Сар">${monthOpts}</select></label></div>`;
-  return pageToolbarHtml({
-    filters,
-    actions: excelDownloadBtn(exportOnclick, { shortLabel: "Татах" }),
-    extraClass: "page-toolbar--sales-report",
-  });
+  const catOpts = [
+    `<option value="all" ${cat === "all" ? "selected" : ""}>Бүгд</option>`,
+    ...cats().map(
+      (c) =>
+        `<option value="${esc(c)}" ${cat === c ? "selected" : ""}>${esc(c)}</option>`,
+    ),
+  ].join("");
+  const productList = (state.products || [])
+    .filter((p) => p && p.id)
+    .filter((p) => cat === "all" || String(p.category || "") === cat)
+    .sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+    );
+  const productOpts = [
+    `<option value="" ${!productId ? "selected" : ""}>Бүгд</option>`,
+    ...productList.map(
+      (p) =>
+        `<option value="${esc(p.id)}" ${productId === String(p.id) ? "selected" : ""}>${esc(p.name || "-")}</option>`,
+    ),
+  ].join("");
+  const statusOpts = [
+    `<option value="all" ${orderStatus === "all" ? "selected" : ""}>Бүгд</option>`,
+    ...["pending", "confirmed", "delivered", "cancelled"].map(
+      (s) =>
+        `<option value="${s}" ${orderStatus === s ? "selected" : ""}>${status(s)}</option>`,
+    ),
+  ].join("");
+  const fields = [
+    field("Хугацаа · жил", sel("Жил", "setReportYear(this.value)", yearOpts)),
+    field("Сар", sel("Сар", "setReportMonth(this.value)", monthOpts)),
+    field("Ажилтан", sel("Ажилтан", "setReportEmployee(this.value)", empOpts)),
+    field(
+      "Барааны төрөл",
+      sel("Барааны төрөл", "setReportCategory(this.value)", catOpts),
+    ),
+    field("Бараа", sel("Бараа", "setReportProductId(this.value)", productOpts)),
+    field(
+      "Харилцагч",
+      sel("Харилцагч", "setReportCustomer(this.value)", custOpts),
+    ),
+    field(
+      "Захиалгын төлөв",
+      sel("Захиалгын төлөв", "setReportOrderStatus(this.value)", statusOpts),
+    ),
+  ].join("");
+  return `<section class="sales-report-dash__filters" aria-label="Шүүлт">${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Хайх..." })}<div class="sales-report-filters sales-report-filters--dash">${fields}</div><div class="sales-report-dash__filter-actions"><button type="button" class="btn btn--secondary btn--sm" onclick="clearReportDate()">Шүүлт цэвэрлэх</button>${excelDownloadBtn(exportOnclick, { shortLabel: "Excel" })}</div></section>`;
 }
 function salesReportEmployeeBlockHtml(row) {
   const customers = row.customers.length
@@ -20686,41 +20897,75 @@ function salesReportEmployeeBlockHtml(row) {
     : `<p class="line-panel__empty">Харилцагч байхгүй</p>`;
   return `<div class="sales-report-emp"><div class="sales-report-emp__head"><div><p class="sales-report-emp__name">${esc(row.name)}</p><p class="line-list__meta">${row.orderCount} захиалга · ${row.customers.length} харилцагч</p></div><div class="sales-report-emp__totals"><b>${fmt(row.sales)}</b><span class="${row.receivable > 0 ? "text-tone-danger" : "text-muted-foreground"}">Авлага ${fmt(row.receivable)}</span></div></div><div class="line-list">${customers}</div></div>`;
 }
-function setSalesReportTab(tab) {
-  state.filters.salesReportTab = tab || "products";
-  render();
-}
 function setReportCustomer(id) {
   state.filters.reportCustomerId = String(id || "").trim();
+  render();
+}
+function setReportCategory(cat) {
+  state.filters.reportCategory = String(cat || "all").trim() || "all";
+  if (state.filters.reportCategory === "all") {
+    /* keep product */
+  } else {
+    const p = (state.products || []).find(
+      (x) => String(x.id) === String(state.filters.reportProductId || ""),
+    );
+    if (p && String(p.category || "") !== state.filters.reportCategory) {
+      state.filters.reportProductId = "";
+    }
+  }
+  render();
+}
+function setReportProductId(id) {
+  state.filters.reportProductId = String(id || "").trim();
+  render();
+}
+function setReportOrderStatus(value) {
+  state.filters.reportOrderStatus = String(value || "all").trim() || "all";
+  render();
+}
+function toggleSalesReportShowAll(kind) {
+  const key =
+    kind === "employees"
+      ? "employees"
+      : kind === "customers"
+        ? "customers"
+        : "products";
+  const current = state.filters.salesReportShowAll || {};
+  state.filters.salesReportShowAll = {
+    ...current,
+    [key]: !current[key],
+  };
   render();
 }
 function salesReportProductRows(orders) {
   const map = new Map();
   for (const o of orders) {
-    const items = o.items || [];
-    for (const it of items) {
-      const pid = String(it.productId || "");
+    for (const it of o.items || []) {
+      const pid = String(it.productId || "").trim();
       if (!pid) continue;
+      const p = salesReportProductForItem(it);
+      if (!salesReportItemMatchesFilters(it, p)) continue;
       let row = map.get(pid);
       if (!row) {
-        const p = state.products.find((x) => String(x.id) === pid);
         row = {
           productId: pid,
+          product: p,
           productName: it.productName || p?.name || "-",
-          category: p?.category || "",
+          category: p?.category || it.category || "",
           qty: 0,
           sales: 0,
           cost: 0,
-          costPrice: productCostPrice(p),
-          salesPrice: p?.price || 0,
+          costPrice: salesReportItemUnitCost(it, p),
+          salesPrice: salesReportItemUnitPrice(it, p),
         };
         map.set(pid, row);
       }
-      const q = Number(it.quantity) || 0;
-      const lineTotal = Number(it.total) || q * (Number(it.price) || 0);
+      const q = salesReportItemQty(it);
+      const lineTotal = salesReportItemSales(it);
       row.qty += q;
       row.sales += lineTotal;
-      row.cost += q * row.costPrice;
+      row.cost += q * salesReportItemUnitCost(it, p);
+      if (q > 0) row.salesPrice = lineTotal / q || row.salesPrice;
     }
   }
   return [...map.values()]
@@ -20739,29 +20984,188 @@ function salesReportProductRowHtml(row) {
   const profitClass =
     row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
   const marginStr = row.margin.toFixed(1) + "%";
-  return `<div class="line-list__row line-list__row--static sales-report-product" role="listitem"><div class="sales-report-product__main"><p class="sales-report-product__name">${esc(row.productName)}</p><p class="sales-report-product__meta">${row.qty} ш · ${row.category ? esc(row.category) : ""}</p></div><div class="sales-report-product__amounts"><b class="sales-report-product__sales">${fmt(row.sales)}</b><span class="sales-report-product__profit ${profitClass}">${fmt(row.profit)} (${marginStr})</span></div></div>`;
+  const p = row.product || { id: row.productId, name: row.productName, category: row.category };
+  const showCost = canViewProductCost();
+  const img = `<img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="sales-report-dash__thumb" width="40" height="40" loading="lazy" decoding="async" alt="">`;
+  return `<tr><td class="sales-report-dash__cell-product">${img}<span>${esc(row.productName)}</span></td><td>${esc(row.category || "-")}</td><td class="num">${row.qty}</td><td class="num">${fmt(row.salesPrice)}</td>${showCost ? `<td class="num">${fmt(row.costPrice)}</td><td class="num">${fmt(row.cost)}</td>` : ""}<td class="num">${fmt(row.sales)}</td>${showCost ? `<td class="num ${profitClass}">${fmt(row.profit)}</td><td class="num ${profitClass}">${marginStr}</td>` : ""}</tr>`;
+}
+function salesReportKpiFromOrders(orders) {
+  const products = salesReportProductRows(orders);
+  const lineFilter = salesReportHasLineFilters();
+  const sales = lineFilter
+    ? products.reduce((s, r) => s + r.sales, 0)
+    : orders.reduce((s, o) => s + orderAmount(o), 0);
+  const cost = products.reduce((s, r) => s + r.cost, 0);
+  const profit = sales - cost;
+  const qty = products.reduce((s, r) => s + r.qty, 0);
+  return {
+    sales,
+    cost,
+    profit,
+    margin: sales ? (profit / sales) * 100 : 0,
+    orderCount: orders.length,
+    qty,
+    receivable: orders
+      .filter((o) => !orderIsPaid(o))
+      .reduce((s, o) => s + orderAmount(o), 0),
+  };
+}
+function salesReportDeltaHtml(pct) {
+  if (pct == null || !Number.isFinite(pct)) return "";
+  const up = pct >= 0;
+  const sign = up ? "+" : "";
+  return `<span class="sales-report-kpi__delta ${up ? "is-up" : "is-down"}">${sign}${pct.toFixed(1)}%</span>`;
+}
+function salesReportDailyPoints(orders) {
+  const map = new Map();
+  const lineFilter = salesReportHasLineFilters();
+  for (const o of orders) {
+    const day = orderCreatedDay(o) || orderTakenDay(o) || "";
+    if (!day) continue;
+    let amt = 0;
+    if (lineFilter) {
+      for (const it of o.items || []) {
+        const p = salesReportProductForItem(it);
+        if (!salesReportItemMatchesFilters(it, p)) continue;
+        amt += salesReportItemSales(it);
+      }
+    } else {
+      amt = orderAmount(o);
+    }
+    map.set(day, (map.get(day) || 0) + amt);
+  }
+  return [...map.entries()]
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+    .map(([day, sales]) => ({ day, sales }));
+}
+function salesReportCategorySlices(products) {
+  const map = new Map();
+  for (const r of products) {
+    const key = String(r.category || "Бусад").trim() || "Бусад";
+    map.set(key, (map.get(key) || 0) + r.sales);
+  }
+  const total = [...map.values()].reduce((s, n) => s + n, 0);
+  return [...map.entries()]
+    .map(([label, sales]) => ({
+      label,
+      sales,
+      pct: total ? (sales / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.sales - a.sales);
+}
+function salesReportLineChartSvg(points) {
+  if (!points.length) {
+    return `<p class="sales-report-dash__empty">График харуулах өгөгдөл алга</p>`;
+  }
+  const w = 400;
+  const h = 180;
+  const pad = { l: 8, r: 8, t: 16, b: 28 };
+  const max = Math.max(...points.map((p) => p.sales), 1);
+  const innerW = w - pad.l - pad.r;
+  const innerH = h - pad.t - pad.b;
+  const xAt = (i) =>
+    pad.l + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+  const yAt = (v) => pad.t + innerH - (v / max) * innerH;
+  const coords = points.map((p, i) => `${xAt(i).toFixed(1)},${yAt(p.sales).toFixed(1)}`);
+  const labels = [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]]
+    .filter(Boolean)
+    .filter((p, i, arr) => arr.findIndex((x) => x.day === p.day) === i);
+  const labelHtml = labels
+    .map((p) => {
+      const i = points.findIndex((x) => x.day === p.day);
+      const x = xAt(Math.max(0, i));
+      const text = String(p.day).slice(5).replace("-", "/");
+      return `<text x="${x.toFixed(1)}" y="${h - 8}" text-anchor="middle" class="sales-report-dash__chart-label">${esc(text)}</text>`;
+    })
+    .join("");
+  return `<svg class="sales-report-dash__svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Өдөр бүрийн борлуулалт"><polyline fill="none" stroke="var(--hex-primary, #16899a)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${coords.join(" ")}"/>${points.map((p, i) => `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(p.sales).toFixed(1)}" r="3" fill="var(--hex-primary, #16899a)"><title>${esc(p.day)}: ${fmt(p.sales)}</title></circle>`).join("")}${labelHtml}</svg>`;
+}
+function salesReportDonutSvg(slices) {
+  if (!slices.length) {
+    return `<p class="sales-report-dash__empty">Төрөл харуулах өгөгдөл алга</p>`;
+  }
+  const colors = ["#16899a", "#4db3c0", "#c5e9ef", "#687386", "#e2b86a", "#182032"];
+  const r = 42;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  const rings = slices
+    .map((s, i) => {
+      const len = (s.pct / 100) * c;
+      const dash = `${len.toFixed(2)} ${(c - len).toFixed(2)}`;
+      const el = `<circle cx="56" cy="56" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="16" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 56 56)"/>`;
+      offset += len;
+      return el;
+    })
+    .join("");
+  const legend = slices
+    .slice(0, 6)
+    .map(
+      (s, i) =>
+        `<li><span class="sales-report-dash__swatch" style="background:${colors[i % colors.length]}"></span><span>${esc(s.label)}</span><b>${s.pct.toFixed(1)}%</b></li>`,
+    )
+    .join("");
+  return `<div class="sales-report-dash__donut"><svg viewBox="0 0 112 112" class="sales-report-dash__donut-svg" aria-hidden="true">${rings}</svg><ul class="sales-report-dash__legend">${legend}</ul></div>`;
+}
+function salesReportTableWrap(title, thead, rows, kind, empty) {
+  const showAll = !!(state.filters.salesReportShowAll || {})[kind];
+  const limit = 8;
+  const visible = showAll ? rows : rows.slice(0, limit);
+  const more =
+    rows.length > limit
+      ? `<button type="button" class="sales-report-dash__more" onclick="toggleSalesReportShowAll('${kind}')">${showAll ? "Хураах" : "Бүгдийг харах"}</button>`
+      : "";
+  return `<section class="sales-report-dash__table-card"><h3 class="sales-report-dash__table-title">${esc(title)} · ${rows.length}</h3><div class="sales-report-dash__table-scroll"><table class="sales-report-dash__table"><thead>${thead}</thead><tbody>${visible.length ? visible.join("") : `<tr><td colspan="12" class="sales-report-dash__empty">${esc(empty)}</td></tr>`}</tbody></table></div>${more}</section>`;
 }
 function salesReportProductsBodyHtml(filtered, q) {
   const products = salesReportProductRows(filtered);
-  const totalQty = products.reduce((s, r) => s + r.qty, 0);
-  const totalSales = products.reduce((s, r) => s + r.sales, 0);
-  const totalProfit = products.reduce((s, r) => s + r.profit, 0);
-  const totalMargin = totalSales
-    ? ((totalProfit / totalSales) * 100).toFixed(1) + "%"
-    : "0%";
-  return `<section class="sales-report-product-summary"><dl class="sales-report-summary__stats"><div class="sales-report-summary__stat"><dt>Нийт тоо</dt><dd>${totalQty} ш</dd></div><div class="sales-report-summary__stat"><dt>Борлуулалт</dt><dd>${fmt(totalSales)}</dd></div><div class="sales-report-summary__stat"><dt>Ашиг</dt><dd class="${totalProfit >= 0 ? "" : "sales-report-summary__value--debt"}">${fmt(totalProfit)} (${totalMargin})</dd></div></dl></section><section class="line-panel sales-report-panel"><h2 class="line-panel__section-title">Бараанууд · ${products.length}</h2><div class="line-list sales-report-list" role="list">${products.length ? products.map((r) => salesReportProductRowHtml(r)).join("") : `<p class="line-panel__empty">${q ? "Олдсонгүй" : "Борлуулалт байхгүй"}</p>`}</div></section>`;
+  const showCost = canViewProductCost();
+  const thead = `<tr><th>Бараа</th><th>Төрөл</th><th class="num">Тоо</th><th class="num">Нэгж үнэ</th>${showCost ? `<th class="num">Нэгж өртөг</th><th class="num">Нийт өртөг</th>` : ""}<th class="num">Борлуулалт</th>${showCost ? `<th class="num">Ашиг</th><th class="num">Маржин</th>` : ""}</tr>`;
+  return salesReportTableWrap(
+    "Борлуулсан барааны тайлан",
+    thead,
+    products.map((r) => salesReportProductRowHtml(r)),
+    "products",
+    q ? "Олдсонгүй" : "Борлуулалт байхгүй",
+  );
 }
 function salesReportCustomersBodyHtml(filtered, q) {
   const customers = salesReportCustomerRows(filtered);
-  return `<section class="line-panel sales-report-panel" aria-labelledby="sales-report-customers-title"><h2 id="sales-report-customers-title" class="line-panel__section-title">Харилцагчид · ${customers.length}</h2><div class="line-list sales-report-list" role="list" aria-label="Харилцагчийн жагсаалт">${customers.length ? customers.map((row) => salesReportCustomerRowHtml(row)).join("") : `<p class="line-panel__empty">${q ? "Олдсонгүй" : "Борлуулалт байхгүй"}</p>`}</div></section>`;
+  const showCost = canViewProductCost();
+  const thead = `<tr><th>№</th><th>Харилцагч</th><th class="num">Захиалга</th><th class="num">Борлуулалт</th>${showCost ? `<th class="num">Өртөг</th><th class="num">Ашиг</th><th class="num">Маржин</th>` : ""}</tr>`;
+  const rows = customers.map((row, i) => {
+    const profitClass =
+      row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
+    return `<tr><td>${i + 1}</td><td>${esc(row.customerName)}</td><td class="num">${row.orderCount}</td><td class="num">${fmt(row.sales)}</td>${showCost ? `<td class="num">${fmt(row.cost)}</td><td class="num ${profitClass}">${fmt(row.profit)}</td><td class="num ${profitClass}">${row.margin.toFixed(1)}%</td>` : ""}</tr>`;
+  });
+  return salesReportTableWrap(
+    "Хамгийн их борлуулалттай харилцагчид",
+    thead,
+    rows,
+    "customers",
+    q ? "Олдсонгүй" : "Борлуулалт байхгүй",
+  );
 }
-function salesReportTabsHtml() {
-  const tab = state.filters.salesReportTab || "products";
-  const tabs = [
-    { id: "products", label: "Бараагаар" },
-    { id: "customers", label: "Харилцагчаар" },
-  ];
-  return `<div class="seg-tabs seg-tabs--sm sales-report-tabs">${tabs.map((t) => `<button type="button" class="seg-tab${tab === t.id ? " is-active" : ""}" onclick="setSalesReportTab('${t.id}')">${t.label}</button>`).join("")}</div>`;
+function salesReportEmployeesBodyHtml(filtered, q) {
+  const employees = salesReportEmployeeRows(filtered);
+  const showCost = canViewProductCost();
+  const thead = `<tr><th>Ажилтан</th><th class="num">Захиалга</th><th class="num">Тоо</th>${showCost ? `<th class="num">Өртөг</th>` : ""}<th class="num">Борлуулалт</th>${showCost ? `<th class="num">Ашиг</th><th class="num">Маржин</th>` : ""}</tr>`;
+  const rows = employees.map((row) => {
+    const profitClass =
+      row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
+    const emp = state.employees.find((e) => String(e.id) === String(row.employeeId));
+    const src = emp ? entityImageSrc(emp.image) : "";
+    const avatar = src
+      ? `<img src="${esc(src)}" alt="" class="sales-report-dash__avatar" width="32" height="32">`
+      : "";
+    return `<tr><td class="sales-report-dash__cell-product">${avatar}<span>${esc(row.name)}</span></td><td class="num">${row.orderCount}</td><td class="num">${row.qty || 0}</td>${showCost ? `<td class="num">${fmt(row.cost)}</td>` : ""}<td class="num">${fmt(row.sales)}</td>${showCost ? `<td class="num ${profitClass}">${fmt(row.profit)}</td><td class="num ${profitClass}">${row.margin.toFixed(1)}%</td>` : ""}</tr>`;
+  });
+  return salesReportTableWrap(
+    "Ажилтан тус бүрийн борлуулалт",
+    thead,
+    rows,
+    "employees",
+    q ? "Олдсонгүй" : "Борлуулалт байхгүй",
+  );
 }
 function salesReportFilteredWithCustomer() {
   let orders = salesReportOrdersFiltered();
@@ -20769,7 +21173,7 @@ function salesReportFilteredWithCustomer() {
   if (custId) {
     orders = orders.filter((o) => String(o.customerId || "") === custId);
   }
-  return orders;
+  return orders.filter((o) => salesReportOrderMatchesLineFilters(o));
 }
 function stockReportKindLabel(kind) {
   if (kind === "sales") return "Борлуулалтын тайлан";
@@ -21169,23 +21573,75 @@ function salesReportDetailView() {
   const q = String(state.searches.reports || "")
     .trim()
     .toLowerCase();
-  const orderCount = filtered.length;
-  const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
-  const receivable = filtered
-    .filter((o) => !orderIsPaid(o))
-    .reduce((s, o) => s + orderAmount(o), 0);
-  const summary = salesReportSummaryHtml({
-    total,
-    receivable,
-    orderCount,
-    periodLabel: reportPeriodHint(),
-  });
-  const tab = state.filters.salesReportTab || "products";
-  const body =
-    tab === "products"
-      ? salesReportProductsBodyHtml(filtered, q)
-      : salesReportCustomersBodyHtml(filtered, q);
-  return `<div class="space-y-4 sales-report-view">${pageHead("Борлуулалтын тайлан")}${salesReportFiltersHtml()}${summary}${salesReportTabsHtml()}${body}</div>`;
+  const kpi = salesReportKpiFromOrders(filtered);
+  const prevPeriod = previousReportPeriod();
+  let prevKpi = null;
+  if (prevPeriod) {
+    const prevOrders = salesReportFilteredWithCustomerPeriod(prevPeriod);
+    prevKpi = salesReportKpiFromOrders(prevOrders);
+  }
+  const showCost = canViewProductCost();
+  const products = salesReportProductRows(filtered);
+  const kpis = [
+    {
+      label: "Нийт борлуулалт",
+      value: fmt(kpi.sales),
+      delta: prevKpi ? salesReportDeltaPct(kpi.sales, prevKpi.sales) : null,
+    },
+    showCost
+      ? {
+          label: "Нийт өртөг",
+          value: fmt(kpi.cost),
+          delta: prevKpi ? salesReportDeltaPct(kpi.cost, prevKpi.cost) : null,
+        }
+      : null,
+    showCost
+      ? {
+          label: "Нийт ашиг",
+          value: fmt(kpi.profit),
+          delta: prevKpi ? salesReportDeltaPct(kpi.profit, prevKpi.profit) : null,
+        }
+      : null,
+    showCost
+      ? {
+          label: "Нийт маржин",
+          value: `${kpi.margin.toFixed(2)}%`,
+          delta: prevKpi
+            ? salesReportDeltaPct(kpi.margin, prevKpi.margin)
+            : null,
+        }
+      : {
+          label: "Захиалга",
+          value: String(kpi.orderCount),
+          delta: null,
+        },
+  ].filter(Boolean);
+  const kpiHtml = `<section class="sales-report-dash__kpis" aria-label="Нэгтгэл">${kpis
+    .map(
+      (k) =>
+        `<article class="sales-report-kpi"><p class="sales-report-kpi__label">${esc(k.label)}</p><p class="sales-report-kpi__value">${k.value}</p>${salesReportDeltaHtml(k.delta)}</article>`,
+    )
+    .join("")}</section>`;
+  const charts = `<section class="sales-report-dash__charts"><article class="sales-report-dash__chart-card"><h3>Өдөр бүрийн борлуулалт</h3>${salesReportLineChartSvg(salesReportDailyPoints(filtered))}</article><article class="sales-report-dash__chart-card"><h3>Барааны төрлөөр борлуулалт</h3>${salesReportDonutSvg(salesReportCategorySlices(products))}</article></section>`;
+  return `<div class="sales-report-dash">${pageHead("Борлуулалтын тайлан")}<p class="sales-report-dash__period">${esc(reportPeriodHint())}</p>${salesReportFiltersHtml()}${kpiHtml}${charts}${salesReportProductsBodyHtml(filtered, q)}${salesReportEmployeesBodyHtml(filtered, q)}${salesReportCustomersBodyHtml(filtered, q)}</div>`;
+}
+function salesReportFilteredWithCustomerPeriod(period) {
+  let orders = reportOrdersFiltered(period);
+  const q = String(state.searches.reports || "")
+    .trim()
+    .toLowerCase();
+  if (q) {
+    orders = orders.filter((o) => {
+      const hay =
+        `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  const custId = String(state.filters.reportCustomerId || "").trim();
+  if (custId) {
+    orders = orders.filter((o) => String(o.customerId || "") === custId);
+  }
+  return orders.filter((o) => salesReportOrderMatchesLineFilters(o));
 }
 function salesInfoDetailView() {
   const filtered = salesReportOrdersFiltered();
@@ -30701,6 +31157,11 @@ Object.assign(window, {
   setReportEmployee,
   setReportYear,
   setReportMonth,
+  setReportCustomer,
+  setReportCategory,
+  setReportProductId,
+  setReportOrderStatus,
+  toggleSalesReportShowAll,
   reportOrdersFiltered,
   openStockReportsHub,
   openStockReport,
