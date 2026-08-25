@@ -90,6 +90,10 @@ PRODUCT_HEADER_ALIASES: dict[str, str] = {
     "барааны нэр": "name",
     "нэр": "name",
     "name": "name",
+    "бүлэг": "group",
+    "group": "group",
+    "төрөл": "category",
+    "category": "category",
     "хэмжих нэгж": "unit",
     "нэгж": "unit",
     "unit": "unit",
@@ -752,6 +756,12 @@ def import_products_into_state(
             existing["name"] = name
             existing["unit"] = unit or "ширхэг"
             existing["price"] = int(price or 0)
+            group = _cell_text(data.get("group"))
+            category = _cell_text(data.get("category"))
+            if group:
+                existing["group"] = group
+            if category:
+                existing["category"] = category
             if cost is not None:
                 existing["costPrice"] = int(cost or 0)
             existing["country"] = country
@@ -771,7 +781,8 @@ def import_products_into_state(
             "id": pid,
             "barcode": barcode,
             "name": name,
-            "category": "Бусад",
+            "group": _cell_text(data.get("group")) or "Бусад",
+            "category": _cell_text(data.get("category")) or "Бусад",
             "unit": unit or "ширхэг",
             "boxQuantity": 1,
             "price": int(price or 0),

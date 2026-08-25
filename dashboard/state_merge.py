@@ -375,6 +375,8 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
                 "promotionRules",
                 "settings",
                 "extraCategories",
+                "extraGroups",
+                "categoryGroups",
                 "countQty",
                 "countOpeningStock",
                 "countSessionStartedAt",
@@ -423,6 +425,26 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
             ]
         )
     )
+    merged["extraGroups"] = list(
+        dict.fromkeys(
+            [
+                *[str(x) for x in _as_list(remote_state.get("extraGroups")) if x],
+                *[str(x) for x in _as_list(local_state.get("extraGroups")) if x],
+            ]
+        )
+    )
+    merged["categoryGroups"] = {
+        **{
+            str(k): str(v)
+            for k, v in _as_dict(remote_state.get("categoryGroups")).items()
+            if k and v
+        },
+        **{
+            str(k): str(v)
+            for k, v in _as_dict(local_state.get("categoryGroups")).items()
+            if k and v
+        },
+    }
 
     remote_count_ms = _count_session_ms(remote_state.get("countSessionStartedAt"))
     local_count_ms = _count_session_ms(local_state.get("countSessionStartedAt"))

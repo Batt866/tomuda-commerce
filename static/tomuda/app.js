@@ -16,12 +16,14 @@ const state = {
   filters: {
     order: "all",
     category: "all",
+    productGroup: "all",
     inventory: "stock",
     inventoryCategory: "all",
     warehouseTab: "orders",
     countCategory: "all",
     worker: "new",
     workerCategory: "",
+    workerGroup: "",
     workerPay: "all",
     workerDate: "",
     warehouseDate: "",
@@ -85,6 +87,8 @@ const state = {
   receiptEditItems: null,
   receiptEditOriginalItems: null,
   extraCategories: [],
+  extraGroups: [],
+  categoryGroups: {},
   inventoryLogs: [],
   deletionLog: [],
   promotionDeletionLog: [],
@@ -280,6 +284,8 @@ const persistKeys = [
   "suppliers",
   "orders",
   "extraCategories",
+  "extraGroups",
+  "categoryGroups",
   "inventoryLogs",
   "stockInReceipts",
   "stockOutReceipts",
@@ -308,6 +314,8 @@ const SYNC_ENTITY_KEYS = [
   "suppliers",
   "orders",
   "extraCategories",
+  "extraGroups",
+  "categoryGroups",
   "inventoryLogs",
   "stockInReceipts",
   "stockOutReceipts",
@@ -328,6 +336,8 @@ const BUSINESS_ENTITY_KEYS = [
   "suppliers",
   "orders",
   "extraCategories",
+  "extraGroups",
+  "categoryGroups",
   "inventoryLogs",
   "stockInReceipts",
   "stockOutReceipts",
@@ -2401,6 +2411,7 @@ function applyImportPayload(kind, payload) {
     if ((report.success || 0) > 0) {
       state.searches.products = "";
       state.filters.category = "all";
+      state.filters.productGroup = "all";
       state.currentView = "products";
     }
     return true;
@@ -2694,6 +2705,86 @@ const cats = () => [
     ...state.extraCategories,
   ]),
 ];
+const OTHER_GROUP = "Бусад";
+const INFERRED_FOOD_TYPES = new Set([
+  "Ундаа",
+  "Энергийн ундаа",
+  "Амттан",
+  "Жигнэмэг",
+  "Хүнс",
+  "Чипс",
+  "Чихэр",
+]);
+function categoryGroupMap() {
+  if (
+    !state.categoryGroups ||
+    typeof state.categoryGroups !== "object" ||
+    Array.isArray(state.categoryGroups)
+  ) {
+    state.categoryGroups = {};
+  }
+  return state.categoryGroups;
+}
+function rememberCategoryGroup(cat, group) {
+  const c = String(cat || "").trim();
+  const g = String(group || "").trim() || OTHER_GROUP;
+  if (!c) return;
+  categoryGroupMap()[c] = g;
+}
+function inferredGroupForType(cat) {
+  const c = String(cat || "").trim();
+  if (!c) return OTHER_GROUP;
+  const mapped = categoryGroupMap()[c];
+  if (mapped) return mapped;
+  if (INFERRED_FOOD_TYPES.has(c)) return "Хүнс";
+  return OTHER_GROUP;
+}
+function productGroupName(p) {
+  const g = String(p?.group || "").trim();
+  if (g) return g;
+  return inferredGroupForType(p?.category);
+}
+function groups() {
+  return [
+    ...new Set([
+      ...(state.extraGroups || []),
+      ...(state.products || []).map(productGroupName),
+      ...Object.values(categoryGroupMap()),
+    ]),
+  ]
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b), "mn"));
+}
+function catsInGroup(group) {
+  const g = String(group || "").trim();
+  if (!g || g === "all") {
+    return cats()
+      .filter(Boolean)
+      .sort((a, b) => String(a).localeCompare(String(b), "mn"));
+  }
+  const names = new Set();
+  for (const p of state.products || []) {
+    if (productGroupName(p) === g && p.category) names.add(p.category);
+  }
+  for (const [cat, mapped] of Object.entries(categoryGroupMap())) {
+    if (mapped === g) names.add(cat);
+  }
+  for (const c of state.extraCategories || []) {
+    if (inferredGroupForType(c) === g) names.add(c);
+  }
+  return [...names]
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b), "mn"));
+}
+function ensureGroupName(name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return "";
+  if (!Array.isArray(state.extraGroups)) state.extraGroups = [];
+  if (!groups().includes(trimmed) && !state.extraGroups.includes(trimmed)) {
+    state.extraGroups.push(trimmed);
+  }
+  return trimmed;
+}
 const role = (r) =>
   ({
     admin: "Админ",
@@ -5246,6 +5337,22 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       ];
       continue;
     }
+    if (key === "extraGroups") {
+      merged.extraGroups = [
+        ...new Set([
+          ...(remote.extraGroups || []),
+          ...(local.extraGroups || []),
+        ]),
+      ];
+      continue;
+    }
+    if (key === "categoryGroups") {
+      merged.categoryGroups = {
+        ...(remote.categoryGroups || {}),
+        ...(local.categoryGroups || {}),
+      };
+      continue;
+    }
     if (key === "inventoryLogs") {
       merged.inventoryLogs = mergeArrayById(
         remote.inventoryLogs,
@@ -5373,6 +5480,15 @@ function applyPersistentState(data) {
     state.workerQtyParts = {};
   if (!Array.isArray(state.stockInReceipts)) state.stockInReceipts = [];
   if (!Array.isArray(state.stockOutReceipts)) state.stockOutReceipts = [];
+  if (!Array.isArray(state.extraCategories)) state.extraCategories = [];
+  if (!Array.isArray(state.extraGroups)) state.extraGroups = [];
+  if (
+    !state.categoryGroups ||
+    typeof state.categoryGroups !== "object" ||
+    Array.isArray(state.categoryGroups)
+  ) {
+    state.categoryGroups = {};
+  }
   if (!Array.isArray(state.suppliers)) state.suppliers = [];
   if (!state.stockOutDraft || typeof state.stockOutDraft !== "object")
     state.stockOutDraft = {};
@@ -5631,6 +5747,17 @@ function pageToolbarSelectHandlers() {
 }
 function setProductCategory(value) {
   state.filters.category = value || "all";
+  render();
+}
+function setProductGroup(value) {
+  state.filters.productGroup = value || "all";
+  const types = catsInGroup(state.filters.productGroup);
+  if (
+    state.filters.category !== "all" &&
+    !types.includes(state.filters.category)
+  ) {
+    state.filters.category = "all";
+  }
   render();
 }
 function setOrderStatusFilter(value) {
@@ -6054,9 +6181,12 @@ function applyRemoteState(payload, opts = {}) {
   const customersChanged = peerCustomersChanged(beforeState, merged);
   const session = captureSessionSnapshot();
   const pickerCategory = state.filters.workerCategory;
+  const pickerGroup = state.filters.workerGroup;
   const reopenPicker = pickerOpen();
   applyPersistentState(merged);
   restoreSessionSnapshot(session);
+  state.filters.workerCategory = pickerCategory;
+  state.filters.workerGroup = pickerGroup;
   ensureEmployeeEmails();
   ensureEmployeePercentDiscount();
   normalizeOrderTakenDays();
@@ -7674,6 +7804,11 @@ function initPickerModalActions() {
     const catBtn = e.target.closest("[data-picker-cat]");
     if (catBtn) {
       setPickerCategory(catBtn.getAttribute("data-picker-cat") || "");
+      return;
+    }
+    const groupBtn = e.target.closest("[data-picker-group]");
+    if (groupBtn) {
+      setPickerGroup(groupBtn.getAttribute("data-picker-group") || "");
       return;
     }
     const clearSearchBtn = e.target.closest("[data-picker-clear-search]");
@@ -12962,24 +13097,35 @@ function confirmProductsExport() {
 }
 function productsExportList() {
   const q = state.searches.products || "",
-    cat = state.filters.category;
+    cat = state.filters.category,
+    group = state.filters.productGroup || "all";
   return state.products
     .filter(
       (p) =>
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
           String(p.barcode || "").includes(q)) &&
+        (group === "all" || productGroupName(p) === group) &&
         (cat === "all" || p.category === cat),
     )
     .sort(
       (a, b) =>
+        String(productGroupName(a)).localeCompare(productGroupName(b), "mn") ||
         String(a.category || "").localeCompare(
           String(b.category || ""),
           "mn",
-        ) || String(a.name || "").localeCompare(String(b.name || ""), "mn"),
+        ) ||
+        String(a.name || "").localeCompare(String(b.name || ""), "mn"),
     );
 }
 function productExcelHeaders() {
-  const headers = ["№", "Баркод", "Барааны нэр", "Төрөл", "Борлуулалтын үнэ"];
+  const headers = [
+    "№",
+    "Баркод",
+    "Барааны нэр",
+    "Бүлэг",
+    "Төрөл",
+    "Борлуулалтын үнэ",
+  ];
   if (canViewProductCost()) headers.push("Өртөг үнэ");
   headers.push("Үлдэгдэл", "Нэгж");
   return headers;
@@ -12990,6 +13136,7 @@ function productExcelDataRows(products = productsExportList()) {
       i + 1,
       p.barcode || "-",
       p.name || "",
+      productGroupName(p),
       p.category || "",
       Number(p.price) || 0,
     ];
@@ -13008,9 +13155,10 @@ function productSheetProductsGrouped(products = productsExportList()) {
   let index = 0;
   for (const p of products) {
     const cat = p.category || "Бусад";
-    if (cat !== cur) {
-      groups.push({ type: "cat", name: cat });
-      cur = cat;
+    const name = `${productGroupName(p)} · ${cat}`;
+    if (name !== cur) {
+      groups.push({ type: "cat", name });
+      cur = name;
     }
     index += 1;
     groups.push({ type: "product", product: p, index });
@@ -13990,14 +14138,16 @@ function focusSavedProduct(productId, productName, opts = {}) {
 function productsView() {
   const q = state.searches.products || "",
     cat = state.filters.category,
+    group = state.filters.productGroup || "all",
+    typeOpts = catsInGroup(group),
     list = state.products.filter(
       (p) =>
         (p.name.toLowerCase().includes(q.toLowerCase()) ||
-          p.barcode.includes(q)) &&
+          String(p.barcode || "").includes(q)) &&
+        (group === "all" || productGroupName(p) === group) &&
         (cat === "all" || p.category === cat),
     ),
-    low = lowStockProducts().length,
-    badBarcode = nonStandardBarcodeProducts().length;
+    low = lowStockProducts().length;
   const highlightId = state.productHighlightId || "";
   if (highlightId) {
     const idx = list.findIndex((p) => String(p.id) === String(highlightId));
@@ -14006,13 +14156,23 @@ function productsView() {
       list.unshift(hit);
     }
   }
-  const toolbarFilters = `${pageToolbarSearch({ focusKey: "products", value: q, placeholder: "Хайх..." })}<select onchange="setProductCategory(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input"><option value="all">Бүх төрөл</option>${cats()
-    .map((c) => `<option ${cat === c ? "selected" : ""}>${c}</option>`)
+  const toolbarFilters = `${pageToolbarSearch({ focusKey: "products", value: q, placeholder: "Хайх..." })}<select onchange="setProductGroup(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Бүлэг"><option value="all" ${group === "all" ? "selected" : ""}>Бүх бүлэг</option>${groups()
+    .map(
+      (g) =>
+        `<option value="${esc(g)}" ${group === g ? "selected" : ""}>${esc(g)}</option>`,
+    )
+    .join(
+      "",
+    )}</select><select onchange="setProductCategory(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Төрөл"><option value="all" ${cat === "all" ? "selected" : ""}>Бүх төрөл</option>${typeOpts
+    .map(
+      (c) =>
+        `<option value="${esc(c)}" ${cat === c ? "selected" : ""}>${esc(c)}</option>`,
+    )
     .join("")}</select>`;
   const toolbarActions = [
     canExportExcel() ? excelDownloadBtn("confirmProductsExport()") : "",
     canManageProductCategories()
-      ? pageToolbarSecondaryBtn("Төрөл", "categoryModal()")
+      ? pageToolbarSecondaryBtn("Бүлэг", "categoryModal()")
       : "",
     canManageProducts()
       ? pageToolbarPrimaryBtn(
@@ -14025,7 +14185,7 @@ function productsView() {
     .filter(Boolean)
     .join("");
   const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${canViewProductCost() ? " product-list--show-cost" : ""}`;
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}${card("Ст.бус", badBarcode, badBarcode ? "text-tone-warning" : "text-tone-success")}`, 4, "equal")}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Бүлэг", groups().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}${card("Төрөл", cats().filter(Boolean).length)}`, 4, "equal")}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = canManageProducts(),
@@ -14065,6 +14225,7 @@ function productDetailHtml(p, id) {
           ? `<span class="product-detail__mono">${esc(p.barcode)}</span>`
           : `<span class="customer-detail__muted">—</span>`,
       ),
+      productDetailRow("Бүлэг", esc(productGroupName(p))),
       productDetailRow("Төрөл", esc(p.category || "—")),
       productDetailRow("Хэмжих нэгж", esc(p.unit || "—")),
       productDetailRow("Борлуулалтын үнэ", esc(fmt(p.price))),
@@ -14110,7 +14271,9 @@ function productDetail(id) {
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
 function productCard(p, active = false) {
-  const catLine = p.category || "—";
+  const catLine = [productGroupName(p), p.category || ""]
+    .filter(Boolean)
+    .join(" · ") || "—";
   const packLabel = productPackLabel(p);
   const packCell = packLabel
     ? `<span class="product-card__pack" title="${esc(packLabel)}">${esc(packLabel)}</span>`
@@ -15768,6 +15931,11 @@ function productTextMatchesQuery(p, raw) {
   const q = String(raw || "").trim();
   if (!q) return false;
   if (searchTextMatches(p.name || "", q) || searchTokensMatch(p.name || "", q))
+    return true;
+  if (
+    searchTextMatches(productGroupName(p), q) ||
+    searchTokensMatch(productGroupName(p), q)
+  )
     return true;
   return productMatchCodes(p).some((c) => barcodesLooselyIncludes(c, q));
 }
@@ -26437,6 +26605,7 @@ function closeModal(opts) {
   const deliveryTrigger = document.getElementById("warehouse-delivery-trigger");
   if (deliveryTrigger) deliveryTrigger.setAttribute("aria-expanded", "false");
   state.filters.workerCategory = "";
+  state.filters.workerGroup = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
   state.customerHistoryId = "";
@@ -27774,11 +27943,26 @@ function productModal(id) {
     treatZeroAsEmpty: true,
   });
   const barcodeAttrs = inputAttrs(p.barcode || "", "Баркод");
-  const catList = cats();
+  const currentGroup = productGroupName(p);
+  const groupList = groups();
+  const catList = catsInGroup(currentGroup);
+  const showNewGroup = !groupList.length;
   const showNewCat = !catList.length;
-  const categoryAddBtn = canManageProductCategories()
+  const canTaxonomy = canManageProductCategories();
+  const groupAddBtn = canTaxonomy
+    ? `<button type="button" class="product-form__category-add" onclick="toggleProductNewGroupField()">+ Шинэ бүлэг</button>`
+    : "";
+  const categoryAddBtn = canTaxonomy
     ? `<button type="button" class="product-form__category-add" onclick="toggleProductNewCategoryField()">+ Шинэ төрөл</button>`
     : "";
+  const groupHtml = `<label class="product-form__category"><span class="block text-sm font-medium mb-2">Бүлэг</span><div class="product-form__category-row"><select name="group" onchange="onProductFormGroupChange(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${currentGroup ? "" : "selected"}>Бүлэг сонгох</option>${groupList
+    .map(
+      (g) =>
+        `<option value="${esc(g)}" ${currentGroup === g ? "selected" : ""}>${esc(g)}</option>`,
+    )
+    .join(
+      "",
+    )}</select>${groupAddBtn}</div><div class="product-form__category-new" id="productNewGroupField"${showNewGroup ? "" : " hidden"}><input name="newGroupName" type="text" autocomplete="off" placeholder="Шинэ бүлгийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="button" class="btn btn--primary shrink-0" onclick="addGroupFromProductForm()">Нэмэх</button></div></label>`;
   const categoryHtml = `<label class="product-form__category"><span class="block text-sm font-medium mb-2">Төрөл</span><div class="product-form__category-row"><select name="category" class="w-full px-4 py-3 bg-secondary rounded app-input"><option value="" disabled ${p.category ? "" : "selected"}>Төрөл сонгох</option>${catList
     .map(
       (c) =>
@@ -27789,7 +27973,7 @@ function productModal(id) {
     )}</select>${categoryAddBtn}</div><div class="product-form__category-new" id="productNewCategoryField"${showNewCat ? "" : " hidden"}><input name="newCategoryName" type="text" autocomplete="off" placeholder="Шинэ төрлийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="button" class="btn btn--primary shrink-0" onclick="addCategoryFromProductForm()">Нэмэх</button></div></label>`;
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
-    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>${categoryHtml}<label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
+    `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>${groupHtml}${categoryHtml}<label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
     "max-w-2xl",
     { panelClass: "product-form-modal", closeAsBack: true },
   );
@@ -28011,6 +28195,14 @@ function buildProductDataFromForm(form) {
   if (!data.name) return { error: "Барааны нэр оруулна уу" };
   const newCat = String(data.newCategoryName || "").trim();
   delete data.newCategoryName;
+  const newGroup = String(data.newGroupName || "").trim();
+  delete data.newGroupName;
+  if (newGroup) {
+    if (canManageProductCategories()) ensureGroupName(newGroup);
+    data.group = newGroup;
+  }
+  data.group = String(data.group || "").trim();
+  if (!data.group) return { error: "Бүлэг сонгоно уу" };
   if (newCat) {
     if (canManageProductCategories() && !cats().includes(newCat)) {
       if (!state.extraCategories.includes(newCat)) {
@@ -28020,6 +28212,7 @@ function buildProductDataFromForm(form) {
     data.category = newCat;
   }
   if (!data.category?.trim()) return { error: "Төрөл сонгоно уу" };
+  rememberCategoryGroup(data.category, data.group);
   data.price = Number(data.price || 0);
   delete data.costPrice;
   const packRaw = String(data.boxQuantity ?? "").trim();
@@ -28359,6 +28552,60 @@ async function saveProduct(e, id) {
     }
   }
 }
+function toggleProductNewGroupField() {
+  const row = document.getElementById("productNewGroupField");
+  if (!row) return;
+  const open = row.hasAttribute("hidden");
+  row.toggleAttribute("hidden", !open);
+  if (open) row.querySelector("input")?.focus();
+}
+function fillProductFormCategoryOptions(group, selected = "") {
+  const select = document.querySelector("form.product-form [name='category']");
+  if (!select) return;
+  const types = catsInGroup(group);
+  const keep = selected && types.includes(selected) ? selected : "";
+  select.innerHTML = `<option value="" disabled ${keep ? "" : "selected"}>Төрөл сонгох</option>${types
+    .map(
+      (c) =>
+        `<option value="${esc(c)}" ${keep === c ? "selected" : ""}>${esc(c)}</option>`,
+    )
+    .join("")}`;
+  if (keep) select.value = keep;
+}
+function onProductFormGroupChange(value) {
+  const form = document.querySelector("form.product-form");
+  const currentCat = String(form?.elements?.category?.value || "");
+  fillProductFormCategoryOptions(value, currentCat);
+}
+function addGroupFromProductForm() {
+  const form = document.querySelector("form.product-form");
+  const input = form?.querySelector("[name='newGroupName']");
+  const select = form?.elements?.group;
+  const name = String(input?.value || "").trim();
+  if (!name) return alert("Бүлгийн нэр оруулна уу");
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Бүлэг нэмэх эрхгүй.");
+  }
+  const existing = groups().find(
+    (g) => String(g).toLowerCase() === name.toLowerCase(),
+  );
+  const chosen = existing || name;
+  if (!existing) {
+    ensureGroupName(name);
+    criticalBackendSave();
+    showAppToast(`«${name}» бүлэг нэмэгдлээ`, "success");
+  }
+  if (select && ![...select.options].some((o) => o.value === chosen)) {
+    const opt = document.createElement("option");
+    opt.value = chosen;
+    opt.textContent = chosen;
+    select.appendChild(opt);
+  }
+  if (select) select.value = chosen;
+  if (input) input.value = "";
+  document.getElementById("productNewGroupField")?.setAttribute("hidden", "");
+  fillProductFormCategoryOptions(chosen, String(form?.elements?.category?.value || ""));
+}
 function toggleProductNewCategoryField() {
   const row = document.getElementById("productNewCategoryField");
   if (!row) return;
@@ -28375,6 +28622,7 @@ function addCategoryFromProductForm() {
   if (!canManageProductCategories()) {
     return alertModal("Эрхгүй", "Төрөл нэмэх эрхгүй.");
   }
+  const group = String(form?.elements?.group?.value || "").trim();
   const existing = cats().find(
     (c) => String(c).toLowerCase() === name.toLowerCase(),
   );
@@ -28383,8 +28631,11 @@ function addCategoryFromProductForm() {
     if (!state.extraCategories.includes(name)) {
       state.extraCategories.push(name);
     }
+    if (group) rememberCategoryGroup(name, group);
     criticalBackendSave();
     showAppToast(`«${name}» төрөл нэмэгдлээ`, "success");
+  } else if (group) {
+    rememberCategoryGroup(chosen, group);
   }
   if (select && ![...select.options].some((o) => o.value === chosen)) {
     const opt = document.createElement("option");
@@ -28401,41 +28652,95 @@ function addCategoryFromProductForm() {
 function categoryProductCount(name) {
   return state.products.filter((p) => p.category === name).length;
 }
+function groupProductCount(name) {
+  return state.products.filter((p) => productGroupName(p) === name).length;
+}
 function categoryModal() {
   if (!canManageProductCategories()) {
-    return alertModal("Эрхгүй", "Төрөл удирдах эрхгүй.");
+    return alertModal("Эрхгүй", "Бүлэг, төрөл удирдах эрхгүй.");
   }
-  const rows = cats()
-    .filter(Boolean)
-    .sort((a, b) => String(a).localeCompare(String(b), "mn"))
-    .map((cat) => {
-      const count = categoryProductCount(cat);
-      const meta =
-        count > 0
-          ? `<span class="category-row__meta">${count} бараа</span>`
-          : `<span class="category-row__meta category-row__meta--empty">Хоосон</span>`;
-      return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span><div class="category-row__actions">${meta}${deleteIconButton(
-        {
-          className: "category-row__delete",
-          attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
-          label: "Төрөл устгах",
-        },
-      )}</div></div>`;
+  const groupOpts = groups()
+    .map((g) => `<option value="${esc(g)}">${esc(g)}</option>`)
+    .join("");
+  const sections = groups()
+    .map((g) => {
+      const types = catsInGroup(g);
+      const gCount = groupProductCount(g);
+      const gDel =
+        g === OTHER_GROUP
+          ? ""
+          : deleteIconButton({
+              className: "category-row__delete",
+              attrs: `onclick="confirmDeleteGroup('${esc(g)}')"`,
+              label: "Бүлэг устгах",
+            });
+      const typeRows = types.length
+        ? types
+            .map((cat) => {
+              const count = categoryProductCount(cat);
+              const meta =
+                count > 0
+                  ? `<span class="category-row__meta">${count} бараа</span>`
+                  : `<span class="category-row__meta category-row__meta--empty">Хоосон</span>`;
+              return `<div class="category-row"><span class="category-row__name">${esc(cat)}</span><div class="category-row__actions">${meta}${deleteIconButton(
+                {
+                  className: "category-row__delete",
+                  attrs: `onclick="confirmDeleteCategory('${esc(cat)}')"`,
+                  label: "Төрөл устгах",
+                },
+              )}</div></div>`;
+            })
+            .join("")
+        : `<p class="category-form__empty">Төрөл байхгүй</p>`;
+      return `<section class="category-group"><div class="category-group__head"><div><p class="category-group__name">${esc(g)}</p><p class="category-group__meta">${gCount} бараа</p></div>${gDel}</div>${typeRows}</section>`;
     })
     .join("");
   box(
-    "Төрөл удирдах",
-    `<form onsubmit="addCategory(event)" class="category-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="category-form__add shrink-0"><label class="block text-sm font-medium mb-2">Шинэ төрөл</label><div class="category-form__add-row"><input name="category" autofocus required placeholder="Төрөлийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="submit" class="btn btn--primary shrink-0">Нэмэх</button></div></div><div class="category-form__list modal-scroll flex-1 min-h-0 overflow-y-auto mt-4">${rows || `<p class="category-form__empty">Төрөл байхгүй</p>`}</div></form>`,
+    "Бүлэг, төрөл",
+    `<div class="category-form p-5 flex flex-col min-h-0 max-h-[85vh]"><form onsubmit="addGroup(event)" class="category-form__add shrink-0"><label class="block text-sm font-medium mb-2">Шинэ бүлэг</label><div class="category-form__add-row"><input name="group" autofocus required placeholder="жнь. Хүнс, Бичиг хэрэг, Ахуй" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="submit" class="btn btn--primary shrink-0">Нэмэх</button></div></form><form onsubmit="addCategory(event)" class="category-form__add shrink-0 mt-3"><label class="block text-sm font-medium mb-2">Шинэ төрөл</label><div class="category-form__add-row category-form__add-row--type"><select name="group" required class="page-toolbar__select app-input" aria-label="Бүлэг"><option value="" disabled selected>Бүлэг</option>${groupOpts}</select><input name="category" required placeholder="Төрөлийн нэр" class="flex-1 px-4 py-3 bg-secondary rounded app-input"><button type="submit" class="btn btn--primary shrink-0">Нэмэх</button></div></form><div class="category-form__list modal-scroll flex-1 min-h-0 overflow-y-auto mt-4">${sections || `<p class="category-form__empty">Бүлэг байхгүй</p>`}</div></div>`,
     "max-w-lg",
   );
 }
-function applyAddCategory(name) {
+function applyAddGroup(name) {
+  if (!canManageProductCategories()) return;
+  const trimmed = ensureGroupName(name);
+  if (!trimmed) return;
+  criticalBackendSave();
+  showAppToast(`«${trimmed}» бүлэг нэмэгдлээ`, "success");
+  categoryModal();
+}
+function addGroup(e) {
+  e.preventDefault();
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Бүлэг нэмэх эрхгүй.");
+  }
+  const name = String(new FormData(e.target).get("group") || "").trim();
+  if (!name) return alert("Бүлгийн нэр оруулна уу");
+  if (groups().some((g) => String(g).toLowerCase() === name.toLowerCase())) {
+    return alertModal(
+      "Давхардал",
+      `<strong>${esc(name)}</strong> нэртэй бүлэг аль хэдийн байна.`,
+    );
+  }
+  confirmModal(
+    "Бүлэг нэмэх үү?",
+    `<strong>${esc(name)}</strong> нэртэй шинэ бүлэг нэмэх гэж байна.`,
+    {
+      confirmLabel: "Нэмэх",
+      onConfirm: () => applyAddGroup(name),
+    },
+  );
+}
+function applyAddCategory(name, group) {
   if (!canManageProductCategories()) return;
   const trimmed = String(name || "").trim();
+  const g = String(group || "").trim() || OTHER_GROUP;
   if (!trimmed) return;
+  ensureGroupName(g);
   if (!state.extraCategories.includes(trimmed)) {
     state.extraCategories.push(trimmed);
   }
+  rememberCategoryGroup(trimmed, g);
   criticalBackendSave();
   showAppToast(`«${trimmed}» төрөл нэмэгдлээ`, "success");
   categoryModal();
@@ -28445,7 +28750,10 @@ function addCategory(e) {
   if (!canManageProductCategories()) {
     return alertModal("Эрхгүй", "Төрөл нэмэх эрхгүй.");
   }
-  const name = String(new FormData(e.target).get("category") || "").trim();
+  const fd = new FormData(e.target);
+  const name = String(fd.get("category") || "").trim();
+  const group = String(fd.get("group") || "").trim();
+  if (!group) return alert("Бүлэг сонгоно уу");
   if (!name) return alert("Төрөлийн нэр оруулна уу");
   if (cats().includes(name)) {
     return alertModal(
@@ -28455,12 +28763,50 @@ function addCategory(e) {
   }
   confirmModal(
     "Төрөл нэмэх үү?",
-    `<strong>${esc(name)}</strong> нэртэй шинэ төрөл нэмэх гэж байна.`,
+    `<strong>${esc(name)}</strong> төрлийг «${esc(group)}» бүлэгт нэмэх гэж байна.`,
     {
       confirmLabel: "Нэмэх",
-      onConfirm: () => applyAddCategory(name),
+      onConfirm: () => applyAddCategory(name, group),
     },
   );
+}
+function confirmDeleteGroup(name) {
+  if (!canManageProductCategories()) {
+    return alertModal("Эрхгүй", "Бүлэг устгах эрхгүй.");
+  }
+  if (name === OTHER_GROUP) {
+    return alertModal(
+      "Устгах боломжгүй",
+      "«Бусад» үндсэн бүлэг тул устгах боломжгүй.",
+    );
+  }
+  const count = groupProductCount(name);
+  const msg =
+    count > 0
+      ? `<p><strong>${esc(name)}</strong> бүлэгт <strong>${count}</strong> бараа байна.</p><p class="text-sm text-muted-foreground mt-2">Устгахад эдгээр барааг «Бусад» бүлэг рүү шилжүүлнэ.</p>`
+      : `<strong>${esc(name)}</strong> бүлгийг устгах гэж байна.`;
+  confirmModal("Бүлэг устгах уу?", msg, {
+    confirmLabel: "Устгах",
+    danger: true,
+    onConfirm: () => deleteGroupNow(name),
+  });
+}
+function deleteGroupNow(name) {
+  if (!canManageProductCategories()) return;
+  if (name === OTHER_GROUP) return;
+  state.products.forEach((p) => {
+    if (productGroupName(p) === name) p.group = OTHER_GROUP;
+  });
+  const map = categoryGroupMap();
+  for (const [cat, g] of Object.entries(map)) {
+    if (g === name) map[cat] = OTHER_GROUP;
+  }
+  state.extraGroups = (state.extraGroups || []).filter((g) => g !== name);
+  if (state.filters.productGroup === name) state.filters.productGroup = "all";
+  if (state.filters.workerGroup === name) state.filters.workerGroup = "";
+  criticalBackendSave();
+  showAppToast(`«${name}» бүлэг устгагдлаа`, "success");
+  categoryModal();
 }
 function confirmDeleteCategory(name) {
   if (!canManageProductCategories()) {
@@ -28502,6 +28848,7 @@ function deleteCategoryNow(name) {
     if (p.category === name) p.category = "Бусад";
   });
   state.extraCategories = state.extraCategories.filter((c) => c !== name);
+  delete categoryGroupMap()[name];
   if (state.filters.category === name) state.filters.category = "all";
   if (state.filters.inventoryCategory === name)
     state.filters.inventoryCategory = "all";
@@ -29185,7 +29532,8 @@ function applyStock(id, type, qty, costPrice) {
 function pickerHasActiveFilters() {
   return !!(
     String(state.searches.workerProduct || "").trim() ||
-    String(state.filters.workerCategory || "").trim()
+    String(state.filters.workerCategory || "").trim() ||
+    String(state.filters.workerGroup || "").trim()
   );
 }
 function pickerEmptyStateHtml() {
@@ -29218,8 +29566,10 @@ function pickerProductSearchRank(p, rawQuery) {
 function pickerProductsInView() {
   const q = String(state.searches.workerProduct || "").trim();
   const cat = state.filters.workerCategory || "";
+  const group = state.filters.workerGroup || "";
   return state.products
     .filter((p) => {
+      if (group && productGroupName(p) !== group) return false;
       if (cat && p.category !== cat) return false;
       if (!q) return true;
       if (productTextMatchesQuery(p, q)) return true;
@@ -29257,9 +29607,22 @@ function pickerSearch(value) {
   }
 }
 function pickerCategoryChipsHtml() {
-  const active = state.filters.workerCategory || "",
-    categories = cats();
-  return `<div class="picker-cat-chips" role="tablist" aria-label="Төрөлөөр шүүх"><button type="button" data-picker-cat="" class="picker-cat-chip${active ? "" : " is-active"}" role="tab" aria-selected="${active ? "false" : "true"}">Бүгд</button>${categories.map((c) => `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-chip${active === c ? " is-active" : ""}" role="tab" aria-selected="${active === c ? "true" : "false"}">${esc(c)}</button>`).join("")}</div>`;
+  const activeGroup = state.filters.workerGroup || "";
+  const activeCat = state.filters.workerCategory || "";
+  const typeList = catsInGroup(activeGroup || "all");
+  const groupChips = `<div class="picker-cat-chips" role="tablist" aria-label="Бүлгээр шүүх"><button type="button" data-picker-group="" class="picker-cat-chip${activeGroup ? "" : " is-active"}" role="tab" aria-selected="${activeGroup ? "false" : "true"}">Бүгд</button>${groups()
+    .map(
+      (g) =>
+        `<button type="button" data-picker-group="${esc(g)}" class="picker-cat-chip${activeGroup === g ? " is-active" : ""}" role="tab" aria-selected="${activeGroup === g ? "true" : "false"}">${esc(g)}</button>`,
+    )
+    .join("")}</div>`;
+  const typeChips = `<div class="picker-cat-chips" role="tablist" aria-label="Төрлөөр шүүх"><button type="button" data-picker-cat="" class="picker-cat-chip${activeCat ? "" : " is-active"}" role="tab" aria-selected="${activeCat ? "false" : "true"}">Бүгд</button>${typeList
+    .map(
+      (c) =>
+        `<button type="button" data-picker-cat="${esc(c)}" class="picker-cat-chip${activeCat === c ? " is-active" : ""}" role="tab" aria-selected="${activeCat === c ? "true" : "false"}">${esc(c)}</button>`,
+    )
+    .join("")}</div>`;
+  return `<div class="picker-tax-chips">${groupChips}${typeChips}</div>`;
 }
 function updatePickerClearBtn() {
   const clearBtn = modal.querySelector("[data-picker-clear-cart]");
@@ -29504,6 +29867,7 @@ function resetWorkerCart() {
   state.pickerBarcode = "";
   state.searches.workerProduct = "";
   state.filters.workerCategory = "";
+  state.filters.workerGroup = "";
 }
 function setWorkerQty(id, qty) {
   const p = state.products.find((x) => x.id === id);
@@ -29562,6 +29926,7 @@ function applyPickerBarcode(value, scanned = false) {
   const code = String(value || "").trim();
   if (!code) return;
   state.filters.workerCategory = "";
+  state.filters.workerGroup = "";
   const product = state.products.find(
     (p) => String(p.barcode || "").trim() === code,
   );
@@ -29584,6 +29949,7 @@ function applyPickerBarcode(value, scanned = false) {
 function clearPickerFilter() {
   state.searches.workerProduct = "";
   state.filters.workerCategory = "";
+  state.filters.workerGroup = "";
   state.pickerStatus = "";
   state.pickerBarcode = "";
   if (refreshPickerList()) {
@@ -29782,6 +30148,7 @@ function stopBarcodeScan(opts = {}) {
 function openPickerModal() {
   stopBarcodeScan();
   state.filters.workerCategory = "";
+  state.filters.workerGroup = "";
   state.searches.workerProduct = "";
   state.pickerStatus = "";
   state.pickerBarcode = "";
@@ -29811,6 +30178,7 @@ function pickerModal() {
   restorePickerScroll(scrollSnap);
 }
 function backToPickerCategories() {
+  state.filters.workerGroup = "";
   setPickerCategory("");
 }
 function clearPickerCart() {
@@ -29908,6 +30276,20 @@ function pickerRow(p) {
       ? `<span class="picker-row__qty" aria-label="Сонгосон ${esc(qtyLabel)}">${esc(qtyLabel)}</span>`
       : "";
   return `<button type="button" class="picker-row${inCart ? " is-selected" : ""}" data-picker-open="${esc(p.id)}" aria-label="${esc(p.name)} — тоо сонгох"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="picker-row__thumb" width="56" height="56" loading="lazy" decoding="async"><div class="picker-row__info"><span class="picker-row__name">${esc(p.name)}</span><span class="picker-row__meta"><span class="picker-row__value--price">${fmt(p.price)}</span><span class="picker-row__meta-sep">·</span><span class="picker-row__value--stock${left <= 10 ? " picker-row__value--stock-low" : ""}">Үлд ${left}</span>${promoHint}</span></div>${qtyBadge}</button>`;
+}
+function setPickerGroup(group) {
+  state.filters.workerGroup = String(group || "").trim();
+  const types = catsInGroup(state.filters.workerGroup || "all");
+  if (
+    state.filters.workerCategory &&
+    !types.includes(state.filters.workerCategory)
+  ) {
+    state.filters.workerCategory = "";
+  }
+  state.pickerActiveId = "";
+  state.pickerQtyProductId = "";
+  if (refreshPickerList()) return;
+  pickerModal();
 }
 function setPickerCategory(cat) {
   state.filters.workerCategory = String(cat || "").trim();
@@ -30975,7 +31357,10 @@ Object.assign(window, {
   productModal,
   handleProductImage,
   toggleProductNewCategoryField,
+  toggleProductNewGroupField,
   addCategoryFromProductForm,
+  addGroupFromProductForm,
+  onProductFormGroupChange,
   applySettlementTextInput,
   growSettlementInput,
   settlementInputFocus,
@@ -30994,7 +31379,9 @@ Object.assign(window, {
   saveProduct,
   categoryModal,
   addCategory,
+  addGroup,
   confirmDeleteCategory,
+  confirmDeleteGroup,
   employeeModal,
   orderModal,
   saveOrder,
@@ -31046,6 +31433,7 @@ Object.assign(window, {
   backToPickerCategories,
   clearPickerCart,
   setPickerCategory,
+  setPickerGroup,
   applyPickerBarcode,
   applyStockInBarcode,
   applyStockOutBarcode,
@@ -31114,6 +31502,7 @@ Object.assign(window, {
   toolbarSelectFocus,
   toolbarSelectBlur,
   setProductCategory,
+  setProductGroup,
   setOrderStatusFilter,
   setWorkerPayFilter,
   receiptStatusFilterFocus,

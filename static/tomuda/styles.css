@@ -10482,6 +10482,56 @@ textarea::placeholder {
   background: var(--hex-card);
 }
 
+.picker-tax-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.category-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--hex-border);
+}
+
+.category-group:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.category-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.category-group__name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.category-group__meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--hex-muted-foreground);
+}
+
+.category-form__add-row--type {
+  flex-wrap: wrap;
+}
+
+.category-form__add-row--type select {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
 .picker-cat-chips {
   display: flex;
   flex-wrap: nowrap;
