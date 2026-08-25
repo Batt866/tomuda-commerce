@@ -18655,14 +18655,23 @@ input.stock-in-sheet__input::placeholder {
   font-weight: 600;
 }
 
-.stock-in-sheet__live-hits {
+.stock-in-sheet__live-hits:empty {
   display: none;
+}
+.stock-in-sheet__live-hits:not(:empty) {
+  display: block;
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
 }
 
 .stock-in-search-window {
   display: flex;
   flex-direction: column;
-  max-height: min(58vh, 440px);
+  flex-shrink: 0;
+  min-height: 120px;
+  max-height: min(52vh, 420px);
   background: #fff;
   border: 1px solid var(--si-line);
   border-radius: 14px;
@@ -18702,7 +18711,10 @@ input.stock-in-sheet__input::placeholder {
 .stock-in-search-window__body {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 6px;
+  min-height: 88px;
+  max-height: min(44vh, 360px);
   padding: 8px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -18720,7 +18732,7 @@ input.stock-in-sheet__input::placeholder {
 
 .stock-in-sheet__search-panel {
   position: relative;
-  z-index: 5;
+  z-index: 8;
   flex-shrink: 0;
   overflow: visible;
   padding: 10px var(--si-pad);
@@ -18881,7 +18893,8 @@ input.stock-in-sheet__input::placeholder {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  min-height: 64px;
+  padding: 10px 12px;
   border: 1px solid var(--si-line);
   border-radius: 12px;
   background: #fff;
@@ -18889,12 +18902,18 @@ input.stock-in-sheet__input::placeholder {
   cursor: pointer;
 }
 
+.stock-in-sheet__hit.is-added {
+  border-color: color-mix(in srgb, var(--si-primary) 35%, var(--si-line));
+  background: color-mix(in srgb, var(--si-primary) 8%, #ffffff);
+}
+
 .stock-in-sheet__hit img {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
   border-radius: 8px;
   background: #eef2f5;
+  flex-shrink: 0;
 }
 
 .stock-in-sheet__hit span {
@@ -18915,6 +18934,15 @@ input.stock-in-sheet__input::placeholder {
 .stock-in-sheet__hit small {
   font-size: 11px;
   color: var(--si-muted);
+}
+
+.stock-in-sheet__hit-price {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--si-primary);
 }
 
 .stock-in-sheet__lines {
@@ -19409,6 +19437,7 @@ input.stock-in-sheet__input::placeholder {
   }
 
   .stock-in-sheet__tools {
+    flex-wrap: wrap;
     flex-direction: row;
     align-items: end;
     gap: 12px;

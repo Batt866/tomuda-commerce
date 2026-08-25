@@ -15587,10 +15587,10 @@ function findProductByBarcode(code) {
   return matches.length === 1 ? matches[0] : matches[0] || null;
 }
 function stockInUnusedSearchHits(query) {
-  return findProductsByQuery(query).filter((p) => stockInLineQty(p) <= 0);
+  return findProductsByQuery(query);
 }
 function stockOutUnusedSearchHits(query) {
-  return findProductsByQuery(query).filter((p) => stockOutLineQty(p) <= 0);
+  return findProductsByQuery(query);
 }
 /** Same path for typing, Хайх, and camera scan. */
 function stockInApplySearchQuery(code, { fromScan = false } = {}) {
@@ -16248,15 +16248,25 @@ function stockInSearchHitProducts() {
   return stockInUnusedSearchHits(q).slice(0, 24);
 }
 function stockInSearchHitsWindowHtml(hits, { emptyMsg, pickFn, closeFn }) {
+  const addedSet = new Set(
+    (state.products || [])
+      .filter((p) =>
+        pickFn === "stockOutPickSearchHit"
+          ? stockOutLineQty(p) > 0
+          : stockInLineQty(p) > 0,
+      )
+      .map((p) => String(p.id)),
+  );
   const head = `<div class="stock-in-search-window__head"><p>Олдсон бараа</p><button type="button" class="stock-in-search-window__close" onclick="${closeFn}()" aria-label="Хайх цонх хаах">✕</button></div>`;
   if (!hits.length) {
     return `<div class="stock-in-sheet__hits stock-in-sheet__hits--miss stock-in-search-window" role="dialog" aria-label="Хайлтын үр дүн">${head}<div class="stock-in-search-window__body"><p class="stock-in-sheet__hits-empty">${emptyMsg}</p></div></div>`;
   }
   const rows = hits
-    .map(
-      (p) =>
-        `<button type="button" class="stock-in-sheet__hit" onclick="${pickFn}('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="40" height="40" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}</small></span></button>`,
-    )
+    .map((p) => {
+      const added = addedSet.has(String(p.id));
+      const price = fmt(Number(p.price ?? p.sellPrice ?? 0) || 0);
+      return `<button type="button" class="stock-in-sheet__hit${added ? " is-added" : ""}" onclick="${pickFn}('${esc(p.id)}')"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} alt="" width="48" height="48" loading="lazy" decoding="async"><span><b>${esc(p.name)}</b><small>${esc(p.barcode || "")}${added ? " · нэмсэн" : ""}</small></span><em class="stock-in-sheet__hit-price">${price}</em></button>`;
+    })
     .join("");
   return `<div class="stock-in-sheet__hits stock-in-search-window" role="dialog" aria-label="Хайлтын үр дүн">${head}<div class="stock-in-search-window__body">${rows}</div></div>`;
 }
@@ -16275,29 +16285,11 @@ function stockInSearchHitsContentHtml() {
   });
 }
 function patchStockInSearchHits() {
-  const q = String(state.stockInScanQuery || "").trim();
-  const html = stockInSearchHitsContentHtml();
   const live = document.querySelector("[data-stock-in-live-hits]");
-  if (live && live.innerHTML !== html) live.innerHTML = html;
-  const scroll = document.querySelector(".stock-in-sheet__scroll");
-  if (!scroll) {
-    if (live) bindProductImages(live);
-    return !!live;
-  }
-  const prev = scroll.querySelector(":scope > .stock-in-sheet__hits");
-  if (!q) {
-    prev?.remove();
-    if (live) bindProductImages(live);
-    return !!live;
-  }
-  if (prev) {
-    if (prev.outerHTML !== html) prev.outerHTML = html;
-  } else {
-    scroll.insertAdjacentHTML("afterbegin", html);
-  }
-  const hits = scroll.querySelector(":scope > .stock-in-sheet__hits");
-  if (hits) bindProductImages(hits);
-  if (live) bindProductImages(live);
+  if (!live) return false;
+  const html = stockInSearchHitsContentHtml();
+  if (live.innerHTML !== html) live.innerHTML = html;
+  bindProductImages(live);
   return true;
 }
 function clearStockInSearch() {
@@ -16311,8 +16303,8 @@ function stockInPickSearchHit(id) {
   clearStockInSearch();
   stockInEntryModal(id);
 }
-function stockInSearchHitsHtml(list) {
-  return stockInSearchHitsContentHtml();
+function stockInSearchHitsHtml() {
+  return "";
 }
 function stockInLinesHtml(list) {
   const filled = (list || []).filter((p) => stockInLineQty(p) > 0);
@@ -16376,29 +16368,11 @@ function stockOutSearchHitsContentHtml() {
   });
 }
 function patchStockOutSearchHits() {
-  const q = String(state.stockOutScanQuery || "").trim();
-  const html = stockOutSearchHitsContentHtml();
   const live = document.querySelector("[data-stock-out-live-hits]");
-  if (live && live.innerHTML !== html) live.innerHTML = html;
-  const scroll = document.querySelector(".stock-in-sheet__scroll");
-  if (!scroll) {
-    if (live) bindProductImages(live);
-    return !!live;
-  }
-  const prev = scroll.querySelector(":scope > .stock-in-sheet__hits");
-  if (!q) {
-    prev?.remove();
-    if (live) bindProductImages(live);
-    return !!live;
-  }
-  if (prev) {
-    if (prev.outerHTML !== html) prev.outerHTML = html;
-  } else {
-    scroll.insertAdjacentHTML("afterbegin", html);
-  }
-  const hits = scroll.querySelector(":scope > .stock-in-sheet__hits");
-  if (hits) bindProductImages(hits);
-  if (live) bindProductImages(live);
+  if (!live) return false;
+  const html = stockOutSearchHitsContentHtml();
+  if (live.innerHTML !== html) live.innerHTML = html;
+  bindProductImages(live);
   return true;
 }
 function clearStockOutSearch() {
@@ -16412,8 +16386,8 @@ function stockOutPickSearchHit(id) {
   clearStockOutSearch();
   stockOutModal(id);
 }
-function stockOutSearchHitsHtml(list) {
-  return stockOutSearchHitsContentHtml();
+function stockOutSearchHitsHtml() {
+  return "";
 }
 function stockOutLinesHtml(list) {
   const filled = (list || []).filter((p) => stockOutLineQty(p) > 0);
@@ -16469,7 +16443,6 @@ function stockInPanel(list) {
   </section>
   <div class="stock-in-sheet__body">
     <div class="stock-in-sheet__scroll">
-      ${stockInSearchHitsHtml(list)}
       ${stockInLinesHtml(allProducts)}
     </div>
     ${stockInFooterHtml(allProducts)}
@@ -16599,7 +16572,6 @@ function stockOutPanel(list) {
   </section>
   <div class="stock-in-sheet__body">
     <div class="stock-in-sheet__scroll">
-      ${stockOutSearchHitsHtml(list)}
       ${stockOutLinesHtml(allProducts)}
     </div>
     ${stockOutFooterHtml(allProducts)}
