@@ -4076,17 +4076,16 @@ function productImageFallbackList(p = {}, { thumb = false } = {}) {
   const list = [];
   const id = String(p?.id || "").trim();
   const stored = storedProductImage(p);
-  const storedMedia = productMediaPathFromUrl(stored);
   const version = productImageVersion(stored);
 
   if (thumb && id) {
-    pushUniqueProductImage(list, productImageMediaUrl(`${id}_t`, "jpg", version));
+    PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
+      pushUniqueProductImage(list, productImageMediaUrl(`${id}_t`, ext, version));
+    });
   }
   pushUniqueProductImage(list, stored);
 
-  // Only probe alternate extensions when we have no known local media URL —
-  // otherwise each broken image fires up to 4 serial 404s.
-  if (!storedMedia && id) {
+  if (id) {
     PRODUCT_IMAGE_EXTENSIONS.forEach((ext) => {
       pushUniqueProductImage(list, productImageMediaUrl(id, ext, version));
     });
@@ -6137,6 +6136,7 @@ function completeBootUiInit(options = {}) {
   initPickerModalActions();
   initEmployeeModalActions();
   initQtyStepperButtons();
+  initPromoSearchDropdownDismiss();
   initCountInputHandlers();
   initExcelImportHandlers();
   initStockInSearchHandlers();
@@ -9043,16 +9043,20 @@ function orderReceiptRowsFiltered(
   const deliveryIds = idList(opts.deliveryIds);
   const skipWarehouseDate = opts.skipWarehouseDate || searchKey === "orders";
   const requireWorkerScope = !!opts.requireWorkerScope;
-  let rows = state.orders.filter(
-    (o) =>
+  let rows = state.orders.filter((o) => {
+    const status = String(o.status || "").toLowerCase();
+    const warehouseView = !skipWarehouseDate;
+    if (warehouseView && status === "cancelled") return false;
+    return (
       (requireWorkerScope
         ? workerIds.length > 0 && workerIds.includes(o.employeeId)
         : !workerIds.length || workerIds.includes(o.employeeId)) &&
       (!deliveryIds.length ||
         deliveryIds.includes(orderDeliveryEmployeeId(o))) &&
       orderReceiptMatchesQuery(o, q) &&
-      (state.filters.order === "all" || o.status === state.filters.order),
-  );
+      (state.filters.order === "all" || o.status === state.filters.order)
+    );
+  });
   if (!skipWarehouseDate) rows = filterWarehouseOrders(rows);
   return sortOrdersBySelectedPeople(rows, workerIds, deliveryIds);
 }
@@ -11669,7 +11673,7 @@ function warehouseReceiptPrintListItem(o) {
   return `<div class="wh-receipt-list__item wh-receipt-list__item--selectable${active ? " is-active" : ""}"><label class="wh-receipt-list__check"><input type="checkbox"${checked ? " checked" : ""} onchange="toggleReceiptPrintOrder('${esc(o.id)}')" aria-label="Захиалга ${esc(formatReceiptNumber(o))} сонгох"><span class="sr-only">${esc(orderCustomerName(o))}</span></label><button type="button" onclick="selectWarehouseOrder('${esc(o.id)}')" class="wh-receipt-list__body-btn">${receiptNo(o, "sm")}<span class="wh-receipt-list__body"><span class="wh-receipt-list__name">${esc(orderCustomerName(o))}</span><span class="wh-receipt-list__meta">${fmt(orderAmount(o))} · Авсан ${dte(orderCreatedDay(o))} · Хүргэлт ${dte(orderDeliveryDay(o))}</span></span></button></div>`;
 }
 function warehouseReceiptStatusOptions(includeDelivered = true) {
-  const opts = ["pending", "confirmed", "delivered", "cancelled"];
+  const opts = ["pending", "confirmed", "delivered"];
   return includeDelivered ? opts : opts.filter((s) => s !== "delivered");
 }
 function warehouseReceiptsPanel(rows, { title, searchKey, employeeIds }) {
@@ -12461,6 +12465,7 @@ function receiptPrintWorkerOrders(workerIds = receiptPrintWorkerIds()) {
     state.orders.filter(
       (o) =>
         ids.has(o.employeeId) &&
+        String(o.status || "").toLowerCase() !== "cancelled" &&
         (state.filters.order === "all" || o.status === state.filters.order),
     ),
   );
@@ -12492,7 +12497,11 @@ function receiptPrintDisplayOrders(
   const rows = orderReceiptRowsFiltered(searchKey, employeeIds, receiptFilterOptions());
   const workerIds = receiptPrintWorkerIds();
   const sourceRows = workerIds.length ? receiptPrintWorkerOrders(workerIds) : rows;
-  return sourceRows.filter((o) => o.status !== "delivered");
+  return sourceRows.filter(
+    (o) =>
+      o.status !== "delivered" &&
+      String(o.status || "").toLowerCase() !== "cancelled",
+  );
 }
 function selectAllReceiptPrintOrders(searchKey = "warehouseOrders", employeeIds = []) {
   if (!receiptPrintWorkerIds().length) return;
@@ -21593,7 +21602,8 @@ function promotionSheetPickerBlock({
     ids.length > 0
       ? `<span class="promo-section-count">${ids.length}</span>`
       : "";
-  const searchInput = `<input data-promo-pick="${pickKey}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input promo-sheet-search" autocomplete="off">`;
+  const searchOpen = promoSearchDropdownOpen(pickKey);
+  const searchInput = `<input data-promo-pick="${pickKey}" type="search" inputmode="search" value="${esc(rawQ)}" onfocus="openPromoSearchDropdown(${jsStringArg(pickKey)})" oninput="promoPickSearch('${pickKey}',this.value)" onkeydown="promoSearchDropdownKey(event,${jsStringArg(pickKey)})" placeholder="${esc(placeholder)}" class="promo-search-input promo-sheet-search" autocomplete="off">`;
   const categoryHtml = showCategory ? promoCategorySelectHtml(pickKey) : "";
   const gridHtml = promoProductGridHtml({
     pickKey,
@@ -21608,8 +21618,10 @@ function promotionSheetPickerBlock({
     : "";
   const extraHtml = extraBeforeStepper || "";
   const head = `<div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}${countBadge}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>`;
-  const dropdownHtml = `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown">${promoSearchDropdownInnerHtml(pickKey, ids)}</div>`;
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo">${searchInput}${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
+  const searchIcon = `<span class="promo-search-combo__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>`;
+  const chevron = `<button type="button" class="promo-search-combo__toggle" onclick="togglePromoSearchDropdown(${jsStringArg(pickKey)})" aria-label="${searchOpen ? "Хайлт хураах" : "Бараа харах"}" aria-expanded="${searchOpen ? "true" : "false"}"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`;
+  const dropdownHtml = `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown" ${searchOpen ? "" : "hidden"}>${searchOpen ? promoSearchDropdownInnerHtml(pickKey, ids) : ""}</div>`;
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo${searchOpen ? " is-open" : ""}" data-promo-search-combo="${esc(pickKey)}"><div class="promo-search-combo__field">${searchIcon}${searchInput}${chevron}</div>${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoSheetSectionHtml({ variant = "condition", title, hint = "", body = "" }) {
@@ -21655,21 +21667,94 @@ function promoPercentRewardSectionHtml(hint) {
 function promoQtySetupCardHtml(buyMode, buyQtyDefault, freeQtyDefault) {
   return "";
 }
+function promoSearchDropdownOpen(pickKey) {
+  return !!(state.promoSearchOpen && state.promoSearchOpen[pickKey]);
+}
+function setPromoSearchDropdown(pickKey, open) {
+  state.promoSearchOpen = {
+    ...(state.promoSearchOpen || {}),
+    [pickKey]: !!open,
+  };
+}
+function patchPromoSearchDropdown(pickKey) {
+  const combo = document.querySelector(`[data-promo-search-combo="${pickKey}"]`);
+  if (!combo) return false;
+  const ids = promotionPickIds(state.promoPick || {}, pickKey);
+  const open = promoSearchDropdownOpen(pickKey);
+  combo.classList.toggle("is-open", open);
+  const toggle = combo.querySelector(".promo-search-combo__toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    toggle.setAttribute("aria-label", open ? "Хайлт хураах" : "Бараа харах");
+  }
+  const dd = combo.querySelector(`[data-promo-search-dropdown="${pickKey}"]`);
+  if (dd) {
+    dd.hidden = !open;
+    dd.innerHTML = open ? promoSearchDropdownInnerHtml(pickKey, ids) : "";
+  }
+  return true;
+}
+function openPromoSearchDropdown(pickKey) {
+  if (!pickKey || promoSearchDropdownOpen(pickKey)) return;
+  setPromoSearchDropdown(pickKey, true);
+  if (!patchPromoSearchDropdown(pickKey)) {
+    refreshPromoModal({ focusPickKey: pickKey });
+  }
+}
+function closePromoSearchDropdown(pickKey) {
+  if (!pickKey || !promoSearchDropdownOpen(pickKey)) return;
+  setPromoSearchDropdown(pickKey, false);
+  patchPromoSearchDropdown(pickKey);
+}
+function togglePromoSearchDropdown(pickKey) {
+  if (!pickKey) return;
+  setPromoSearchDropdown(pickKey, !promoSearchDropdownOpen(pickKey));
+  if (!patchPromoSearchDropdown(pickKey)) {
+    refreshPromoModal({ focusPickKey: pickKey });
+  }
+}
+function promoSearchDropdownKey(event, pickKey) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closePromoSearchDropdown(pickKey);
+  }
+}
+function initPromoSearchDropdownDismiss() {
+  if (document.documentElement.dataset.promoSearchDdBound) return;
+  document.documentElement.dataset.promoSearchDdBound = "1";
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      document.querySelectorAll(".promo-search-combo.is-open").forEach((combo) => {
+        const filters = combo.closest(".promo-sheet-filters");
+        if (filters ? filters.contains(e.target) : combo.contains(e.target)) return;
+        const pickKey = combo.getAttribute("data-promo-search-combo");
+        if (pickKey) closePromoSearchDropdown(pickKey);
+      });
+    },
+    true,
+  );
+}
 function promoSearchDropdownInnerHtml(pickKey, selectedIds) {
-  const searchKey = promoPickSearchKey(pickKey);
-  const rawQ = (searchKey && state.searches[searchKey]) || "";
-  if (!rawQ.trim()) return "";
   const selectedSet = new Set((selectedIds || []).map(String));
-  const filtered = promoFilteredProducts(pickKey, [], { requireFilter: true })
-    .filter((p) => !selectedSet.has(String(p.id)))
-    .slice(0, 20);
-  if (!filtered.length) return `<p class="promo-search-dropdown__empty">Олдсонгүй</p>`;
-  return filtered
-    .map((p) => {
-      const img = `<span class="promo-search-dropdown__img-wrap"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-search-dropdown__img" width="36" height="36" loading="lazy" decoding="async" alt=""></span>`;
-      return `<button type="button" class="promo-search-dropdown__item" onclick="addPromoPickProduct(${jsStringArg(pickKey)},${jsStringArg(p.id)})">${img}<span class="promo-search-dropdown__name">${esc(p.name)}</span><span class="promo-search-dropdown__price">${fmt(Number(p.price ?? p.sellPrice ?? 0) || 0)}</span></button>`;
-    })
-    .join("");
+  const products = promoFilteredProducts(pickKey, [], { requireFilter: false }).filter(
+    (p) => !selectedSet.has(String(p.id)),
+  );
+  const shown = products.slice(0, 40);
+  const more = Math.max(0, products.length - shown.length);
+  if (!shown.length) {
+    return `<p class="promo-search-dropdown__empty">Олдсонгүй</p>`;
+  }
+  return `<div class="promo-search-dropdown__grid promo-product-grid">${shown
+    .map((p) =>
+      promoProductCardHtml(p, {
+        pickKey,
+        selected: false,
+      }),
+    )
+    .join(
+      "",
+    )}${more ? `<p class="promo-product-more">+${more} бараа. Хайлтаа нарийсгана уу.</p>` : ""}</div>`;
 }
 function promoProductSearchListInnerHtml({
   pickKey,
@@ -21756,10 +21841,7 @@ function patchPromoPickSearchList(pickKey, opts = {}) {
       selectedIds,
       perProductQty: ppq,
     });
-    const dd = mount
-      .closest(".promo-sheet-section")
-      ?.querySelector(`[data-promo-search-dropdown="${pickKey}"]`);
-    if (dd) dd.innerHTML = promoSearchDropdownInnerHtml(pickKey, selectedIds);
+    patchPromoSearchDropdown(pickKey);
   } else {
     let selectedId = "";
     if (addAction === "select") {
@@ -22729,6 +22811,7 @@ function promoPickSearch(pickKey, value) {
   const key = promoPickSearchKey(pickKey);
   if (!key) return;
   state.searches[key] = value;
+  setPromoSearchDropdown(pickKey, true);
   // Update only the product list so the search input keeps focus / keyboard.
   if (!patchPromoPickSearchList(pickKey, { preserveScroll: false })) {
     refreshPromoModal({ focusPickKey: pickKey });
@@ -22762,6 +22845,7 @@ function addPromoPickProduct(pickKey, id) {
   if (!idStr || ids.includes(idStr)) return;
   const searchKey = promoPickSearchKey(pickKey);
   if (searchKey) state.searches[searchKey] = "";
+  setPromoSearchDropdown(pickKey, true);
   state.promoPick = { ...pick, [pickKey]: [...ids, idStr] };
   if (pickKey === "buyProductIds") {
     state.promoFormDraft = state.promoFormDraft || {};
@@ -23040,6 +23124,7 @@ function openPromotionQtyModal() {
   state.promoPick = { buyProductIds: [], freeProductIds: [] };
   state.promoFormDraft = { buyQty: "8", freeQty: "1" };
   resetPromoPickListScroll();
+  state.promoSearchOpen = {};
   state.searches.promo_buyProductIds = "";
   state.searches.promo_freeProductIds = "";
   state.searches.promo_buyProductIds_category = "all";
@@ -23153,6 +23238,7 @@ function openPromotionPriceModal() {
   state.promoPick = { priceFreeProductIds: [] };
   state.promoFormDraft = {};
   resetPromoPickListScroll();
+  state.promoSearchOpen = {};
   state.searches.promo_priceFreeProductIds = "";
   state.searches.promo_priceFreeProductIds_category = "all";
   promotionPriceModal();
@@ -23203,6 +23289,7 @@ function openPromotionPaymentModal() {
   state.promoPick = { paymentFreeProductIds: [] };
   state.promoFormDraft = {};
   resetPromoPickListScroll();
+  state.promoSearchOpen = {};
   state.searches.promo_paymentFreeProductIds = "";
   state.searches.promo_paymentFreeProductIds_category = "all";
   promotionPaymentModal();
@@ -25208,7 +25295,11 @@ function cancelWorkerOrderNow(id) {
   }
   if (state.selectedWarehouseOrderId === id) {
     state.selectedWarehouseOrderId = "";
+    warehouseReceiptScrollId = "";
   }
+  state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
+    (x) => String(x) !== String(id),
+  );
   showAppToast("Захиалга цуцлагдлаа", "success");
   requestAnimationFrame(() => render());
   void criticalBackendSave({ fast: true });
@@ -30006,6 +30097,13 @@ function setOrder(id, s) {
     (o.items || []).forEach((i) => {
       if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
     });
+    if (state.selectedWarehouseOrderId === id) {
+      state.selectedWarehouseOrderId = "";
+      warehouseReceiptScrollId = "";
+    }
+    state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
+      (x) => String(x) !== String(id),
+    );
   }
   o.status = s;
   requestAnimationFrame(() => render());
@@ -30390,6 +30488,10 @@ Object.assign(window, {
   promoProductSearch,
   selectPromoProduct,
   promoPickSearch,
+  openPromoSearchDropdown,
+  closePromoSearchDropdown,
+  togglePromoSearchDropdown,
+  promoSearchDropdownKey,
   setPromoPickCategory,
   promoFormDraftField,
   addPromoPickProduct,

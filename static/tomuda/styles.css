@@ -16299,12 +16299,17 @@ textarea::placeholder {
 .modal-panel--promo-qty .promo-product-grid,
 .modal-panel--promo-sheet .promo-product-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   max-height: min(42vh, 320px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 2px;
+  padding: 4px 2px 8px;
+}
+
+.modal-panel--promo-qty .promo-sheet-section:has(.promo-search-combo.is-open) [data-promo-pick-list-mount] .promo-product-grid,
+.modal-panel--promo-sheet .promo-sheet-section:has(.promo-search-combo.is-open) [data-promo-pick-list-mount] .promo-product-grid {
+  max-height: min(22vh, 168px);
 }
 
 .modal-panel--promo-qty .promo-product-card,
@@ -16563,7 +16568,7 @@ textarea::placeholder {
 @media (max-width: 380px) {
   .modal-panel--promo-qty .promo-product-grid,
   .modal-panel--promo-sheet .promo-product-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -21426,72 +21431,130 @@ label.excel-import-toolbar__upload {
 .promo-search-combo {
   position: relative;
   z-index: 6;
-}
-.promo-search-dropdown {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 8;
-  max-height: 240px;
-  overflow-y: auto;
-  background: var(--hex-card, #fff);
-  border: 1px solid var(--hex-border, #e5e7eb);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(16, 22, 35, 0.12);
-}
-.promo-search-dropdown:empty {
-  display: none;
-}
-.promo-search-dropdown__item {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-bottom: 1px solid var(--hex-border, #e5e7eb);
-  background: var(--hex-card, #fff);
-  text-align: left;
-  font-size: 13px;
-  cursor: pointer;
+  flex-direction: column;
+  gap: 8px;
 }
-.promo-search-dropdown__item:last-child {
-  border-bottom: none;
+.promo-search-combo__field {
+  position: relative;
 }
-.promo-search-dropdown__item:active {
-  background: var(--hex-tint, #e0f2fe);
-}
-.promo-search-dropdown__img-wrap {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
+.promo-search-combo__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--promo-sheet-accent, #0e8a9a);
+  pointer-events: none;
 }
-.promo-search-dropdown__img {
+.promo-search-combo__icon .ui-icon {
+  width: 18px;
+  height: 18px;
+}
+.promo-search-combo__toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
-  object-fit: contain;
-  border-radius: 4px;
-  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--promo-sheet-accent, #0e8a9a);
+  cursor: pointer;
 }
-.promo-search-dropdown__name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.promo-search-combo__toggle .ui-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.18s ease;
 }
-.promo-search-dropdown__price {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: var(--hex-primary, #0891b2);
+.promo-search-combo.is-open .promo-search-combo__toggle .ui-icon {
+  transform: rotate(180deg);
+}
+.promo-search-combo__field .promo-search-input,
+.promo-search-combo__field .promo-sheet-search {
+  padding-left: 38px;
+  padding-right: 42px;
+}
+.promo-search-combo__field .promo-search-input::-webkit-search-cancel-button,
+.promo-search-combo__field .promo-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.promo-search-combo.is-open .promo-search-combo__field .promo-search-input {
+  border-color: var(--promo-sheet-accent, #0e8a9a);
+  background: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--promo-sheet-accent, #0e8a9a) 16%, transparent);
+}
+.promo-search-dropdown {
+  display: block;
+  min-height: 176px;
+  max-height: min(58vh, 460px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+  background: var(--hex-card, #fff);
+  border: 1px solid var(--promo-sheet-line, #e5e7eb);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(16, 22, 35, 0.08);
+}
+.promo-search-dropdown[hidden],
+.promo-search-dropdown:empty {
+  display: none;
+}
+.promo-search-dropdown .promo-product-grid,
+.modal-panel--promo-qty .promo-search-dropdown .promo-product-grid,
+.modal-panel--promo-sheet .promo-search-dropdown .promo-product-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: none;
+  overflow: visible;
+  gap: 12px;
+  padding: 0;
+}
+.promo-search-dropdown .promo-product-card,
+.modal-panel--promo-qty .promo-search-dropdown .promo-product-card,
+.modal-panel--promo-sheet .promo-search-dropdown .promo-product-card {
+  min-height: 168px;
+  height: auto;
+  overflow: visible;
+  padding: 12px 8px 14px;
+  border-radius: 12px;
+  background: #f7f9fb;
+}
+.promo-search-dropdown .promo-product-card__media,
+.modal-panel--promo-qty .promo-search-dropdown .promo-product-card__media,
+.modal-panel--promo-sheet .promo-search-dropdown .promo-product-card__media {
+  height: 84px;
+}
+.promo-search-dropdown .promo-product-card__img,
+.modal-panel--promo-qty .promo-search-dropdown .promo-product-card__img,
+.modal-panel--promo-sheet .promo-search-dropdown .promo-product-card__img {
+  max-height: 84px;
+}
+.promo-search-dropdown .promo-product-card__name,
+.modal-panel--promo-qty .promo-search-dropdown .promo-product-card__name,
+.modal-panel--promo-sheet .promo-search-dropdown .promo-product-card__name {
+  font-size: 12px;
+  -webkit-line-clamp: 3;
+}
+.promo-search-dropdown .promo-product-card__price,
+.modal-panel--promo-qty .promo-search-dropdown .promo-product-card__price,
+.modal-panel--promo-sheet .promo-search-dropdown .promo-product-card__price {
+  font-size: 13px;
 }
 .promo-search-dropdown__empty {
   margin: 0;
-  padding: 10px;
+  padding: 18px 10px;
   font-size: 13px;
   color: var(--hex-muted, #9ca3af);
   text-align: center;
