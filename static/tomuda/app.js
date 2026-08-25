@@ -13693,7 +13693,15 @@ function buildSalesReportExcelRows(orders, customers, meta) {
     ],
     salesReportExcelBlankRow(),
     ["ХАРИЛЦАГЧИД", "", "", "", "", "", ""],
-    ["Харилцагч", "Захиалга", "Борлуулалт", "Өртөг", "Ашиг", "Маржин", "Авлага"],
+    [
+      "Харилцагч",
+      "Захиалга",
+      "Борлуулалт",
+      "Өртөг",
+      "Ашиг",
+      "Маржин",
+      "Авлага",
+    ],
     ...customers.map((c) => [
       c.customerName,
       c.orderCount,
@@ -13769,16 +13777,23 @@ function buildSalesReportProductExcelRows(orders, meta) {
   const kpiSales = Number(meta.total) || 0;
   const kpiCost = Number(meta.cost) || 0;
   const kpiProfit = Number(meta.profit) || 0;
-  const kpiMargin =
-    Number.isFinite(Number(meta.margin))
-      ? Number(meta.margin).toFixed(1) + "%"
-      : "0%";
+  const kpiMargin = Number.isFinite(Number(meta.margin))
+    ? Number(meta.margin).toFixed(1) + "%"
+    : "0%";
   return [
     ["Борлуулалтын тайлан (Бараагаар)", "", "", "", "", "", ""],
     salesReportExcelBlankRow(),
     ["Ажилтан", emp, "", "Хугацаа", period, "", ""],
     salesReportExcelBlankRow(),
-    ["Нийт борлуулалт", "Нийт өртөг", "Нийт ашиг", "Маржин", "Нийт тоо", "", ""],
+    [
+      "Нийт борлуулалт",
+      "Нийт өртөг",
+      "Нийт ашиг",
+      "Маржин",
+      "Нийт тоо",
+      "",
+      "",
+    ],
     [
       fmtExcelMoney(kpiSales),
       fmtExcelMoney(kpiCost),
@@ -13836,7 +13851,15 @@ function confirmReportExport() {
     const customerBlock = [
       salesReportExcelBlankRow(),
       ["ХАРИЛЦАГЧИД", "", "", "", "", "", ""],
-      ["Харилцагч", "Захиалга", "Борлуулалт", "Өртөг", "Ашиг", "Маржин", "Авлага"],
+      [
+        "Харилцагч",
+        "Захиалга",
+        "Борлуулалт",
+        "Өртөг",
+        "Ашиг",
+        "Маржин",
+        "Авлага",
+      ],
       ...customers.map((c) => [
         c.customerName,
         c.orderCount,
@@ -13847,14 +13870,14 @@ function confirmReportExport() {
         c.receivable ? fmtExcelMoney(c.receivable) : "Авлагагүй",
       ]),
     ];
-    excel(`Борлуулалтын-тайлан-${stamp}.xlsx`, [
-      ...productRows,
-      ...empBlock,
-      ...customerBlock,
-    ], {
-      sheetName: "Борлуулалтын тайлан",
-      colWidths: SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS,
-    });
+    excel(
+      `Борлуулалтын-тайлан-${stamp}.xlsx`,
+      [...productRows, ...empBlock, ...customerBlock],
+      {
+        sheetName: "Борлуулалтын тайлан",
+        colWidths: SALES_REPORT_PRODUCT_XLSX_COL_WIDTHS,
+      },
+    );
   });
 }
 function confirmSalesInfoExport() {
@@ -14185,7 +14208,8 @@ function productsView() {
     .filter(Boolean)
     .join("");
   const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${canViewProductCost() ? " product-list--show-cost" : ""}`;
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Бүлэг", groups().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}${card("Төрөл", cats().filter(Boolean).length)}`, 4, "equal")}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  const baraaValue = `${state.products.length}<span class="metrics-bar__sub ${low ? "text-tone-warning" : "text-tone-success"}">Үлд ${low}</span>`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", baraaValue)}${card("Бүлэг", groups().length)}${card("Төрөл", cats().filter(Boolean).length)}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = canManageProducts(),
@@ -14271,9 +14295,8 @@ function productDetail(id) {
   box(p.name, productDetailHtml(p, id), "max-w-xl");
 }
 function productCard(p, active = false) {
-  const catLine = [productGroupName(p), p.category || ""]
-    .filter(Boolean)
-    .join(" · ") || "—";
+  const catLine =
+    [productGroupName(p), p.category || ""].filter(Boolean).join(" · ") || "—";
   const packLabel = productPackLabel(p);
   const packCell = packLabel
     ? `<span class="product-card__pack" title="${esc(packLabel)}">${esc(packLabel)}</span>`
@@ -20853,7 +20876,9 @@ function salesReportAddItemTotals(row, it, p) {
   row.itemSales = (row.itemSales || 0) + sales;
 }
 function salesReportFinishMoneyRow(row, lineFilter) {
-  const sales = lineFilter ? Number(row.itemSales) || 0 : Number(row.sales) || 0;
+  const sales = lineFilter
+    ? Number(row.itemSales) || 0
+    : Number(row.sales) || 0;
   const cost = Number(row.cost) || 0;
   const profit = sales - cost;
   return {
@@ -21175,7 +21200,11 @@ function salesReportProductRowHtml(row) {
   const profitClass =
     row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
   const marginStr = row.margin.toFixed(1) + "%";
-  const p = row.product || { id: row.productId, name: row.productName, category: row.category };
+  const p = row.product || {
+    id: row.productId,
+    name: row.productName,
+    category: row.category,
+  };
   const showCost = canViewProductCost();
   const img = `<img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="sales-report-dash__thumb" width="40" height="40" loading="lazy" decoding="async" alt="">`;
   return `<tr><td class="sales-report-dash__cell-product">${img}<span>${esc(row.productName)}</span></td><td>${esc(row.category || "-")}</td><td class="num">${row.qty}</td><td class="num">${fmt(row.salesPrice)}</td>${showCost ? `<td class="num">${fmt(row.costPrice)}</td><td class="num">${fmt(row.cost)}</td>` : ""}<td class="num">${fmt(row.sales)}</td>${showCost ? `<td class="num ${profitClass}">${fmt(row.profit)}</td><td class="num ${profitClass}">${marginStr}</td>` : ""}</tr>`;
@@ -21255,10 +21284,17 @@ function salesReportLineChartSvg(points) {
   const innerW = w - pad.l - pad.r;
   const innerH = h - pad.t - pad.b;
   const xAt = (i) =>
-    pad.l + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+    pad.l +
+    (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
   const yAt = (v) => pad.t + innerH - (v / max) * innerH;
-  const coords = points.map((p, i) => `${xAt(i).toFixed(1)},${yAt(p.sales).toFixed(1)}`);
-  const labels = [points[0], points[Math.floor(points.length / 2)], points[points.length - 1]]
+  const coords = points.map(
+    (p, i) => `${xAt(i).toFixed(1)},${yAt(p.sales).toFixed(1)}`,
+  );
+  const labels = [
+    points[0],
+    points[Math.floor(points.length / 2)],
+    points[points.length - 1],
+  ]
     .filter(Boolean)
     .filter((p, i, arr) => arr.findIndex((x) => x.day === p.day) === i);
   const labelHtml = labels
@@ -21275,7 +21311,14 @@ function salesReportDonutSvg(slices) {
   if (!slices.length) {
     return `<p class="sales-report-dash__empty">Төрөл харуулах өгөгдөл алга</p>`;
   }
-  const colors = ["#16899a", "#4db3c0", "#c5e9ef", "#687386", "#e2b86a", "#182032"];
+  const colors = [
+    "#16899a",
+    "#4db3c0",
+    "#c5e9ef",
+    "#687386",
+    "#e2b86a",
+    "#182032",
+  ];
   const r = 42;
   const c = 2 * Math.PI * r;
   let offset = 0;
@@ -21343,7 +21386,9 @@ function salesReportEmployeesBodyHtml(filtered, q) {
   const rows = employees.map((row) => {
     const profitClass =
       row.profit >= 0 ? "text-tone-success" : "text-tone-danger";
-    const emp = state.employees.find((e) => String(e.id) === String(row.employeeId));
+    const emp = state.employees.find(
+      (e) => String(e.id) === String(row.employeeId),
+    );
     const src = emp ? entityImageSrc(emp.image) : "";
     const avatar = src
       ? `<img src="${esc(src)}" alt="" class="sales-report-dash__avatar" width="32" height="32">`
@@ -21790,7 +21835,9 @@ function salesReportDetailView() {
       ? {
           label: "Нийт ашиг",
           value: fmt(kpi.profit),
-          delta: prevKpi ? salesReportDeltaPct(kpi.profit, prevKpi.profit) : null,
+          delta: prevKpi
+            ? salesReportDeltaPct(kpi.profit, prevKpi.profit)
+            : null,
         }
       : null,
     showCost
@@ -28604,7 +28651,10 @@ function addGroupFromProductForm() {
   if (select) select.value = chosen;
   if (input) input.value = "";
   document.getElementById("productNewGroupField")?.setAttribute("hidden", "");
-  fillProductFormCategoryOptions(chosen, String(form?.elements?.category?.value || ""));
+  fillProductFormCategoryOptions(
+    chosen,
+    String(form?.elements?.category?.value || ""),
+  );
 }
 function toggleProductNewCategoryField() {
   const row = document.getElementById("productNewCategoryField");
