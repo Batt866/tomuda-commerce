@@ -1246,6 +1246,28 @@ function isLowStock(p) {
 function lowStockProducts() {
   return state.products.filter(isLowStock);
 }
+function gs1BarcodeCheckValid(digits) {
+  const d = String(digits || "");
+  if (!/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/.test(d)) return false;
+  const body = d.slice(0, -1);
+  let sum = 0;
+  for (let i = 0; i < body.length; i++) {
+    const fromRight = body.length - 1 - i;
+    const weight = fromRight % 2 === 0 ? 3 : 1;
+    sum += Number(body[i]) * weight;
+  }
+  return (10 - (sum % 10)) % 10 === Number(d.slice(-1));
+}
+function isStandardProductBarcode(p) {
+  const compact = String(p?.barcode || "")
+    .trim()
+    .replace(/[\s-]/g, "");
+  if (!compact || !/^\d+$/.test(compact)) return false;
+  return gs1BarcodeCheckValid(compact);
+}
+function nonStandardBarcodeProducts() {
+  return (state.products || []).filter((p) => !isStandardProductBarcode(p));
+}
 const dte = (d) => {
   // Date-only ISO must use local calendar day (avoid UTC midnight shifting the day).
   const raw = String(d ?? "").trim();
@@ -13974,7 +13996,8 @@ function productsView() {
           p.barcode.includes(q)) &&
         (cat === "all" || p.category === cat),
     ),
-    low = lowStockProducts().length;
+    low = lowStockProducts().length,
+    badBarcode = nonStandardBarcodeProducts().length;
   const highlightId = state.productHighlightId || "";
   if (highlightId) {
     const idx = list.findIndex((p) => String(p.id) === String(highlightId));
@@ -14002,7 +14025,7 @@ function productsView() {
     .filter(Boolean)
     .join("");
   const productListClass = `product-list${canManageProducts() ? "" : " product-list--readonly"}${canViewProductCost() ? " product-list--show-cost" : ""}`;
-  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}`, 3)}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead("Бараа")}${metricsBar(`${card("Бараа", state.products.length)}${card("Төрөл", cats().length)}${card("Үлд", low, low ? "text-tone-warning" : "text-tone-success")}${card("Ст.бус", badBarcode, badBarcode ? "text-tone-warning" : "text-tone-success")}`, 4, "equal")}<div class="line-panel">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}${excelImportToolbar("products")}<div class="${productListClass}">${list.length ? `${productListHead()}${list.map((p) => productCard(p, String(p.id) === String(highlightId))).join("")}` : `<div class="line-panel__empty">Бараа олдсонгүй</div>`}</div></div></div>`;
 }
 function productListHead() {
   const actions = canManageProducts(),

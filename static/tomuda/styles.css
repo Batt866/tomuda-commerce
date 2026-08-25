@@ -14929,6 +14929,14 @@ textarea::placeholder {
   letter-spacing: -0.03em;
 }
 
+.metrics-bar--equal.metrics-bar--4 .metrics-bar__item,
+.metrics-bar--equal.metrics-bar--4 .metrics-bar__item:nth-child(1),
+.metrics-bar--equal.metrics-bar--4 .metrics-bar__item:nth-child(2),
+.metrics-bar--equal.metrics-bar--4 .metrics-bar__item:nth-child(3),
+.metrics-bar--equal.metrics-bar--4 .metrics-bar__item:nth-child(4) {
+  flex: 1 1 0;
+}
+
 .metrics-bar--3 .metrics-bar__item {
   min-width: 0;
   overflow: hidden;
