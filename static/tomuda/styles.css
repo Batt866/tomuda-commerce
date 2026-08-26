@@ -1976,6 +1976,35 @@ label.excel-import-toolbar__upload {
   min-width: 0;
 }
 
+.page-toolbar--products {
+  align-items: stretch;
+}
+
+.page-toolbar--products .page-toolbar__filters {
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.page-toolbar--products .page-toolbar__search {
+  width: 100%;
+  flex: none;
+}
+
+.page-toolbar--products .page-toolbar__tax {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.page-toolbar--products .page-toolbar__tax .page-toolbar__select {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  flex: none;
+}
+
 .page-toolbar__actions {
   display: flex;
   flex-wrap: wrap;
@@ -5696,6 +5725,21 @@ button:focus-visible,
   justify-content: center;
   padding: 16px;
   background: rgba(16, 22, 35, 0.52);
+}
+
+.confirm-card-overlay--blur {
+  background: rgba(16, 22, 35, 0.58);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.confirm-card__field {
+  display: block;
+  margin: 4px 0 0;
+}
+
+.confirm-card__field .field-input {
+  width: 100%;
 }
 
 .confirm-card {

@@ -41,6 +41,8 @@ PERM_GROUPS: list[dict[str, Any]] = [
             {"id": "customerAdd", "label": "Харилцагч нэмэх", "actions": CRUD},
             {"id": "productAdd", "label": "Бараа нэмэх", "actions": CRUD},
             {"id": "categoryAdd", "label": "Төрөл нэмэх", "actions": CRUD},
+            {"id": "groupAdd", "label": "Бүлэг нэмэх", "actions": CRUD},
+            {"id": "productCost", "label": "Өртөг үнэ харах", "actions": ["view"]},
             {"id": "employeeAdd", "label": "Ажилтан нэмэх", "actions": CRUD},
             {"id": "stockIn", "label": "Орлого", "actions": CRUD},
             {"id": "stockOut", "label": "Зарлага", "actions": CRUD},
@@ -149,6 +151,24 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "categoryAdd.create": ["products.create", "products.edit"],
     "categoryAdd.edit": ["products.edit"],
     "categoryAdd.delete": ["products.edit", "products.delete"],
+    "groupAdd.view": [
+        "categoryAdd.view",
+        "categoryAdd.create",
+        "products.create",
+        "products.edit",
+    ],
+    "groupAdd.create": [
+        "categoryAdd.create",
+        "products.create",
+        "products.edit",
+    ],
+    "groupAdd.edit": ["categoryAdd.edit", "products.edit", "groupAdd.create"],
+    "groupAdd.delete": [
+        "categoryAdd.delete",
+        "products.edit",
+        "products.delete",
+    ],
+    "productCost.view": ["warehouse.edit", "stockIn.view", "stockIn.edit"],
     "employeeAdd.view": ["employees.create"],
     "employeeAdd.create": ["employees.create"],
     "employeeAdd.edit": ["employees.create", "employees.edit"],
@@ -264,8 +284,12 @@ def expand_legacy_permissions(raw: list[str]) -> list[str]:
     if "products.create" in keys:
         _add_crud(keys, "productAdd")
         _add_crud(keys, "categoryAdd")
+        _add_crud(keys, "groupAdd")
     if "products.edit" in keys:
         _add_crud(keys, "categoryAdd")
+        _add_crud(keys, "groupAdd")
+    if "warehouse.edit" in keys and "productCost.view" in ALL_PERMISSION_KEY_SET:
+        keys.add("productCost.view")
     if "employees.create" in keys:
         _add_crud(keys, "employeeAdd")
     if "reports.view" in keys:
@@ -316,6 +340,7 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "receipts.view",
         "warehousePrepare.view",
         "stockReports.view",
+        "productCost.view",
     ],
     "delivery": ["orders.view", "orderDeliveryMark.view"],
 }
@@ -664,6 +689,36 @@ def validate_state_mutation(
 
     if _settings_changed(old_state, new_state) and not _can_manage_settings(perms):
         return False, "Тохиргоо өөрчлөх эрхгүй"
+
+    if (old_state.get("extraGroups") or []) != (new_state.get("extraGroups") or []) or (
+        old_state.get("categoryGroups") or {}
+    ) != (new_state.get("categoryGroups") or {}):
+        if not _has_any_permission(
+            perms,
+            "groupAdd.view",
+            "groupAdd.create",
+            "groupAdd.edit",
+            "groupAdd.delete",
+            "categoryAdd.create",
+            "categoryAdd.edit",
+            "products.create",
+            "products.edit",
+        ):
+            return False, "Бүлэг өөрчлөх эрхгүй"
+
+    if (old_state.get("extraCategories") or []) != (
+        new_state.get("extraCategories") or []
+    ):
+        if not _has_any_permission(
+            perms,
+            "categoryAdd.view",
+            "categoryAdd.create",
+            "categoryAdd.edit",
+            "categoryAdd.delete",
+            "products.create",
+            "products.edit",
+        ):
+            return False, "Төрөл өөрчлөх эрхгүй"
 
     if _promotion_rules_changed(old_state, new_state) and not _has_any_permission(
         perms, "promotions.edit", "promotions.view", "settings.view"

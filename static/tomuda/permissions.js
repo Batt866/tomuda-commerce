@@ -31,6 +31,8 @@
         { id: "customerAdd", label: "Харилцагч нэмэх", actions: CRUD },
         { id: "productAdd", label: "Бараа нэмэх", actions: CRUD },
         { id: "categoryAdd", label: "Төрөл нэмэх", actions: CRUD },
+        { id: "groupAdd", label: "Бүлэг нэмэх", actions: CRUD },
+        { id: "productCost", label: "Өртөг үнэ харах", actions: ["view"] },
         { id: "employeeAdd", label: "Ажилтан нэмэх", actions: CRUD },
         { id: "stockIn", label: "Орлого", actions: CRUD },
         { id: "stockOut", label: "Зарлага", actions: CRUD },
@@ -132,6 +134,24 @@
     "categoryAdd.create": ["products.create", "products.edit"],
     "categoryAdd.edit": ["products.edit"],
     "categoryAdd.delete": ["products.edit", "products.delete"],
+    "groupAdd.view": [
+      "categoryAdd.view",
+      "categoryAdd.create",
+      "products.create",
+      "products.edit",
+    ],
+    "groupAdd.create": [
+      "categoryAdd.create",
+      "products.create",
+      "products.edit",
+    ],
+    "groupAdd.edit": ["categoryAdd.edit", "products.edit", "groupAdd.create"],
+    "groupAdd.delete": [
+      "categoryAdd.delete",
+      "products.edit",
+      "products.delete",
+    ],
+    "productCost.view": ["warehouse.edit", "stockIn.view", "stockIn.edit"],
     "employeeAdd.view": ["employees.create"],
     "employeeAdd.create": ["employees.create"],
     "employeeAdd.edit": ["employees.create", "employees.edit"],
@@ -241,8 +261,15 @@
     if (set.has("products.create")) {
       addCrud("productAdd");
       addCrud("categoryAdd");
+      addCrud("groupAdd");
     }
-    if (set.has("products.edit")) addCrud("categoryAdd");
+    if (set.has("products.edit")) {
+      addCrud("categoryAdd");
+      addCrud("groupAdd");
+    }
+    if (set.has("warehouse.edit") && ALL_KEY_SET.has("productCost.view")) {
+      set.add("productCost.view");
+    }
     if (set.has("employees.create")) addCrud("employeeAdd");
     if (set.has("reports.view")) addCrud("excelExport");
     if (set.has("reports.view")) addCrud("salesInfo");
@@ -293,6 +320,7 @@
       "receipts.view",
       "warehousePrepare.view",
       "stockReports.view",
+      "productCost.view",
     ],
     delivery: ["orders.view", "orderDeliveryMark.view"],
   };
