@@ -450,11 +450,22 @@ def _order_retention_days(state: dict[str, Any] | None = None) -> int:
 
 
 def _order_is_paid(order: dict[str, Any]) -> bool:
+    try:
+        due = float(order.get("total") or 0)
+    except (TypeError, ValueError):
+        due = 0.0
+    recorded = order.get("paidAmount")
+    if recorded is not None and recorded != "":
+        try:
+            paid = float(recorded)
+        except (TypeError, ValueError):
+            paid = None
+        else:
+            if paid >= 0:
+                return paid + 0.009 >= due
     term = str(order.get("paymentTerm") or "").strip()
     if term == "cash":
-        return True
-    if term == "credit":
-        return bool(order.get("isPaid"))
+        return order.get("isPaid") is not False
     return bool(order.get("isPaid"))
 
 

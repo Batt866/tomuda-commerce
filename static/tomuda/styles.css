@@ -774,6 +774,22 @@ textarea.text-sm,
   gap: 6px;
 }
 
+.customer-detail__name {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.customer-detail__name-text {
+  min-width: 0;
+  flex: 1;
+}
+
 .customer-detail__company {
   margin: 0;
   font-size: 0.95rem;
@@ -1379,6 +1395,15 @@ textarea.text-sm,
   min-width: 0;
 }
 
+.customer-card__name-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
 .customer-card__name {
   flex: 1 1 auto;
   min-width: 0;
@@ -1704,7 +1729,7 @@ a.customer-card__line .customer-card__icon {
 .worker-pick-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   padding: 12px 0;
   border: none;
@@ -1713,15 +1738,30 @@ a.customer-card__line .customer-card__icon {
   background: transparent;
   color: var(--hex-foreground);
   text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
   box-shadow: none !important;
   transition: background 0.15s ease;
 }
 
-.worker-pick-card:focus-visible {
+.worker-pick-card__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: none !important;
+}
+
+.worker-pick-card__main:focus-visible {
   outline: none;
-  border-color: var(--hex-primary);
   box-shadow: 0 0 0 3px rgba(22, 137, 154, 0.14);
 }
 
@@ -1805,6 +1845,43 @@ img.worker-pick-card__avatar {
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
+}
+
+.customer-pay-mark {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--hex-secondary);
+  color: var(--hex-muted-foreground);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.customer-pay-mark__icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.customer-pay-mark--good {
+  color: #0f9d8e;
+  background: color-mix(in srgb, #0f9d8e 16%, transparent);
+}
+
+.customer-pay-mark--bad {
+  color: #b42318;
+  background: color-mix(in srgb, #b42318 16%, transparent);
+}
+
+.worker-order-store__name .customer-pay-mark {
+  width: 32px;
+  height: 32px;
 }
 
 .list-panel--customers {
@@ -7626,7 +7703,7 @@ textarea::placeholder {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 4px 10px;
   font-size: 16px;
   font-weight: 700;
@@ -8019,6 +8096,46 @@ textarea::placeholder {
   color: var(--hex-foreground);
   text-align: right;
   white-space: nowrap;
+}
+
+.worker-receivable__paid {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+}
+
+.pay-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pay-confirm__line {
+  margin: 0;
+  font-size: 14px;
+}
+.pay-confirm__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pay-confirm__input {
+  width: 100%;
+  min-height: var(--field-h, 44px);
+}
+.pay-confirm__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--hex-muted-foreground);
+  font-weight: 400;
+}
+
+.app-input.is-locked {
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .worker-receivable__action {

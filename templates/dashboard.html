@@ -271,12 +271,12 @@
     </style>
     <link
       rel="preload"
-      href="{% static 'tomuda/styles.css' %}?v=20260827-no-airprint"
+      href="{% static 'tomuda/styles.css' %}?v=20260827-pay-mark"
       as="style"
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260827-no-airprint"
+      href="{% static 'tomuda/app.js' %}?v=20260827-pay-mark"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -314,7 +314,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260827-no-airprint"
+      href="{% static 'tomuda/styles.css' %}?v=20260827-pay-mark"
     />
   </head>
   <body>
@@ -446,7 +446,7 @@
       };
       window.__loadTomudaApp = function () {
         var sources = [
-          "{% static 'tomuda/app.js' %}?v=20260827-no-airprint",
+          "{% static 'tomuda/app.js' %}?v=20260827-pay-mark",
           "{% static 'tomuda/app.js' %}?v=" + Date.now(),
           "{% static 'tomuda/app.js' %}",
         ];
@@ -507,9 +507,9 @@
       };
     </script>
     <script src="{% static 'tomuda/vendor/jszip.min.js' %}?v=20260604-count-xlsx"></script>
-    <script src="{% static 'tomuda/permissions.js' %}?v=20260827-no-airprint"></script>
+    <script src="{% static 'tomuda/permissions.js' %}?v=20260827-pay-mark"></script>
     <script src="{% static 'tomuda/capacitor-geolocation.js' %}?v=20260705-promo-labels"></script>
-    <script src="{% static 'tomuda/capacitor-bluetooth-printer.js' %}?v=20260827-no-airprint"></script>
+    <script src="{% static 'tomuda/capacitor-bluetooth-printer.js' %}?v=20260827-pay-mark"></script>
     <script>
       __loadTomudaApp();
     </script>

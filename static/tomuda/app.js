@@ -1784,9 +1784,31 @@ function paidFromPaymentTerm(_term) {
 function paymentTermLabel(term) {
   return term === "credit" ? "Зээлээр" : "Шууд төлөх";
 }
+function orderPaidAmount(o) {
+  if (!o) return 0;
+  const due = orderAmount(o);
+  const recorded = Number(o.paidAmount);
+  if (Number.isFinite(recorded) && recorded >= 0) {
+    return Math.min(due, Math.max(0, recorded));
+  }
+  return orderIsPaidFlag(o) ? due : 0;
+}
+function orderRemainingAmount(o) {
+  return Math.max(0, orderAmount(o) - orderPaidAmount(o));
+}
+function orderIsPaidFlag(o) {
+  return !!o?.isPaid;
+}
 function orderIsPaid(o) {
   if (!o) return false;
+  const recorded = Number(o.paidAmount);
+  if (Number.isFinite(recorded) && recorded >= 0) {
+    return orderRemainingAmount(o) <= 0.009;
+  }
   return !!o.isPaid;
+}
+function customerHasOpenBalance(customerId) {
+  return customerReceivableTotal(customerId) > 0.009;
 }
 function customerUnpaidOrders(customerId) {
   if (!customerId) return [];
@@ -1914,7 +1936,7 @@ function customerHistorySectionHtml(customerId) {
 }
 function customerReceivableTotal(customerId) {
   return customerUnpaidOrders(customerId).reduce(
-    (sum, o) => sum + orderAmount(o),
+    (sum, o) => sum + orderRemainingAmount(o),
     0,
   );
 }
@@ -1935,7 +1957,14 @@ function refreshCustomerEditReceivable(customerId) {
 function workerReceivableItemHtml(o, opts = {}) {
   const { actions = "" } = opts;
   const id = esc(o.id);
-  return `<div class="worker-receivable__item"><button type="button" class="worker-receivable__open" onclick="event.stopPropagation();orderReceiptModal('${id}')" aria-label="Баримт ${esc(formatReceiptNumber(o))} харах"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span><span class="worker-receivable__amount">${fmt(orderAmount(o))}</span></button>${actions}</div>`;
+  const remaining = orderRemainingAmount(o);
+  const paid = orderPaidAmount(o);
+  const due = orderAmount(o);
+  const amountHtml =
+    paid > 0.009 && remaining > 0.009
+      ? `<span class="worker-receivable__amount">${fmt(remaining)}</span><span class="worker-receivable__paid">Төлсөн ${fmt(paid)} / ${fmt(due)}</span>`
+      : `<span class="worker-receivable__amount">${fmt(remaining > 0.009 ? remaining : due)}</span>`;
+  return `<div class="worker-receivable__item"><button type="button" class="worker-receivable__open" onclick="event.stopPropagation();orderReceiptModal('${id}')" aria-label="Баримт ${esc(formatReceiptNumber(o))} харах"><span class="worker-receivable__no">${receiptNo(o, "xs")}</span>${amountHtml}</button>${actions}</div>`;
 }
 function workerReceivableHtml(customerId, opts = {}) {
   const orders = customerUnpaidOrders(customerId);
@@ -1973,7 +2002,12 @@ function normalizeOrderPayments() {
   if (!Array.isArray(state.orders)) return;
   for (const o of state.orders) {
     if (!o.paymentTerm) o.paymentTerm = "cash";
-    if (o.paymentTerm === "cash") {
+    const recorded = Number(o.paidAmount);
+    if (Number.isFinite(recorded) && recorded >= 0) {
+      const due = orderAmount(o);
+      o.paidAmount = Math.min(due, Math.max(0, recorded));
+      o.isPaid = o.paidAmount + 0.009 >= due;
+    } else if (o.paymentTerm === "cash") {
       // Legacy cash was auto-paid; only explicit false stays unpaid (confirm flow).
       o.isPaid = o.isPaid !== false;
     } else {
@@ -6330,9 +6364,16 @@ async function fetchWithTimeout(url, opts = {}, ms = 20000) {
   try {
     if (opts.signal) {
       if (opts.signal.aborted) ctrl.abort();
-      else opts.signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+      else
+        opts.signal.addEventListener("abort", () => ctrl.abort(), {
+          once: true,
+        });
     }
-    return await fetch(url, { ...opts, signal: ctrl.signal, credentials: "same-origin" });
+    return await fetch(url, {
+      ...opts,
+      signal: ctrl.signal,
+      credentials: "same-origin",
+    });
   } finally {
     clearTimeout(timer);
   }
@@ -7978,7 +8019,8 @@ function readCssSafeInset(side) {
   el.setAttribute("aria-hidden", "true");
   el.style.cssText = `position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-${side}:env(safe-area-inset-${side}, 0px);`;
   document.documentElement.appendChild(el);
-  const px = parseFloat(getComputedStyle(el).getPropertyValue(`padding-${side}`)) || 0;
+  const px =
+    parseFloat(getComputedStyle(el).getPropertyValue(`padding-${side}`)) || 0;
   el.remove();
   return px;
 }
@@ -7994,7 +8036,8 @@ function iosStatusBarFallbackPx() {
 function isApplePhoneLike() {
   const ua = navigator.userAgent || "";
   if (/iPhone|iPod/i.test(ua)) return true;
-  if (/iPad/i.test(ua)) return Math.min(window.innerWidth, window.innerHeight) <= 640;
+  if (/iPad/i.test(ua))
+    return Math.min(window.innerWidth, window.innerHeight) <= 640;
   return (
     navigator.platform === "MacIntel" &&
     navigator.maxTouchPoints > 1 &&
@@ -8511,9 +8554,7 @@ function isPermissionSaveMessage(message = "") {
   return PERMISSION_SAVE_RE.test(String(message || ""));
 }
 function markBackendSaveFailed(message = "") {
-  const msg = String(
-    message || "Серверт хадгалагдаагүй өгөгдөл байна",
-  ).trim();
+  const msg = String(message || "Серверт хадгалагдаагүй өгөгдөл байна").trim();
   if (!isPermissionSaveMessage(msg)) {
     scheduleBackendSaveRetry(5000);
     return;
@@ -10616,7 +10657,10 @@ function receiptXlsxLabelUnits(text) {
   return units;
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
-function xlsxFitColWidth(text, { min = 6, max = 42, pad = 1.7, fontScale = 1 } = {}) {
+function xlsxFitColWidth(
+  text,
+  { min = 6, max = 42, pad = 1.7, fontScale = 1 } = {},
+) {
   const units = receiptXlsxLabelUnits(text) * fontScale + pad;
   return Math.min(max, Math.max(min, Math.round(units * 10) / 10));
 }
@@ -12272,6 +12316,45 @@ function customerAvatarHtml(c, className = "customer-card__avatar") {
   }
   return `<span class="${className}" aria-hidden="true">${initial}</span>`;
 }
+function normalizeCustomerPayMark(value) {
+  const s = String(value || "").trim();
+  return s === "good" || s === "bad" ? s : "";
+}
+function customerPayMarkLabel(mark) {
+  if (mark === "good") return "Шууд төлдөг";
+  if (mark === "bad") return "Новшсон тооцоо";
+  return "Төлбөрийн тэмдэг";
+}
+function customerPayMarkIcon(mark) {
+  if (mark === "good") {
+    return `<svg class="customer-pay-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-6.7-4.2-9.5-8.4C.4 9.2 1.9 4.8 5.8 3.9 8 3.3 10.1 4.4 12 6.5c1.9-2.1 4-3.2 6.2-2.6 3.9.9 5.4 5.3 3.3 8.7C18.7 16.8 12 21 12 21z"/></svg>`;
+  }
+  if (mark === "bad") {
+    return `<svg class="customer-pay-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-7h-2v5h2V9z"/></svg>`;
+  }
+  return `<svg class="customer-pay-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+}
+function customerPayMarkHtml(c) {
+  if (!c?.id) return "";
+  const mark = normalizeCustomerPayMark(c.payMark);
+  const label = customerPayMarkLabel(mark);
+  const cls = mark ? ` customer-pay-mark--${mark}` : "";
+  return `<button type="button" class="customer-pay-mark${cls}" onclick="cycleCustomerPayMark('${esc(c.id)}',event)" aria-label="${esc(label)}" title="${esc(label)}">${customerPayMarkIcon(mark)}</button>`;
+}
+function cycleCustomerPayMark(id, event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  const c = state.customers.find((x) => String(x.id) === String(id));
+  if (!c) return;
+  const cur = normalizeCustomerPayMark(c.payMark);
+  c.payMark = cur === "" ? "good" : cur === "good" ? "bad" : "";
+  c.updatedAt = new Date().toISOString();
+  render();
+  void upsertCustomerOnServer(c).catch((err) => {
+    console.warn("Pay mark save failed", err);
+  });
+  criticalBackendSave();
+}
 function customerImageField(c) {
   const preview = c.image || customerStoreImage(c);
   return `<div class="customer-image-field"><span class="block text-sm font-medium mb-2">Зураг</span><div class="customer-image-upload customer-image-upload--stack"><img id="customerImagePreview" src="${preview}" alt="" class="customer-image-upload__preview"><div class="customer-image-upload__body"><input id="customerImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleCustomerImage(this)" hidden><div class="customer-image-upload__actions"><button type="button" onclick="document.getElementById('customerImageFile').click()" class="btn btn--primary btn--sm customer-image-upload__pick">Зураг оруулах</button>${c.image ? `<button type="button" onclick="clearCustomerImage()" class="btn btn--secondary btn--sm">Зураг арилгах</button>` : ""}</div><input id="customerImageValue" name="image" type="hidden" value=""><p class="customer-image-upload__hint">Дэлгүүрийн зураг оруулна. JPG, PNG, WEBP.</p></div></div></div>`;
@@ -12433,15 +12516,18 @@ function customerPhonesFromFormData(fd) {
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 }
-function customerPhoneFieldRow(value = "", index = 0, total = 1) {
-  const canRemove = total > 1;
-  return `<div class="customer-phone-row" data-customer-phone-row><label class="customer-phone-row__field"><span class="block text-sm font-medium mb-2">Утас ${index + 1}</span><input name="phones" type="tel" inputmode="tel" autocomplete="tel" value="${esc(value || "")}" placeholder="Утасны дугаар" class="w-full px-4 py-3 bg-secondary rounded app-input"></label>${canRemove ? `<button type="button" class="customer-phone-row__remove" onclick="removeCustomerPhoneField(this)" aria-label="Утас устгах" title="Устгах">×</button>` : ""}</div>`;
+function customerPhoneFieldRow(value = "", index = 0, total = 1, locked = false) {
+  const canRemove = total > 1 && !locked;
+  const lock = locked
+    ? " readonly tabindex='-1' aria-readonly='true'"
+    : "";
+  return `<div class="customer-phone-row" data-customer-phone-row><label class="customer-phone-row__field"><span class="block text-sm font-medium mb-2">Утас ${index + 1}</span><input name="phones" type="tel" inputmode="tel" autocomplete="tel" value="${esc(value || "")}" placeholder="Утасны дугаар"${lock} class="w-full px-4 py-3 bg-secondary rounded app-input${locked ? " is-locked" : ""}"></label>${canRemove ? `<button type="button" class="customer-phone-row__remove" onclick="removeCustomerPhoneField(this)" aria-label="Утас устгах" title="Устгах">×</button>` : ""}</div>`;
 }
-function customerPhonesFieldsHtml(c) {
+function customerPhonesFieldsHtml(c, locked = false) {
   let phones = customerPhonesList(c);
   if (!phones.length) phones = [""];
-  const addHidden = phones.length >= CUSTOMER_PHONE_MAX ? " hidden" : "";
-  return `<div class="customer-phones" data-customer-phones><div class="customer-phones__list" id="customerPhonesList">${phones.map((p, i) => customerPhoneFieldRow(p, i, phones.length)).join("")}</div><button type="button" class="customer-phones__add"${addHidden} onclick="addCustomerPhoneField()">+ Утас нэмэх</button></div>`;
+  const addHidden = locked || phones.length >= CUSTOMER_PHONE_MAX ? " hidden" : "";
+  return `<div class="customer-phones" data-customer-phones><div class="customer-phones__list" id="customerPhonesList">${phones.map((p, i) => customerPhoneFieldRow(p, i, phones.length, locked)).join("")}</div>${locked ? "" : `<button type="button" class="customer-phones__add"${addHidden} onclick="addCustomerPhoneField()">+ Утас нэмэх</button>`}</div>`;
 }
 function renumberCustomerPhoneFields() {
   const list = document.getElementById("customerPhonesList");
@@ -12470,6 +12556,9 @@ function renumberCustomerPhoneFields() {
   if (addBtn) addBtn.hidden = rows.length >= CUSTOMER_PHONE_MAX;
 }
 function addCustomerPhoneField() {
+  const form = document.querySelector("form[data-customer-form]");
+  const cid = form?.getAttribute("data-customer-id") || "";
+  if (cid && customerHasOpenBalance(cid)) return;
   const list = document.getElementById("customerPhonesList");
   if (!list) return;
   const count = list.querySelectorAll("[data-customer-phone-row]").length;
@@ -12482,6 +12571,9 @@ function addCustomerPhoneField() {
   list.querySelector("[data-customer-phone-row]:last-child input")?.focus();
 }
 function removeCustomerPhoneField(btn) {
+  const form = document.querySelector("form[data-customer-form]");
+  const cid = form?.getAttribute("data-customer-id") || "";
+  if (cid && customerHasOpenBalance(cid)) return;
   const row = btn?.closest?.("[data-customer-phone-row]");
   const list = document.getElementById("customerPhonesList");
   if (!row || !list) return;
@@ -12533,7 +12625,7 @@ function customerDetailHtml(c) {
     ),
     customerDetailRow("Байршил", mapsHtml, customerCardPinIcon()),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name">${esc(displayName)}</p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div>${customerHistorySectionHtml(c.id)}</div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name"><span class="customer-detail__name-text">${esc(displayName)}</span>${customerPayMarkHtml(c)}</p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div>${customerHistorySectionHtml(c.id)}</div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -12776,7 +12868,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${customerPayMarkHtml(c)}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
@@ -14312,7 +14404,7 @@ function workerPickCard(c) {
   const subHtml = line2
     ? `<span class="worker-pick-card__sub">${esc(line2)}</span>`
     : "";
-  return `<button type="button" class="worker-pick-card${active ? " is-selected" : ""}" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</button>`;
+  return `<div class="worker-pick-card${active ? " is-selected" : ""}"><button type="button" class="worker-pick-card__main" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span></button>${customerPayMarkHtml(c)}${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</div>`;
 }
 function focusSavedProduct(productId, productName, opts = {}) {
   const name = String(productName || "Бараа").trim() || "Бараа";
@@ -19639,9 +19731,7 @@ function buildStockOutSheetXmlLegacy(
     ),
   ]);
   pushRow(STOCK_RECEIPT_META_ROW_HEIGHT, [
-    ...(partyLabel
-      ? [xlsxCellXml("A3", s.metaLeft, si(partyLabel), "s")]
-      : []),
+    ...(partyLabel ? [xlsxCellXml("A3", s.metaLeft, si(partyLabel), "s")] : []),
     xlsxCellXml(
       "E3",
       s.metaRight,
@@ -19988,11 +20078,17 @@ const WAREHOUSE_PREPARE_BODY_ROW_HEIGHT = 15;
 const WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT = 38;
 const WAREHOUSE_PREPARE_META_ROW_HEIGHT = 16;
 const WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT = 18;
-const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 22;
+const WAREHOUSE_PREPARE_SIGN_HANDED_NAME = "Хүлээлгэн өгсөн ажилтны нэр:";
+const WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME = "Хүлээн авсан ажилтны нэр:";
+const WAREHOUSE_PREPARE_SIGN_MARK_LABEL = "гарын үсэг:";
+const WAREHOUSE_PREPARE_CAT_ROW_HEIGHT = 22;
+const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 10;
+const WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT = 36;
+const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 24;
 /**
  * A4 print widths — name widest, barcode full 13 digits, qty cols narrow.
  */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [32, 13, 16, 8, 9.5, 8, 12];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [40, 8.5, 16, 8, 9.5, 8, 12];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -20014,10 +20110,10 @@ const WAREHOUSE_PREPARE_SHEET_STYLES = {
   header: 7,
   unitHead: WAREHOUSE_PREPARE_UNIT_HEAD_STYLE,
   text: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
-  category: 11,
+  category: 15,
   stock: 10,
-  signLabel: 3,
-  signLine: WAREHOUSE_PREPARE_SIGN_LINE_STYLE,
+  signLabel: 26,
+  signLine: 27,
 };
 /** Print-ready B&W pack appended by warehousePreparePrintPatchStylesXml. */
 const WAREHOUSE_PREPARE_PRINT_STYLE_KEYS = [
@@ -20070,8 +20166,8 @@ function warehousePreparePrintXfs({
     `<xf numFmtId="49" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
     `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderSection}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderSign}" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf>`,
   ];
@@ -20192,19 +20288,28 @@ const WAREHOUSE_PREPARE_GRAY_CATEGORY = WAREHOUSE_PREPARE_FILL_PIECE.rgb;
 function warehousePrepareColWidthsFor(sections, metaTexts = []) {
   const widths = WAREHOUSE_PREPARE_COL_WIDTHS.slice();
   widths[1] = Math.max(
-    widths[1],
-    xlsxFitColWidth("Хэмжих нэгж", { min: 13, max: 16, fontScale: 1.05 }),
+    8,
+    Math.min(
+      9.5,
+      xlsxFitColWidth("ширхэг", { min: 8, max: 9.5, fontScale: 1.05 }),
+    ),
   );
   widths[2] = Math.max(
     widths[2],
     xlsxFitColWidth("0000000000000", { min: 15, max: 18 }),
   );
-  widths[3] = Math.max(widths[3], xlsxFitColWidth("Том/х", { min: 8, max: 10 }));
+  widths[3] = Math.max(
+    widths[3],
+    xlsxFitColWidth("Том/х", { min: 8, max: 10 }),
+  );
   widths[4] = Math.max(
     widths[4],
     xlsxFitColWidth("Жижиг/х", { min: 9.5, max: 12 }),
   );
-  widths[5] = Math.max(widths[5], xlsxFitColWidth("Тоо/ш", { min: 8, max: 10 }));
+  widths[5] = Math.max(
+    widths[5],
+    xlsxFitColWidth("Тоо/ш", { min: 8, max: 10 }),
+  );
   widths[6] = Math.max(
     widths[6],
     xlsxFitColWidth("Үлдэгдэл (ш)", { min: 12, max: 15 }),
@@ -20212,8 +20317,8 @@ function warehousePrepareColWidthsFor(sections, metaTexts = []) {
   let longestName = "Барааны нэр төрөл";
   const scan = (groups) => {
     for (const item of groups || []) {
-      const name =
-        item?.type === "cat" ? item.name : item?.product?.name || "";
+      if (item?.type === "cat") continue;
+      const name = item?.product?.name || "";
       if (String(name).length > String(longestName).length) longestName = name;
     }
   };
@@ -20221,13 +20326,13 @@ function warehousePrepareColWidthsFor(sections, metaTexts = []) {
   scan(sections?.promo);
   widths[0] = Math.max(
     widths[0],
-    xlsxFitColWidth(longestName, { min: 32, max: 46 }),
+    xlsxFitColWidth(longestName, { min: 38, max: 52 }),
   );
   const metaNeed = Math.max(
     0,
-    ...metaTexts.map((t) => xlsxFitColWidth(t, { min: 24, max: 58 })),
+    ...metaTexts.map((t) => xlsxFitColWidth(t, { min: 28, max: 62 })),
   );
-  const leftMerge = widths[0] + widths[1] + widths[2];
+  const leftMerge = widths[0] + widths[1] + widths[2] + widths[3];
   if (metaNeed > leftMerge) widths[0] += metaNeed - leftMerge;
   return widths;
 }
@@ -20382,8 +20487,11 @@ function warehousePreparePatchStylesXml(
 
   const signXfLeft =
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" /></xf>';
-  const signXfCenter =
-    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>';
+  const catXfInTable =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" /></xf>';
+  const catXfOutside =
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>';
+  if (out.includes(catXfInTable)) out = out.replace(catXfInTable, catXfOutside);
   // Category row (style 15): no fill — bold centered label only.
   if (fillCategory) {
     const catXfPlain =
@@ -20397,14 +20505,22 @@ function warehousePreparePatchStylesXml(
     `<xf numFmtId="1" fontId="2" fillId="${fillId}" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
 
   const appendXfs = [];
-  if (out.includes(signXfLeft)) out = out.replace(signXfLeft, signXfCenter);
-  else if (!out.includes(signXfCenter)) appendXfs.push(signXfCenter);
+  const xfCountMatch = out.match(/<cellXfs[^>]*count="(\d+)"/);
+  const xfCount = xfCountMatch ? Number(xfCountMatch[1]) : 0;
+  // Template has 19 xfs (0–18). Keep 19 reserved so qty stays 20–25.
+  if (xfCount <= 19) appendXfs.push(signXfLeft);
   for (const fillId of [largeFillId, smallFillId, pieceFillId]) {
     const head = qtyHeadXf(fillId);
     const cell = qtyCellXf(fillId);
     if (!out.includes(head)) appendXfs.push(head);
     if (!out.includes(cell)) appendXfs.push(cell);
   }
+  const signLabelXf =
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" wrapText="0" shrinkToFit="1"/></xf>';
+  const signLineXf =
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf>';
+  if (!out.includes(signLabelXf)) appendXfs.push(signLabelXf);
+  if (!out.includes(signLineXf)) appendXfs.push(signLineXf);
   if (appendXfs.length) {
     out = out.replace(
       /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
@@ -20463,10 +20579,10 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   const rows = [];
   const merges = [
     `A1:${WAREHOUSE_PREPARE_LAST_COL}1`,
-    `A2:C2`,
-    `D2:${WAREHOUSE_PREPARE_LAST_COL}2`,
-    `A3:C3`,
-    `D3:${WAREHOUSE_PREPARE_LAST_COL}3`,
+    `A2:D2`,
+    `E2:${WAREHOUSE_PREPARE_LAST_COL}2`,
+    `A3:D3`,
+    `E3:${WAREHOUSE_PREPARE_LAST_COL}3`,
   ];
   let rowNum = 1;
   const pushRow = (height, cells) => {
@@ -20499,7 +20615,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       "s",
     ),
     xlsxCellXml(
-      "D2",
+      "E2",
       s.metaRight,
       si(`Захиалгын огноо: ${orderDateValue}`),
       "s",
@@ -20511,7 +20627,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
     xlsxCellXml("A3", s.metaLeft, si(orderWorkerLabel), "s"),
     xlsxCellXml(
-      "D3",
+      "E3",
       s.metaRight,
       si(`Хэвлэсэн огноо: ${printedDateValue}`),
       "s",
@@ -20519,7 +20635,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   ]);
   for (let i = 1; i < workerNames.length; i += 1) {
     const r = rowNum;
-    merges.push(`A${r}:C${r}`);
+    merges.push(`A${r}:D${r}`);
     pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, s.metaLeft, si(workerNames[i]), "s"),
     ]);
@@ -20556,12 +20672,20 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   const pushPrepareGroups = (groups) => {
     for (const item of groups) {
       if (item.type === "cat") {
+        pushRow(
+          WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
+          emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+        );
         const r = rowNum;
         merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
-        pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
+        pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
           xlsxCellXml(`A${r}`, s.category, si(item.name), "s"),
-          ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, s.category),
+          ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
         ]);
+        pushRow(
+          WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
+          emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+        );
         continue;
       }
       const p = item.product;
@@ -20581,29 +20705,44 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   };
   pushPrepareGroups(sections.regular);
   if (sections.promo.length) {
+    pushRow(
+      WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
+      emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+    );
     const promoHeadRow = rowNum;
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(WAREHOUSE_PREPARE_HEADER_ROW_HEIGHT, [
+    pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
       xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
-      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.category),
+      ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
+    pushRow(
+      WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
+      emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+    );
     pushPrepareGroups(sections.promo);
   }
-  pushRow(12, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
-  const pushWarehousePrepareSignatureBlock = (role) => {
+  pushRow(
+    WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT,
+    emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+  );
+  const pushWarehousePrepareSignatureBlock = (nameLabel) => {
     const r = rowNum;
-    merges.push(`C${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
+    merges.push(`A${r}:B${r}`, `C${r}:D${r}`, `F${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
     pushRow(WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT, [
-      ...emptyCells(r, "A", "B", s.spacer),
-      xlsxCellXml(`C${r}`, s.signLine, si(`${role} ____________________`), "s"),
-      ...emptyCells(r, "D", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
+      xlsxCellXml(`A${r}`, s.signLabel, si(nameLabel), "s"),
+      ...emptyCells(r, "B", "B", s.signLabel),
+      xlsxCellXml(`C${r}`, s.signLine, null, "empty"),
+      ...emptyCells(r, "D", "D", s.signLine),
+      xlsxCellXml(`E${r}`, s.signLabel, si(WAREHOUSE_PREPARE_SIGN_MARK_LABEL), "s"),
+      xlsxCellXml(`F${r}`, s.signLine, null, "empty"),
+      ...emptyCells(r, "G", WAREHOUSE_PREPARE_LAST_COL, s.signLine),
     ]);
   };
-  pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_HANDED_LABEL);
-  pushRow(12, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
-  pushWarehousePrepareSignatureBlock(RECEIPT_SIGN_RECEIVED_LABEL);
+  pushWarehousePrepareSignatureBlock(WAREHOUSE_PREPARE_SIGN_HANDED_NAME);
+  pushRow(18, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
+  pushWarehousePrepareSignatureBlock(WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME);
   const lastRow = Math.max(1, rowNum - 1);
   const printArea = `$A$1:$${WAREHOUSE_PREPARE_LAST_COL}$${lastRow}`;
   const sheetXml = warehousePrepareWorksheetXml(
@@ -20664,15 +20803,15 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     ? workerNames
         .map(
           (name, idx) =>
-            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value" colspan="2">${h(name)}</td>${idx === 0 ? `<td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td>` : `<td colspan="4" style="border:none"></td>`}</tr>`,
+            `<tr><td class="meta-label">${idx === 0 ? "Захиалга авсан ажилтан:" : ""}</td><td class="meta-value" colspan="3">${h(name)}</td>${idx === 0 ? `<td class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue)}</td>` : `<td colspan="3" style="border:none"></td>`}</tr>`,
         )
         .join("")
-    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value" colspan="2">-</td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="3" class="date-value">${h(printedDateValue)}</td></tr>`;
+    : `<tr><td class="meta-label">Захиалга авсан ажилтан:</td><td class="meta-value" colspan="3">-</td><td class="date-label">Хэвлэсэн огноо:</td><td colspan="2" class="date-value">${h(printedDateValue)}</td></tr>`;
   const renderGroupRows = (groups) =>
     groups
       .map((item) => {
         if (item.type === "cat") {
-          return `<tr><td colspan="7" class="cat">${h(item.name)}</td></tr>`;
+          return `<tr class="cat-gap"><td colspan="7"></td></tr><tr><td colspan="7" class="cat">${h(item.name)}</td></tr><tr class="cat-gap"><td colspan="7"></td></tr>`;
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
@@ -20680,19 +20819,19 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
       })
       .join("");
   const promoRows = sections.promo.length
-    ? `<tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
+    ? `<tr class="cat-gap"><td colspan="7"></td></tr><tr><td colspan="7" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr><tr class="cat-gap"><td colspan="7"></td></tr>${renderGroupRows(sections.promo)}`
     : "";
-  const html = `<!doctype html><!-- tomuda-stock-xls-v678 --><html><head><meta charset="utf-8"><style>
+  const html = `<!doctype html><!-- tomuda-stock-xls-v680 --><html><head><meta charset="utf-8"><style>
 @page { size: A4 portrait; margin: 10mm 7mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
 table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
-.prepare col.c-name { width: 32%; }
-.prepare col.c-unit { width: 14%; }
-.prepare col.c-barcode { width: 16%; }
-.prepare col.c-large { width: 9%; }
-.prepare col.c-small { width: 11%; }
-.prepare col.c-piece { width: 9%; }
-.prepare col.c-stock { width: 14%; }
+.prepare col.c-name { width: 44%; }
+.prepare col.c-unit { width: 8%; }
+.prepare col.c-barcode { width: 15%; }
+.prepare col.c-large { width: 8%; }
+.prepare col.c-small { width: 9%; }
+.prepare col.c-piece { width: 7%; }
+.prepare col.c-stock { width: 9%; }
 .prepare td, .prepare th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; height: 20px; }
 .prepare td.name,
 .prepare td.unit,
@@ -20709,8 +20848,9 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-large { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-small { background: #d9d9d9; white-space: nowrap; }
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 20px; white-space: nowrap; }
-.promo-head { border-top: 1px solid #000 !important; }
+.cat { text-align: center; font-weight: 800; height: 24px; padding: 8px 0; white-space: nowrap; border: none !important; background: none !important; }
+.cat-gap td { height: 10px; border: none !important; background: none !important; }
+.promo-head { border: none !important; }
 .barcode { mso-number-format:"\\@"; text-align: left; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
@@ -20721,21 +20861,22 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .num.qty-piece:empty { font-weight: 400; }
 .stock { font-weight: 700; background: #fff; white-space: nowrap; }
 .spacer td { height: 18px; border: none !important; }
+.sign-pad td { height: 36px; border: none !important; }
 .sign-label { text-align: left; font-weight: 400; border: none !important; white-space: nowrap; }
 .sign-line { border: none !important; border-bottom: 1px dotted #000 !important; }
 .sign-gap td { height: 18px; border: none !important; }
 </style></head><body><table class="prepare">
 <colgroup><col class="c-name"><col class="c-unit"><col class="c-barcode"><col class="c-large"><col class="c-small"><col class="c-piece"><col class="c-stock"></colgroup>
 <tr><td colspan="7" class="title">Бараа бэлдэж ачуулах хуудас</td></tr>
-<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value" colspan="2">${h(warehouseEmp)}</td><td class="date-label">Захиалгын огноо:</td><td colspan="3" class="date-value">${h(orderDateValue)}</td></tr>
+<tr><td class="meta-label">Агуулахын ажилтан:</td><td class="meta-value" colspan="3">${h(warehouseEmp)}</td><td class="date-label">Захиалгын огноо:</td><td colspan="2" class="date-value">${h(orderDateValue)}</td></tr>
 ${workerRows}
 <tr class="blank"><td colspan="7"></td></tr>
 <tr class="head"><th>Барааны нэр төрөл</th><th class="unit-head">Хэмжих нэгж</th><th>Баркод</th><th class="qty-large">Том/х</th><th class="qty-small">Жижиг/х</th><th class="qty-piece">Тоо/ш</th><th>Үлдэгдэл (ш)</th></tr>
 ${renderGroupRows(sections.regular)}${promoRows}
-<tr class="spacer"><td colspan="7"></td></tr>
-<tr><td colspan="2" style="border:none"></td><td colspan="5" class="sign-label">${RECEIPT_SIGN_HANDED_LABEL} _____________________</td></tr>
+<tr class="sign-pad"><td colspan="7"></td></tr>
+<tr><td colspan="2" class="sign-label">${WAREHOUSE_PREPARE_SIGN_HANDED_NAME}</td><td colspan="2" class="sign-line"></td><td class="sign-label">${WAREHOUSE_PREPARE_SIGN_MARK_LABEL}</td><td colspan="2" class="sign-line"></td></tr>
 <tr class="sign-gap"><td colspan="7"></td></tr>
-<tr><td colspan="2" style="border:none"></td><td colspan="5" class="sign-label">${RECEIPT_SIGN_RECEIVED_LABEL} _____________________</td></tr>
+<tr><td colspan="2" class="sign-label">${WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME}</td><td colspan="2" class="sign-line"></td><td class="sign-label">${WAREHOUSE_PREPARE_SIGN_MARK_LABEL}</td><td colspan="2" class="sign-line"></td></tr>
 </table></body></html>`;
   downloadReceiptExcelBlob(`Агуулах-бэлдэх-${stamp}.xls`, html);
 }
@@ -21128,7 +21269,7 @@ function salesReportCustomerRows(orders) {
     }
     row.orderCount += 1;
     if (!lineFilter) row.sales += orderAmount(o);
-    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderAmount(o);
+    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderRemainingAmount(o);
     if (o.employeeName) row.employeeNames.add(String(o.employeeName));
     for (const it of o.items || []) {
       salesReportAddItemTotals(row, it, salesReportProductForItem(it));
@@ -21166,7 +21307,7 @@ function salesReportEmployeeRows(orders) {
     }
     row.orderCount += 1;
     if (!lineFilter) row.sales += orderAmount(o);
-    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderAmount(o);
+    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderRemainingAmount(o);
     for (const it of o.items || []) {
       salesReportAddItemTotals(row, it, salesReportProductForItem(it));
     }
@@ -21186,7 +21327,7 @@ function salesReportEmployeeRows(orders) {
     }
     cust.orderCount += 1;
     if (!lineFilter) cust.sales += orderAmount(o);
-    if (!orderIsPaid(o) && !lineFilter) cust.receivable += orderAmount(o);
+    if (!orderIsPaid(o) && !lineFilter) cust.receivable += orderRemainingAmount(o);
     for (const it of o.items || []) {
       salesReportAddItemTotals(cust, it, salesReportProductForItem(it));
     }
@@ -22148,20 +22289,38 @@ function reportsView() {
 function paymentRow(o) {
   const paid = orderIsPaid(o),
     amount = orderAmount(o),
+    remaining = orderRemainingAmount(o),
+    paidSoFar = orderPaidAmount(o),
     term = paymentTermLabel(o.paymentTerm),
+    status = paid
+      ? "Тооцоо дууссан"
+      : paidSoFar > 0.009
+        ? `Үлдэгдэл ${fmt(remaining)}`
+        : "Төлбөрийн үлдэгдэлтэй",
     actions = paid
       ? ""
       : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Төлбөр баталгаажуулах</button>`;
-  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(orderCustomerName(o))}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${paid ? "Тооцоо дууссан" : "Төлбөрийн үлдэгдэлтэй"}</span><div class="payment-row__actions">${actions}</div></div>`;
+  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(orderCustomerName(o))}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(remaining > 0.009 ? remaining : amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${status}</span><div class="payment-row__actions">${actions}</div></div>`;
+}
+function parsePayMoney(value) {
+  const n = Number(String(value ?? "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) ? n : NaN;
 }
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o || orderIsPaid(o)) return;
-  confirmModal("", "Төлбөр төлснийг баталгаажуулах уу?", {
-    confirmLabel: "Тийм",
-    cancelLabel: "Үгүй",
-    onConfirm: () => setPaid(id, true),
-  });
+  const due = orderAmount(o);
+  const paid = orderPaidAmount(o);
+  const remaining = orderRemainingAmount(o);
+  confirmModal(
+    "Төлбөр баталгаажуулах",
+    `<div class="pay-confirm"><p class="pay-confirm__line">Нийт дүн: <b>${fmt(due)}</b></p><p class="pay-confirm__line">Төлсөн: <b>${fmt(paid)}</b></p><p class="pay-confirm__line">Үлдэгдэл: <b>${fmt(remaining)}</b></p><label class="pay-confirm__field"><span>Энэ удаагийн төлөлт</span><input data-pay-amount type="text" inputmode="decimal" autocomplete="off" value="${esc(String(remaining))}" class="app-input pay-confirm__input" aria-label="Энэ удаагийн төлөлт"></label><p class="pay-confirm__hint">Хувааж төлөх бол үлдэгдлээс бага дүн бичнэ.</p></div>`,
+    {
+      confirmLabel: "Бүртгэх",
+      cancelLabel: "Үгүй",
+      onConfirm: (raw) => recordOrderPayment(id, parsePayMoney(raw)),
+    },
+  );
 }
 const PROMO_PRODUCT_LABEL = "Урамшууллын бараа";
 const PROMO_PERCENT_TAB_LABEL = "Хөнгөлөх хувь";
@@ -26128,8 +26287,8 @@ function workerStoreSummary(c, compact = false) {
     ? `<span class="worker-order-store__loc">${esc(loc)}</span>`
     : "";
   if (compact)
-    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
-  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
+    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${customerPayMarkHtml(c)}${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${customerPayMarkHtml(c)}${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
 }
 function workerOrderAgentField() {
   ensureOrderEmployeeSelection();
@@ -27647,9 +27806,15 @@ function field(name, label, value = "", type = "text", placeholder = "") {
   const kb = mobileInputKeyboardAttrs(type, name);
   return `<label><span class="block text-sm font-medium mb-2">${label}</span><input name="${name}" ${kb} ${attrs} class="w-full px-4 py-3 bg-secondary rounded app-input"></label>`;
 }
-function customerRegistrationField(value = "") {
+function customerRegistrationField(value = "", locked = false) {
   const attrs = inputAttrs(value, "Регистрийн дугаар");
-  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="text" autocomplete="off" ${attrs} oninput="scheduleCustomerRegistryLookup(this.value)" onblur="fillCustomerFromRegistration(this.value)" class="w-full px-4 py-3 bg-secondary rounded app-input"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>`;
+  const lock = locked
+    ? " readonly tabindex='-1' aria-readonly='true'"
+    : "";
+  const lookup = locked
+    ? ""
+    : ` oninput="scheduleCustomerRegistryLookup(this.value)" onblur="fillCustomerFromRegistration(this.value)"`;
+  return `<label><span class="block text-sm font-medium mb-2">Регистрийн дугаар</span><input id="customerRegistrationInput" name="registrationNumber" type="text" inputmode="text" autocomplete="off" ${attrs}${lock}${lookup} class="w-full px-4 py-3 bg-secondary rounded app-input${locked ? " is-locked" : ""}"><p id="customerRegistryLookupStatus" class="text-xs text-muted-foreground mt-2">${locked ? "Төлбөрийн үлдэгдэлтэй тул РД өөрчлөхгүй." : ""}</p></label>`;
 }
 function customerProvinceField(value = "") {
   const selected = (value || "").trim() || "Улаанбаатар";
@@ -27808,12 +27973,20 @@ function customerModal(id, draft = null) {
     customerFormDraft && String(customerFormDraft.customerId || "") === cid;
   const useDraft = draft || (matchingStored ? customerFormDraft : null);
   const c = customerFromDraft(cid, useDraft);
+  const identityLocked = !!(cid && customerHasOpenBalance(cid));
+  const identityHint = identityLocked
+    ? `<p class="text-sm text-muted-foreground m-0">Төлбөрийн үлдэгдэлтэй тул нэр, РД, утас өөрчлөгдөхгүй. Байршил, зураг засна.</p>`
+    : "";
+  const nameLock = identityLocked
+    ? " readonly tabindex='-1' aria-readonly='true'"
+    : "";
+  const nameField = `<label><span class="block text-sm font-medium mb-2">Нэр / Дэлгүүрийн нэр</span><input name="name" type="text" value="${esc(c.name || "")}" placeholder="Жишээ: Номин 5-р хороо"${nameLock} class="w-full px-4 py-3 bg-secondary rounded app-input${identityLocked ? " is-locked" : ""}"></label>`;
   const receivableHost = id
     ? `<div data-customer-receivable-host>${customerEditReceivableSectionHtml(id)}</div>`
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}<div class="grid sm:grid-cols-2 gap-4">${field("name", "Нэр / Дэлгүүрийн нэр", c.name, "text", "Жишээ: Номин 5-р хороо")}${customerRegistrationField(c.registrationNumber)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}${field("locationText", "Олж очих заавар (түгээгчид)", c.locationText || "", "text", "Жишээ: 12-р байрны 1 давхар, улаан хаалга")}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c, identityLocked)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}${field("locationText", "Олж очих заавар (түгээгчид)", c.locationText || "", "text", "Жишээ: 12-р байрны 1 давхар, улаан хаалга")}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -28004,8 +28177,17 @@ async function applyCustomerSave(data, id) {
       alert("Харилцагч олдсонгүй");
       return false;
     }
+    if (customerHasOpenBalance(id)) {
+      data.name = existing.name;
+      data.registrationNumber = existing.registrationNumber;
+      applyCustomerPhoneFields(data, customerPhonesList(existing));
+    }
     const prevImage = storedEntityImage(existing);
+    const prevPayMark = normalizeCustomerPayMark(existing.payMark);
     Object.assign(existing, data);
+    existing.payMark = Object.prototype.hasOwnProperty.call(data, "payMark")
+      ? normalizeCustomerPayMark(data.payMark)
+      : prevPayMark;
     if (!storedEntityImage(existing) && prevImage) {
       existing.image = prevImage;
     }
@@ -28013,6 +28195,7 @@ async function applyCustomerSave(data, id) {
     customer = existing;
   } else {
     customer = { ...data, id: newEntityId("c") };
+    customer.payMark = normalizeCustomerPayMark(customer.payMark);
     if (!customer.image) delete customer.image;
     applyCustomerPhoneFields(customer, customer.phones);
     state.customers.push(customer);
@@ -28310,6 +28493,8 @@ async function fillCustomerFromRegistration(code) {
     reg = parsed.digits,
     lookupId = ++customerRegistryLookupId;
   if (!form) return;
+  if (form.dataset.customerId && customerHasOpenBalance(form.dataset.customerId))
+    return;
   if (!reg) {
     if (status) {
       status.textContent = parsed.prefix
@@ -29997,7 +30182,8 @@ function thermalBytesConcat(parts) {
 
 function thermalBytesToBase64(bytes) {
   let bin = "";
-  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += 1)
+    bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
 
@@ -30019,7 +30205,9 @@ function thermalReceiptLines(o) {
   push(thermalCenter(`№${formatReceiptNumber(snap)}`));
   push(thermalRule("="));
   push(`Хүргэлт: ${receiptDeliveryDateDisplay(snap) || "-"}`);
-  push(`Огноо: ${formatIsoDayDisplay(orderTakenDay(snap) || todayIso()) || "-"}`);
+  push(
+    `Огноо: ${formatIsoDayDisplay(orderTakenDay(snap) || todayIso()) || "-"}`,
+  );
   push(thermalRule());
   push("Худалдааны төлөөлөгч");
   push(thermalWrap(thermalPlain(f.salesName)));
@@ -30077,10 +30265,7 @@ function thermalReceiptLines(o) {
   push(thermalRule("="));
   if (receiptShouldShowGross(snap)) {
     push(
-      thermalPair(
-        "Хувь хасагдаагүй дүн",
-        receiptMoney(orderGrossTotal(snap)),
-      ),
+      thermalPair("Хувь хасагдаагүй дүн", receiptMoney(orderGrossTotal(snap))),
     );
   }
   push(thermalPair("Барааны дүн", receiptMoneyDetailed(sub)));
@@ -30104,7 +30289,9 @@ function thermalReceiptLines(o) {
     ),
   );
   push(thermalWrap("Хувь хүний дансанд бүү шилжүүлээрэй."));
-  push(thermalWrap("Өөр данс руу шилжүүлсэн төлбөрийг нийлүүлэгч хариуцахгүй."));
+  push(
+    thermalWrap("Өөр данс руу шилжүүлсэн төлбөрийг нийлүүлэгч хариуцахгүй."),
+  );
   push(thermalWrap("Барааг шалгаж тоо ширхгийг тулгаж хүлээн авна уу."));
   push(thermalRule());
   push(RECEIPT_SIGN_HANDED_LABEL);
@@ -30206,10 +30393,7 @@ async function printOrdersViaBluetooth(orders) {
     await plugin.requestPermission();
     await sendThermalReceiptsToPrinter(plugin, saved.address, orders);
   } catch (err) {
-    showAppToast(
-      err?.message || "Bluetooth принтертэй холбогдсонгүй",
-      "error",
-    );
+    showAppToast(err?.message || "Bluetooth принтертэй холбогдсонгүй", "error");
   }
 }
 
@@ -31573,9 +31757,11 @@ function initConfirmCard() {
     .querySelector("#confirm-card-yes")
     ?.addEventListener("click", async () => {
       const fn = pendingConfirm?.onConfirm;
+      const payEl = overlay.querySelector("[data-pay-amount]");
+      const payRaw = payEl ? payEl.value : undefined;
       closeConfirmCard();
       try {
-        await fn?.();
+        await fn?.(payRaw);
       } catch (err) {
         console.warn("Confirm action failed", err);
         alert("Алдаа гарлаа. Дахин оролдоно уу.");
@@ -31979,11 +32165,46 @@ function setOrder(id, s) {
 function setPaid(id, isPaid) {
   const o = state.orders.find((order) => order.id === id);
   if (!o) return;
+  const due = orderAmount(o);
+  if (isPaid) {
+    o.paidAmount = due;
+    o.isPaid = true;
+  } else {
+    o.paidAmount = 0;
+    o.isPaid = false;
+  }
   const customerId = o.customerId;
-  o.isPaid = isPaid;
   render();
   if (customerId) refreshCustomerEditReceivable(customerId);
   criticalBackendSave();
+}
+function recordOrderPayment(id, amount) {
+  const o = state.orders.find((order) => order.id === id);
+  if (!o || orderIsPaid(o)) return;
+  const remaining = orderRemainingAmount(o);
+  const add = Math.round(Number(amount));
+  if (!Number.isFinite(add) || add <= 0) {
+    showAppToast("Төлөх дүнгээ бичнэ үү", "error");
+    return;
+  }
+  const credit = Math.min(add, remaining);
+  const paid = orderPaidAmount(o) + credit;
+  const due = orderAmount(o);
+  o.paidAmount = paid;
+  o.isPaid = paid + 0.009 >= due;
+  const payments = Array.isArray(o.payments) ? o.payments.slice() : [];
+  payments.push({
+    amount: credit,
+    at: new Date().toISOString(),
+    by: state.currentEmployee?.name || "",
+  });
+  o.payments = payments;
+  const customerId = o.customerId;
+  render();
+  if (customerId) refreshCustomerEditReceivable(customerId);
+  criticalBackendSave();
+  if (o.isPaid) showAppToast("Тооцоо дууссан");
+  else showAppToast(`Үлдэгдэл ${fmt(orderRemainingAmount(o))}`);
 }
 function csvRow(cells) {
   return cells
@@ -32203,6 +32424,7 @@ Object.assign(window, {
   centerCustomerMapOnUser,
   openDeviceLocationSettings,
   saveCustomer,
+  cycleCustomerPayMark,
   customerDetail,
   clearCustomerHistoryRange,
   setCustomerHistoryFrom,
@@ -32424,6 +32646,7 @@ Object.assign(window, {
   delProduct,
   setOrder,
   setPaid,
+  recordOrderPayment,
   confirmSetPaid,
   setReportDate,
   clearReportDate,
