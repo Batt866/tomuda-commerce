@@ -7930,7 +7930,58 @@ function initPickerModalActions() {
     }
   });
 }
+function readCssSafeInset(side) {
+  const el = document.createElement("div");
+  el.setAttribute("aria-hidden", "true");
+  el.style.cssText = `position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-${side}:env(safe-area-inset-${side}, 0px);`;
+  document.documentElement.appendChild(el);
+  const px = parseFloat(getComputedStyle(el).getPropertyValue(`padding-${side}`)) || 0;
+  el.remove();
+  return px;
+}
+
+function iosStatusBarFallbackPx() {
+  const w = Math.min(screen.width || 0, screen.height || 0);
+  const h = Math.max(screen.width || 0, screen.height || 0);
+  if (h >= 852 || w >= 430) return 54;
+  if (h >= 812) return 47;
+  return 20;
+}
+
+function isApplePhoneLike() {
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPod/i.test(ua)) return true;
+  if (/iPad/i.test(ua)) return Math.min(window.innerWidth, window.innerHeight) <= 640;
+  return (
+    navigator.platform === "MacIntel" &&
+    navigator.maxTouchPoints > 1 &&
+    Math.min(window.innerWidth, window.innerHeight) <= 640
+  );
+}
+
+function syncSafeAreaInsets() {
+  let top = readCssSafeInset("top");
+  if (isApplePhoneLike() && top < 16) top = iosStatusBarFallbackPx();
+  document.documentElement.style.setProperty("--sat", `${top}px`);
+}
+
+function initSafeAreaInsets() {
+  syncSafeAreaInsets();
+  if (initSafeAreaInsets._bound) return;
+  initSafeAreaInsets._bound = true;
+  window.addEventListener("resize", syncSafeAreaInsets, { passive: true });
+  window.addEventListener(
+    "orientationchange",
+    () => setTimeout(syncSafeAreaInsets, 250),
+    { passive: true },
+  );
+  window.visualViewport?.addEventListener("resize", syncSafeAreaInsets, {
+    passive: true,
+  });
+}
+
 function initNoZoom() {
+  initSafeAreaInsets();
   const meta = document.querySelector('meta[name="viewport"]');
   if (meta) {
     meta.setAttribute(
@@ -7950,6 +8001,11 @@ function initNoZoom() {
     },
     { passive: false },
   );
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initSafeAreaInsets);
+} else {
+  initSafeAreaInsets();
 }
 const NESTED_SCROLL_CHAIN_SELECTOR =
   ".line-list--scroll, .worker-order-lines-wrap, .picker-step2__scroll, .stock-alert-list, .employee-form__body, .modal-scroll";
@@ -23871,7 +23927,7 @@ function promoApprovedRuleCard({
   return `<article class="promo-rule-card"><header class="promo-rule-card__head"><span class="promo-rule-card__num" aria-hidden="true">${index + 1}</span><p class="promo-rule-card__formula">${esc(formula)}</p>${deleteBtn}</header><div class="promo-rule-card__flow"><section class="promo-rule-card__lane promo-rule-card__lane--buy"><p class="promo-rule-card__lane-label">Нөхцөл</p>${conditionHtml}</section><div class="promo-rule-card__arrow" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div><section class="promo-rule-card__lane promo-rule-card__lane--free"><p class="promo-rule-card__lane-label">Урамшуулал</p>${rewardHtml}</section></div></article>`;
 }
 function promoRuleAmountHtml(text) {
-  return `<p class="promo-rule-card__amount">${esc(text)}</p>`;
+  return `<div class="promo-rule-card__caption"><p class="promo-rule-card__amount">${esc(text)}</p></div>`;
 }
 function promoRuleProductsHtml(products, qtyById = null, caption = "") {
   const rows = (products || [])

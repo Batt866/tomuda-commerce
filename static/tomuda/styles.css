@@ -5467,7 +5467,7 @@ button:focus-visible,
 }
 
 .modal-panel--picker .modal-panel__head {
-  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-top: calc(12px + var(--sat));
 }
 
 .modal-panel--picker {
@@ -5602,9 +5602,8 @@ button:focus-visible,
   grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 8px;
-  padding: max(12px, env(safe-area-inset-top, 0px))
-    max(16px, env(safe-area-inset-right, 0px)) 12px
-    max(12px, env(safe-area-inset-left, 0px));
+  padding: calc(12px + var(--sat)) max(16px, var(--sar)) 12px
+    max(12px, var(--sal));
 }
 
 .modal-panel__head--back .modal-close--back {
@@ -6169,7 +6168,7 @@ button:focus-visible,
   }
 
   .modal-panel__head {
-    padding-top: var(--space-3) !important;
+    padding-top: calc(var(--space-3) + var(--sat)) !important;
   }
 
   .modal-close {
@@ -9624,18 +9623,36 @@ textarea::placeholder {
   font-variant-numeric: tabular-nums;
 }
 
-.promo-rule-card__lane .promo-qty-chips {
-  margin-top: 0;
+.promo-rule-card__caption {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 10px;
 }
 
-.promo-rule-card__lane .promo-qty-chips + .promo-rule-card__amount,
-.promo-rule-card__lane--free .promo-rule-card__amount {
-  margin-top: 10px;
+.promo-rule-card__caption .promo-rule-card__amount {
+  margin: 0;
+  display: inline-block;
   padding: 8px 12px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--hex-primary, #16899a) 10%, #fff);
   color: var(--hex-primary, #16899a);
   text-align: center;
+}
+
+.promo-rule-card__lane .promo-qty-chips {
+  margin-top: 0;
+}
+
+.promo-rule-card__lane--free .promo-qty-chip {
+  flex-wrap: wrap;
+}
+
+.promo-rule-card__lane--free .promo-qty-chip__meta {
+  flex: 1 0 100%;
+  justify-content: center;
+  text-align: center;
+  margin-top: 6px;
 }
 
 .promo-rule-card__amount--solo {
@@ -12005,15 +12022,15 @@ textarea::placeholder {
     padding: 14px !important;
   }
 
-  .p-6 {
+  .p-6:not(.modal-panel__head) {
     padding: 13px !important;
   }
 
-  .p-5 {
+  .p-5:not(.modal-panel__head) {
     padding: 12px !important;
   }
 
-  .p-4 {
+  .p-4:not(.modal-panel__head) {
     padding: 10px !important;
   }
 
@@ -12064,8 +12081,12 @@ textarea::placeholder {
     overflow: hidden !important;
   }
 
-  #modal > div > div > .border-b {
-    padding: max(10px, env(safe-area-inset-top, 0px)) 12px 10px !important;
+  #modal > div > div > .border-b,
+  #modal > div > div > .modal-panel__head {
+    padding-top: calc(10px + var(--sat)) !important;
+    padding-right: 12px !important;
+    padding-bottom: 10px !important;
+    padding-left: 12px !important;
     flex-shrink: 0;
   }
 
