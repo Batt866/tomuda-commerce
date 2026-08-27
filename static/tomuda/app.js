@@ -23896,11 +23896,10 @@ function promoRuleRewardHtml(r) {
     r.type === "percent" || (r.discountPercent && !freeIds.length);
   if (isPercent) return promoRulePercentHtml(r.discountPercent);
   const freeQty = Math.floor(Number(r.freeQty) || 0);
-  return promoRuleProductsHtml(
-    products,
-    null,
-    freeQty > 0 ? promoProductQtyLabel(freeQty) : "",
-  );
+  const productsHtml = promoRuleProductsHtml(products);
+  const cap =
+    freeQty > 0 ? promoRuleAmountHtml(promoProductQtyLabel(freeQty)) : "";
+  return `${productsHtml}${cap}`;
 }
 function promotionQuantityPanel(rows) {
   return promotionRulesPanel({

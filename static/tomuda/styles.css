@@ -5466,6 +5466,10 @@ button:focus-visible,
   font-size: 13px;
 }
 
+.modal-panel--picker .modal-panel__head {
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+}
+
 .modal-panel--picker {
   display: flex;
   flex-direction: column;
@@ -5598,7 +5602,8 @@ button:focus-visible,
   grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 8px;
-  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px
+  padding: max(12px, env(safe-area-inset-top, 0px))
+    max(16px, env(safe-area-inset-right, 0px)) 12px
     max(12px, env(safe-area-inset-left, 0px));
 }
 
@@ -9623,7 +9628,8 @@ textarea::placeholder {
   margin-top: 0;
 }
 
-.promo-rule-card__lane .promo-qty-chips + .promo-rule-card__amount {
+.promo-rule-card__lane .promo-qty-chips + .promo-rule-card__amount,
+.promo-rule-card__lane--free .promo-rule-card__amount {
   margin-top: 10px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -9681,11 +9687,16 @@ textarea::placeholder {
   color: var(--hex-muted-foreground);
 }
 
-.promo-rule-card__gift-meta {
-  margin: 6px 0 0 46px;
+.promo-rule-card__gift-meta,
+.promo-qty-rule-card__gift {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-primary, #16899a) 10%, #fff);
+  color: var(--hex-primary, #16899a);
   font-size: 12px;
   font-weight: 700;
-  color: var(--hex-primary, #16899a);
+  text-align: center;
 }
 
 .promo-qty-rule-card__head-text {
@@ -9760,10 +9771,14 @@ textarea::placeholder {
 }
 
 .promo-qty-rule-card__gift {
-  margin: 6px 0 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--hex-success-text);
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hex-primary, #16899a) 10%, #fff);
+  color: var(--hex-primary, #16899a);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .promo-qty-rule-card__arrow {
@@ -12050,7 +12065,7 @@ textarea::placeholder {
   }
 
   #modal > div > div > .border-b {
-    padding: 10px 12px !important;
+    padding: max(10px, env(safe-area-inset-top, 0px)) 12px 10px !important;
     flex-shrink: 0;
   }
 
