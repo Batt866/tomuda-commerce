@@ -306,6 +306,17 @@ const persistKeys = [
   "deliveryPhone",
   "settings",
 ];
+/** Draft/session fields stored locally — must not dirty or POST the shared blob. */
+const SESSION_PERSIST_KEYS = [
+  "workerCustomer",
+  "orderEmployee",
+  "paymentTerm",
+  "settlementText",
+  "deliveryDate",
+  "selectedDeliveryId",
+  "deliveryName",
+  "deliveryPhone",
+];
 /** Shared business data — session UI keys must not block peer merges. */
 const SYNC_ENTITY_KEYS = [
   "customers",
@@ -355,6 +366,7 @@ function newEntityId(prefix = "id") {
 let backendSaveFailedMessage = "";
 let backendReady = false;
 let backendSaveTimer = null;
+let backendSaveRetryTimer = null;
 let backendLastSaved = "";
 let serverUpdatedAt = "";
 let backendSaving = false;
@@ -4550,12 +4562,18 @@ function stripInlineEntityImages(items = []) {
     return copy;
   });
 }
+function omitSessionPersist(data = {}) {
+  const next = { ...data };
+  for (const key of SESSION_PERSIST_KEYS) delete next[key];
+  return next;
+}
 function comparableBackendState(data = {}) {
+  const cleaned = omitSessionPersist(data);
   return {
-    ...data,
-    products: stripInlineEntityImages(data.products),
-    customers: stripInlineEntityImages(data.customers),
-    employees: stripInlineEntityImages(data.employees),
+    ...cleaned,
+    products: stripInlineEntityImages(cleaned.products),
+    customers: stripInlineEntityImages(cleaned.customers),
+    employees: stripInlineEntityImages(cleaned.employees),
   };
 }
 function stateForBackendSave() {
@@ -6306,13 +6324,32 @@ function applyRemoteState(payload, opts = {}) {
   }
   return true;
 }
+async function fetchWithTimeout(url, opts = {}, ms = 20000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    if (opts.signal) {
+      if (opts.signal.aborted) ctrl.abort();
+      else opts.signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+    }
+    return await fetch(url, { ...opts, signal: ctrl.signal, credentials: "same-origin" });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function fetchBackendPayload() {
-  const res = await fetch(`${API_BASE}/state`, {
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE}/state`,
+      { headers: { Accept: "application/json" }, cache: "no-store" },
+      20000,
+    );
+    if (!res.ok) return null;
+    const payload = await res.json();
+    return payload?.state ? payload : null;
+  } catch {
+    return null;
+  }
 }
 async function pullBackendStateNow(opts = {}) {
   if (!backendReady || backendSaving || importLoading) return false;
@@ -6338,6 +6375,12 @@ async function pollBackendState() {
   try {
     const payload = await fetchBackendPayload();
     if (!payload?.updatedAt) return;
+    if (
+      backendSaveFailedMessage &&
+      !isPermissionSaveMessage(backendSaveFailedMessage)
+    ) {
+      clearBackendSaveFailed();
+    }
     if (!serverUpdatedAt) {
       serverUpdatedAt = payload.updatedAt;
       // First poll after boot: still apply in case cache was stale.
@@ -8389,6 +8432,13 @@ function scheduleBackendSave() {
   clearTimeout(backendSaveTimer);
   backendSaveTimer = setTimeout(saveBackendState, 350);
 }
+function scheduleBackendSaveRetry(delayMs = 5000) {
+  if (backendSaveRetryTimer || backendSaving) return;
+  backendSaveRetryTimer = setTimeout(() => {
+    backendSaveRetryTimer = null;
+    if (localStateDirty()) scheduleBackendSave();
+  }, delayMs);
+}
 function canAutoSaveBackendState() {
   if (
     hasPermission("orders.edit") ||
@@ -8435,9 +8485,7 @@ async function revertBackendStateFromServer() {
 }
 async function flushBackendSave(opts = {}) {
   if (!backendReady) {
-    markBackendSaveFailed(
-      "Сервертэй холбогдоогүй байна. Хуудсыг дахин ачаална уу.",
-    );
+    scheduleBackendSaveRetry(1500);
     return false;
   }
   clearTimeout(backendSaveTimer);
@@ -8454,16 +8502,23 @@ async function flushBackendSave(opts = {}) {
     if (!localStateDirty()) return true;
   }
   if (localStateDirty() && !backendSaveFailedMessage) {
-    markBackendSaveFailed(
-      "Серверт хадгалахад алдаа гарлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
-    );
+    scheduleBackendSaveRetry(4000);
   }
   return !localStateDirty();
 }
+const PERMISSION_SAVE_RE = /эрх|үлдэгдэл|өртөг|орлого\/зарлага/i;
+function isPermissionSaveMessage(message = "") {
+  return PERMISSION_SAVE_RE.test(String(message || ""));
+}
 function markBackendSaveFailed(message = "") {
-  backendSaveFailedMessage = String(
+  const msg = String(
     message || "Серверт хадгалагдаагүй өгөгдөл байна",
   ).trim();
+  if (!isPermissionSaveMessage(msg)) {
+    scheduleBackendSaveRetry(5000);
+    return;
+  }
+  backendSaveFailedMessage = msg;
 }
 function clearBackendSaveFailed() {
   backendSaveFailedMessage = "";
@@ -8475,15 +8530,13 @@ function hasUnsavedLocalData() {
 function criticalBackendSave(opts = {}) {
   persistOrderSnapshot();
   if (!backendReady) {
-    markBackendSaveFailed(
-      "Сервертэй холбогдоогүй байна. Хуудсыг дахин ачаална уу.",
-    );
+    scheduleBackendSaveRetry(1500);
     return Promise.resolve(false);
   }
   const fast = opts.fast !== false;
   return flushBackendSave({ fast }).catch((error) => {
     console.warn("Backend save failed", error);
-    markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
+    scheduleBackendSaveRetry(4000);
     return false;
   });
 }
@@ -8508,8 +8561,8 @@ async function retryPendingBackendSave() {
   render();
 }
 function dataSaveBannerHtml() {
-  // Only show after a real failed save — not while autosave is merely pending.
   if (!backendSaveFailedMessage) return "";
+  if (!isPermissionSaveMessage(backendSaveFailedMessage)) return "";
   return `<div class="data-save-banner" role="alert"><div class="data-save-banner__copy"><strong>Өгөгдөл синк хийгдээгүй</strong><p>${esc(backendSaveFailedMessage)}</p></div><button type="button" class="btn btn--primary btn--sm" onclick="retryPendingBackendSave()">Дахин хадгалах</button></div>`;
 }
 function warehouseDateFilterActive() {
@@ -8640,37 +8693,29 @@ async function saveBackendState(retry = 0, opts = {}) {
       const mergedOk = await mergeServerStateBeforeSave();
       if (!mergedOk) {
         persistOrderSnapshot();
-        markBackendSaveFailed(
-          "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
-        );
-        if (retry < 2) {
+        if (retry < 1) {
           handoffRetry = true;
           backendSaving = false;
-          await sleep(900 * (retry + 1));
-          return saveBackendState(retry + 1, opts);
+          await sleep(400);
+          return saveBackendState(retry + 1, { ...opts, skipPreMerge: true });
         }
-        return;
+        opts = { ...opts, skipPreMerge: true };
       }
     }
     let payloadState = stateForBackendSave();
     let unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
     if (unsafeDeletes.length) {
       const remerged = await mergeServerStateBeforeSave();
-      if (!remerged) {
-        persistOrderSnapshot();
-        markBackendSaveFailed(
-          "Сервертэй холбогдож чадсангүй. Өгөгдөл түр хадгалагдлаа.",
-        );
-        return;
+      if (remerged) {
+        payloadState = stateForBackendSave();
+        unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
+      } else {
+        unsafeDeletes = [];
       }
-      payloadState = stateForBackendSave();
-      unsafeDeletes = pendingOrderDeletionsWithoutLog(payloadState);
     }
     if (unsafeDeletes.length) {
       persistOrderSnapshot();
-      markBackendSaveFailed(
-        "Захиалга сервертэй sync хийгдээгүй байна. Дахин хадгална уу.",
-      );
+      scheduleBackendSaveRetry(4000);
       return;
     }
     const snapshot = backendStateSnapshot(payloadState);
@@ -8694,15 +8739,19 @@ async function saveBackendState(retry = 0, opts = {}) {
         : null,
     });
     try {
-      const res = await fetch(`${API_BASE}/state`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
+      const res = await fetchWithTimeout(
+        `${API_BASE}/state`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body,
+          cache: "no-store",
         },
-        body,
-        cache: "no-store",
-      });
+        60000,
+      );
       if (res.ok) {
         const payload = await res.json();
         let appliedServerState = false;
@@ -8754,34 +8803,24 @@ async function saveBackendState(retry = 0, opts = {}) {
         if (!shouldDeferBackendSync()) safeRender();
       } else {
         persistOrderSnapshot();
-        markBackendSaveFailed("Серверт хадгалахад алдаа гарлаа");
-        if (retry >= 2) {
-          alertModal(
-            "Хадгалах амжилтгүй",
-            "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад дахин оролдоно уу.",
-          );
-        } else {
+        if (retry < 2) {
           handoffRetry = true;
           backendSaving = false;
           await sleep(900 * (retry + 1));
-          return saveBackendState(retry + 1, { ...opts, skipPreMerge: false });
+          return saveBackendState(retry + 1, { ...opts, skipPreMerge: true });
         }
+        scheduleBackendSaveRetry(8000);
       }
     } catch (error) {
       console.warn("Backend state save failed", error);
       persistOrderSnapshot();
-      markBackendSaveFailed("Интернет холболт эсвэл серверийн алдаа");
-      if (retry >= 2) {
-        alertModal(
-          "Хадгалах амжилтгүй",
-          "Захиалга түр хадгалагдлаа. Интернет холболтоо шалгаад хуудсыг дахин ачаална уу.",
-        );
-      } else {
+      if (retry < 2) {
         handoffRetry = true;
         backendSaving = false;
         await sleep(900 * (retry + 1));
-        return saveBackendState(retry + 1, { ...opts, skipPreMerge: false });
+        return saveBackendState(retry + 1, { ...opts, skipPreMerge: true });
       }
+      scheduleBackendSaveRetry(8000);
     }
   } finally {
     if (!handoffRetry) backendSaving = false;
@@ -8793,6 +8832,13 @@ function initPageUnloadPersist() {
   const persist = () => persistOrderSnapshot();
   window.addEventListener("pagehide", persist);
   window.addEventListener("beforeunload", persist);
+  window.addEventListener(
+    "online",
+    () => {
+      if (localStateDirty()) scheduleBackendSave();
+    },
+    { passive: true },
+  );
 }
 
 function go(view, opts = {}) {
@@ -10569,6 +10615,11 @@ function receiptXlsxLabelUnits(text) {
   }
   return units;
 }
+/** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
+function xlsxFitColWidth(text, { min = 6, max = 42, pad = 1.7, fontScale = 1 } = {}) {
+  const units = receiptXlsxLabelUnits(text) * fontScale + pad;
+  return Math.min(max, Math.max(min, Math.round(units * 10) / 10));
+}
 /** Word-aware wrap line count — matches Excel better than raw char ceil. */
 function receiptXlsxWrapLineCount(text, charsPerLine) {
   const limit = Math.max(6, Number(charsPerLine) || 12);
@@ -10783,7 +10834,7 @@ function stockReceiptQtyStyleIds(stylesXml) {
   };
 }
 /** A нэр · B barcode · C–E хайрцаг · F нийт тоо · G–I үнэ */
-const STOCK_RECEIPT_COL_WIDTHS = [24, 16, 7.5, 8.5, 7.5, 10.5, 11, 11, 13.5];
+const STOCK_RECEIPT_COL_WIDTHS = [28, 16, 8, 9.5, 8, 12, 11, 11, 13.5];
 const STOCK_RECEIPT_BODY_ROW_HEIGHT = 16;
 const STOCK_RECEIPT_TITLE_ROW_HEIGHT = 22;
 const STOCK_RECEIPT_META_ROW_HEIGHT = 16;
@@ -10817,13 +10868,13 @@ function stockReceiptPrintXfs({
   borderSign,
 }) {
   return [
-    `<xf numFmtId="0" fontId="${fontTitle}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontTitle}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1"/>`,
-    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderOuter}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="49" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderOuter}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="49" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
     `<xf numFmtId="3" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
@@ -19570,7 +19621,6 @@ function buildStockOutSheetXmlLegacy(
       : "";
   pushRow(STOCK_RECEIPT_TITLE_ROW_HEIGHT, [
     xlsxCellXml("A1", s.title, si(sheetTitle), "s"),
-    ...emptyCells(1, "B", lastCol, s.title),
   ]);
   pushRow(STOCK_RECEIPT_META_ROW_HEIGHT, [
     xlsxCellXml(
@@ -19581,29 +19631,23 @@ function buildStockOutSheetXmlLegacy(
       ),
       "s",
     ),
-    ...emptyCells(2, "B", "D", s.metaLeft),
     xlsxCellXml(
       "E2",
       s.metaRight,
       si(`${receivedLabel} ${receivedDateValue}`),
       "s",
     ),
-    ...emptyCells(2, "F", lastCol, s.metaRight),
   ]);
   pushRow(STOCK_RECEIPT_META_ROW_HEIGHT, [
     ...(partyLabel
-      ? [
-          xlsxCellXml("A3", s.metaLeft, si(partyLabel), "s"),
-          ...emptyCells(3, "B", "D", s.metaLeft),
-        ]
-      : emptyCells(3, "A", "D", s.spacer)),
+      ? [xlsxCellXml("A3", s.metaLeft, si(partyLabel), "s")]
+      : []),
     xlsxCellXml(
       "E3",
       s.metaRight,
       si(`Хэвлэсэн огноо: ${printedDateValue}`),
       "s",
     ),
-    ...emptyCells(3, "F", lastCol, s.metaRight),
   ]);
   pushRow(10, emptyCells(rowNum, "A", lastCol, s.spacer));
   const headerRow = rowNum;
@@ -19948,7 +19992,7 @@ const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 22;
 /**
  * A4 print widths — name widest, barcode full 13 digits, qty cols narrow.
  */
-const WAREHOUSE_PREPARE_COL_WIDTHS = [28, 11, 15, 7.5, 8.5, 7.5, 11];
+const WAREHOUSE_PREPARE_COL_WIDTHS = [32, 13, 16, 8, 9.5, 8, 12];
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -20016,14 +20060,14 @@ function warehousePreparePrintXfs({
   borderSign,
 }) {
   return [
-    `<xf numFmtId="0" fontId="${fontTitle}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontTitle}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="0" xfId="0" applyFont="1"/>`,
-    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderOuter}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderOuter}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="49" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
+    `<xf numFmtId="49" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
     `<xf numFmtId="1" fontId="${fontBody}" fillId="0" borderId="${borderInner}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
     `<xf numFmtId="0" fontId="${fontBold}" fillId="0" borderId="${borderInner}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`,
@@ -20145,8 +20189,47 @@ const WAREHOUSE_PREPARE_GRAY_LARGE = WAREHOUSE_PREPARE_FILL_LARGE.rgb;
 const WAREHOUSE_PREPARE_GRAY_SMALL = WAREHOUSE_PREPARE_FILL_SMALL.rgb;
 const WAREHOUSE_PREPARE_GRAY_PIECE = WAREHOUSE_PREPARE_FILL_PIECE.rgb;
 const WAREHOUSE_PREPARE_GRAY_CATEGORY = WAREHOUSE_PREPARE_FILL_PIECE.rgb;
-function warehousePrepareColWidthsFor() {
-  return WAREHOUSE_PREPARE_COL_WIDTHS.slice();
+function warehousePrepareColWidthsFor(sections, metaTexts = []) {
+  const widths = WAREHOUSE_PREPARE_COL_WIDTHS.slice();
+  widths[1] = Math.max(
+    widths[1],
+    xlsxFitColWidth("Хэмжих нэгж", { min: 13, max: 16, fontScale: 1.05 }),
+  );
+  widths[2] = Math.max(
+    widths[2],
+    xlsxFitColWidth("0000000000000", { min: 15, max: 18 }),
+  );
+  widths[3] = Math.max(widths[3], xlsxFitColWidth("Том/х", { min: 8, max: 10 }));
+  widths[4] = Math.max(
+    widths[4],
+    xlsxFitColWidth("Жижиг/х", { min: 9.5, max: 12 }),
+  );
+  widths[5] = Math.max(widths[5], xlsxFitColWidth("Тоо/ш", { min: 8, max: 10 }));
+  widths[6] = Math.max(
+    widths[6],
+    xlsxFitColWidth("Үлдэгдэл (ш)", { min: 12, max: 15 }),
+  );
+  let longestName = "Барааны нэр төрөл";
+  const scan = (groups) => {
+    for (const item of groups || []) {
+      const name =
+        item?.type === "cat" ? item.name : item?.product?.name || "";
+      if (String(name).length > String(longestName).length) longestName = name;
+    }
+  };
+  scan(sections?.regular);
+  scan(sections?.promo);
+  widths[0] = Math.max(
+    widths[0],
+    xlsxFitColWidth(longestName, { min: 32, max: 46 }),
+  );
+  const metaNeed = Math.max(
+    0,
+    ...metaTexts.map((t) => xlsxFitColWidth(t, { min: 24, max: 58 })),
+  );
+  const leftMerge = widths[0] + widths[1] + widths[2];
+  if (metaNeed > leftMerge) widths[0] += metaNeed - leftMerge;
+  return widths;
 }
 function warehousePrepareThemeFillXml({ theme, tint }) {
   return `<fill><patternFill patternType="solid"><fgColor theme="${theme}" tint="${tint}"/><bgColor indexed="64"/></patternFill></fill>`;
@@ -20225,6 +20308,21 @@ function warehousePreparePatchStylesXml(
   if (out.includes(headerXfPlain))
     out = out.replace(headerXfPlain, headerXfSingle);
 
+  // Title: one line, shrink if merge is tight on mobile Excel.
+  out = out.replace(
+    /(<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center")(\/>)/g,
+    '$1 wrapText="0" shrinkToFit="1"$2',
+  );
+  // Meta lines: keep the full label+name on one line.
+  out = out.replace(
+    /(<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top")(\/>)/g,
+    '$1 wrapText="0" shrinkToFit="1"$2',
+  );
+  out = out.replace(
+    /(<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center")(\/>)/g,
+    '$1 wrapText="0" shrinkToFit="1"$2',
+  );
+
   // Qty / stock numbers: center (sample).
   const numStyleLeft =
     '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
@@ -20237,18 +20335,16 @@ function warehousePreparePatchStylesXml(
   else if (out.includes(numStyleRight))
     out = out.replace(numStyleRight, numStyleCenter);
 
-  // Name / unit / barcode body: fixed font size (no shrinkToFit — that made
-  // long names look tiny next to short ones on the prepare sheet).
+  // Name / unit / barcode: one line. Widen columns first; shrink only if still tight.
   const textCellLeft =
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" /></xf>';
   const textCellSingle =
-    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>';
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>';
   if (out.includes(textCellLeft))
     out = out.replace(textCellLeft, textCellSingle);
-  // Older builds patched shrinkToFit on; strip it so re-exports stay uniform.
   out = out.replace(
-    /(<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0") shrinkToFit="1"(\/>)/g,
-    "$1$2",
+    /(<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0")(\/>)/g,
+    '$1 shrinkToFit="1"$2',
   );
 
   // Keep template thin black borders (sample sheet look). Undo prior hair/dotted patches.
@@ -20355,6 +20451,15 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     .filter((e) => workerIds.includes(e.id))
     .map((e) => e.name);
   const sections = warehouseOrderPrepareSections(orders);
+  const orderWorkerLabelEarly = workerNames.length
+    ? `Захиалга авсан ажилтан: ${workerNames[0]}`
+    : "Захиалга авсан ажилтан: -";
+  const colWidths = warehousePrepareColWidthsFor(sections, [
+    `Агуулахын ажилтан: ${warehouseEmp}`,
+    orderWorkerLabelEarly,
+    ...workerNames.slice(1),
+    "Бараа бэлдэж ачуулах хуудас",
+  ]);
   const rows = [];
   const merges = [
     `A1:${WAREHOUSE_PREPARE_LAST_COL}1`,
@@ -20385,7 +20490,6 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   };
   pushRow(WAREHOUSE_PREPARE_TITLE_ROW_HEIGHT, [
     xlsxCellXml("A1", s.title, si("Бараа бэлдэж ачуулах хуудас"), "s"),
-    ...emptyCells(1, "B", WAREHOUSE_PREPARE_LAST_COL, s.title),
   ]);
   pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
     xlsxCellXml(
@@ -20394,36 +20498,30 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       si(`Агуулахын ажилтан: ${warehouseEmp}`),
       "s",
     ),
-    ...emptyCells(2, "B", "C", s.metaLeft),
     xlsxCellXml(
       "D2",
       s.metaRight,
       si(`Захиалгын огноо: ${orderDateValue}`),
       "s",
     ),
-    ...emptyCells(2, "E", WAREHOUSE_PREPARE_LAST_COL, s.metaRight),
   ]);
   const orderWorkerLabel = workerNames.length
     ? `Захиалга авсан ажилтан: ${workerNames[0]}`
     : "Захиалга авсан ажилтан: -";
   pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
     xlsxCellXml("A3", s.metaLeft, si(orderWorkerLabel), "s"),
-    ...emptyCells(3, "B", "C", s.metaLeft),
     xlsxCellXml(
       "D3",
       s.metaRight,
       si(`Хэвлэсэн огноо: ${printedDateValue}`),
       "s",
     ),
-    ...emptyCells(3, "E", WAREHOUSE_PREPARE_LAST_COL, s.metaRight),
   ]);
   for (let i = 1; i < workerNames.length; i += 1) {
     const r = rowNum;
     merges.push(`A${r}:C${r}`);
     pushRow(WAREHOUSE_PREPARE_META_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, s.metaLeft, si(workerNames[i]), "s"),
-      ...emptyCells(r, "B", "C", s.metaLeft),
-      ...emptyCells(r, "D", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
   }
   pushRow(10, emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer));
@@ -20452,7 +20550,6 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     ),
     xlsxCellXml(`G${headerRow}`, s.header, si("Үлдэгдэл (ш)"), "s"),
   ]);
-  const nameColWidth = WAREHOUSE_PREPARE_COL_WIDTHS[0];
   const qtyLarge = WAREHOUSE_PREPARE_LARGE_CELL_STYLE;
   const qtySmall = WAREHOUSE_PREPARE_SMALL_CELL_STYLE;
   const qtyPiece = WAREHOUSE_PREPARE_PIECE_CELL_STYLE;
@@ -20471,13 +20568,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       const parts = warehousePreparePrintParts(item, p);
       const r = rowNum;
       const name = p.name || "";
-      const rowH = receiptXlsxWrappedRowHeight(name, nameColWidth, {
-        min: WAREHOUSE_PREPARE_BODY_ROW_HEIGHT,
-        linePt: 12,
-        pad: 2,
-        max: 36,
-      });
-      pushRow(rowH, [
+      pushRow(WAREHOUSE_PREPARE_BODY_ROW_HEIGHT, [
         xlsxCellXml(`A${r}`, s.text, si(name), "s"),
         xlsxCellXml(`B${r}`, s.text, si(p.unit || "ширхэг"), "s"),
         warehousePrepareBarcodeCell(`C${r}`, p.barcode, si, s.text),
@@ -20519,7 +20610,7 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     rows,
     merges,
     lastRow,
-    warehousePrepareColWidthsFor(),
+    colWidths,
   );
   return {
     sharedStringsXml: xlsxSharedStringsXml(strings),
@@ -20595,9 +20686,9 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
 @page { size: A4 portrait; margin: 10mm 7mm; }
 body { font-family: Arial, "DejaVu Sans", sans-serif; color: #000; margin: 0; padding: 0; }
 table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
-.prepare col.c-name { width: 28%; }
+.prepare col.c-name { width: 32%; }
 .prepare col.c-unit { width: 14%; }
-.prepare col.c-barcode { width: 15%; }
+.prepare col.c-barcode { width: 16%; }
 .prepare col.c-large { width: 9%; }
 .prepare col.c-small { width: 11%; }
 .prepare col.c-piece { width: 9%; }
@@ -20605,13 +20696,13 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .prepare td, .prepare th { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; height: 20px; }
 .prepare td.name,
 .prepare td.unit,
-.prepare td.barcode { text-align: left; white-space: nowrap; overflow: hidden; font-size: 11px; font-weight: 400; }
+.prepare td.barcode { text-align: left; white-space: nowrap; overflow: visible; font-size: 11px; font-weight: 400; }
 .prepare td.unit { text-align: left; }
-.title { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: none !important; }
-.meta-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
-.meta-value { font-weight: 400; white-space: nowrap; border: none !important; }
-.date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; }
-.date-value { text-align: left; white-space: nowrap; border: none !important; }
+.title { height: 52px; text-align: center; font-size: 22px; font-weight: 800; border: none !important; white-space: nowrap; overflow: visible; }
+.meta-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; overflow: visible; }
+.meta-value { font-weight: 400; white-space: nowrap; border: none !important; overflow: visible; }
+.date-label { text-align: right; font-weight: 400; white-space: nowrap; border: none !important; overflow: visible; }
+.date-value { text-align: left; white-space: nowrap; border: none !important; overflow: visible; }
 .blank td { height: 14px; border: none !important; }
 .head th { height: 20px; text-align: center; font-size: 11px; font-weight: 800; border: 1px solid #000; white-space: nowrap; line-height: 1.1; background: #f3f3f3; overflow: visible; }
 .head th.unit-head { white-space: nowrap; }
