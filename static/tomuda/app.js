@@ -29691,7 +29691,17 @@ let btPrinterSetupBack = null;
 let btPrinterScanning = false;
 
 function shouldShowBtPrinterUi() {
-  return isAndroidDevice();
+  return isAndroidDevice() || isIosDevice();
+}
+
+function btPrinterSetupHintHtml() {
+  if (isIosDevice()) {
+    return `<p class="bt-setup__kicker">iPhone дээр AirPrint ажиллахгүй</p><p class="bt-setup__hint">58мм Bluetooth принтер iPhone-ий «Printer» жагсаалтад гардаггүй. Хэвлэхийн тулд принтерээ Android утсан дээр Bluetooth-аар холбоод Томуда аппаар хэвлэнэ үү.</p>`;
+  }
+  if (!shouldUseBluetoothReceiptPrint()) {
+    return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
+  }
+  return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Принтерээ асаагаад утасны Bluetooth-аар нэг удаа холбоно. Дараа нь скан хийж нэрэн дээр нь дарна. Зөвхөн зарлагын баримт хэвлэнэ.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -29762,6 +29772,9 @@ function btPrinterSetupListHtml() {
     return `<p class="bt-printer-hint">Принтер хайж байна...</p>`;
   }
   if (!btPrinterScanResults.length) {
+    if (isIosDevice()) {
+      return `<p class="bt-printer-hint">iPhone дээр энэ принтерийн нэр гарахгүй. Android апп ашиглана уу.</p>`;
+    }
     return `<p class="bt-printer-hint">Принтер олдсонгүй. Принтерээ асаагаад утасны Bluetooth-аар холбоод дахин скан хийнэ үү.</p>`;
   }
   return btPrinterScanResults
@@ -29779,7 +29792,7 @@ function renderBtPrinterSetupModal() {
   const canDisconnect = !!saved;
   box(
     "Хэвлэгч тохируулах",
-    `<div class="bt-setup"><p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Принтерээ асаагаад утасны Bluetooth-аар нэг удаа холбоно. Дараа нь скан хийж нэрэн дээр нь дарна. Зөвхөн зарлагын баримт хэвлэнэ.</p><div class="bt-printer-list">${btPrinterSetupListHtml()}</div><div class="bt-setup__bar"><button type="button" class="bt-setup__round" onclick="testBtPrinter()" aria-label="Турших">${btSetupIconPrinter()}</button><button type="button" class="btn btn--secondary bt-setup__disconnect"${canDisconnect ? "" : " disabled"} onclick="disconnectBtPrinter()">Салгах</button><button type="button" class="bt-setup__round" onclick="scanBtPrinters()" aria-label="Скан">${btSetupIconSearch()}</button></div></div>`,
+    `<div class="bt-setup">${btPrinterSetupHintHtml()}<div class="bt-printer-list">${btPrinterSetupListHtml()}</div><div class="bt-setup__bar"><button type="button" class="bt-setup__round" onclick="testBtPrinter()" aria-label="Турших">${btSetupIconPrinter()}</button><button type="button" class="btn btn--secondary bt-setup__disconnect"${canDisconnect ? "" : " disabled"} onclick="disconnectBtPrinter()">Салгах</button><button type="button" class="bt-setup__round" onclick="scanBtPrinters()" aria-label="Скан">${btSetupIconSearch()}</button></div></div>`,
     "max-w-md",
     {
       dialog: true,
@@ -29800,7 +29813,7 @@ function openBtPrinterSetup(ev, receiptId) {
       ? { type: "receipt", id: String(state.receiptEditOrderId) }
       : null;
   renderBtPrinterSetupModal();
-  void scanBtPrinters();
+  if (!isIosDevice()) void scanBtPrinters();
 }
 
 function backFromBtPrinterSetup() {
@@ -29815,11 +29828,16 @@ function backFromBtPrinterSetup() {
 }
 
 async function scanBtPrinters() {
-  if (!shouldUseBluetoothReceiptPrint()) {
+  if (isIosDevice() || !shouldUseBluetoothReceiptPrint()) {
     btPrinterScanResults = [];
     btPrinterScanning = false;
     renderBtPrinterSetupModal();
-    showAppToast("Bluetooth хэвлэлт Android апп дээр ажиллана", "error");
+    showAppToast(
+      isIosDevice()
+        ? "iPhone дээр 58мм Bluetooth принтер холбогдохгүй"
+        : "Bluetooth хэвлэлт Android апп дээр ажиллана",
+      "error",
+    );
     return;
   }
   btPrinterScanning = true;
@@ -30180,7 +30198,8 @@ async function printOrdersViaBluetooth(orders) {
   }
   const plugin = await waitForBluetoothPrinterPlugin();
   if (!plugin) {
-    printOrdersViaBrowser(orders);
+    showAppToast("Bluetooth хэвлэлт Android апп дээр ажиллана", "error");
+    openBtPrinterSetup(null, orders[0]?.id);
     return;
   }
   try {
@@ -30194,68 +30213,22 @@ async function printOrdersViaBluetooth(orders) {
   }
 }
 
-function thermalReceiptTextEscape(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-const THERMAL_RECEIPT_PRINT_CSS = `
-@page { size: 58mm auto; margin: 2mm; }
-.thermal-print-sheet {
-  width: 54mm;
-  max-width: 54mm;
-  margin: 0 auto;
-  color: #111;
-  background: #fff;
-  font-family: "Courier New", Courier, ui-monospace, monospace;
-  font-size: 11px;
-  line-height: 1.28;
-}
-.thermal-print-sheet pre {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  font: inherit;
-}
-.thermal-print-sheet + .thermal-print-sheet {
-  page-break-before: always;
-  break-before: page;
-}
-`;
-
-function thermalReceiptPrintHtml(o) {
-  return `<div class="print-receipt thermal-print-sheet"><pre>${thermalReceiptTextEscape(
-    thermalReceiptLines(o).join("\n"),
-  )}</pre></div>`;
-}
-
-function isPhoneReceiptPrint() {
-  return isAndroidDevice() || isIosDevice();
-}
-
 function printOrdersViaBrowser(orders) {
+  if (isIosDevice() || isAndroidDevice()) {
+    openBtPrinterSetup(null, orders[0]?.id);
+    return;
+  }
   void (async () => {
-    const phone = isPhoneReceiptPrint();
-    document.documentElement.classList.toggle("thermal-receipt-print", phone);
+    const logoSrc =
+      (await getReceiptExcelLogoDataUri().catch(() => "")) ||
+      RECEIPT_LOGO_DATA_URI;
     const root = printRootEl();
-    if (phone) {
-      root.innerHTML = `<style>${THERMAL_RECEIPT_PRINT_CSS}</style>${orders
-        .map((o) => thermalReceiptPrintHtml(o))
-        .join("")}`;
-    } else {
-      const logoSrc =
-        (await getReceiptExcelLogoDataUri().catch(() => "")) ||
-        RECEIPT_LOGO_DATA_URI;
-      root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
+    root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
   @page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
   .receipt-page { width: 184mm; max-width: 184mm; margin: 0; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
-    }
     const cleanup = () => {
       document.documentElement.classList.remove("thermal-receipt-print");
       root.innerHTML = "";
@@ -30282,6 +30255,10 @@ function printOrderReceiptsNow(ids) {
     }
     closeModal();
     void printOrdersViaBluetooth(orders);
+    return;
+  }
+  if (isIosDevice() || isAndroidDevice()) {
+    openBtPrinterSetup(null, orders[0]?.id);
     return;
   }
   closeModal();
