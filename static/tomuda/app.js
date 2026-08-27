@@ -1601,10 +1601,14 @@ function orderMatchesWorkerDate(o, day = state.filters.workerDate) {
   const taken = orderTakenDay(o);
   return !!taken && taken === targetDay;
 }
+function clampOrderRetentionDays(raw) {
+  const n = Number(String(raw ?? "").replace(/[^\d]/g, ""));
+  if (!Number.isFinite(n) || n < 7) return 30;
+  return Math.min(Math.floor(n), 365);
+}
 function orderRetentionDays() {
   ensureSettings();
-  const n = Number(state.settings.orderRetentionDays);
-  return Number.isFinite(n) && n >= 7 ? Math.min(Math.floor(n), 365) : 30;
+  return clampOrderRetentionDays(state.settings.orderRetentionDays);
 }
 function orderRetentionExpiresAt(o) {
   const day = orderCreatedDay(o);
@@ -2825,9 +2829,7 @@ function refreshProductTaxonomyUi() {
 function catsInGroup(group) {
   const g = String(group || "").trim();
   if (!g || g === "all") {
-    return cats()
-      .filter(Boolean)
-      .sort(taxonomyNameSort);
+    return cats().filter(Boolean).sort(taxonomyNameSort);
   }
   const names = new Set();
   for (const p of state.products || []) {
@@ -2839,9 +2841,7 @@ function catsInGroup(group) {
   for (const c of state.extraCategories || []) {
     if (inferredGroupForType(c) === g) names.add(c);
   }
-  return [...names]
-    .filter(Boolean)
-    .sort(taxonomyNameSort);
+  return [...names].filter(Boolean).sort(taxonomyNameSort);
 }
 function ensureGroupName(name) {
   const trimmed = String(name || "").trim();
@@ -8477,7 +8477,7 @@ function warehouseLiveFilterBannerHtml() {
     day === today
       ? "Өнөөдөр авсан"
       : `${warehouseDateDisplayText(day)} өдөр авсан`;
-  return `<div class="wh-date-banner" role="status"><strong>${dayLabel} захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Календараас өдөр сонгоод бараа бэлдэнэ.</span></div>`;
+  return `<div class="wh-date-banner" role="status"><strong>${dayLabel} захиалга харагдаж байна.</strong><span>Нийт ${total}, энд ${visible}${hidden ? ` · ${hidden} нуугдсан` : ""}. Хуанлиас өдөр сонгоод бараа бэлдэнэ.</span></div>`;
 }
 async function mergeServerStateBeforeSave() {
   try {
@@ -9151,19 +9151,20 @@ function orderRetentionSettingsModal() {
   const days = orderRetentionDays();
   box(
     "Захиалгын түүх хадгалах",
-    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалгын түүхэнд тохируулсан хугацааны дотор системээс автоматаар устана. <b>Авлагатай (төлөөгүй) баримт хэзээ ч устахгүй.</b></p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" min="7" max="365" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveOrderRetentionSettings(event)" class="p-5 space-y-4"><p class="text-sm text-muted-foreground">Захиалгын түүхэнд тохируулсан хугацааны дотор системээс автоматаар устана. <b>Авлагатай (төлөөгүй) баримт хэзээ ч устахгүй.</b> 7–365 хоног.</p><label class="block text-sm font-medium">Хадгалах хоног</label><input name="orderRetentionDays" type="text" inputmode="numeric" autocomplete="off" required value="${days}" class="w-full px-3 py-3 bg-secondary rounded app-input"><div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-md",
   );
 }
 function saveOrderRetentionSettings(e) {
-  if (!isAdmin()) return;
   e.preventDefault();
+  if (!canManageOrderHistorySettings()) {
+    return alertModal("Эрхгүй", "Тохиргоо өөрчлөх эрхгүй.");
+  }
   ensureSettings();
-  const raw = Number(new FormData(e.target).get("orderRetentionDays"));
-  state.settings.orderRetentionDays = Math.min(
-    365,
-    Math.max(7, Number.isFinite(raw) ? Math.floor(raw) : 31),
-  );
+  const raw =
+    e.target?.elements?.orderRetentionDays?.value ??
+    new FormData(e.target).get("orderRetentionDays");
+  state.settings.orderRetentionDays = clampOrderRetentionDays(raw);
   closeModal();
   render();
   showInstallToast("Захиалгын түүх хадгалах хугацаа шинэчлэгдлээ");
@@ -12787,7 +12788,7 @@ function receiptSalesEmployees() {
   return salesOrderAgents();
 }
 function receiptPrintWorkerRoleLabel(role) {
-  return role === "admin" ? "Админ" : "ХТ";
+  return role === "admin" ? "Админ" : "Худалдааны төлөөлөгч";
 }
 function receiptPrintWorkerSummary(selected = receiptPrintWorkerIds()) {
   if (!selected.length) return "Сонгох";
@@ -17900,7 +17901,7 @@ function countView() {
           const diffTone =
             t.diffValue !== 0 ? "text-tone-danger" : "text-tone-success";
           const qtyBar = metricsBar(
-            `${card("Эхний үлдэгдэл", t.opening)}${card("Борлуулсан", t.sold)}${card("Зарлагдсан", t.expended)}${card("Эцсийн үлдэгдэл", t.final)}`,
+            `${card("Эхний үлдэгдэл", t.opening)}${card("Борлуулсан", t.sold)}${card("Зарлага гаргасан", t.expended)}${card("Эцсийн үлдэгдэл", t.final)}`,
             "4",
             "count",
           );
@@ -17985,7 +17986,7 @@ function countResult(mismatches) {
   const list = countFilteredProducts().filter((p) => countValue(p.id) !== null);
   const mismatchCount = mismatches.length;
   const showCost = canViewProductCost();
-  const headHtml = `<div class="count-result-table__head" role="row"><span class="count-result-table__head-name" role="columnheader">Бараа</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд борлуулсан">Борлуулсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд зарлагдсан">Зарлагдсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллогын эцсийн үлдэгдэл">Эцсийн үлдэгдэл</span>${showCost ? `<span class="count-result-table__head-num" role="columnheader" title="Нэгжийн өртөг үнэ">Өртөг үнэ</span>` : ""}<span class="count-result-table__head-num" role="columnheader" title="Тоолсон − бүртгэл">Зөрүү</span>${showCost ? `<span class="count-result-table__head-num" role="columnheader" title="Зөрүүний дүн">Зөрүү дүн</span>` : ""}</div>`;
+  const headHtml = `<div class="count-result-table__head" role="row"><span class="count-result-table__head-name" role="columnheader">Бараа</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого эхлэх үеийн үлдэгдэл">Эхний үлдэгдэл</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд борлуулсан">Борлуулсан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллого хугацаанд зарлага гаргасан">Зарлага гаргасан</span><span class="count-result-table__head-num" role="columnheader" title="Тооллогын эцсийн үлдэгдэл">Эцсийн үлдэгдэл</span>${showCost ? `<span class="count-result-table__head-num" role="columnheader" title="Нэгжийн өртөг үнэ">Өртөг үнэ</span>` : ""}<span class="count-result-table__head-num" role="columnheader" title="Тоолсон − бүртгэл">Зөрүү</span>${showCost ? `<span class="count-result-table__head-num" role="columnheader" title="Зөрүүний дүн">Зөрүү дүн</span>` : ""}</div>`;
   const rowHtml = list
     .map((p) => {
       const stats = countProductStats(p),
@@ -17997,7 +17998,7 @@ function countResult(mismatches) {
             : "count-result-table__diff count-result-table__diff--bad",
         diffText = countDiffQtyText(diff),
         diffAmtText = countDiffAmountText(diff, p);
-      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}" role="row"><span class="count-result-table__name" role="cell" title="${esc(p.name)}">${esc(p.name)}</span>${countResultQtyCell(stats.opening, "Эхний үлдэгдэл")}${countResultQtyCell(stats.sold, "Борлуулсан")}${countResultQtyCell(stats.expended, "Зарлагдсан")}${countResultQtyCell(stats.final, "Эцсийн үлдэгдэл")}${showCost ? `<span class="count-result-table__num" data-label="Өртөг үнэ" title="Өртөг үнэ: ${esc(cost ? fmt(cost) : "-")}">${cost ? fmt(cost) : "-"}</span>` : ""}<span class="${diffClass}" data-label="Зөрүү" title="Зөрүү: ${esc(diffText)}">${diffText}</span>${showCost ? `<span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн" title="Зөрүү дүн: ${esc(diffAmtText)}">${diffAmtText}</span>` : ""}</div>`;
+      return `<div class="count-result-table__row${diff !== 0 && diff !== null ? " count-result-table__row--mismatch" : ""}" role="row"><span class="count-result-table__name" role="cell" title="${esc(p.name)}">${esc(p.name)}</span>${countResultQtyCell(stats.opening, "Эхний үлдэгдэл")}${countResultQtyCell(stats.sold, "Борлуулсан")}${countResultQtyCell(stats.expended, "Зарлага гаргасан")}${countResultQtyCell(stats.final, "Эцсийн үлдэгдэл")}${showCost ? `<span class="count-result-table__num" data-label="Өртөг үнэ" title="Өртөг үнэ: ${esc(cost ? fmt(cost) : "-")}">${cost ? fmt(cost) : "-"}</span>` : ""}<span class="${diffClass}" data-label="Зөрүү" title="Зөрүү: ${esc(diffText)}">${diffText}</span>${showCost ? `<span class="${diffClass} count-result-table__amount" data-label="Зөрүү дүн" title="Зөрүү дүн: ${esc(diffAmtText)}">${diffAmtText}</span>` : ""}</div>`;
     })
     .join("");
   const badgeClass = mismatchCount
@@ -18423,7 +18424,7 @@ function buildCountSheetXml() {
       "A3",
       3,
       si(
-        `Тоолсон: ${products.length} бараа · ${mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"} · Хүлээгдэж буй = Эхний + Орлого − Борлуулсан − Зарлагдсан · Зөрүү = Тоолсон − Бүртгэл`,
+        `Тоолсон: ${products.length} бараа · ${mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"} · Хүлээгдэж буй = Эхний + Орлого − Борлуулсан − Зарлага гаргасан · Зөрүү = Тоолсон − Бүртгэл`,
       ),
       "s",
     ),
@@ -18437,7 +18438,7 @@ function buildCountSheetXml() {
     xlsxCellXml(`C${headerRow}`, 7, si("Эхний үлдэгдэл"), "s"),
     xlsxCellXml(`D${headerRow}`, 7, si("Орлого"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Борлуулсан"), "s"),
-    xlsxCellXml(`F${headerRow}`, 7, si("Зарлагдсан"), "s"),
+    xlsxCellXml(`F${headerRow}`, 7, si("Зарлага гаргасан"), "s"),
     xlsxCellXml(`G${headerRow}`, 7, si("Хүлээгдэж буй"), "s"),
     xlsxCellXml(`H${headerRow}`, 7, si("Бүртгэл"), "s"),
     xlsxCellXml(`I${headerRow}`, 7, si("Тоолсон"), "s"),
@@ -20618,7 +20619,7 @@ function exportCountExcelFallback() {
     [`Агуулахын ажилтан: ${state.currentEmployee?.name || "-"}`],
     [countSheetDateLabel()],
     [
-      `Тоолсон: ${products.length} бараа · ${mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"} · Хүлээгдэж буй = Эхний + Орлого − Борлуулсан − Зарлагдсан · Зөрүү = Тоолсон − Бүртгэл`,
+      `Тоолсон: ${products.length} бараа · ${mismatchCount ? `Зөрүүтэй: ${mismatchCount}` : "Зөрүүгүй"} · Хүлээгдэж буй = Эхний + Орлого − Борлуулсан − Зарлага гаргасан · Зөрүү = Тоолсон − Бүртгэл`,
     ],
     [],
     [
@@ -20627,7 +20628,7 @@ function exportCountExcelFallback() {
       "Эхний үлдэгдэл",
       "Орлого",
       "Борлуулсан",
-      "Зарлагдсан",
+      "Зарлага гаргасан",
       "Хүлээгдэж буй",
       "Бүртгэл",
       "Тоолсон",
@@ -23846,10 +23847,18 @@ function promotionQtyRuleText(r) {
   }
   return `${r.minQty || 0} ширхэг · ${r.discountPercent || 0}% (хуучин дүрэм)`;
 }
-function promoQtyProductChipHtml(p, qty = 0) {
-  const qtyBadge =
-    qty > 0 ? `<span class="promo-qty-chip__qty">${qty} ш</span>` : "";
-  return `<div class="promo-qty-chip"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-qty-chip__img" width="40" height="40" loading="lazy" decoding="async" alt=""><span class="promo-qty-chip__name">${esc(p.name)}</span>${qtyBadge}</div>`;
+function promoQtyProductChipHtml(p, qtyOrOpts = 0) {
+  const opts =
+    qtyOrOpts && typeof qtyOrOpts === "object"
+      ? qtyOrOpts
+      : { qty: Number(qtyOrOpts) || 0 };
+  const qty = Math.floor(Number(opts.qty) || 0);
+  const caption = String(opts.caption || "").trim();
+  const metaText = caption || (qty > 0 ? `${qty} ш` : "");
+  const meta = metaText
+    ? `<span class="promo-qty-chip__meta">${esc(metaText)}</span>`
+    : "";
+  return `<div class="promo-qty-chip"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="promo-qty-chip__img" width="40" height="40" loading="lazy" decoding="async" alt=""><span class="promo-qty-chip__text"><span class="promo-qty-chip__name">${esc(p.name)}</span>${meta}</span></div>`;
 }
 function promoApprovedRuleCard({
   kind,
@@ -23864,13 +23873,13 @@ function promoApprovedRuleCard({
 function promoRuleAmountHtml(text) {
   return `<p class="promo-rule-card__amount">${esc(text)}</p>`;
 }
-function promoRuleProductsHtml(products, qtyById = null) {
+function promoRuleProductsHtml(products, qtyById = null, caption = "") {
   const rows = (products || [])
     .map((p) =>
-      promoQtyProductChipHtml(
-        p,
-        qtyById && p?.id != null ? Number(qtyById[p.id]) || 0 : 0,
-      ),
+      promoQtyProductChipHtml(p, {
+        qty: qtyById && p?.id != null ? Number(qtyById[p.id]) || 0 : 0,
+        caption,
+      }),
     )
     .join("");
   return `<div class="promo-qty-chips">${rows || `<p class="promo-rule-card__empty">—</p>`}</div>`;
@@ -23887,7 +23896,11 @@ function promoRuleRewardHtml(r) {
     r.type === "percent" || (r.discountPercent && !freeIds.length);
   if (isPercent) return promoRulePercentHtml(r.discountPercent);
   const freeQty = Math.floor(Number(r.freeQty) || 0);
-  return `${promoRuleProductsHtml(products)}${freeQty > 0 ? `<p class="promo-rule-card__gift-meta">${esc(promoProductQtyLabel(freeQty))}</p>` : ""}`;
+  return promoRuleProductsHtml(
+    products,
+    null,
+    freeQty > 0 ? promoProductQtyLabel(freeQty) : "",
+  );
 }
 function promotionQuantityPanel(rows) {
   return promotionRulesPanel({
@@ -25802,9 +25815,9 @@ function workerChooser(orders) {
       : state.currentEmployee?.name || "-",
     emptyText = canPick
       ? hasSelection
-        ? "Сонгосон ХТ дээр захиалга алга"
+        ? "Сонгосон худалдааны төлөөлөгч дээр захиалга олдсонгүй"
         : "Худалдааны төлөөлөгч сонгоно уу"
-      : "Өнөөдөр авсан захиалга алга",
+      : "Өнөөдөр авсан захиалга олдсонгүй",
     pickerHtml = canPick
       ? `<button type="button" onclick="workerSelectModal()" class="wh-worker-chooser" aria-haspopup="dialog" aria-label="Худалдааны төлөөлөгч сонгох"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value${chooserLabel === "Сонгох" ? " is-placeholder" : ""}">${esc(chooserLabel)}</span></span><svg class="wh-worker-chooser__chev ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
       : `<div class="wh-worker-chooser wh-worker-chooser--static"><span class="wh-worker-chooser__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span><span class="wh-worker-chooser__body"><span class="wh-worker-chooser__label">Худалдааны төлөөлөгч</span><span class="wh-worker-chooser__value">${esc(chooserLabel)}</span></span></div>`;
@@ -28072,9 +28085,7 @@ function productModal(id) {
       (c) =>
         `<option value="${esc(c)}" ${p.category === c ? "selected" : ""}>${esc(c)}</option>`,
     )
-    .join(
-      "",
-    )}</select>${categoryAddBtn}</div></div>`;
+    .join("")}</select>${categoryAddBtn}</div></div>`;
   box(
     id ? PRODUCT_EDIT_TITLE : PRODUCT_NEW_TITLE,
     `<form novalidate onsubmit="saveProduct(event,'${id || ""}')" class="product-form p-5 flex flex-col min-h-0"><div class="product-form__body modal-scroll overflow-y-auto space-y-4 flex-1 min-h-0"><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Баркод</span><div class="barcode-input-row"><input id="productBarcodeInput" name="barcode" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${barcodeAttrs} onchange="fillProductFromBarcode(this.value)" class="w-full px-4 py-3 bg-secondary rounded"><button type="button" onclick="startBarcodeScan('product')" class="px-4 py-3 bg-primary text-primary-foreground rounded text-sm">Скан</button></div><p id="productBarcodeLookupStatus" class="text-xs text-muted-foreground mt-2"></p></label>${field("name", "Барааны нэр", p.name)}</div><div id="barcodeScanner" class="barcode-scanner" hidden><video id="barcodeVideo" playsinline webkit-playsinline muted autoplay></video><div class="barcode-scanner-actions"><span id="barcodeStatus">Баркодоо камер руу ойртуулна уу</span><button type="button" onclick="stopBarcodeScan()" class="px-3 py-2 bg-card rounded text-sm text-foreground">Зогсоох</button></div></div>${groupHtml}${categoryHtml}<label><span class="block text-sm font-medium mb-2">Хэмжих нэгж</span><select name="unit" class="w-full px-4 py-3 bg-secondary rounded">${productUnitOptionsHtml(p.unit)}</select></label><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Том хайрцаг</span><input name="largeBoxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${largeBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 том = хэдэн жижиг хайрцаг? (жишээ нь 10). Жижиг тохируулсны дараа.</p></label><label><span class="block text-sm font-medium mb-2">Жижиг хайрцаг</span><input name="boxQuantity" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" ${smallBoxAttrs} class="w-full px-4 py-3 bg-secondary rounded app-input"><p class="text-xs text-muted-foreground mt-2">1 жижиг = хэдэн ширхэг? (жишээ нь 10). Хоосон бол ашиглахгүй.</p></label></div>${field("price", "Борлуулалтын үнэ", isNew ? "" : p.price, "number", "0")}${field("country", "Үйлдвэрлэсэн улс", isNew ? "" : p.country, "text", "Монгол")}<div><span class="block text-sm font-medium mb-2">Зураг</span><div class="flex items-center gap-3 bg-secondary rounded p-3"><img id="productImagePreview" src="${productImageSrcAttr(p)}" class="product-thumb product-thumb--preview" referrerpolicy="no-referrer"><div class="flex-1"><input type="file" accept="image/jpeg,image/png,image/webp,image/*" onchange="handleProductImage(this)" class="w-full text-sm"><input id="productImageValue" name="image" type="hidden" value=""><p class="text-xs text-muted-foreground mt-2">JPG, PNG, WEBP зураг сонгоно.</p></div></div></div><p class="text-xs text-muted-foreground">Үлдэгдэл болон <b>өртөг үнэ</b> нь зөвхөн <b>Нярав → Орлого</b> цэснээс оруулна.</p></div><div class="product-form__foot shrink-0 pt-3 mt-2 border-t border-border"><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium">Хадгалах</button></div></form>`,
@@ -29901,7 +29912,9 @@ function refreshPickerList(opts = {}) {
   const scrollSnap = capturePickerScroll();
   ensurePickerActiveId();
   updatePickerModalTitle();
-  const chips = modal.querySelector(".picker-cat-chips");
+  const chips =
+    modal.querySelector(".picker-tax-chips") ||
+    modal.querySelector(".picker-cat-chips");
   if (chips) chips.outerHTML = pickerCategoryChipsHtml();
   const products = pickerProductsInView();
   const singleId = opts.singleProductId || "";
@@ -30508,7 +30521,7 @@ function employeeExcel() {
   if (!orders.length || !workerIds.length)
     return alert(
       state.selectedWorkers.length
-        ? "Сонгосон ХТ дээр захиалга алга"
+        ? "Сонгосон худалдааны төлөөлөгч дээр захиалга олдсонгүй"
         : "Ажилтан сонгоно уу",
     );
   return exportWarehousePrepareExcel(orders, workerIds);

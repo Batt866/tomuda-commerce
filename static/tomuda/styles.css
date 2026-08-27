@@ -9558,7 +9558,7 @@ textarea::placeholder {
 
 .promo-qty-chip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
 }
@@ -9572,8 +9572,16 @@ textarea::placeholder {
   background: var(--secondary);
 }
 
-.promo-qty-chip__name {
+.promo-qty-chip__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   flex: 1;
+  min-width: 0;
+}
+
+.promo-qty-chip__name {
   min-width: 0;
   font-size: 13px;
   font-weight: 500;
@@ -9581,14 +9589,18 @@ textarea::placeholder {
   word-break: break-word;
 }
 
-.promo-qty-chip__qty {
-  flex-shrink: 0;
+.promo-qty-chip__qty,
+.promo-qty-chip__meta {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
   font-size: 12px;
   font-weight: 700;
-  color: var(--hex-primary);
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--hex-primary-soft);
+  line-height: 1.3;
+  color: var(--hex-primary, #16899a);
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hex-primary, #16899a) 10%, #fff);
 }
 
 .promo-qty-rule-card__empty,
@@ -9670,10 +9682,10 @@ textarea::placeholder {
 }
 
 .promo-rule-card__gift-meta {
-  margin: 6px 0 0;
+  margin: 6px 0 0 46px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--hex-success-text);
+  font-weight: 700;
+  color: var(--hex-primary, #16899a);
 }
 
 .promo-qty-rule-card__head-text {
