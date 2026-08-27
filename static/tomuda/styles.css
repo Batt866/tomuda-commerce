@@ -5975,6 +5975,22 @@ button:focus-visible,
   font-weight: 700;
 }
 
+.receipt-edit-printbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hex-border);
+}
+
+.receipt-edit-printbar .receipt-edit-total {
+  flex: 1;
+  min-width: 120px;
+  padding-top: 0;
+  border-top: none;
+}
+
 .receipt-edit-total strong {
   color: var(--hex-primary);
   font-size: 16px;
@@ -14599,6 +14615,10 @@ textarea::placeholder {
     /* top | right | bottom | left — left > right */
     margin: 14mm 8mm 12mm 18mm;
   }
+  html.thermal-receipt-print @page {
+    size: 58mm auto;
+    margin: 2mm;
+  }
   body > *:not(#print-root) {
     display: none !important;
   }
@@ -22179,5 +22199,93 @@ label.excel-import-toolbar__upload {
   font-size: 12px;
   color: var(--hex-muted-foreground);
   font-variant-numeric: tabular-nums;
+}
+
+.bt-printer-fab {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: #9aa3af;
+  color: #fff;
+  cursor: pointer;
+}
+
+.bt-printer-fab.is-on {
+  background: var(--hex-primary);
+}
+
+.bt-printer-fab .ui-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.bt-setup {
+  padding: 16px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: min(52vh, 420px);
+}
+
+.bt-setup__kicker {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--hex-foreground);
+}
+
+.bt-setup__hint {
+  margin: 0 0 14px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--hex-muted-foreground);
+}
+
+.bt-setup .bt-printer-list {
+  flex: 1;
+  min-height: 160px;
+}
+
+.bt-setup__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 4px 4px;
+}
+
+.bt-setup__round {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: var(--hex-primary);
+  color: #fff;
+  cursor: pointer;
+}
+
+.bt-setup__round .ui-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.bt-setup__disconnect {
+  flex: 1;
+  max-width: 160px;
+  border-radius: 999px;
+}
+
+.bt-setup__disconnect:disabled {
+  opacity: 0.45;
 }
 

@@ -12039,7 +12039,7 @@ function warehouseReceiptToolbarActionsHtml(
     printBtn = workerIds.length
       ? `<button type="button" onclick="printSelectedOrderReceipts()" class="btn btn--secondary btn--toolbar wh-receipts__print"${selectedCount ? "" : " disabled"} aria-label="Баримт хэвлэх"><span class="btn--toolbar__label btn--toolbar__label--full">Хэвлэх</span><span class="btn--toolbar__label btn--toolbar__label--short">Хэвлэх</span></button>`
       : "";
-  return `${printBtn}${excelDownloadBtn(exportOnclick, { disabled: !hasOrders, extraClass: "wh-receipts__export" })}`;
+  return `${printBtn}${btPrinterIconBtnHtml()}${excelDownloadBtn(exportOnclick, { disabled: !hasOrders, extraClass: "wh-receipts__export" })}`;
 }
 function confirmWarehouseReceiptsExcel(
   searchKey = "warehouseOrders",
@@ -12213,7 +12213,7 @@ function warehouseOrderDetail(o) {
   const snap = orderReceiptSnapshot(o);
   const docHtml = receiptSheetHtml(snap, RECEIPT_LOGO_DATA_URI);
   const statusActions = warehouseOrderStatusActions(o);
-  return `<div class="wh-receipt-detail wh-receipt-preview"><div class="wh-receipt-preview__scroll"><div class="wh-receipt-preview__doc receipt-page">${docHtml}</div></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns">${statusActions ? `<div class="wh-receipt-detail__status">${statusActions}</div>` : ""}<button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
+  return `<div class="wh-receipt-detail wh-receipt-preview"><div class="wh-receipt-preview__scroll"><div class="wh-receipt-preview__doc receipt-page">${docHtml}</div></div><div class="wh-receipt-detail__bar"><div class="wh-receipt-detail__btns">${statusActions ? `<div class="wh-receipt-detail__status">${statusActions}</div>` : ""}<button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--secondary btn--toolbar">Хэвлэх</button>${btPrinterIconBtnHtml({ receiptId: o.id })}${excelDownloadBtn(`downloadOrderReceiptExcel('${esc(o.id)}', event)`)}${canDeleteReceipt() ? `<button type="button" onclick="confirmDeleteReceipt('${esc(o.id)}')" class="btn btn--danger btn--toolbar">Устгах</button>` : ""}</div></div></div>`;
 }
 function ensureReceiptScreenStyles() {
   let el = document.getElementById("tomuda-receipt-screen-styles");
@@ -26739,8 +26739,9 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
     closeLabel = esc(opts.closeLabel || "Цонхыг хаах"),
     titleHtml = opts.titleHtml ? title : esc(title),
     panelExtra = opts.panelClass ? ` ${opts.panelClass}` : "",
-    closeAsBack = !!opts.closeAsBack;
-  const closeBtn = `<button type="button" onclick="closeModal()" class="modal-close btn btn--secondary btn--sm${closeAsBack ? " modal-close--back" : ""}" aria-label="${closeAsBack ? "Буцах" : closeLabel}">${
+    closeAsBack = !!opts.closeAsBack,
+    closeOnclick = opts.closeOnclick || "closeModal()";
+  const closeBtn = `<button type="button" onclick="${closeOnclick}" class="modal-close btn btn--secondary btn--sm${closeAsBack ? " modal-close--back" : ""}" aria-label="${closeAsBack ? "Буцах" : closeLabel}">${
     closeAsBack
       ? `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg>`
       : `<span aria-hidden="true">✕</span>`
@@ -29565,7 +29566,7 @@ function orderReceiptModal(id, keepDraft = false) {
     : "";
   box(
     `<span class="receipt-edit-head"><span>Зарлагын баримт</span>${receiptNo(o, "sm")}</span>`,
-    `<div class="receipt-edit-modal${editable ? "" : " receipt-edit-modal--locked"}"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div>${lockNote}<table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div>${cancelBtn}</div>`,
+    `<div class="receipt-edit-modal${editable ? "" : " receipt-edit-modal--locked"}"><div class="receipt-edit-store"><p class="receipt-edit-store__name">${esc(orderCustomerName(o))}</p><p class="receipt-edit-store__meta">${esc(o.employeeName || "-")} · Захиалга ${dteAt(o.createdAt)}</p><span class="receipt-edit-store__pill ${orderStatusBadgeClass(o)}">${orderStatusText(o)}</span></div>${lockNote}<table class="receipt-edit-table"><tbody>${orderReceiptEditRows()}</tbody></table><div class="receipt-edit-printbar"><div class="receipt-edit-total"><span>Нийт</span><strong id="receipt-edit-total">${fmt(orderPayableTotal(draft))}</strong></div><button type="button" onclick="printOrderReceipt('${esc(o.id)}', event)" class="btn btn--primary btn--toolbar">Хэвлэх</button>${btPrinterIconBtnHtml({ receiptId: o.id })}</div>${cancelBtn}</div>`,
     "max-w-lg",
     { titleId: "receipt-edit-title", dialog: true, titleHtml: true },
   );
@@ -29685,7 +29686,222 @@ function printOrderReceiptNow(id) {
 }
 const THERMAL_RECEIPT_COLS = 32;
 const BT_PRINTER_STORAGE_KEY = "tomuda-bt-printer";
-let thermalPrintQueue = [];
+let btPrinterScanResults = [];
+let btPrinterSetupBack = null;
+let btPrinterScanning = false;
+
+function shouldShowBtPrinterUi() {
+  return isAndroidDevice();
+}
+
+function getSavedBtPrinter() {
+  try {
+    const raw = localStorage.getItem(BT_PRINTER_STORAGE_KEY) || "";
+    if (!raw) return null;
+    if (raw.startsWith("{")) {
+      const parsed = JSON.parse(raw);
+      const address = String(parsed.address || "").trim();
+      if (!address) return null;
+      return { address, name: String(parsed.name || address) };
+    }
+    return { address: raw, name: raw };
+  } catch {
+    return null;
+  }
+}
+
+function setSavedBtPrinter(printer) {
+  try {
+    if (!printer?.address) {
+      localStorage.removeItem(BT_PRINTER_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      BT_PRINTER_STORAGE_KEY,
+      JSON.stringify({
+        address: String(printer.address),
+        name: String(printer.name || printer.address),
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function isBtPrinterLinked() {
+  return !!getSavedBtPrinter();
+}
+
+function btIconSvg() {
+  return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29ZM13 5.83l1.88 1.88L13 9.59V5.83Zm1.88 10.46L13 18.17v-3.76l1.88 1.88Z"/></svg>`;
+}
+
+function btPrinterIconBtnHtml(opts = {}) {
+  if (!shouldShowBtPrinterUi()) return "";
+  const on = isBtPrinterLinked() ? " is-on" : "";
+  const receiptId = opts.receiptId ? String(opts.receiptId) : "";
+  const arg = receiptId ? `'${esc(receiptId)}'` : "''";
+  const label = isBtPrinterLinked()
+    ? "Принтер холбогдсон"
+    : "Хэвлэгч тохируулах";
+  return `<button type="button" class="bt-printer-fab${on}" onclick="openBtPrinterSetup(event, ${arg})" aria-label="${esc(label)}" title="${esc(label)}">${btIconSvg()}</button>`;
+}
+
+function btSetupIconSearch() {
+  return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m16 16 4 4"/></svg>`;
+}
+
+function btSetupIconPrinter() {
+  return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2"/><path fill="none" stroke="currentColor" stroke-width="2" d="M7 14h10v6H7z"/></svg>`;
+}
+
+function btPrinterSetupListHtml() {
+  const saved = getSavedBtPrinter();
+  const savedAddr = saved?.address || "";
+  if (btPrinterScanning) {
+    return `<p class="bt-printer-hint">Принтер хайж байна...</p>`;
+  }
+  if (!btPrinterScanResults.length) {
+    return `<p class="bt-printer-hint">Принтер олдсонгүй. Принтерээ асаагаад утасны Bluetooth-аар холбоод дахин скан хийнэ үү.</p>`;
+  }
+  return btPrinterScanResults
+    .map((d) => {
+      const addr = String(d.address || "");
+      const on = addr === savedAddr ? " is-on" : "";
+      const name = d.name || addr;
+      return `<button type="button" class="bt-printer-row${on}" onclick="selectBtPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(addr)}</span></button>`;
+    })
+    .join("");
+}
+
+function renderBtPrinterSetupModal() {
+  const saved = getSavedBtPrinter();
+  const canDisconnect = !!saved;
+  box(
+    "Хэвлэгч тохируулах",
+    `<div class="bt-setup"><p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Принтерээ асаагаад утасны Bluetooth-аар нэг удаа холбоно. Дараа нь скан хийж нэрэн дээр нь дарна. Зөвхөн зарлагын баримт хэвлэнэ.</p><div class="bt-printer-list">${btPrinterSetupListHtml()}</div><div class="bt-setup__bar"><button type="button" class="bt-setup__round" onclick="testBtPrinter()" aria-label="Турших">${btSetupIconPrinter()}</button><button type="button" class="btn btn--secondary bt-setup__disconnect"${canDisconnect ? "" : " disabled"} onclick="disconnectBtPrinter()">Салгах</button><button type="button" class="bt-setup__round" onclick="scanBtPrinters()" aria-label="Скан">${btSetupIconSearch()}</button></div></div>`,
+    "max-w-md",
+    {
+      dialog: true,
+      closeAsBack: true,
+      closeOnclick: "backFromBtPrinterSetup()",
+    },
+  );
+}
+
+function openBtPrinterSetup(ev, receiptId) {
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  btPrinterSetupBack = receiptId
+    ? { type: "receipt", id: String(receiptId) }
+    : state.receiptEditOrderId
+      ? { type: "receipt", id: String(state.receiptEditOrderId) }
+      : null;
+  renderBtPrinterSetupModal();
+  void scanBtPrinters();
+}
+
+function backFromBtPrinterSetup() {
+  const back = btPrinterSetupBack;
+  btPrinterSetupBack = null;
+  if (back?.type === "receipt" && back.id) {
+    orderReceiptModal(back.id, true);
+    return;
+  }
+  closeModal();
+  render();
+}
+
+async function scanBtPrinters() {
+  if (!shouldUseBluetoothReceiptPrint()) {
+    btPrinterScanResults = [];
+    btPrinterScanning = false;
+    renderBtPrinterSetupModal();
+    showAppToast("Bluetooth хэвлэлт Android апп дээр ажиллана", "error");
+    return;
+  }
+  btPrinterScanning = true;
+  renderBtPrinterSetupModal();
+  const plugin = await waitForBluetoothPrinterPlugin();
+  if (!plugin) {
+    btPrinterScanning = false;
+    renderBtPrinterSetupModal();
+    showAppToast("Принтерийн холболт олдсонгүй. Аппаа шинэчилнэ үү.", "error");
+    return;
+  }
+  try {
+    await plugin.requestPermission();
+    const listed = await plugin.listDevices();
+    btPrinterScanResults = listed?.devices || [];
+  } catch (err) {
+    btPrinterScanResults = [];
+    showAppToast(err?.message || "Принтер хайж чадсангүй", "error");
+  } finally {
+    btPrinterScanning = false;
+    renderBtPrinterSetupModal();
+  }
+}
+
+async function selectBtPrinter(address) {
+  const found = btPrinterScanResults.find((d) => String(d.address) === address);
+  const name = found?.name || address;
+  const plugin = await waitForBluetoothPrinterPlugin();
+  if (!plugin) {
+    showAppToast("Принтерийн холболт олдсонгүй", "error");
+    return;
+  }
+  try {
+    await plugin.connect({ address });
+    setSavedBtPrinter({ address, name });
+    showAppToast("Принтер идэвхжлээ");
+    renderBtPrinterSetupModal();
+  } catch (err) {
+    showAppToast(err?.message || "Принтертэй холбогдож чадсангүй", "error");
+  }
+}
+
+async function disconnectBtPrinter() {
+  const plugin = await waitForBluetoothPrinterPlugin();
+  try {
+    if (plugin) await plugin.disconnect();
+  } catch {
+    /* ignore */
+  }
+  setSavedBtPrinter(null);
+  showAppToast("Принтер салсан");
+  renderBtPrinterSetupModal();
+}
+
+async function testBtPrinter() {
+  const saved = getSavedBtPrinter();
+  if (!saved) {
+    showAppToast("Эхлээд принтерийн нэрэн дээр дарна уу", "error");
+    return;
+  }
+  const plugin = await waitForBluetoothPrinterPlugin();
+  if (!plugin) {
+    showAppToast("Принтерийн холболт олдсонгүй", "error");
+    return;
+  }
+  try {
+    const body = `${thermalCenter("ТОМУДА")}\n${thermalCenter("Туршилт")}\n\n\n`;
+    const bytes = thermalBytesConcat([
+      new Uint8Array([0x1b, 0x40]),
+      body,
+      new Uint8Array([0x1d, 0x56, 0x41, 0x10]),
+    ]);
+    await plugin.connect({ address: saved.address });
+    await plugin.write({
+      address: saved.address,
+      data: thermalBytesToBase64(bytes),
+    });
+    showAppToast("Туршилт хэвлэгдлээ");
+  } catch (err) {
+    showAppToast(err?.message || "Хэвлэж чадсангүй", "error");
+  }
+}
 
 function thermalPlain(value) {
   return String(value ?? "")
@@ -29767,7 +29983,7 @@ function thermalBytesToBase64(bytes) {
   return btoa(bin);
 }
 
-function thermalEscPosReceipt(o) {
+function thermalReceiptLines(o) {
   const snap = orderReceiptSnapshot(o);
   const f = receiptPartyFields(snap);
   const paid = receiptPaidItems(snap);
@@ -29879,7 +30095,11 @@ function thermalEscPosReceipt(o) {
   push(RECEIPT_SIGN_RECEIVED_LABEL);
   push("____________________");
   push("");
-  const body = `${lines.join("\n")}\n\n\n`;
+  return lines;
+}
+
+function thermalEscPosReceipt(o) {
+  const body = `${thermalReceiptLines(o).join("\n")}\n\n\n`;
   return thermalBytesConcat([
     new Uint8Array([0x1b, 0x40]),
     new Uint8Array([0x1b, 0x39, 0x01]),
@@ -29943,62 +30163,21 @@ async function sendThermalReceiptsToPrinter(plugin, address, orders) {
       /* ignore */
     }
   }
-  try {
-    localStorage.setItem(BT_PRINTER_STORAGE_KEY, address);
-  } catch {
-    /* ignore */
-  }
+  const saved = getSavedBtPrinter();
+  setSavedBtPrinter({
+    address,
+    name: saved?.address === address ? saved.name : address,
+  });
   showAppToast("Баримт хэвлэгдлээ");
 }
 
-function showBluetoothPrinterPicker(devices, orders) {
-  thermalPrintQueue = orders;
-  const last = (() => {
-    try {
-      return localStorage.getItem(BT_PRINTER_STORAGE_KEY) || "";
-    } catch {
-      return "";
-    }
-  })();
-  const rows = devices
-    .map((d) => {
-      const addr = String(d.address || "");
-      const on = addr === last ? " is-on" : "";
-      return `<button type="button" class="bt-printer-row${on}" onclick="confirmBluetoothPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(d.name || addr)}</span><span class="bt-printer-row__addr">${esc(addr)}</span></button>`;
-    })
-    .join("");
-  box(
-    "Bluetooth принтер",
-    `<div class="p-4"><p class="bt-printer-hint">Утсан дээрээ принтертэйгээ Bluetooth-аар холбосон байх ёстой. 58мм цаастай хэвлэнэ.</p><div class="bt-printer-list">${rows || `<p class="bt-printer-hint">Холбосон принтер алга.</p>`}</div></div>`,
-    "max-w-md",
-    { dialog: true },
-  );
-}
-
-async function confirmBluetoothPrinter(address) {
-  const orders = thermalPrintQueue.slice();
-  if (!orders.length) {
-    closeModal();
-    return;
-  }
-  closeModal();
-  const plugin = await waitForBluetoothPrinterPlugin();
-  if (!plugin) {
-    showAppToast("Принтерийн холболт олдсонгүй", "error");
-    return;
-  }
-  try {
-    await sendThermalReceiptsToPrinter(plugin, address, orders);
-    thermalPrintQueue = [];
-  } catch (err) {
-    showAppToast(
-      err?.message || "Принтертэй холбогдож чадсангүй",
-      "error",
-    );
-  }
-}
-
 async function printOrdersViaBluetooth(orders) {
+  const saved = getSavedBtPrinter();
+  if (!saved) {
+    showAppToast("Эхлээд Bluetooth принтерээ сонгоно уу", "error");
+    openBtPrinterSetup();
+    return;
+  }
   const plugin = await waitForBluetoothPrinterPlugin();
   if (!plugin) {
     printOrdersViaBrowser(orders);
@@ -30006,31 +30185,7 @@ async function printOrdersViaBluetooth(orders) {
   }
   try {
     await plugin.requestPermission();
-    const listed = await plugin.listDevices();
-    const devices = listed?.devices || [];
-    if (!devices.length) {
-      alertModal(
-        "Bluetooth принтер",
-        "Утасныхаа Bluetooth тохиргооноос принтертэйгээ холбоод дахин хэвлэнэ үү.",
-      );
-      return;
-    }
-    let last = "";
-    try {
-      last = localStorage.getItem(BT_PRINTER_STORAGE_KEY) || "";
-    } catch {
-      last = "";
-    }
-    const remembered = devices.find((d) => d.address === last);
-    if (remembered) {
-      await sendThermalReceiptsToPrinter(plugin, remembered.address, orders);
-      return;
-    }
-    if (devices.length === 1) {
-      await sendThermalReceiptsToPrinter(plugin, devices[0].address, orders);
-      return;
-    }
-    showBluetoothPrinterPicker(devices, orders);
+    await sendThermalReceiptsToPrinter(plugin, saved.address, orders);
   } catch (err) {
     showAppToast(
       err?.message || "Bluetooth принтертэй холбогдсонгүй",
@@ -30039,19 +30194,70 @@ async function printOrdersViaBluetooth(orders) {
   }
 }
 
+function thermalReceiptTextEscape(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+const THERMAL_RECEIPT_PRINT_CSS = `
+@page { size: 58mm auto; margin: 2mm; }
+.thermal-print-sheet {
+  width: 54mm;
+  max-width: 54mm;
+  margin: 0 auto;
+  color: #111;
+  background: #fff;
+  font-family: "Courier New", Courier, ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.28;
+}
+.thermal-print-sheet pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font: inherit;
+}
+.thermal-print-sheet + .thermal-print-sheet {
+  page-break-before: always;
+  break-before: page;
+}
+`;
+
+function thermalReceiptPrintHtml(o) {
+  return `<div class="print-receipt thermal-print-sheet"><pre>${thermalReceiptTextEscape(
+    thermalReceiptLines(o).join("\n"),
+  )}</pre></div>`;
+}
+
+function isPhoneReceiptPrint() {
+  return isAndroidDevice() || isIosDevice();
+}
+
 function printOrdersViaBrowser(orders) {
   void (async () => {
-    const logoSrc =
-      (await getReceiptExcelLogoDataUri().catch(() => "")) ||
-      RECEIPT_LOGO_DATA_URI;
+    const phone = isPhoneReceiptPrint();
+    document.documentElement.classList.toggle("thermal-receipt-print", phone);
     const root = printRootEl();
-    root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
+    if (phone) {
+      root.innerHTML = `<style>${THERMAL_RECEIPT_PRINT_CSS}</style>${orders
+        .map((o) => thermalReceiptPrintHtml(o))
+        .join("")}`;
+    } else {
+      const logoSrc =
+        (await getReceiptExcelLogoDataUri().catch(() => "")) ||
+        RECEIPT_LOGO_DATA_URI;
+      root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
 @media print {
   @page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
   .receipt-page { width: 184mm; max-width: 184mm; margin: 0; padding: 0; }
 }
 </style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
+    }
     const cleanup = () => {
+      document.documentElement.classList.remove("thermal-receipt-print");
       root.innerHTML = "";
     };
     window.addEventListener("afterprint", cleanup, { once: true });
@@ -30068,11 +30274,17 @@ function printOrderReceiptsNow(ids) {
     .map((id) => state.orders.find((o) => o.id === id))
     .filter(Boolean);
   if (!orders.length) return alert("Захиалга олдсонгүй");
-  closeModal();
   if (shouldUseBluetoothReceiptPrint()) {
+    if (!getSavedBtPrinter()) {
+      showAppToast("Эхлээд Bluetooth принтерээ сонгоно уу", "error");
+      openBtPrinterSetup(null, orders[0]?.id);
+      return;
+    }
+    closeModal();
     void printOrdersViaBluetooth(orders);
     return;
   }
+  closeModal();
   printOrdersViaBrowser(orders);
 }
 function printSelectedOrderReceipts() {
@@ -32060,6 +32272,12 @@ Object.assign(window, {
   receiptDetail,
   printOrderReceipt,
   printOrderReceiptNow,
+  openBtPrinterSetup,
+  backFromBtPrinterSetup,
+  scanBtPrinters,
+  selectBtPrinter,
+  disconnectBtPrinter,
+  testBtPrinter,
   downloadOrderReceiptExcel,
   downloadOrderReceiptExcelNow,
   orderReceiptModalKeepDraft,
