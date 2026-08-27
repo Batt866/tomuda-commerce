@@ -29683,13 +29683,363 @@ function printOrderReceiptNow(id) {
   if (!o) return;
   printOrderReceiptsNow([id]);
 }
-function printOrderReceiptsNow(ids) {
-  const idOrder = idList(ids);
-  const orders = idOrder
-    .map((id) => state.orders.find((o) => o.id === id))
-    .filter(Boolean);
-  if (!orders.length) return alert("Захиалга олдсонгүй");
+const THERMAL_RECEIPT_COLS = 32;
+const BT_PRINTER_STORAGE_KEY = "tomuda-bt-printer";
+let thermalPrintQueue = [];
+
+function thermalPlain(value) {
+  return String(value ?? "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#039;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function thermalWrap(text, width = THERMAL_RECEIPT_COLS) {
+  const raw = String(text ?? "").replace(/\r/g, "");
+  const out = [];
+  for (const part of raw.split("\n")) {
+    const chars = [...part];
+    if (!chars.length) {
+      out.push("");
+      continue;
+    }
+    for (let i = 0; i < chars.length; i += width) {
+      out.push(chars.slice(i, i + width).join(""));
+    }
+  }
+  return out.length ? out : [""];
+}
+
+function thermalPair(left, right, width = THERMAL_RECEIPT_COLS) {
+  const r = String(right ?? "");
+  const maxLeft = Math.max(1, width - r.length - 1);
+  const leftLines = thermalWrap(left, maxLeft);
+  return leftLines.map((line, idx) => {
+    if (idx < leftLines.length - 1) return line.padEnd(width, " ");
+    const gap = Math.max(1, width - line.length - r.length);
+    return `${line}${" ".repeat(gap)}${r}`;
+  });
+}
+
+function thermalRule(ch = "-") {
+  return ch.repeat(THERMAL_RECEIPT_COLS);
+}
+
+function thermalCenter(text, width = THERMAL_RECEIPT_COLS) {
+  return thermalWrap(text, width).map((line) => {
+    if (line.length >= width) return line;
+    const pad = Math.floor((width - line.length) / 2);
+    return `${" ".repeat(pad)}${line}`;
+  });
+}
+
+function thermalBytesConcat(parts) {
+  const chunks = [];
+  let total = 0;
+  for (const part of parts) {
+    if (!part) continue;
+    const chunk =
+      part instanceof Uint8Array
+        ? part
+        : new TextEncoder().encode(String(part));
+    chunks.push(chunk);
+    total += chunk.length;
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+function thermalBytesToBase64(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function thermalEscPosReceipt(o) {
+  const snap = orderReceiptSnapshot(o);
+  const f = receiptPartyFields(snap);
+  const paid = receiptPaidItems(snap);
+  const promo = receiptPromoItems(snap).map(enrichPromoLineForReceipt);
+  const payable = orderPayableTotal(snap);
+  const sub = payable / 1.1;
+  const vat = payable - sub;
+  const payTerm = receiptPaymentTermDisplay(snap);
+  const lines = [];
+  const push = (...vals) => {
+    vals.flat().forEach((v) => lines.push(v));
+  };
+  push(thermalCenter("ТОМУДА ГРУПП"));
+  push(thermalCenter("ЗАРЛАГЫН БАРИМТ"));
+  push(thermalCenter(`№${formatReceiptNumber(snap)}`));
+  push(thermalRule("="));
+  push(`Хүргэлт: ${receiptDeliveryDateDisplay(snap) || "-"}`);
+  push(`Огноо: ${formatIsoDayDisplay(orderTakenDay(snap) || todayIso()) || "-"}`);
+  push(thermalRule());
+  push("Худалдааны төлөөлөгч");
+  push(thermalWrap(thermalPlain(f.salesName)));
+  push(`Утас: ${thermalPlain(f.salesPhone)}`);
+  push("Харилцагч");
+  push(thermalWrap(thermalPlain(f.customerName)));
+  push(`РД: ${thermalPlain(f.customerReg)}`);
+  if (thermalPlain(f.companyName) && thermalPlain(f.companyName) !== "-") {
+    push(thermalWrap(`Компани: ${thermalPlain(f.companyName)}`));
+  }
+  push(`Утас: ${thermalPlain(f.customerPhone)}`);
+  push(thermalWrap(`Түгээгч: ${thermalPlain(f.deliveryName)}`));
+  push(`Түгээгч утас: ${thermalPlain(f.deliveryPhone)}`);
+  if (thermalPlain(f.customerEmail) && thermalPlain(f.customerEmail) !== "-") {
+    push(thermalWrap(`И-мэйл: ${thermalPlain(f.customerEmail)}`));
+  }
+  push(thermalRule());
+  push("Дансны нэр: ТОМУДА");
+  push("Регистр: 5397987");
+  push("Хаан банк");
+  push(`IBAN: ${RECEIPT_BANK_IBAN_SHORT}`);
+  push(`Данс: ${RECEIPT_BANK_ACCOUNT}`);
+  push("Хүргэлтийн хаяг:");
+  push(thermalWrap(thermalPlain(f.addressPlain)));
+  push(thermalRule());
+  paid.forEach((item, idx) => {
+    const p = productForReceiptLine(item);
+    const name = receiptProductNameText(item.productName);
+    const qty = orderLineQtyLabel(item, p);
+    const unit = p.unit || "ш";
+    const barcode = String(p.barcode || "-");
+    push(`${idx + 1}. ${name}`);
+    push(thermalWrap(`${qty} ${unit}  ${barcode}`));
+    push(
+      thermalPair(
+        receiptMoney(resolveOrderItemUnitPrice(item)),
+        receiptMoney(resolveOrderItemLineTotal(item)),
+      ),
+    );
+  });
+  if (promo.length) {
+    push(thermalRule());
+    push(thermalCenter("Урамшуулал"));
+    promo.forEach((item) => {
+      const name = receiptProductNameText(item.productName);
+      push(thermalWrap(name));
+      push(
+        thermalPair(
+          `${item.quantity} ш`,
+          receiptMoney(receiptPromoDisplayTotal(item)),
+        ),
+      );
+    });
+  }
+  push(thermalRule("="));
+  if (receiptShouldShowGross(snap)) {
+    push(
+      thermalPair(
+        "Хувь хасагдаагүй дүн",
+        receiptMoney(orderGrossTotal(snap)),
+      ),
+    );
+  }
+  push(thermalPair("Барааны дүн", receiptMoneyDetailed(sub)));
+  push(thermalPair("НӨАТ", receiptMoneyDetailed(vat)));
+  const grandNote = receiptGrandNote(snap);
+  push(thermalPair("ТАНЫ ТӨЛӨХ ДҮН", receiptMoney(payable)));
+  if (grandNote) push(thermalWrap(grandNote));
+  if (receiptShouldShowCashSettleNote(snap)) {
+    push(thermalWrap(receiptCashSettleNoteText()));
+  }
+  push(`Төлбөр: ${payTerm}`);
+  const note = receiptNoteText(snap);
+  if (note) {
+    push(thermalRule());
+    push(thermalWrap(note));
+  }
+  push(thermalRule());
+  push(
+    thermalWrap(
+      "Төлбөрөө баримт дээрх компанийн дансанд шилжүүлнэ үү. Гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР бичнэ үү.",
+    ),
+  );
+  push(thermalWrap("Хувь хүний дансанд бүү шилжүүлээрэй."));
+  push(thermalWrap("Өөр данс руу шилжүүлсэн төлбөрийг нийлүүлэгч хариуцахгүй."));
+  push(thermalWrap("Барааг шалгаж тоо ширхгийг тулгаж хүлээн авна уу."));
+  push(thermalRule());
+  push(RECEIPT_SIGN_HANDED_LABEL);
+  push("____________________");
+  push("");
+  push(RECEIPT_SIGN_RECEIVED_LABEL);
+  push("____________________");
+  push("");
+  const body = `${lines.join("\n")}\n\n\n`;
+  return thermalBytesConcat([
+    new Uint8Array([0x1b, 0x40]),
+    new Uint8Array([0x1b, 0x39, 0x01]),
+    new Uint8Array([0x1b, 0x61, 0x00]),
+    new Uint8Array([0x1b, 0x32]),
+    body,
+    new Uint8Array([0x1d, 0x56, 0x41, 0x10]),
+  ]);
+}
+
+function shouldUseBluetoothReceiptPrint() {
+  return isCapacitorNative() && isAndroidDevice();
+}
+
+let tomudaBluetoothPrinterPlugin = null;
+function capBluetoothPrinterPlugin() {
+  if (!isCapacitorNative()) return null;
+  if (tomudaBluetoothPrinterPlugin) return tomudaBluetoothPrinterPlugin;
+  if (window.TomudaBluetoothPrinter) {
+    tomudaBluetoothPrinterPlugin = window.TomudaBluetoothPrinter;
+    return tomudaBluetoothPrinterPlugin;
+  }
+  const cap = window.Capacitor;
+  if (cap?.Plugins?.BluetoothPrinter) {
+    tomudaBluetoothPrinterPlugin = cap.Plugins.BluetoothPrinter;
+    return tomudaBluetoothPrinterPlugin;
+  }
+  if (typeof cap?.registerPlugin === "function") {
+    tomudaBluetoothPrinterPlugin = cap.registerPlugin("BluetoothPrinter");
+    return tomudaBluetoothPrinterPlugin;
+  }
+  return null;
+}
+
+async function waitForBluetoothPrinterPlugin(attempts = 40) {
+  for (let i = 0; i < attempts; i += 1) {
+    if (typeof window.__initTomudaBluetoothPrinter === "function") {
+      window.__initTomudaBluetoothPrinter();
+    }
+    const plugin = capBluetoothPrinterPlugin();
+    if (plugin) return plugin;
+    await sleep(50);
+  }
+  return capBluetoothPrinterPlugin();
+}
+
+async function sendThermalReceiptsToPrinter(plugin, address, orders) {
+  await plugin.connect({ address });
+  try {
+    for (let i = 0; i < orders.length; i += 1) {
+      const bytes = thermalEscPosReceipt(orders[i]);
+      await plugin.write({
+        address,
+        data: thermalBytesToBase64(bytes),
+      });
+    }
+  } finally {
+    try {
+      await plugin.disconnect();
+    } catch {
+      /* ignore */
+    }
+  }
+  try {
+    localStorage.setItem(BT_PRINTER_STORAGE_KEY, address);
+  } catch {
+    /* ignore */
+  }
+  showAppToast("Баримт хэвлэгдлээ");
+}
+
+function showBluetoothPrinterPicker(devices, orders) {
+  thermalPrintQueue = orders;
+  const last = (() => {
+    try {
+      return localStorage.getItem(BT_PRINTER_STORAGE_KEY) || "";
+    } catch {
+      return "";
+    }
+  })();
+  const rows = devices
+    .map((d) => {
+      const addr = String(d.address || "");
+      const on = addr === last ? " is-on" : "";
+      return `<button type="button" class="bt-printer-row${on}" onclick="confirmBluetoothPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(d.name || addr)}</span><span class="bt-printer-row__addr">${esc(addr)}</span></button>`;
+    })
+    .join("");
+  box(
+    "Bluetooth принтер",
+    `<div class="p-4"><p class="bt-printer-hint">Утсан дээрээ принтертэйгээ Bluetooth-аар холбосон байх ёстой. 58мм цаастай хэвлэнэ.</p><div class="bt-printer-list">${rows || `<p class="bt-printer-hint">Холбосон принтер алга.</p>`}</div></div>`,
+    "max-w-md",
+    { dialog: true },
+  );
+}
+
+async function confirmBluetoothPrinter(address) {
+  const orders = thermalPrintQueue.slice();
+  if (!orders.length) {
+    closeModal();
+    return;
+  }
   closeModal();
+  const plugin = await waitForBluetoothPrinterPlugin();
+  if (!plugin) {
+    showAppToast("Принтерийн холболт олдсонгүй", "error");
+    return;
+  }
+  try {
+    await sendThermalReceiptsToPrinter(plugin, address, orders);
+    thermalPrintQueue = [];
+  } catch (err) {
+    showAppToast(
+      err?.message || "Принтертэй холбогдож чадсангүй",
+      "error",
+    );
+  }
+}
+
+async function printOrdersViaBluetooth(orders) {
+  const plugin = await waitForBluetoothPrinterPlugin();
+  if (!plugin) {
+    printOrdersViaBrowser(orders);
+    return;
+  }
+  try {
+    await plugin.requestPermission();
+    const listed = await plugin.listDevices();
+    const devices = listed?.devices || [];
+    if (!devices.length) {
+      alertModal(
+        "Bluetooth принтер",
+        "Утасныхаа Bluetooth тохиргооноос принтертэйгээ холбоод дахин хэвлэнэ үү.",
+      );
+      return;
+    }
+    let last = "";
+    try {
+      last = localStorage.getItem(BT_PRINTER_STORAGE_KEY) || "";
+    } catch {
+      last = "";
+    }
+    const remembered = devices.find((d) => d.address === last);
+    if (remembered) {
+      await sendThermalReceiptsToPrinter(plugin, remembered.address, orders);
+      return;
+    }
+    if (devices.length === 1) {
+      await sendThermalReceiptsToPrinter(plugin, devices[0].address, orders);
+      return;
+    }
+    showBluetoothPrinterPicker(devices, orders);
+  } catch (err) {
+    showAppToast(
+      err?.message || "Bluetooth принтертэй холбогдсонгүй",
+      "error",
+    );
+  }
+}
+
+function printOrdersViaBrowser(orders) {
   void (async () => {
     const logoSrc =
       (await getReceiptExcelLogoDataUri().catch(() => "")) ||
@@ -29710,6 +30060,20 @@ function printOrderReceiptsNow(ids) {
       setTimeout(cleanup, 1500);
     }, 120);
   })();
+}
+
+function printOrderReceiptsNow(ids) {
+  const idOrder = idList(ids);
+  const orders = idOrder
+    .map((id) => state.orders.find((o) => o.id === id))
+    .filter(Boolean);
+  if (!orders.length) return alert("Захиалга олдсонгүй");
+  closeModal();
+  if (shouldUseBluetoothReceiptPrint()) {
+    void printOrdersViaBluetooth(orders);
+    return;
+  }
+  printOrdersViaBrowser(orders);
 }
 function printSelectedOrderReceipts() {
   let ids = idList(state.receiptPrintOrderIds);
