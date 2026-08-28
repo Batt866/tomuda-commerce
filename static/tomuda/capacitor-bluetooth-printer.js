@@ -1,9 +1,19 @@
 (function () {
+  var PLUGIN_OPTIONS = {
+    listDevices: { timeout: 30000 },
+    connect: { timeout: 30000 },
+    write: { timeout: 30000 },
+    requestPermission: { timeout: 120000 },
+  };
+
   function registerTomudaBluetoothPrinter() {
     var cap = window.Capacitor;
     if (!cap || typeof cap.registerPlugin !== "function") return false;
     if (window.TomudaBluetoothPrinter) return true;
-    window.TomudaBluetoothPrinter = cap.registerPlugin("BluetoothPrinter");
+    window.TomudaBluetoothPrinter = cap.registerPlugin(
+      "BluetoothPrinter",
+      PLUGIN_OPTIONS,
+    );
     return true;
   }
 

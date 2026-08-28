@@ -29886,7 +29886,7 @@ function btPrinterSetupHintHtml() {
   if (!shouldUseBluetoothReceiptPrint()) {
     return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
   }
-  return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Принтерээ асаана. Samsung утас дээр эхлээд утасны Bluetooth тохиргооноос 58мм принтертэй хослуулна. Дараа нь энд скан хийж зөвхөн принтерийн нэрэн дээр нь дарна. Утас, чихэвч, телевизор биш.</p>`;
+  return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Утасны Bluetooth тохиргооноос принтертэй хослуулсан бол энд бүх холбосон төхөөрөмж гарна. Скан дарж жагсаалтыг шинэчилнэ. Принтерийн нэрэн дээр дарна.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -30021,6 +30021,27 @@ function btPrinterKindLabel(kind) {
   return "";
 }
 
+function btListedDevices(listed) {
+  if (!listed) return [];
+  let raw = listed.devices;
+  if (raw == null && Array.isArray(listed)) raw = listed;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (Array.isArray(raw)) return raw.filter((d) => d && (d.address || d.name));
+  if (raw && typeof raw === "object") {
+    return Object.keys(raw)
+      .filter((key) => key !== "length")
+      .map((key) => raw[key])
+      .filter((d) => d && typeof d === "object" && (d.address || d.name));
+  }
+  return [];
+}
+
 function btPluginError(err, fallback) {
   const text = String(
     err?.message || err?.errorMessage || err?.data?.message || "",
@@ -30051,9 +30072,13 @@ async function scanBtPrinters() {
     return;
   }
   try {
-    await plugin.requestPermission();
+    try {
+      await plugin.requestPermission();
+    } catch (permErr) {
+      console.warn("Bluetooth permission", permErr);
+    }
     const listed = await plugin.listDevices();
-    btPrinterScanResults = listed?.devices || [];
+    btPrinterScanResults = btListedDevices(listed);
   } catch (err) {
     btPrinterScanResults = [];
     showAppToast(btPluginError(err, "Принтер хайж чадсангүй"), "error");
@@ -30069,10 +30094,6 @@ async function selectBtPrinter(address) {
   const plugin = await waitForBluetoothPrinterPlugin();
   if (!plugin) {
     showAppToast("Принтерийн холболт олдсонгүй", "error");
-    return;
-  }
-  if (found?.kind === "ble") {
-    showAppToast("Энэ төхөөрөмж BLE. Classic Bluetooth 58мм принтер сонгоно уу.", "error");
     return;
   }
   try {
@@ -30340,6 +30361,12 @@ function shouldUseBluetoothReceiptPrint() {
 }
 
 let tomudaBluetoothPrinterPlugin = null;
+const BT_PRINTER_PLUGIN_OPTS = {
+  listDevices: { timeout: 30000 },
+  connect: { timeout: 30000 },
+  write: { timeout: 30000 },
+  requestPermission: { timeout: 120000 },
+};
 function capBluetoothPrinterPlugin() {
   if (!isCapacitorNative()) return null;
   if (tomudaBluetoothPrinterPlugin) return tomudaBluetoothPrinterPlugin;
@@ -30348,12 +30375,15 @@ function capBluetoothPrinterPlugin() {
     return tomudaBluetoothPrinterPlugin;
   }
   const cap = window.Capacitor;
-  if (cap?.Plugins?.BluetoothPrinter) {
-    tomudaBluetoothPrinterPlugin = cap.Plugins.BluetoothPrinter;
+  if (typeof cap?.registerPlugin === "function") {
+    tomudaBluetoothPrinterPlugin = cap.registerPlugin(
+      "BluetoothPrinter",
+      BT_PRINTER_PLUGIN_OPTS,
+    );
     return tomudaBluetoothPrinterPlugin;
   }
-  if (typeof cap?.registerPlugin === "function") {
-    tomudaBluetoothPrinterPlugin = cap.registerPlugin("BluetoothPrinter");
+  if (cap?.Plugins?.BluetoothPrinter) {
+    tomudaBluetoothPrinterPlugin = cap.Plugins.BluetoothPrinter;
     return tomudaBluetoothPrinterPlugin;
   }
   return null;

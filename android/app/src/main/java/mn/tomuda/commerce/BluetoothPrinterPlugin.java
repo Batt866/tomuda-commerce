@@ -7,10 +7,7 @@ import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Build;
 import android.os.ParcelUuid;
 import android.util.Base64;
@@ -34,10 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 @CapacitorPlugin(
     name = "BluetoothPrinter",
@@ -113,42 +108,38 @@ public class BluetoothPrinterPlugin extends Plugin {
     @SuppressLint("MissingPermission")
     @PluginMethod
     public void listDevices(PluginCall call) {
-        io.execute(() -> {
-            try {
-                BluetoothAdapter adapter = adapter();
-                if (adapter == null) {
-                    call.reject("Bluetooth дэмжихгүй");
-                    return;
-                }
-                if (!adapter.isEnabled()) {
-                    call.reject("Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
-                    return;
-                }
-                Map<String, JSObject> byAddress =
-                    java.util.Collections.synchronizedMap(new LinkedHashMap<>());
-                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-                if (bonded != null) {
-                    for (BluetoothDevice device : bonded) {
-                        putDevice(byAddress, device, true);
-                    }
-                }
-                discoverNearby(adapter, byAddress);
-                List<JSObject> ranked = new ArrayList<>(byAddress.values());
-                ranked.sort((a, b) -> Integer.compare(
-                    deviceRank(jsKind(b)),
-                    deviceRank(jsKind(a))
-                ));
-                JSArray devices = new JSArray();
-                for (JSObject row : ranked) devices.put(row);
-                JSObject ret = new JSObject();
-                ret.put("devices", devices);
-                call.resolve(ret);
-            } catch (SecurityException e) {
-                call.reject("Bluetooth эрх олгогдоогүй");
-            } catch (Exception e) {
-                call.reject(e.getMessage() != null ? e.getMessage() : "Принтер олдсонгүй");
+        try {
+            BluetoothAdapter adapter = adapter();
+            if (adapter == null) {
+                call.reject("Bluetooth дэмжихгүй");
+                return;
             }
-        });
+            if (!adapter.isEnabled()) {
+                call.reject("Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
+                return;
+            }
+            Map<String, JSObject> byAddress = new LinkedHashMap<>();
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded != null) {
+                for (BluetoothDevice device : bonded) {
+                    putDevice(byAddress, device, true);
+                }
+            }
+            List<JSObject> ranked = new ArrayList<>(byAddress.values());
+            ranked.sort((a, b) -> Integer.compare(
+                deviceRank(jsKind(b)),
+                deviceRank(jsKind(a))
+            ));
+            JSArray devices = new JSArray();
+            for (JSObject row : ranked) devices.put(row);
+            JSObject ret = new JSObject();
+            ret.put("devices", devices);
+            call.resolve(ret);
+        } catch (SecurityException e) {
+            call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Nearby devices зөвшөөрнө үү.");
+        } catch (Exception e) {
+            call.reject(e.getMessage() != null ? e.getMessage() : "Принтер олдсонгүй");
+        }
     }
 
     @PluginMethod
@@ -339,54 +330,6 @@ public class BluetoothPrinterPlugin extends Plugin {
     }
 
     @SuppressLint("MissingPermission")
-    private void discoverNearby(BluetoothAdapter adapter, Map<String, JSObject> byAddress) {
-        Context ctx = getContext();
-        if (ctx == null) return;
-        if (Build.VERSION.SDK_INT >= 31
-            && getPermissionState("btScan") != com.getcapacitor.PermissionState.GRANTED) {
-            return;
-        }
-        CountDownLatch done = new CountDownLatch(1);
-        BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent != null ? intent.getAction() : "";
-                if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                    BluetoothDevice found =
-                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    putDevice(byAddress, found, false);
-                } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                    done.countDown();
-                }
-            }
-        };
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(BluetoothDevice.ACTION_FOUND);
-        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
-            } else {
-                ctx.registerReceiver(receiver, filter);
-            }
-            adapter.startDiscovery();
-            if (!done.await(8, TimeUnit.SECONDS)) {
-                try {
-                    adapter.cancelDiscovery();
-                } catch (Exception ignored) {}
-            }
-        } catch (Exception ignored) {
-        } finally {
-            try {
-                adapter.cancelDiscovery();
-            } catch (Exception ignored) {}
-            try {
-                ctx.unregisterReceiver(receiver);
-            } catch (Exception ignored) {}
-        }
-    }
-
-    @SuppressLint("MissingPermission")
     private void putDevice(
         Map<String, JSObject> byAddress,
         BluetoothDevice device,
@@ -413,6 +356,19 @@ public class BluetoothPrinterPlugin extends Plugin {
 
     @SuppressLint("MissingPermission")
     private String deviceKind(BluetoothDevice device) {
+        String name = "";
+        try {
+            name = String.valueOf(device.getName()).toLowerCase();
+        } catch (Exception ignored) {}
+        if (name.contains("print")
+            || name.contains("pos")
+            || name.contains("rpp")
+            || name.contains("innerprinter")
+            || name.contains("thermal")
+            || name.contains("xp-")
+            || name.contains("mtp")) {
+            return "printer";
+        }
         try {
             if (Build.VERSION.SDK_INT >= 18
                 && device.getType() == BluetoothDevice.DEVICE_TYPE_LE) {
@@ -431,17 +387,6 @@ public class BluetoothPrinterPlugin extends Plugin {
             return "phone";
         }
         if (major == BluetoothClass.Device.Major.AUDIO_VIDEO) return "audio";
-        String name = "";
-        try {
-            name = String.valueOf(device.getName()).toLowerCase();
-        } catch (Exception ignored) {}
-        if (name.contains("print")
-            || name.contains("pos")
-            || name.contains("rpp")
-            || name.contains("innerprinter")
-            || name.contains("thermal")) {
-            return "printer";
-        }
         return "other";
     }
 
