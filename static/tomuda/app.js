@@ -29886,7 +29886,7 @@ function btPrinterSetupHintHtml() {
   if (!shouldUseBluetoothReceiptPrint()) {
     return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
   }
-  return `<p class="bt-setup__kicker">ZJ-5809 Mini Thermal</p><p class="bt-setup__hint">Принтерээ асаана. Жагсаалтад «Bluetooth Printer» эсвэл InnerPrinter гэж гарна — энэ таны 58мм принтер. PIN асуувал 1234 эсвэл 0000. Нэрэн дээр нь дарна.</p>`;
+  return `<p class="bt-setup__kicker">M58-L Thermal Printer</p><p class="bt-setup__hint">Принтерээ асаана. Жагсаалтад «BlueTooth Printer» гэж гарна — энэ таны принтер. Хаяг 66:32:C0:82:F5:EA. PIN 1234 эсвэл 0000. Нэрэн дээр нь дарна.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -29968,8 +29968,8 @@ function btPrinterSetupListHtml() {
       const on = addr === savedAddr ? " is-on" : "";
       const rawName = d.name || addr;
       const name =
-        d.model === "ZJ-5809" || isZj5809PrinterName(rawName)
-          ? `${rawName} · ZJ-5809`
+        d.model === "M58-L" || isZj5809PrinterName(rawName)
+          ? `${rawName} · M58-L`
           : rawName;
       const kind = btPrinterKindLabel(d.kind);
       return `<button type="button" class="bt-printer-row${on}" onclick="selectBtPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(kind ? `${kind} · ${addr}` : addr)}</span></button>`;
@@ -30017,11 +30017,24 @@ function backFromBtPrinterSetup() {
   render();
 }
 
+function normalizeBtAddress(address) {
+  return String(address || "")
+    .replace(/[^0-9A-Fa-f]/g, "")
+    .toUpperCase();
+}
+
+function isPreferredM58Address(address) {
+  return normalizeBtAddress(address) === "6632C082F5EA";
+}
+
 function isZj5809PrinterName(name) {
-  const n = String(name || "").toLowerCase();
+  const n = String(name || "").toLowerCase().replace(/\s+/g, " ");
   return (
     n.includes("bluetooth printer") ||
+    n.includes("bluetoothprinter") ||
     n.includes("innerprinter") ||
+    n.includes("m58-l") ||
+    n.includes("m58") ||
     n.includes("zj-5809") ||
     n.includes("zj5809") ||
     n.includes("5809") ||
@@ -30094,13 +30107,22 @@ async function scanBtPrinters() {
       console.warn("Bluetooth permission", permErr);
     }
     const listed = await plugin.listDevices();
-    btPrinterScanResults = btListedDevices(listed);
+    btPrinterScanResults = btListedDevices(listed).sort((a, b) => {
+      const ap = isPreferredM58Address(a.address) ? 2 : isZj5809PrinterName(a.name) ? 1 : 0;
+      const bp = isPreferredM58Address(b.address) ? 2 : isZj5809PrinterName(b.name) ? 1 : 0;
+      return bp - ap;
+    });
   } catch (err) {
     btPrinterScanResults = [];
     showAppToast(btPluginError(err, "Принтер хайж чадсангүй"), "error");
   } finally {
     btPrinterScanning = false;
     renderBtPrinterSetupModal();
+  }
+  const mine = btPrinterScanResults.find((d) => isPreferredM58Address(d.address));
+  if (mine) {
+    await selectBtPrinter(mine.address);
+    return;
   }
 }
 

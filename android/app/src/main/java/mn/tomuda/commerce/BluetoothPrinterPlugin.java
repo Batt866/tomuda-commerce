@@ -67,6 +67,7 @@ import java.util.concurrent.TimeUnit;
 public class BluetoothPrinterPlugin extends Plugin {
     private static final UUID SPP_UUID =
         UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private static final String M58_MAC = "66:32:C0:82:F5:EA";
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private BluetoothSocket socket;
@@ -240,7 +241,8 @@ public class BluetoothPrinterPlugin extends Plugin {
         Thread.sleep(300);
         ensureBonded(device);
         Exception last = null;
-        boolean zijiang = isZijiangName(deviceName(device));
+        boolean zijiang =
+            isZijiangName(deviceName(device)) || isPreferredMac(device.getAddress());
         if (zijiang) {
             last = tryHiddenChannel(device, 1);
             if (last == null) return;
@@ -264,9 +266,9 @@ public class BluetoothPrinterPlugin extends Plugin {
             ? last.getMessage()
             : "";
         throw new IOException(
-            "ZJ-5809 принтертэй холбогдсонгүй"
+            "M58-L принтертэй холбогдсонгүй"
                 + (detail.isEmpty() ? "" : ": " + detail)
-                + ". Принтерээ асаагаад PIN 1234 эсвэл 0000-аар хослуулаад дахин оролдоно уу."
+                + ". BlueTooth Printer гэсэн нэрэн дээр дарна. PIN 1234 эсвэл 0000."
         );
     }
 
@@ -370,10 +372,10 @@ public class BluetoothPrinterPlugin extends Plugin {
         } catch (Exception ignored) {}
         if (name != null && !name.isEmpty()) row.put("name", name);
         else if (!row.has("name")) row.put("name", address);
-        if (isZijiangName(name)) {
+        if (isZijiangName(name) || isPreferredMac(address)) {
             row.put("kind", "printer");
-            row.put("model", "ZJ-5809");
-            if (name == null || name.isEmpty()) row.put("name", "Bluetooth Printer");
+            row.put("model", "M58-L");
+            if (name == null || name.isEmpty()) row.put("name", "BlueTooth Printer");
         } else {
             row.put("kind", deviceKind(device));
         }
@@ -395,7 +397,8 @@ public class BluetoothPrinterPlugin extends Plugin {
             || name.contains("zj58")
             || name.contains("5809")
             || name.contains("xp-")
-            || name.contains("mtp")) {
+            || name.contains("m58")
+            || name.contains("bluetoothprinter")) {
             return "printer";
         }
         try {
@@ -424,7 +427,7 @@ public class BluetoothPrinterPlugin extends Plugin {
         try {
             name = row.getString("name");
         } catch (Exception ignored) {}
-        if (isZijiangName(name)) return 50;
+        if (isPreferredMac(jsAddr(row)) || isZijiangName(name)) return 50;
         String kind = jsKind(row);
         if ("printer".equals(kind)) return 30;
         if ("other".equals(kind)) return 10;
@@ -445,8 +448,12 @@ public class BluetoothPrinterPlugin extends Plugin {
     private boolean isZijiangName(String name) {
         String n = String.valueOf(name == null ? "" : name).toLowerCase().trim();
         return n.contains("bluetooth printer")
+            || n.contains("bluetoothprinter")
             || n.contains("innerprinter")
             || n.contains("inner printer")
+            || n.contains("m58-l")
+            || n.contains("m58.l")
+            || n.contains("m58")
             || n.contains("zj-5809")
             || n.contains("zj5809")
             || n.contains("5809")
@@ -454,6 +461,26 @@ public class BluetoothPrinterPlugin extends Plugin {
             || n.contains("mini thermal")
             || n.equals("printer")
             || n.startsWith("printer_");
+    }
+
+    private String jsAddr(JSObject row) {
+        if (row == null) return "";
+        try {
+            String address = row.getString("address");
+            return address != null ? address : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private boolean isPreferredMac(String address) {
+        return normalizeBtAddress(address).equals(normalizeBtAddress(M58_MAC));
+    }
+
+    private String normalizeBtAddress(String address) {
+        return String.valueOf(address == null ? "" : address)
+            .replaceAll("[^0-9A-Fa-f]", "")
+            .toUpperCase();
     }
 
     private void ensurePinReceiver() {
@@ -470,7 +497,9 @@ public class BluetoothPrinterPlugin extends Plugin {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (device == null) return;
                 String name = deviceName(device);
-                if (!isZijiangName(name) && !"printer".equals(deviceKind(device))) return;
+                if (!isZijiangName(name)
+                    && !isPreferredMac(device.getAddress())
+                    && !"printer".equals(deviceKind(device))) return;
                 try {
                     byte[] pin1234 = "1234".getBytes(StandardCharsets.UTF_8);
                     device.setPin(pin1234);
