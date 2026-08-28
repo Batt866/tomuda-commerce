@@ -7,7 +7,10 @@ import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
 import android.os.ParcelUuid;
 import android.util.Base64;
@@ -24,6 +27,7 @@ import com.getcapacitor.annotation.PermissionCallback;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -31,8 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @CapacitorPlugin(
     name = "BluetoothPrinter",
@@ -51,6 +57,10 @@ import java.util.concurrent.Executors;
                 Manifest.permission.BLUETOOTH,
                 Manifest.permission.BLUETOOTH_ADMIN
             }
+        ),
+        @Permission(
+            alias = "location",
+            strings = { Manifest.permission.ACCESS_FINE_LOCATION }
         )
     }
 )
@@ -62,6 +72,8 @@ public class BluetoothPrinterPlugin extends Plugin {
     private BluetoothSocket socket;
     private OutputStream output;
     private String connectedAddress = "";
+    private BroadcastReceiver pinReceiver;
+    private boolean pinReceiverRegistered = false;
 
     private BluetoothAdapter adapter() {
         Context ctx = getContext();
@@ -84,7 +96,7 @@ public class BluetoothPrinterPlugin extends Plugin {
     public void requestPermission(PluginCall call) {
         if (Build.VERSION.SDK_INT >= 31) {
             requestPermissionForAliases(
-                new String[] { "btConnect", "btScan" },
+                new String[] { "btConnect", "btScan", "location" },
                 call,
                 "onBtPermission"
             );
@@ -108,38 +120,40 @@ public class BluetoothPrinterPlugin extends Plugin {
     @SuppressLint("MissingPermission")
     @PluginMethod
     public void listDevices(PluginCall call) {
-        try {
-            BluetoothAdapter adapter = adapter();
-            if (adapter == null) {
-                call.reject("Bluetooth дэмжихгүй");
-                return;
-            }
-            if (!adapter.isEnabled()) {
-                call.reject("Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
-                return;
-            }
-            Map<String, JSObject> byAddress = new LinkedHashMap<>();
-            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-            if (bonded != null) {
-                for (BluetoothDevice device : bonded) {
-                    putDevice(byAddress, device, true);
+        io.execute(() -> {
+            try {
+                BluetoothAdapter adapter = adapter();
+                if (adapter == null) {
+                    call.reject("Bluetooth дэмжихгүй");
+                    return;
                 }
+                if (!adapter.isEnabled()) {
+                    call.reject("Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
+                    return;
+                }
+                ensurePinReceiver();
+                Map<String, JSObject> byAddress =
+                    java.util.Collections.synchronizedMap(new LinkedHashMap<>());
+                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+                if (bonded != null) {
+                    for (BluetoothDevice device : bonded) {
+                        putDevice(byAddress, device, true);
+                    }
+                }
+                discoverNearby(adapter, byAddress);
+                List<JSObject> ranked = new ArrayList<>(byAddress.values());
+                ranked.sort((a, b) -> Integer.compare(deviceScore(b), deviceScore(a)));
+                JSArray devices = new JSArray();
+                for (JSObject row : ranked) devices.put(row);
+                JSObject ret = new JSObject();
+                ret.put("devices", devices);
+                call.resolve(ret);
+            } catch (SecurityException e) {
+                call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Nearby devices зөвшөөрнө үү.");
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Принтер олдсонгүй");
             }
-            List<JSObject> ranked = new ArrayList<>(byAddress.values());
-            ranked.sort((a, b) -> Integer.compare(
-                deviceRank(jsKind(b)),
-                deviceRank(jsKind(a))
-            ));
-            JSArray devices = new JSArray();
-            for (JSObject row : ranked) devices.put(row);
-            JSObject ret = new JSObject();
-            ret.put("devices", devices);
-            call.resolve(ret);
-        } catch (SecurityException e) {
-            call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Nearby devices зөвшөөрнө үү.");
-        } catch (Exception e) {
-            call.reject(e.getMessage() != null ? e.getMessage() : "Принтер олдсонгүй");
-        }
+        });
     }
 
     @PluginMethod
@@ -151,6 +165,7 @@ public class BluetoothPrinterPlugin extends Plugin {
         }
         io.execute(() -> {
             try {
+                ensurePinReceiver();
                 openSocket(address);
                 JSObject ret = new JSObject();
                 ret.put("ok", true);
@@ -219,18 +234,21 @@ public class BluetoothPrinterPlugin extends Plugin {
         if (adapter == null) throw new IOException("Bluetooth дэмжихгүй");
         if (!adapter.isEnabled()) throw new IOException("Bluetooth унтраалттай байна");
         BluetoothDevice device = adapter.getRemoteDevice(address);
-        if (Build.VERSION.SDK_INT >= 18
-            && device.getType() == BluetoothDevice.DEVICE_TYPE_LE) {
-            throw new IOException(
-                "Энэ төхөөрөмж BLE. 58мм Classic Bluetooth принтер сонгоно уу."
-            );
-        }
         try {
             adapter.cancelDiscovery();
         } catch (Exception ignored) {}
-        Thread.sleep(250);
+        Thread.sleep(300);
         ensureBonded(device);
         Exception last = null;
+        boolean zijiang = isZijiangName(deviceName(device));
+        if (zijiang) {
+            last = tryHiddenChannel(device, 1);
+            if (last == null) return;
+            last = tryConnect(device, SPP_UUID, true);
+            if (last == null) return;
+            last = tryConnect(device, SPP_UUID, false);
+            if (last == null) return;
+        }
         for (int attempt = 0; attempt < 2; attempt++) {
             if (attempt > 0) Thread.sleep(400);
             for (UUID uuid : sppUuids(device)) {
@@ -246,9 +264,9 @@ public class BluetoothPrinterPlugin extends Plugin {
             ? last.getMessage()
             : "";
         throw new IOException(
-            "Принтертэй холбогдсонгүй"
+            "ZJ-5809 принтертэй холбогдсонгүй"
                 + (detail.isEmpty() ? "" : ": " + detail)
-                + ". Утасны Bluetooth-аас салгах/холбоод дахин оролдоно уу."
+                + ". Принтерээ асаагаад PIN 1234 эсвэл 0000-аар хослуулаад дахин оролдоно уу."
         );
     }
 
@@ -271,27 +289,29 @@ public class BluetoothPrinterPlugin extends Plugin {
     }
 
     @SuppressLint("MissingPermission")
-    private Exception tryHiddenChannels(BluetoothDevice device) {
-        Exception last = null;
+    private Exception tryHiddenChannel(BluetoothDevice device, int channel) {
+        BluetoothSocket next = null;
         try {
             Method method = device.getClass().getMethod("createRfcommSocket", int.class);
-            for (int channel = 1; channel <= 5; channel++) {
-                BluetoothSocket next = null;
-                try {
-                    next = (BluetoothSocket) method.invoke(device, channel);
-                    if (next == null) continue;
-                    next.connect();
-                    socket = next;
-                    output = next.getOutputStream();
-                    connectedAddress = device.getAddress();
-                    return null;
-                } catch (Exception e) {
-                    last = e;
-                    closeQuietly(next);
-                }
-            }
+            next = (BluetoothSocket) method.invoke(device, channel);
+            if (next == null) return new IOException("RFCOMM socket null");
+            next.connect();
+            socket = next;
+            output = next.getOutputStream();
+            connectedAddress = device.getAddress();
+            return null;
         } catch (Exception e) {
-            last = e;
+            closeQuietly(next);
+            return e;
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private Exception tryHiddenChannels(BluetoothDevice device) {
+        Exception last = null;
+        for (int channel = 1; channel <= 5; channel++) {
+            last = tryHiddenChannel(device, channel);
+            if (last == null) return null;
         }
         return last;
     }
@@ -350,7 +370,13 @@ public class BluetoothPrinterPlugin extends Plugin {
         } catch (Exception ignored) {}
         if (name != null && !name.isEmpty()) row.put("name", name);
         else if (!row.has("name")) row.put("name", address);
-        row.put("kind", deviceKind(device));
+        if (isZijiangName(name)) {
+            row.put("kind", "printer");
+            row.put("model", "ZJ-5809");
+            if (name == null || name.isEmpty()) row.put("name", "Bluetooth Printer");
+        } else {
+            row.put("kind", deviceKind(device));
+        }
         if (bonded) row.put("bonded", true);
     }
 
@@ -365,6 +391,9 @@ public class BluetoothPrinterPlugin extends Plugin {
             || name.contains("rpp")
             || name.contains("innerprinter")
             || name.contains("thermal")
+            || name.contains("zj-")
+            || name.contains("zj58")
+            || name.contains("5809")
             || name.contains("xp-")
             || name.contains("mtp")) {
             return "printer";
@@ -388,6 +417,126 @@ public class BluetoothPrinterPlugin extends Plugin {
         }
         if (major == BluetoothClass.Device.Major.AUDIO_VIDEO) return "audio";
         return "other";
+    }
+
+    private int deviceScore(JSObject row) {
+        String name = "";
+        try {
+            name = row.getString("name");
+        } catch (Exception ignored) {}
+        if (isZijiangName(name)) return 50;
+        String kind = jsKind(row);
+        if ("printer".equals(kind)) return 30;
+        if ("other".equals(kind)) return 10;
+        if ("ble".equals(kind)) return 5;
+        return 0;
+    }
+
+    @SuppressLint("MissingPermission")
+    private String deviceName(BluetoothDevice device) {
+        try {
+            String name = device.getName();
+            return name != null ? name : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private boolean isZijiangName(String name) {
+        String n = String.valueOf(name == null ? "" : name).toLowerCase().trim();
+        return n.contains("bluetooth printer")
+            || n.contains("innerprinter")
+            || n.contains("inner printer")
+            || n.contains("zj-5809")
+            || n.contains("zj5809")
+            || n.contains("5809")
+            || n.contains("zj-58")
+            || n.contains("mini thermal")
+            || n.equals("printer")
+            || n.startsWith("printer_");
+    }
+
+    private void ensurePinReceiver() {
+        if (pinReceiverRegistered) return;
+        Context ctx = getContext();
+        if (ctx == null) return;
+        pinReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null
+                    || !BluetoothDevice.ACTION_PAIRING_REQUEST.equals(intent.getAction())) {
+                    return;
+                }
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (device == null) return;
+                String name = deviceName(device);
+                if (!isZijiangName(name) && !"printer".equals(deviceKind(device))) return;
+                try {
+                    byte[] pin1234 = "1234".getBytes(StandardCharsets.UTF_8);
+                    device.setPin(pin1234);
+                    abortBroadcast();
+                } catch (Exception first) {
+                    try {
+                        device.setPin("0000".getBytes(StandardCharsets.UTF_8));
+                        abortBroadcast();
+                    } catch (Exception ignored) {}
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                ctx.registerReceiver(pinReceiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                ctx.registerReceiver(pinReceiver, filter);
+            }
+            pinReceiverRegistered = true;
+        } catch (Exception ignored) {}
+    }
+
+    @SuppressLint("MissingPermission")
+    private void discoverNearby(BluetoothAdapter adapter, Map<String, JSObject> byAddress) {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        CountDownLatch done = new CountDownLatch(1);
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent != null ? intent.getAction() : "";
+                if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                    BluetoothDevice found =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    putDevice(byAddress, found, false);
+                } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                    done.countDown();
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                ctx.registerReceiver(receiver, filter);
+            }
+            adapter.startDiscovery();
+            if (!done.await(3, TimeUnit.SECONDS)) {
+                try {
+                    adapter.cancelDiscovery();
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {
+        } finally {
+            try {
+                adapter.cancelDiscovery();
+            } catch (Exception ignored) {}
+            try {
+                ctx.unregisterReceiver(receiver);
+            } catch (Exception ignored) {}
+        }
     }
 
     private int deviceRank(String kind) {
@@ -429,6 +578,13 @@ public class BluetoothPrinterPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         closeSocket();
+        Context ctx = getContext();
+        if (pinReceiverRegistered && ctx != null && pinReceiver != null) {
+            try {
+                ctx.unregisterReceiver(pinReceiver);
+            } catch (Exception ignored) {}
+            pinReceiverRegistered = false;
+        }
         io.shutdownNow();
         super.handleOnDestroy();
     }

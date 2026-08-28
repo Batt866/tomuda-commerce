@@ -29886,7 +29886,7 @@ function btPrinterSetupHintHtml() {
   if (!shouldUseBluetoothReceiptPrint()) {
     return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
   }
-  return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Утасны Bluetooth тохиргооноос принтертэй хослуулсан бол энд бүх холбосон төхөөрөмж гарна. Скан дарж жагсаалтыг шинэчилнэ. Принтерийн нэрэн дээр дарна.</p>`;
+  return `<p class="bt-setup__kicker">ZJ-5809 Mini Thermal</p><p class="bt-setup__hint">Принтерээ асаана. Жагсаалтад «Bluetooth Printer» эсвэл InnerPrinter гэж гарна — энэ таны 58мм принтер. PIN асуувал 1234 эсвэл 0000. Нэрэн дээр нь дарна.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -29966,7 +29966,11 @@ function btPrinterSetupListHtml() {
     .map((d) => {
       const addr = String(d.address || "");
       const on = addr === savedAddr ? " is-on" : "";
-      const name = d.name || addr;
+      const rawName = d.name || addr;
+      const name =
+        d.model === "ZJ-5809" || isZj5809PrinterName(rawName)
+          ? `${rawName} · ZJ-5809`
+          : rawName;
       const kind = btPrinterKindLabel(d.kind);
       return `<button type="button" class="bt-printer-row${on}" onclick="selectBtPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(kind ? `${kind} · ${addr}` : addr)}</span></button>`;
     })
@@ -30011,6 +30015,18 @@ function backFromBtPrinterSetup() {
   }
   closeModal();
   render();
+}
+
+function isZj5809PrinterName(name) {
+  const n = String(name || "").toLowerCase();
+  return (
+    n.includes("bluetooth printer") ||
+    n.includes("innerprinter") ||
+    n.includes("zj-5809") ||
+    n.includes("zj5809") ||
+    n.includes("5809") ||
+    n.includes("mini thermal")
+  );
 }
 
 function btPrinterKindLabel(kind) {
