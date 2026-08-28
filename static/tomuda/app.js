@@ -29886,7 +29886,7 @@ function btPrinterSetupHintHtml() {
   if (!shouldUseBluetoothReceiptPrint()) {
     return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
   }
-  return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Принтерээ асаагаад утасны Bluetooth-аар нэг удаа холбоно. Дараа нь скан хийж нэрэн дээр нь дарна. Зөвхөн зарлагын баримт хэвлэнэ.</p>`;
+  return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">Принтерээ асаана. Samsung утас дээр эхлээд утасны Bluetooth тохиргооноос 58мм принтертэй хослуулна. Дараа нь энд скан хийж зөвхөн принтерийн нэрэн дээр нь дарна. Утас, чихэвч, телевизор биш.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -29967,7 +29967,8 @@ function btPrinterSetupListHtml() {
       const addr = String(d.address || "");
       const on = addr === savedAddr ? " is-on" : "";
       const name = d.name || addr;
-      return `<button type="button" class="bt-printer-row${on}" onclick="selectBtPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(addr)}</span></button>`;
+      const kind = btPrinterKindLabel(d.kind);
+      return `<button type="button" class="bt-printer-row${on}" onclick="selectBtPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(kind ? `${kind} · ${addr}` : addr)}</span></button>`;
     })
     .join("");
 }
@@ -30012,6 +30013,21 @@ function backFromBtPrinterSetup() {
   render();
 }
 
+function btPrinterKindLabel(kind) {
+  if (kind === "printer") return "Принтер";
+  if (kind === "phone") return "Утас";
+  if (kind === "audio") return "Чихэвч";
+  if (kind === "ble") return "BLE";
+  return "";
+}
+
+function btPluginError(err, fallback) {
+  const text = String(
+    err?.message || err?.errorMessage || err?.data?.message || "",
+  ).trim();
+  return text || fallback;
+}
+
 async function scanBtPrinters() {
   if (isIosDevice() || !shouldUseBluetoothReceiptPrint()) {
     btPrinterScanResults = [];
@@ -30040,7 +30056,7 @@ async function scanBtPrinters() {
     btPrinterScanResults = listed?.devices || [];
   } catch (err) {
     btPrinterScanResults = [];
-    showAppToast(err?.message || "Принтер хайж чадсангүй", "error");
+    showAppToast(btPluginError(err, "Принтер хайж чадсангүй"), "error");
   } finally {
     btPrinterScanning = false;
     renderBtPrinterSetupModal();
@@ -30055,13 +30071,17 @@ async function selectBtPrinter(address) {
     showAppToast("Принтерийн холболт олдсонгүй", "error");
     return;
   }
+  if (found?.kind === "ble") {
+    showAppToast("Энэ төхөөрөмж BLE. Classic Bluetooth 58мм принтер сонгоно уу.", "error");
+    return;
+  }
   try {
     await plugin.connect({ address });
     setSavedBtPrinter({ address, name });
     showAppToast("Принтер идэвхжлээ");
     renderBtPrinterSetupModal();
   } catch (err) {
-    showAppToast(err?.message || "Принтертэй холбогдож чадсангүй", "error");
+    showAppToast(btPluginError(err, "Принтертэй холбогдож чадсангүй"), "error");
   }
 }
 
@@ -30102,7 +30122,7 @@ async function testBtPrinter() {
     });
     showAppToast("Туршилт хэвлэгдлээ");
   } catch (err) {
-    showAppToast(err?.message || "Хэвлэж чадсангүй", "error");
+    showAppToast(btPluginError(err, "Хэвлэж чадсангүй"), "error");
   }
 }
 

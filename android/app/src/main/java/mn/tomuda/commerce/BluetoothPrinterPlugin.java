@@ -3,11 +3,16 @@ package mn.tomuda.commerce;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
+import android.os.ParcelUuid;
 import android.util.Base64;
 
 import com.getcapacitor.JSArray;
@@ -21,10 +26,18 @@ import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @CapacitorPlugin(
     name = "BluetoothPrinter",
@@ -94,7 +107,7 @@ public class BluetoothPrinterPlugin extends Plugin {
             getPermissionState("btConnect") == com.getcapacitor.PermissionState.GRANTED;
         ret.put("granted", granted);
         if (granted) call.resolve(ret);
-        else call.reject("Bluetooth эрх олгогдоогүй");
+        else call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Bluetooth зөвшөөрнө үү.");
     }
 
     @SuppressLint("MissingPermission")
@@ -111,17 +124,22 @@ public class BluetoothPrinterPlugin extends Plugin {
                     call.reject("Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
                     return;
                 }
-                JSArray devices = new JSArray();
+                Map<String, JSObject> byAddress =
+                    java.util.Collections.synchronizedMap(new LinkedHashMap<>());
                 Set<BluetoothDevice> bonded = adapter.getBondedDevices();
                 if (bonded != null) {
                     for (BluetoothDevice device : bonded) {
-                        JSObject row = new JSObject();
-                        String name = device.getName();
-                        row.put("name", name != null && !name.isEmpty() ? name : device.getAddress());
-                        row.put("address", device.getAddress());
-                        devices.put(row);
+                        putDevice(byAddress, device, true);
                     }
                 }
+                discoverNearby(adapter, byAddress);
+                List<JSObject> ranked = new ArrayList<>(byAddress.values());
+                ranked.sort((a, b) -> Integer.compare(
+                    deviceRank(jsKind(b)),
+                    deviceRank(jsKind(a))
+                ));
+                JSArray devices = new JSArray();
+                for (JSObject row : ranked) devices.put(row);
                 JSObject ret = new JSObject();
                 ret.put("devices", devices);
                 call.resolve(ret);
@@ -148,7 +166,9 @@ public class BluetoothPrinterPlugin extends Plugin {
                 ret.put("address", address);
                 call.resolve(ret);
             } catch (Exception e) {
-                call.reject(e.getMessage() != null ? e.getMessage() : "Холбогдсонгүй");
+                call.reject(
+                    e.getMessage() != null ? e.getMessage() : "Принтертэй холбогдсонгүй"
+                );
             }
         });
     }
@@ -208,31 +228,245 @@ public class BluetoothPrinterPlugin extends Plugin {
         if (adapter == null) throw new IOException("Bluetooth дэмжихгүй");
         if (!adapter.isEnabled()) throw new IOException("Bluetooth унтраалттай байна");
         BluetoothDevice device = adapter.getRemoteDevice(address);
+        if (Build.VERSION.SDK_INT >= 18
+            && device.getType() == BluetoothDevice.DEVICE_TYPE_LE) {
+            throw new IOException(
+                "Энэ төхөөрөмж BLE. 58мм Classic Bluetooth принтер сонгоно уу."
+            );
+        }
         try {
             adapter.cancelDiscovery();
         } catch (Exception ignored) {}
-        BluetoothSocket next;
+        Thread.sleep(250);
+        ensureBonded(device);
+        Exception last = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (attempt > 0) Thread.sleep(400);
+            for (UUID uuid : sppUuids(device)) {
+                last = tryConnect(device, uuid, true);
+                if (last == null) return;
+                last = tryConnect(device, uuid, false);
+                if (last == null) return;
+            }
+            last = tryHiddenChannels(device);
+            if (last == null) return;
+        }
+        String detail = last != null && last.getMessage() != null
+            ? last.getMessage()
+            : "";
+        throw new IOException(
+            "Принтертэй холбогдсонгүй"
+                + (detail.isEmpty() ? "" : ": " + detail)
+                + ". Утасны Bluetooth-аас салгах/холбоод дахин оролдоно уу."
+        );
+    }
+
+    @SuppressLint("MissingPermission")
+    private Exception tryConnect(BluetoothDevice device, UUID uuid, boolean insecure) {
+        BluetoothSocket next = null;
         try {
-            next = device.createRfcommSocketToServiceRecord(SPP_UUID);
+            next = insecure
+                ? device.createInsecureRfcommSocketToServiceRecord(uuid)
+                : device.createRfcommSocketToServiceRecord(uuid);
             next.connect();
-        } catch (Exception first) {
-            try {
-                next = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
-                next.connect();
-            } catch (Exception second) {
+            socket = next;
+            output = next.getOutputStream();
+            connectedAddress = device.getAddress();
+            return null;
+        } catch (Exception e) {
+            closeQuietly(next);
+            return e;
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private Exception tryHiddenChannels(BluetoothDevice device) {
+        Exception last = null;
+        try {
+            Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+            for (int channel = 1; channel <= 5; channel++) {
+                BluetoothSocket next = null;
                 try {
-                    next = (BluetoothSocket) device.getClass()
-                        .getMethod("createRfcommSocket", int.class)
-                        .invoke(device, 1);
+                    next = (BluetoothSocket) method.invoke(device, channel);
+                    if (next == null) continue;
                     next.connect();
-                } catch (Exception third) {
-                    throw new IOException("Принтертэй холбогдсонгүй");
+                    socket = next;
+                    output = next.getOutputStream();
+                    connectedAddress = device.getAddress();
+                    return null;
+                } catch (Exception e) {
+                    last = e;
+                    closeQuietly(next);
                 }
             }
+        } catch (Exception e) {
+            last = e;
         }
-        socket = next;
-        output = next.getOutputStream();
-        connectedAddress = address;
+        return last;
+    }
+
+    @SuppressLint("MissingPermission")
+    private UUID[] sppUuids(BluetoothDevice device) {
+        LinkedHashSet<UUID> out = new LinkedHashSet<>();
+        out.add(SPP_UUID);
+        ParcelUuid[] extras = device.getUuids();
+        if (extras == null || extras.length == 0) {
+            try {
+                device.fetchUuidsWithSdp();
+                Thread.sleep(900);
+                extras = device.getUuids();
+            } catch (Exception ignored) {}
+        }
+        if (extras != null) {
+            for (ParcelUuid parcel : extras) {
+                if (parcel != null && parcel.getUuid() != null) out.add(parcel.getUuid());
+            }
+        }
+        return out.toArray(new UUID[0]);
+    }
+
+    @SuppressLint("MissingPermission")
+    private void ensureBonded(BluetoothDevice device) {
+        try {
+            if (device.getBondState() == BluetoothDevice.BOND_BONDED) return;
+            device.createBond();
+            for (int i = 0; i < 24; i++) {
+                Thread.sleep(250);
+                if (device.getBondState() == BluetoothDevice.BOND_BONDED) return;
+                if (device.getBondState() == BluetoothDevice.BOND_NONE && i > 8) return;
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @SuppressLint("MissingPermission")
+    private void discoverNearby(BluetoothAdapter adapter, Map<String, JSObject> byAddress) {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        if (Build.VERSION.SDK_INT >= 31
+            && getPermissionState("btScan") != com.getcapacitor.PermissionState.GRANTED) {
+            return;
+        }
+        CountDownLatch done = new CountDownLatch(1);
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent != null ? intent.getAction() : "";
+                if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+                    BluetoothDevice found =
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    putDevice(byAddress, found, false);
+                } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                    done.countDown();
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevice.ACTION_FOUND);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                ctx.registerReceiver(receiver, filter);
+            }
+            adapter.startDiscovery();
+            if (!done.await(8, TimeUnit.SECONDS)) {
+                try {
+                    adapter.cancelDiscovery();
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception ignored) {
+        } finally {
+            try {
+                adapter.cancelDiscovery();
+            } catch (Exception ignored) {}
+            try {
+                ctx.unregisterReceiver(receiver);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void putDevice(
+        Map<String, JSObject> byAddress,
+        BluetoothDevice device,
+        boolean bonded
+    ) {
+        if (device == null) return;
+        String address = device.getAddress();
+        if (address == null || address.isEmpty()) return;
+        JSObject row = byAddress.get(address);
+        if (row == null) {
+            row = new JSObject();
+            row.put("address", address);
+            byAddress.put(address, row);
+        }
+        String name = null;
+        try {
+            name = device.getName();
+        } catch (Exception ignored) {}
+        if (name != null && !name.isEmpty()) row.put("name", name);
+        else if (!row.has("name")) row.put("name", address);
+        row.put("kind", deviceKind(device));
+        if (bonded) row.put("bonded", true);
+    }
+
+    @SuppressLint("MissingPermission")
+    private String deviceKind(BluetoothDevice device) {
+        try {
+            if (Build.VERSION.SDK_INT >= 18
+                && device.getType() == BluetoothDevice.DEVICE_TYPE_LE) {
+                return "ble";
+            }
+        } catch (Exception ignored) {}
+        BluetoothClass cls = device.getBluetoothClass();
+        if (cls == null) return "other";
+        int major = cls.getMajorDeviceClass();
+        if (major == BluetoothClass.Device.Major.IMAGING
+            || cls.hasService(BluetoothClass.Service.RENDERING)) {
+            return "printer";
+        }
+        if (major == BluetoothClass.Device.Major.PHONE
+            || major == BluetoothClass.Device.Major.COMPUTER) {
+            return "phone";
+        }
+        if (major == BluetoothClass.Device.Major.AUDIO_VIDEO) return "audio";
+        String name = "";
+        try {
+            name = String.valueOf(device.getName()).toLowerCase();
+        } catch (Exception ignored) {}
+        if (name.contains("print")
+            || name.contains("pos")
+            || name.contains("rpp")
+            || name.contains("innerprinter")
+            || name.contains("thermal")) {
+            return "printer";
+        }
+        return "other";
+    }
+
+    private int deviceRank(String kind) {
+        if ("printer".equals(kind)) return 3;
+        if ("other".equals(kind)) return 2;
+        if ("ble".equals(kind)) return 1;
+        return 0;
+    }
+
+    private String jsKind(JSObject row) {
+        if (row == null) return "";
+        try {
+            String kind = row.getString("kind");
+            return kind != null ? kind : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void closeQuietly(BluetoothSocket next) {
+        if (next == null) return;
+        try {
+            next.close();
+        } catch (Exception ignored) {}
     }
 
     private void closeSocket() {
