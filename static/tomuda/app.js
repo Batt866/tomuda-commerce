@@ -3568,18 +3568,11 @@ function salesOrderAgents() {
 function ensureOrderEmployeeSelection() {
   const cur = state.currentEmployee;
   if (!cur) return;
-  const agents = salesOrderAgents();
-  if (!agents.length) return;
-  const valid = new Set(agents.map((e) => e.id));
-  if (state.orderEmployee && valid.has(state.orderEmployee)) return;
-  if (valid.has(cur.id)) state.orderEmployee = cur.id;
-  else state.orderEmployee = agents[0].id;
+  if (state.editingOrderId) return;
+  state.orderEmployee = cur.id;
 }
-function shouldShowOrderAgentPicker(emp = state.currentEmployee) {
-  if (!emp) return true;
-  if (emp.role === "admin" && canTakeOrdersRole(emp.role)) return true;
-  if (emp.role === "sales" && canTakeOrdersRole(emp.role)) return false;
-  return true;
+function shouldShowOrderAgentPicker(_emp = state.currentEmployee) {
+  return false;
 }
 function orderActor() {
   const cur = state.currentEmployee;
@@ -26304,14 +26297,11 @@ function workerOrderAgentField() {
 function workerOrderAgentMetaHtml() {
   ensureOrderEmployeeSelection();
   const editing = !!state.editingOrderId;
-  const editingOrder = editing
-    ? state.orders.find((x) => x.id === state.editingOrderId)
-    : null;
-  const showAgentPicker = !editing && shouldShowOrderAgentPicker();
-  const agentHtml = showAgentPicker
-    ? `<div class="worker-order-meta">${workerOrderAgentField()}</div>`
-    : `<div class="worker-order-meta"><p class="worker-order-sales">${esc(editingOrder?.employeeName || state.currentEmployee?.name || "-")}</p></div>`;
-  return `<div class="worker-order-top-meta">${agentHtml}</div>`;
+  if (!editing) return "";
+  const editingOrder = state.orders.find((x) => x.id === state.editingOrderId);
+  const name = editingOrder?.employeeName || state.currentEmployee?.name || "";
+  if (!name) return "";
+  return `<div class="worker-order-top-meta"><div class="worker-order-meta"><p class="worker-order-sales">${esc(name)}</p></div></div>`;
 }
 function workerOrderReceivableMetaHtml() {
   const customer = state.customers.find((c) => c.id === state.workerCustomer);
@@ -29871,9 +29861,16 @@ function printOrderReceiptNow(id) {
 }
 const THERMAL_RECEIPT_COLS = 32;
 const BT_PRINTER_STORAGE_KEY = "tomuda-bt-printer";
-let btPrinterScanResults = [];
+const M58_L_PRINTER = {
+  address: "66:32:C0:82:F5:EA",
+  name: "BlueTooth Printer",
+  model: "M58-L",
+  kind: "printer",
+};
+let btPrinterScanResults = [M58_L_PRINTER];
 let btPrinterSetupBack = null;
 let btPrinterScanning = false;
+let btPrinterConnecting = false;
 
 function shouldShowBtPrinterUi() {
   return isAndroidDevice() || isIosDevice();
@@ -29886,7 +29883,7 @@ function btPrinterSetupHintHtml() {
   if (!shouldUseBluetoothReceiptPrint()) {
     return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
   }
-  return `<p class="bt-setup__kicker">M58-L Thermal Printer</p><p class="bt-setup__hint">Принтерээ асаана. Жагсаалтад «BlueTooth Printer» гэж гарна — энэ таны принтер. Хаяг 66:32:C0:82:F5:EA. PIN 1234 эсвэл 0000. Нэрэн дээр нь дарна.</p>`;
+  return `<p class="bt-setup__kicker">M58-L Thermal Printer</p><p class="bt-setup__hint">Доорх «BlueTooth Printer» дээр дарна. Шууд Bluetooth-аар холбогдоно. PIN 1234 эсвэл 0000.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -29931,15 +29928,50 @@ function btIconSvg() {
   return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.71 7.71 12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29ZM13 5.83l1.88 1.88L13 9.59V5.83Zm1.88 10.46L13 18.17v-3.76l1.88 1.88Z"/></svg>`;
 }
 
-function btPrinterIconBtnHtml(opts = {}) {
+function defaultBtPrinter() {
+  const saved = getSavedBtPrinter();
+  if (saved?.address) {
+    return {
+      address: saved.address,
+      name: saved.name || M58_L_PRINTER.name,
+      model: "M58-L",
+      kind: "printer",
+    };
+  }
+  return { ...M58_L_PRINTER };
+}
+
+function mergeBtPrinterResults(list) {
+  const rows = Array.isArray(list) ? list.slice() : [];
+  const seen = new Set(rows.map((d) => normalizeBtAddress(d.address)));
+  const fallback = defaultBtPrinter();
+  if (!seen.has(normalizeBtAddress(fallback.address))) {
+    rows.unshift(fallback);
+  }
+  if (!seen.has(normalizeBtAddress(M58_L_PRINTER.address))) {
+    rows.unshift({ ...M58_L_PRINTER });
+  }
+  return rows.sort((a, b) => {
+    const ap = isPreferredM58Address(a.address)
+      ? 2
+      : isZj5809PrinterName(a.name)
+        ? 1
+        : 0;
+    const bp = isPreferredM58Address(b.address)
+      ? 2
+      : isZj5809PrinterName(b.name)
+        ? 1
+        : 0;
+    return bp - ap;
+  });
+}
+
+function btPrinterIconBtnHtml() {
   if (!shouldShowBtPrinterUi()) return "";
+  const printer = defaultBtPrinter();
   const on = isBtPrinterLinked() ? " is-on" : "";
-  const receiptId = opts.receiptId ? String(opts.receiptId) : "";
-  const arg = receiptId ? `'${esc(receiptId)}'` : "''";
-  const label = isBtPrinterLinked()
-    ? "Принтер холбогдсон"
-    : "Хэвлэгч тохируулах";
-  return `<button type="button" class="bt-printer-fab${on}" onclick="openBtPrinterSetup(event, ${arg})" aria-label="${esc(label)}" title="${esc(label)}">${btIconSvg()}</button>`;
+  const label = `${printer.name} холбох`;
+  return `<button type="button" class="bt-printer-chip${on}" onclick="connectBtPrinterNow(event)" aria-label="${esc(label)}" title="${esc(label)}">${btIconSvg()}<span class="bt-printer-chip__name">${esc(printer.name)}</span></button>`;
 }
 
 function btSetupIconSearch() {
@@ -29953,28 +29985,30 @@ function btSetupIconPrinter() {
 function btPrinterSetupListHtml() {
   const saved = getSavedBtPrinter();
   const savedAddr = saved?.address || "";
-  if (btPrinterScanning) {
-    return `<p class="bt-printer-hint">Принтер хайж байна...</p>`;
+  const rows = mergeBtPrinterResults(btPrinterScanResults);
+  if (isIosDevice()) {
+    return `<p class="bt-printer-hint">iPhone дээр энэ принтерийн нэр гарахгүй. Android апп ашиглана уу.</p>`;
   }
-  if (!btPrinterScanResults.length) {
-    if (isIosDevice()) {
-      return `<p class="bt-printer-hint">iPhone дээр энэ принтерийн нэр гарахгүй. Android апп ашиглана уу.</p>`;
-    }
-    return `<p class="bt-printer-hint">Принтер олдсонгүй. Принтерээ асаагаад утасны Bluetooth-аар холбоод дахин скан хийнэ үү.</p>`;
-  }
-  return btPrinterScanResults
+  const status = btPrinterConnecting
+    ? `<p class="bt-printer-hint">Bluetooth-аар холбож байна...</p>`
+    : btPrinterScanning
+      ? `<p class="bt-printer-hint">Жагсаалт шинэчилж байна...</p>`
+      : "";
+  const list = rows
     .map((d) => {
       const addr = String(d.address || "");
-      const on = addr === savedAddr ? " is-on" : "";
+      const on =
+        addr === savedAddr || isPreferredM58Address(addr) ? " is-on" : "";
       const rawName = d.name || addr;
       const name =
         d.model === "M58-L" || isZj5809PrinterName(rawName)
           ? `${rawName} · M58-L`
           : rawName;
       const kind = btPrinterKindLabel(d.kind);
-      return `<button type="button" class="bt-printer-row${on}" onclick="selectBtPrinter('${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(kind ? `${kind} · ${addr}` : addr)}</span></button>`;
+      return `<button type="button" class="bt-printer-row${on}" onclick="connectBtPrinterNow(event,'${esc(addr)}')"><span class="bt-printer-row__name">${esc(name)}</span><span class="bt-printer-row__addr">${esc(kind ? `${kind} · ${addr}` : addr)}</span></button>`;
     })
     .join("");
+  return `${status}${list}`;
 }
 
 function renderBtPrinterSetupModal() {
@@ -30002,6 +30036,7 @@ function openBtPrinterSetup(ev, receiptId) {
     : state.receiptEditOrderId
       ? { type: "receipt", id: String(state.receiptEditOrderId) }
       : null;
+  btPrinterScanResults = mergeBtPrinterResults(btPrinterScanResults);
   renderBtPrinterSetupModal();
   if (!isIosDevice()) void scanBtPrinters();
 }
@@ -30107,40 +30142,53 @@ async function scanBtPrinters() {
       console.warn("Bluetooth permission", permErr);
     }
     const listed = await plugin.listDevices();
-    btPrinterScanResults = btListedDevices(listed).sort((a, b) => {
-      const ap = isPreferredM58Address(a.address) ? 2 : isZj5809PrinterName(a.name) ? 1 : 0;
-      const bp = isPreferredM58Address(b.address) ? 2 : isZj5809PrinterName(b.name) ? 1 : 0;
-      return bp - ap;
-    });
+    btPrinterScanResults = mergeBtPrinterResults(btListedDevices(listed));
   } catch (err) {
-    btPrinterScanResults = [];
+    btPrinterScanResults = mergeBtPrinterResults(btPrinterScanResults);
     showAppToast(btPluginError(err, "Принтер хайж чадсангүй"), "error");
   } finally {
     btPrinterScanning = false;
     renderBtPrinterSetupModal();
   }
-  const mine = btPrinterScanResults.find((d) => isPreferredM58Address(d.address));
-  if (mine) {
-    await selectBtPrinter(mine.address);
-    return;
-  }
+}
+
+async function connectBtPrinterNow(ev, address) {
+  ev?.preventDefault?.();
+  ev?.stopPropagation?.();
+  const addr = String(address || "").trim() || defaultBtPrinter().address;
+  await selectBtPrinter(addr);
 }
 
 async function selectBtPrinter(address) {
-  const found = btPrinterScanResults.find((d) => String(d.address) === address);
-  const name = found?.name || address;
+  const target = String(address || "").trim() || defaultBtPrinter().address;
+  const found =
+    mergeBtPrinterResults(btPrinterScanResults).find(
+      (d) => normalizeBtAddress(d.address) === normalizeBtAddress(target),
+    ) || defaultBtPrinter();
+  const name = found?.name || M58_L_PRINTER.name;
+  if (btPrinterConnecting) return;
   const plugin = await waitForBluetoothPrinterPlugin();
   if (!plugin) {
-    showAppToast("Принтерийн холболт олдсонгүй", "error");
+    showAppToast("Принтерийн холболт олдсонгүй. Аппаа шинэчилнэ үү.", "error");
     return;
   }
+  btPrinterConnecting = true;
+  renderBtPrinterSetupModal();
+  showAppToast("Bluetooth-аар холбож байна...");
   try {
-    await plugin.connect({ address });
-    setSavedBtPrinter({ address, name });
-    showAppToast("Принтер идэвхжлээ");
-    renderBtPrinterSetupModal();
+    try {
+      await plugin.requestPermission();
+    } catch (permErr) {
+      console.warn("Bluetooth permission", permErr);
+    }
+    await plugin.connect({ address: found.address || target });
+    setSavedBtPrinter({ address: found.address || target, name });
+    showAppToast("Принтер холбогдлоо");
   } catch (err) {
     showAppToast(btPluginError(err, "Принтертэй холбогдож чадсангүй"), "error");
+  } finally {
+    btPrinterConnecting = false;
+    renderBtPrinterSetupModal();
   }
 }
 
@@ -30465,12 +30513,7 @@ async function sendThermalReceiptsToPrinter(plugin, address, orders) {
 }
 
 async function printOrdersViaBluetooth(orders) {
-  const saved = getSavedBtPrinter();
-  if (!saved) {
-    showAppToast("Эхлээд Bluetooth принтерээ сонгоно уу", "error");
-    openBtPrinterSetup();
-    return;
-  }
+  const saved = defaultBtPrinter();
   const plugin = await waitForBluetoothPrinterPlugin();
   if (!plugin) {
     showAppToast("Bluetooth хэвлэлт Android апп дээр ажиллана", "error");
@@ -30495,12 +30538,9 @@ function printOrdersViaBrowser(orders) {
       (await getReceiptExcelLogoDataUri().catch(() => "")) ||
       RECEIPT_LOGO_DATA_URI;
     const root = printRootEl();
-    root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}
-@media print {
-  @page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
-  .receipt-page { width: 184mm; max-width: 184mm; margin: 0; padding: 0; }
-}
-</style>${orders.map((o) => `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), logoSrc)}</div>`).join("")}`;
+    root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}</style>${orders
+      .map((o) => receiptExcelPage(orderReceiptSnapshot(o), logoSrc))
+      .join("")}`;
     const cleanup = () => {
       document.documentElement.classList.remove("thermal-receipt-print");
       root.innerHTML = "";
@@ -30556,7 +30596,7 @@ function receiptDetail(id) {
   orderReceiptModal(id);
 }
 function receipt(o) {
-  return `<div class="print-receipt">${receiptPrintPageHtml(orderReceiptSnapshot(o), RECEIPT_LOGO_DATA_URI)}</div>`;
+  return receiptExcelPage(orderReceiptSnapshot(o), RECEIPT_LOGO_DATA_URI);
 }
 function stock(id, qty, type) {
   const p = state.products.find((x) => x.id === id);
@@ -32562,6 +32602,7 @@ Object.assign(window, {
   openBtPrinterSetup,
   backFromBtPrinterSetup,
   scanBtPrinters,
+  connectBtPrinterNow,
   selectBtPrinter,
   disconnectBtPrinter,
   testBtPrinter,

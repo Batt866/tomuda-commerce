@@ -14729,8 +14729,8 @@ textarea::placeholder {
      Keep only print-root chrome here — do not override .receipt-page / logo / title. */
   @page {
     size: A4 portrait;
-    /* top | right | bottom | left — left > right */
-    margin: 14mm 8mm 12mm 18mm;
+    /* Match RECEIPT_EXCEL_STYLES / Excel download */
+    margin: 18mm 8mm 12mm 18mm;
   }
   html.thermal-receipt-print @page {
     size: 58mm auto;
@@ -14748,18 +14748,16 @@ textarea::placeholder {
     overflow: visible !important;
     pointer-events: auto !important;
   }
-  .print-receipt {
+  .print-receipt,
+  .receipt-excel-sheet {
     display: block !important;
     background: white;
     color: black;
   }
-  .print-receipt:not(:last-child) .receipt-page {
-    page-break-after: always;
-    break-after: page;
-  }
-  .print-receipt .receipt-page:not(:last-child) {
-    page-break-after: always;
-    break-after: page;
+  .print-receipt + .print-receipt,
+  .receipt-excel-sheet + .receipt-excel-sheet {
+    page-break-before: always;
+    break-before: page;
   }
   /* Legacy markup only (old .receipt-header / .receipt-info layout). */
   .receipt-header {
@@ -22316,6 +22314,41 @@ label.excel-import-toolbar__upload {
   font-size: 12px;
   color: var(--hex-muted-foreground);
   font-variant-numeric: tabular-nums;
+}
+
+.bt-printer-chip {
+  min-height: 42px;
+  max-width: 100%;
+  padding: 0 12px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 999px;
+  background: #9aa3af;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bt-printer-chip.is-on {
+  background: var(--hex-primary);
+}
+
+.bt-printer-chip .ui-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.bt-printer-chip__name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11rem;
 }
 
 .bt-printer-fab {
