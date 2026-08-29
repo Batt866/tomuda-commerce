@@ -847,9 +847,9 @@ textarea.text-sm,
   background: #fff;
   border: none;
   box-shadow: none;
-  border-radius: 10px;
-  width: 44px;
-  height: 56px;
+  border-radius: 12px;
+  width: 72px;
+  height: 96px;
 }
 
 .customer-image-upload {
@@ -1453,15 +1453,15 @@ textarea.text-sm,
 
 .customer-card__avatar {
   flex-shrink: 0;
-  width: 44px;
-  height: 56px;
-  min-width: 44px;
-  border-radius: 10px;
+  width: 72px;
+  height: 96px;
+  min-width: 72px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   background: var(--hex-primary);
   color: var(--hex-primary-foreground);
-  font-size: 18px;
+  font-size: 28px;
   font-weight: 800;
   border: 1px solid var(--hex-border);
   box-shadow: none;
@@ -2073,17 +2073,17 @@ img.worker-pick-card__avatar {
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img,
 .line-panel--customers .customer-card__avatar,
 .line-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 44px;
-  height: 56px;
-  min-width: 44px;
-  border-radius: 10px;
+  width: 72px;
+  height: 96px;
+  min-width: 72px;
+  border-radius: 12px;
   border: 1px solid var(--hex-border);
   background: #fff;
 }
 
 .list-panel--customers .customer-card__avatar,
 .line-panel--customers .customer-card__avatar {
-  font-size: 18px;
+  font-size: 28px;
 }
 
 .list-panel--customers .customer-card__avatar-img,
@@ -3749,17 +3749,17 @@ img[data-product-img],
   .list-panel--customers .customer-card__avatar.customer-card__avatar-img,
   .line-panel--customers .customer-card__avatar,
   .line-panel--customers .customer-card__avatar.customer-card__avatar-img {
-    width: 48px;
-    height: 64px;
-    min-width: 48px;
-    border-radius: 10px;
+    width: 96px;
+    height: 128px;
+    min-width: 96px;
+    border-radius: 14px;
     border: 1px solid var(--hex-border);
     background: #fff;
   }
 
   .list-panel--customers .customer-card__avatar,
   .line-panel--customers .customer-card__avatar {
-    font-size: 18px;
+    font-size: 36px;
   }
 
   .customer-card__head {

@@ -12493,7 +12493,37 @@ function customerStoreRatingHtml(c) {
   const pct = customerStoreRating(c);
   const editable = canEditStoreRating();
   const label = storeRatingLabel(pct);
-  return `<div class="store-rating" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" onwheel="event.preventDefault()" onchange="setCustomerStoreRating('${esc(c.id)}', this.value, event)"></div>`;
+  return `<div class="store-rating" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" data-saved="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" onwheel="event.preventDefault()" onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"></div>`;
+}
+function askCustomerStoreRating(id, input, event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  if (!input) return;
+  const next = Math.max(0, Math.min(100, Math.round(Number(input.value) || 0)));
+  const prev = Math.max(
+    0,
+    Math.min(100, Math.round(Number(input.getAttribute("data-saved")) || 0)),
+  );
+  if (next === prev) return;
+  if (!canEditStoreRating()) {
+    input.value = String(prev);
+    return;
+  }
+  confirmModal(
+    "Үнэлгээ өөрчлөх",
+    "Та энэ өөрчлөлтийг хийхдээ итгэлтэй байна уу?",
+    {
+      confirmLabel: "Тийм",
+      cancelLabel: "Үгүй",
+      onConfirm: () => {
+        closeModal();
+        setCustomerStoreRating(id, next);
+      },
+      onCancel: () => {
+        input.value = String(prev);
+      },
+    },
+  );
 }
 function setCustomerStoreRating(id, value, event) {
   event?.preventDefault?.();
