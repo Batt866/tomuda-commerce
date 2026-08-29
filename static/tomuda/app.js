@@ -12376,6 +12376,15 @@ function ensureReceiptScreenStyles() {
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
 }
+.wh-receipt-preview__doc.receipt-page .receipt-logo.receipt-logo--overlay {
+  left: 18mm;
+  top: 14mm;
+  width: 14mm !important;
+  height: 14mm !important;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  object-position: left top;
+}
 .wh-receipt-preview .wh-receipt-detail__bar {
   padding: 0 4px 4px;
 }
