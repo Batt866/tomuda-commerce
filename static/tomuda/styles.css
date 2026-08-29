@@ -14736,6 +14736,35 @@ textarea::placeholder {
     size: 58mm auto;
     margin: 2mm;
   }
+  html.receipt-a4-print @page {
+    size: A4 portrait;
+    margin: 18mm 8mm 12mm 18mm;
+  }
+  html.receipt-a4-print {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #000;
+    background: #fff;
+  }
+  /* Excel-layout print: undo legacy print grids without wiping RECEIPT_EXCEL_STYLES. */
+  html.receipt-a4-print .receipt-header {
+    display: block;
+    grid-template-columns: none;
+    gap: 0;
+    margin-bottom: 0;
+  }
+  html.receipt-a4-print .receipt-info {
+    display: block !important;
+    grid-template-columns: none !important;
+    gap: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  html.receipt-a4-print .receipt-info p {
+    display: block;
+    grid-template-columns: none;
+    gap: 0;
+    margin: 0;
+  }
   body > *:not(#print-root) {
     display: none !important;
   }

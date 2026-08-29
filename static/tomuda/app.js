@@ -9577,6 +9577,14 @@ function receiptExcelPage(o, logoSrc) {
 }
 const RECEIPT_EXCEL_STYLES = `
 @page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
+@page {
+  @top-left { content: none; }
+  @top-center { content: none; }
+  @top-right { content: none; }
+  @bottom-left { content: none; }
+  @bottom-center { content: none; }
+  @bottom-right { content: none; }
+}
 body {
   margin: 0;
   padding: 0;
@@ -9670,7 +9678,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
-  border: 0.4pt solid #777 !important;
+  border: 1px solid #000 !important;
   padding: 1px 3px;
   vertical-align: middle;
   background: #fff;
@@ -9710,11 +9718,12 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__promo > td {
   border: none !important;
-  border-bottom: 0.4pt solid #777 !important;
+  border-bottom: 1px solid #000 !important;
   padding: 2px 4px;
   vertical-align: middle;
   font-size: 9px;
   background: #fff;
+  color: ${RECEIPT_TEXT} !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td:first-child,
 .receipt-grid--sheet tr.receipt-items__promo > td:nth-child(2),
@@ -9764,8 +9773,7 @@ td, th { border: none; }
   white-space: nowrap;
   font-size: 11px;
   font-weight: 400;
-  /* Clearer blue than Accent 5 base — promo Нийт үнэ */
-  color: #2E86C1 !important;
+  color: ${RECEIPT_TEXT} !important;
 }
 .receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 1px 0 !important; }
 .receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 1px 0 0 !important; }
@@ -10043,7 +10051,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #000 !important; font-weight: 700; }
-.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #2E86C1 !important; }
+.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: ${RECEIPT_TEXT} !important; }
 .receipt-grid--sheet .receipt-grid__return td {
   padding: 0;
   height: auto;
@@ -10417,6 +10425,8 @@ tbody.receipt-footer-keep {
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .receipt-page {
     width: 184mm;
@@ -10437,11 +10447,18 @@ tbody.receipt-footer-keep {
   .receipt-grid__settle,
   .receipt-grid__warn,
   .receipt-grid__sign { page-break-inside: avoid; break-inside: avoid; }
+  .receipt-excel-sheet,
+  .receipt-page {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color: ${RECEIPT_TEXT} !important;
+    background: #fff !important;
+  }
   .receipt-grid--sheet tr.receipt-items__head > td,
   .receipt-grid--sheet tr.receipt-items__row > td,
   .receipt-items th,
   .receipt-items td {
-    border: 0.5pt solid #000 !important;
+    border: 1px solid #000 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -10450,7 +10467,8 @@ tbody.receipt-footer-keep {
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price,
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
     border: none !important;
-    border-bottom: 0.5pt solid #000 !important;
+    border-bottom: 1px solid #000 !important;
+    color: ${RECEIPT_TEXT} !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -20076,6 +20094,8 @@ const WAREHOUSE_PREPARE_SIGN_HANDED_NAME = "Хүлээлгэн өгсөн ажи
 const WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME = "Хүлээн авсан ажилтны нэр:";
 const WAREHOUSE_PREPARE_SIGN_MARK_LABEL = "гарын үсэг:";
 const WAREHOUSE_PREPARE_CAT_ROW_HEIGHT = 21.95;
+/** «Урамшууллын бараа» — category 9pt-аас илт том (16pt / xf 31). */
+const WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT = 30;
 const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 5;
 const WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT = 36;
 const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 24;
@@ -20489,13 +20509,9 @@ function warehousePreparePatchStylesXml(
   if (!out.includes(unitWrapXf)) appendXfs.push(unitWrapXf);
   if (!out.includes(barcodeCenterXf)) appendXfs.push(barcodeCenterXf);
   if (!out.includes(unitBodyXf)) appendXfs.push(unitBodyXf);
-  const promoFont =
-    '<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>';
-  if (!out.includes('sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>')) {
-    out = xlsxStylesAppendPart(out, "fonts", [promoFont]);
-  }
-  const promoFontId = Math.max(0, xlsxStylesCountPart(out, "fonts") - 1);
-  const promoHeadXf = `<xf numFmtId="0" fontId="${promoFontId}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
+  // Title fontId 3 is 18pt bold — unique xf (shrinkToFit=0) so this is always xf 31.
+  const promoHeadXf =
+    '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="0"/></xf>';
   if (!out.includes(promoHeadXf)) appendXfs.push(promoHeadXf);
   if (appendXfs.length) {
     out = out.replace(
@@ -20699,8 +20715,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
-      xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
+    pushRow(WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT, [
+      xlsxCellXml(`A${promoHeadRow}`, s.promo, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
     pushPrepareGroups(sections.promo, true);
@@ -20840,7 +20856,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 700; height: 22px; padding: 4px 0; white-space: nowrap; border: none !important; background: none !important; }
 .cat-gap td { height: 6px; border: none !important; background: none !important; }
-.promo-head { border: none !important; }
+.promo-head { border: none !important; font-size: 18px; font-weight: 800; height: 32px; padding: 6px 0; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
@@ -30559,11 +30575,15 @@ function printOrdersViaBrowser(orders) {
       (await getReceiptExcelLogoDataUri().catch(() => "")) ||
       RECEIPT_LOGO_DATA_URI;
     const root = printRootEl();
+    document.documentElement.classList.add("receipt-a4-print");
     root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}</style>${orders
       .map((o) => receiptExcelPage(orderReceiptSnapshot(o), logoSrc))
       .join("")}`;
     const cleanup = () => {
-      document.documentElement.classList.remove("thermal-receipt-print");
+      document.documentElement.classList.remove(
+        "thermal-receipt-print",
+        "receipt-a4-print",
+      );
       root.innerHTML = "";
     };
     window.addEventListener("afterprint", cleanup, { once: true });
