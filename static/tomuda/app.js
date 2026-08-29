@@ -9627,7 +9627,7 @@ td, th { border: none; }
   /* A4: left/top margin via @page; right smaller than left. */
   padding: 4mm 0 2mm 0;
   box-sizing: border-box;
-  font-size: 9px;
+  font-size: 9pt;
   line-height: 1.15;
   font-family: ${RECEIPT_FONT};
   background: #fff;
@@ -9657,7 +9657,7 @@ td, th { border: none; }
   max-width: none;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 9px;
+  font-size: 9pt;
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
@@ -9687,7 +9687,7 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__bank .receipt-grid__address-cell {
   vertical-align: top;
   font-weight: 400;
-  font-size: 9px;
+  font-size: 9pt;
   line-height: 1.35;
   color: #000;
   white-space: normal;
@@ -9713,19 +9713,19 @@ td, th { border: none; }
   background: #fff;
   color: ${RECEIPT_TEXT};
   line-height: 1.12;
-  font-size: 9px;
+  font-size: 9pt;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
   background: ${RECEIPT_HEADER_BG} !important;
   font-weight: 700;
-  font-size: 9px;
+  font-size: 9pt;
   text-align: center;
   padding: 2px 3px;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: right;
   padding: 1px 2px;
-  font-size: 9px;
+  font-size: 9pt;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
@@ -9735,7 +9735,7 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__qty { font-weight: 700; }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__barcode {
   text-align: center;
-  font-size: 9px;
+  font-size: 9pt;
   word-break: break-all;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__price,
@@ -9743,7 +9743,7 @@ td, th { border: none; }
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  font-size: 9px;
+  font-size: 9pt;
   font-weight: 400;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td {
@@ -9751,7 +9751,7 @@ td, th { border: none; }
   border-bottom: 0.4pt solid #666 !important;
   padding: 2px 4px;
   vertical-align: middle;
-  font-size: 9px;
+  font-size: 9pt;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
 }
@@ -9781,27 +9781,27 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-label {
   font-weight: 700;
-  font-size: 9px;
+  font-size: 9pt;
   white-space: nowrap;
   text-align: right;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-name {
   font-weight: 400;
-  font-size: 9px;
+  font-size: 9pt;
   text-align: left;
 }
-.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9px; }
+.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9pt; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
   text-align: right;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 9pt;
   font-weight: 700;
   color: #000 !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
   text-align: right;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 9pt;
   font-weight: 700;
   color: #2E86C1 !important;
 }
@@ -10119,7 +10119,7 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-label {
   text-align: right;
   padding-right: 8px !important;
-  font-size: 9px;
+  font-size: 9pt;
   font-weight: 700;
   background: #d9d9d9 !important;
   border: none !important;
@@ -10131,13 +10131,13 @@ tbody.receipt-footer-keep {
   background: #d9d9d9 !important;
 }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
-  font-size: 11px;
+  font-size: 9pt;
   font-weight: 700;
 }
 .receipt-grid--sheet .receipt-grid__summary td {
   height: 16px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: 9pt;
   line-height: 1.15;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
@@ -10146,11 +10146,11 @@ tbody.receipt-footer-keep {
   height: 16px;
   padding: 0 6px;
   font-weight: 700;
-  font-size: 9px;
+  font-size: 9pt;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   font-weight: 700 !important;
-  font-size: 9px !important;
+  font-size: 9pt !important;
   letter-spacing: 0;
   background: ${RECEIPT_GRAND_BG} !important;
   white-space: nowrap;
@@ -10160,15 +10160,15 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-note {
   background: ${RECEIPT_GRAND_BG} !important;
   font-weight: 400 !important;
-  font-size: 8px !important;
+  font-size: 8pt !important;
   text-align: center !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
   background: ${RECEIPT_GRAND_BG} !important;
   font-weight: 700 !important;
-  font-size: 9px !important;
+  font-size: 9pt !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 9px; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 9pt; }
 .receipt-grid__summary-note {
   text-align: center;
   font-size: 8px !important;
@@ -10253,7 +10253,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-header-date {
   white-space: nowrap;
-  font-size: 8px;
+  font-size: 9pt;
   line-height: 1.2;
   padding-top: 1px;
   text-align: right;
@@ -10261,7 +10261,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT_TITLE};
-  font-size: 11px;
+  font-size: 11pt;
   font-weight: 700;
   padding: 0 0 0 10mm !important;
   margin: 0;
@@ -10281,7 +10281,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__address,
 .receipt-grid__phone {
-  font-size: 8px;
+  font-size: 9pt;
   line-height: 1.35;
   white-space: normal;
   word-break: break-word;
@@ -10297,7 +10297,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__phone { font-weight: 400; }
 .receipt-grid__date-label,
 .receipt-grid__date {
-  font-size: 8px;
+  font-size: 9pt;
   text-align: right;
   white-space: nowrap;
   color: ${RECEIPT_TEXT};
@@ -10309,7 +10309,7 @@ tbody.receipt-footer-keep {
 .receipt-title {
   text-align: center;
   font-family: ${RECEIPT_FONT_TITLE};
-  font-size: 14px;
+  font-size: 14pt;
   font-weight: 700;
   padding: 8px 4px !important;
   margin: 0;
@@ -10320,17 +10320,17 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__header--title td { padding-top: 2px !important; padding-bottom: 8px !important; height: 30px; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 9px; line-height: 1.15; padding: 1px 2px !important; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
-  font-size: 11px !important;
+  font-size: 9pt !important;
   font-weight: 400 !important;
 }
-.receipt-grid__label { color: ${RECEIPT_TEXT}; white-space: nowrap; font-weight: 400; font-size: 9px; }
-.receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9px; }
+.receipt-grid__label { color: ${RECEIPT_TEXT}; white-space: nowrap; font-weight: 400; font-size: 9pt; }
+.receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9pt; }
 .receipt-grid__value b { font-weight: 700; font-size: inherit; }
-.receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9px; }
-.receipt-grid__iban-nums { font-weight: 700; font-size: 11px !important; line-height: 1.25; }
-.receipt-grid__iban-nums b { font-size: 11px !important; font-weight: 700; }
+.receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9pt; }
+.receipt-grid__iban-nums { font-weight: 700; font-size: 9pt !important; line-height: 1.25; }
+.receipt-grid__iban-nums b { font-size: 9pt !important; font-weight: 700; }
 .receipt-grid__iban-b {
   text-align: left !important;
   white-space: nowrap;
@@ -10375,17 +10375,17 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--sign td { height: 2mm; }
 .receipt-grid__fill td { height: 1.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.receipt-grid__money--strong { font-weight: 700; font-size: 11px; }
+.receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
 .receipt-grid__summary-pad { border: none !important; background: transparent !important; padding: 0 !important; }
 .receipt-grid__gross-label {
   text-align: right;
-  font-size: 9px !important;
+  font-size: 9pt !important;
   font-weight: 700 !important;
   padding-right: 8px !important;
   border: none !important;
 }
 .receipt-grid__gross .receipt-grid__money {
-  font-size: 11px !important;
+  font-size: 9pt !important;
   font-weight: 700 !important;
   text-align: right;
 }
@@ -10400,10 +10400,10 @@ tbody.receipt-footer-keep {
   border: none !important;
 }
 .receipt-grid__summary-label--vat { font-weight: 700 !important; }
-.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9px !important; letter-spacing: 0; white-space: nowrap; text-align: right !important; }
+.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9pt !important; letter-spacing: 0; white-space: nowrap; text-align: right !important; }
 .receipt-grid__summary-value {
   text-align: right;
-  font-size: 11px;
+  font-size: 9pt;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   font-weight: 400;
@@ -10419,8 +10419,8 @@ tbody.receipt-footer-keep {
   border-top: none !important;
   border-bottom: none !important;
 }
-.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9px !important; }
-.receipt-grid__summary-value--grand { font-size: 9px !important; font-weight: 700 !important; }
+.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9pt !important; }
+.receipt-grid__summary-value--grand { font-size: 9pt !important; font-weight: 700 !important; }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   border: none !important;
 }
@@ -10444,16 +10444,16 @@ tbody.receipt-footer-keep {
   border: none !important;
   box-sizing: border-box;
   margin: 0;
-  font-size: 8px;
+  font-size: 8pt;
   line-height: 1.35;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
 }
 .receipt-grid__warn-line--first { line-height: 1.45; }
-.receipt-grid__warn-line--bold { font-weight: 700; font-size: 9px; }
-.receipt-grid__warn-em { font-weight: 700; font-size: 8px; }
+.receipt-grid__warn-line--bold { font-weight: 700; font-size: 9pt; }
+.receipt-grid__warn-em { font-weight: 700; font-size: 9pt; }
 .receipt-grid__sign-label {
-  font-size: 11px;
+  font-size: 9pt;
   font-weight: 400;
   font-family: ${RECEIPT_FONT};
   padding: 2px 4px 1px 0;
@@ -10483,7 +10483,7 @@ tbody.receipt-footer-keep {
     margin: 0;
     box-shadow: none !important;
     overflow: visible;
-    font-size: 9px;
+    font-size: 9pt;
   }
   .receipt-logo.receipt-logo--overlay {
     top: 0;
@@ -10494,9 +10494,9 @@ tbody.receipt-footer-keep {
     min-height: 14mm !important;
     max-height: 14mm !important;
   }
-  .receipt-grid { max-width: none; font-size: 9px; }
-  .receipt-title { font-size: 14px; }
-  .receipt-grid__brand { font-size: 11px; padding-left: 10mm !important; }
+  .receipt-grid { max-width: none; font-size: 9pt; }
+  .receipt-title { font-size: 14pt; }
+  .receipt-grid__brand { font-size: 11pt; padding-left: 10mm !important; }
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 10mm !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
