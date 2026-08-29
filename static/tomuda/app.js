@@ -12471,9 +12471,14 @@ function customerStoreRating(c) {
   const n = Number(c?.storeRating);
   if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
   const mark = normalizeCustomerPayMark(c?.payMark);
-  if (mark === "good") return 90;
   if (mark === "bad") return 25;
-  return 65;
+  return 90;
+}
+function storeRatingToSlider(pct) {
+  return 100 - Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+}
+function storeRatingFromSlider(value) {
+  return 100 - Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
 }
 function storeRatingLabel(pct) {
   if (pct >= 80) return "Маш сайн";
@@ -12493,20 +12498,21 @@ function customerStoreRatingHtml(c) {
   const pct = customerStoreRating(c);
   const editable = canEditStoreRating();
   const label = storeRatingLabel(pct);
-  return `<div class="store-rating" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" data-saved="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" onwheel="event.preventDefault()" onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"></div>`;
+  const slider = storeRatingToSlider(pct);
+  return `<div class="store-rating" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" onwheel="event.preventDefault()" onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"></div>`;
 }
 function askCustomerStoreRating(id, input, event) {
   event?.preventDefault?.();
   event?.stopPropagation?.();
   if (!input) return;
-  const next = Math.max(0, Math.min(100, Math.round(Number(input.value) || 0)));
+  const next = storeRatingFromSlider(input.value);
   const prev = Math.max(
     0,
     Math.min(100, Math.round(Number(input.getAttribute("data-saved")) || 0)),
   );
   if (next === prev) return;
   if (!canEditStoreRating()) {
-    input.value = String(prev);
+    input.value = String(storeRatingToSlider(prev));
     return;
   }
   confirmModal(
@@ -12520,7 +12526,7 @@ function askCustomerStoreRating(id, input, event) {
         setCustomerStoreRating(id, next);
       },
       onCancel: () => {
-        input.value = String(prev);
+        input.value = String(storeRatingToSlider(prev));
       },
     },
   );
@@ -12573,7 +12579,7 @@ function cycleCustomerPayMark(id, event) {
   if (!c) return;
   const cur = normalizeCustomerPayMark(c.payMark);
   c.payMark = cur === "" ? "good" : cur === "good" ? "bad" : "";
-  c.storeRating = c.payMark === "good" ? 90 : c.payMark === "bad" ? 25 : 65;
+  c.storeRating = c.payMark === "good" ? 90 : c.payMark === "bad" ? 25 : 90;
   c.updatedAt = new Date().toISOString();
   render();
   void upsertCustomerOnServer(c).catch((err) => {
@@ -28429,8 +28435,10 @@ async function applyCustomerSave(data, id) {
     customer = existing;
   } else {
     customer = { ...data, id: newEntityId("c") };
-    customer.payMark = normalizeCustomerPayMark(customer.payMark);
-    customer.storeRating = customerStoreRating(customer);
+    customer.payMark = normalizeCustomerPayMark(customer.payMark) || "good";
+    customer.storeRating = Number.isFinite(Number(customer.storeRating))
+      ? customerStoreRating(customer)
+      : 90;
     if (!customer.image) delete customer.image;
     applyCustomerPhoneFields(customer, customer.phones);
     state.customers.push(customer);
