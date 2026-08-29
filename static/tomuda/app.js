@@ -739,7 +739,7 @@ function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const takenDate = receiptTakenDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" rowspan="2" class="receipt-grid__dates"><span class="receipt-grid__dates-line">Огноо: ${esc(takenDate)}</span><span class="receipt-grid__dates-line">Хүргэлтийн огноо: ${esc(deliveryDate)}</span></td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td></tr><tr class="receipt-grid__header receipt-grid__header--title-gap"><td colspan="11"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" rowspan="2" class="receipt-grid__dates"><span class="receipt-grid__dates-line">Хүргэлтийн огноо: ${esc(deliveryDate)}</span><span class="receipt-grid__dates-line">${esc(takenDate)}</span></td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td></tr><tr class="receipt-grid__header receipt-grid__header--title-gap"><td colspan="11"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -10334,7 +10334,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__dates-line {
   display: block;
-  line-height: 1.2;
+  line-height: 1.05;
 }
 .receipt-title {
   text-align: center;
@@ -11375,7 +11375,7 @@ function appendReceiptSheetRows(
     `B${hr3}:K${hr3}`,
     `J${hr1}:K${hr2}`,
   );
-  const dateBlock = `Огноо: ${takenDateText}\nХүргэлтийн огноо: ${deliveryDateText}`;
+  const dateBlock = `Хүргэлтийн огноо: ${deliveryDateText}\n${takenDateText}`;
   pushRow(RECEIPT_XLSX_TITLE_ROW_HEIGHT, [
     xlsxCellXml(`A${hr1}`, 1, null, "empty"),
     xlsxCellXml(`B${hr1}`, 39, si("ТОМУДА ГРУПП"), "s"),
