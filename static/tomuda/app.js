@@ -9641,7 +9641,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* B+C fits «Худалдааны төлөөлөгчийн утас:»; C stays modest for IBAN */
-.receipt-grid__a { width: 16mm; } .receipt-grid__b { width: 15%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 14.5%; }
+.receipt-grid__a { width: 6mm; } .receipt-grid__b { width: 17.5%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 14.5%; }
 .receipt-grid__f { width: 10.8%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -9679,15 +9679,17 @@ td, th { border: none; }
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: top;
-  padding: 1mm 1mm 0 0 !important;
+  padding: 0 !important;
   overflow: hidden;
-  width: 16mm;
-  min-width: 16mm;
-  max-width: 16mm;
+  width: 6mm;
+  min-width: 6mm;
   position: relative;
   z-index: 1;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 14mm !important;
   height: 14mm !important;
   min-width: 14mm !important;
@@ -9716,6 +9718,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: right;
+  padding: 1px 2px;
   font-size: 9px;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
@@ -10195,6 +10198,13 @@ tbody.receipt-footer-keep {
   padding: 0 !important;
   vertical-align: bottom;
 }
+.receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
+  border: none !important;
+  border-bottom: 0.75pt dotted #000 !important;
+  height: 14px;
+  padding: 0 !important;
+  vertical-align: bottom;
+}
 .receipt-grid__header-cell {
   padding: 0 0 4px !important;
   vertical-align: top;
@@ -10247,7 +10257,7 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 11px;
   font-weight: 700;
-  padding: 0 0 0 2mm !important;
+  padding: 0 0 0 10mm !important;
   margin: 0;
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
@@ -10261,7 +10271,7 @@ tbody.receipt-footer-keep {
   border: none !important;
 }
 .receipt-grid__header--r2 .receipt-grid__address {
-  padding-left: 2mm !important;
+  padding-left: 10mm !important;
 }
 .receipt-grid__address,
 .receipt-grid__phone {
@@ -10473,7 +10483,17 @@ tbody.receipt-footer-keep {
   .receipt-grid__brand { font-size: 11px; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: hidden !important;
-    width: 16mm !important;
+    width: 6mm !important;
+    position: relative;
+  }
+  .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
+    border: none !important;
+    border-bottom: 0.75pt dotted #000 !important;
   }
   .receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
     height: 5mm !important;
