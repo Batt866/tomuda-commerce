@@ -20654,10 +20654,6 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
           xlsxCellXml(`A${r}`, s.category, si(item.name), "s"),
           ...emptyCells(r, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
         ]);
-        pushRow(
-          WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
-          emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
-        );
         continue;
       }
       const p = item.product;
@@ -20693,10 +20689,6 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
       xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
-    pushRow(
-      WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
-      emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
-    );
     pushPrepareGroups(sections.promo);
   }
   pushRow(
@@ -20790,7 +20782,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
     groups
       .map((item) => {
         if (item.type === "cat") {
-          return `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat">${h(item.name)}</td></tr><tr class="cat-gap"><td colspan="10"></td></tr>`;
+          return `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat">${h(item.name)}</td></tr>`;
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
@@ -20798,7 +20790,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
       })
       .join("");
   const promoRows = sections.promo.length
-    ? `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr><tr class="cat-gap"><td colspan="10"></td></tr>${renderGroupRows(sections.promo)}`
+    ? `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
     : "";
   const html = `<!doctype html><!-- tomuda-stock-xls-v680 --><html><head><meta charset="utf-8"><style>
 @page { size: A4 portrait; margin: 10mm 7mm; }
