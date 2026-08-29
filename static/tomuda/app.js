@@ -20738,8 +20738,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT, [
-      xlsxCellXml(`A${promoHeadRow}`, s.promo, si(PROMO_PRODUCT_LABEL), "s"),
+    pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
+      xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
     pushPrepareGroups(sections.promo, true);
@@ -20879,7 +20879,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 700; height: 22px; padding: 4px 0; white-space: nowrap; border: none !important; background: none !important; }
 .cat-gap td { height: 6px; border: none !important; background: none !important; }
-.promo-head { border: none !important; font-size: 22px; font-weight: 800; height: 36px; padding: 8px 0; }
+.promo-head { border: none !important; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
@@ -30604,7 +30604,7 @@ function printOrdersViaBrowser(orders) {
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText =
-      "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+      "position:fixed;left:-100vw;top:0;width:210mm;height:297mm;border:0;visibility:hidden;background:#fff";
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument;
     const win = iframe.contentWindow;
@@ -30618,12 +30618,18 @@ function printOrdersViaBrowser(orders) {
     doc.open();
     doc.write(html);
     doc.close();
+    const waitForImages = Promise.all(
+      [...doc.images].map((img) =>
+        img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
+      ),
+    );
     win.addEventListener("afterprint", cleanup, { once: true });
+    await waitForImages;
     setTimeout(() => {
       win.focus();
       win.print();
       setTimeout(cleanup, 2000);
-    }, 150);
+    }, 80);
   })();
 }
 
