@@ -40,6 +40,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.json.JSONArray;
+
 @CapacitorPlugin(
     name = "BluetoothPrinter",
     permissions = {
@@ -97,62 +99,67 @@ public class BluetoothPrinterPlugin extends Plugin {
     public void requestPermission(PluginCall call) {
         if (Build.VERSION.SDK_INT >= 31) {
             requestPermissionForAliases(
-                new String[] { "btConnect", "btScan", "location" },
+                new String[] { "btConnect", "btScan" },
                 call,
                 "onBtPermission"
             );
             return;
         }
-        JSObject ret = new JSObject();
-        ret.put("granted", true);
-        call.resolve(ret);
+        requestPermissionForAliases(
+            new String[] { "btLegacy", "location" },
+            call,
+            "onBtPermission"
+        );
     }
 
     @PermissionCallback
     private void onBtPermission(PluginCall call) {
         JSObject ret = new JSObject();
         boolean granted =
-            getPermissionState("btConnect") == com.getcapacitor.PermissionState.GRANTED;
+            Build.VERSION.SDK_INT < 31
+                || getPermissionState("btConnect")
+                    == com.getcapacitor.PermissionState.GRANTED;
         ret.put("granted", granted);
         if (granted) call.resolve(ret);
-        else call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Bluetooth зөвшөөрнө үү.");
+        else call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Nearby devices зөвшөөрнө үү.");
     }
 
     @SuppressLint("MissingPermission")
     @PluginMethod
     public void listDevices(PluginCall call) {
+        boolean nearby = Boolean.TRUE.equals(call.getBoolean("nearby", false));
         io.execute(() -> {
             try {
                 BluetoothAdapter adapter = adapter();
                 if (adapter == null) {
-                    call.reject("Bluetooth дэмжихгүй");
+                    rejectOnMain(call, "Bluetooth дэмжихгүй");
                     return;
                 }
                 if (!adapter.isEnabled()) {
-                    call.reject("Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
+                    rejectOnMain(call, "Bluetooth унтраалттай байна. Асаагаад дахин оролдоно уу.");
                     return;
                 }
                 ensurePinReceiver();
                 Map<String, JSObject> byAddress =
                     java.util.Collections.synchronizedMap(new LinkedHashMap<>());
-                Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-                if (bonded != null) {
-                    for (BluetoothDevice device : bonded) {
-                        putDevice(byAddress, device, true);
-                    }
+                collectPairedDevices(adapter, byAddress);
+                injectPreferredPrinter(adapter, byAddress);
+                if (nearby) {
+                    discoverNearby(adapter, byAddress);
+                    collectPairedDevices(adapter, byAddress);
+                    injectPreferredPrinter(adapter, byAddress);
                 }
-                discoverNearby(adapter, byAddress);
-                List<JSObject> ranked = new ArrayList<>(byAddress.values());
-                ranked.sort((a, b) -> Integer.compare(deviceScore(b), deviceScore(a)));
-                JSArray devices = new JSArray();
-                for (JSObject row : ranked) devices.put(row);
-                JSObject ret = new JSObject();
-                ret.put("devices", devices);
-                call.resolve(ret);
+                resolveDevicesOnMain(call, byAddress);
             } catch (SecurityException e) {
-                call.reject("Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Nearby devices зөвшөөрнө үү.");
+                rejectOnMain(
+                    call,
+                    "Bluetooth эрх олгогдоогүй. Тохиргооноос Томуда-д Nearby devices зөвшөөрнө үү."
+                );
             } catch (Exception e) {
-                call.reject(e.getMessage() != null ? e.getMessage() : "Принтер олдсонгүй");
+                rejectOnMain(
+                    call,
+                    e.getMessage() != null ? e.getMessage() : "Принтер олдсонгүй"
+                );
             }
         });
     }
@@ -349,6 +356,70 @@ public class BluetoothPrinterPlugin extends Plugin {
                 if (device.getBondState() == BluetoothDevice.BOND_NONE && i > 8) return;
             }
         } catch (Exception ignored) {}
+    }
+
+    private void runOnMain(Runnable action) {
+        android.app.Activity activity = getActivity();
+        if (activity != null) {
+            activity.runOnUiThread(action);
+        } else {
+            action.run();
+        }
+    }
+
+    private void rejectOnMain(PluginCall call, String message) {
+        runOnMain(() -> call.reject(message));
+    }
+
+    @SuppressLint("MissingPermission")
+    private void collectPairedDevices(
+        BluetoothAdapter adapter,
+        Map<String, JSObject> byAddress
+    ) {
+        Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+        if (bonded == null) return;
+        for (BluetoothDevice device : bonded) {
+            putDevice(byAddress, device, true);
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void injectPreferredPrinter(
+        BluetoothAdapter adapter,
+        Map<String, JSObject> byAddress
+    ) {
+        try {
+            BluetoothDevice preferred = adapter.getRemoteDevice(M58_MAC);
+            boolean bonded = false;
+            Set<BluetoothDevice> devices = adapter.getBondedDevices();
+            if (devices != null) {
+                for (BluetoothDevice device : devices) {
+                    if (isPreferredMac(device.getAddress())) {
+                        bonded = true;
+                        break;
+                    }
+                }
+            }
+            putDevice(byAddress, preferred, bonded);
+        } catch (Exception ignored) {}
+    }
+
+    private void resolveDevicesOnMain(
+        PluginCall call,
+        Map<String, JSObject> byAddress
+    ) {
+        List<JSObject> ranked = new ArrayList<>(byAddress.values());
+        ranked.sort((a, b) -> Integer.compare(deviceScore(b), deviceScore(a)));
+        JSArray devices = new JSArray();
+        JSONArray json = new JSONArray();
+        for (JSObject row : ranked) {
+            devices.put(row);
+            json.put(row);
+        }
+        JSObject ret = new JSObject();
+        ret.put("devices", devices);
+        ret.put("devicesJson", json.toString());
+        runOnMain(() -> call.resolve(ret));
     }
 
     @SuppressLint("MissingPermission")
@@ -551,8 +622,16 @@ public class BluetoothPrinterPlugin extends Plugin {
             } else {
                 ctx.registerReceiver(receiver, filter);
             }
-            adapter.startDiscovery();
-            if (!done.await(3, TimeUnit.SECONDS)) {
+            try {
+                adapter.cancelDiscovery();
+            } catch (Exception ignored) {}
+            boolean started = false;
+            try {
+                started = adapter.startDiscovery();
+            } catch (Exception ignored) {}
+            if (!started) {
+                done.countDown();
+            } else if (!done.await(8, TimeUnit.SECONDS)) {
                 try {
                     adapter.cancelDiscovery();
                 } catch (Exception ignored) {}

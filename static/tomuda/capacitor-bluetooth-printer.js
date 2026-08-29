@@ -1,6 +1,6 @@
 (function () {
   var PLUGIN_OPTIONS = {
-    listDevices: { timeout: 30000 },
+    listDevices: { timeout: 45000 },
     connect: { timeout: 30000 },
     write: { timeout: 30000 },
     requestPermission: { timeout: 120000 },

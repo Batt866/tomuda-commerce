@@ -29916,7 +29916,7 @@ function btPrinterSetupHintHtml() {
   if (!shouldUseBluetoothReceiptPrint()) {
     return `<p class="bt-setup__kicker">Скан хийх зөвлөмж</p><p class="bt-setup__hint">58мм Bluetooth хэвлэлт браузер дээр ажиллахгүй. Томуда Android аппыг суулгаад тэндээс принтерээ сонгоно уу.</p>`;
   }
-  return `<p class="bt-setup__kicker">M58-L Thermal Printer</p><p class="bt-setup__hint">Доорх «BlueTooth Printer» дээр дарна. Шууд Bluetooth-аар холбогдоно. PIN 1234 эсвэл 0000.</p>`;
+  return `<p class="bt-setup__kicker">M58-L Thermal Printer</p><p class="bt-setup__hint">Утасны Bluetooth-аар холбосон принтер хайлт дээр шууд гарна. Ойрын төхөөрөмж нэмж хайна. PIN 1234 эсвэл 0000.</p>`;
 }
 
 function getSavedBtPrinter() {
@@ -30120,6 +30120,25 @@ function btPrinterKindLabel(kind) {
 
 function btListedDevices(listed) {
   if (!listed) return [];
+  const fromJson = (raw) => {
+    if (Array.isArray(raw)) return raw.filter((d) => d && (d.address || d.name));
+    if (raw && typeof raw === "object") {
+      return Object.keys(raw)
+        .filter((key) => key !== "length")
+        .map((key) => raw[key])
+        .filter((d) => d && typeof d === "object" && (d.address || d.name));
+    }
+    return [];
+  };
+  if (typeof listed.devicesJson === "string" && listed.devicesJson.trim()) {
+    try {
+      const parsed = JSON.parse(listed.devicesJson);
+      const rows = fromJson(parsed);
+      if (rows.length) return rows;
+    } catch {
+      /* fall through */
+    }
+  }
   let raw = listed.devices;
   if (raw == null && Array.isArray(listed)) raw = listed;
   if (typeof raw === "string") {
@@ -30129,14 +30148,7 @@ function btListedDevices(listed) {
       return [];
     }
   }
-  if (Array.isArray(raw)) return raw.filter((d) => d && (d.address || d.name));
-  if (raw && typeof raw === "object") {
-    return Object.keys(raw)
-      .filter((key) => key !== "length")
-      .map((key) => raw[key])
-      .filter((d) => d && typeof d === "object" && (d.address || d.name));
-  }
-  return [];
+  return fromJson(raw);
 }
 
 function btPluginError(err, fallback) {
@@ -30145,6 +30157,8 @@ function btPluginError(err, fallback) {
   ).trim();
   return text || fallback;
 }
+
+let btPrinterScanGen = 0;
 
 async function scanBtPrinters() {
   if (isIosDevice() || !shouldUseBluetoothReceiptPrint()) {
@@ -30159,10 +30173,12 @@ async function scanBtPrinters() {
     );
     return;
   }
+  const gen = (btPrinterScanGen += 1);
   btPrinterScanning = true;
   renderBtPrinterSetupModal();
   const plugin = await waitForBluetoothPrinterPlugin();
   if (!plugin) {
+    if (gen !== btPrinterScanGen) return;
     btPrinterScanning = false;
     renderBtPrinterSetupModal();
     showAppToast("Принтерийн холболт олдсонгүй. Аппаа шинэчилнэ үү.", "error");
@@ -30174,14 +30190,22 @@ async function scanBtPrinters() {
     } catch (permErr) {
       console.warn("Bluetooth permission", permErr);
     }
-    const listed = await plugin.listDevices();
-    btPrinterScanResults = mergeBtPrinterResults(btListedDevices(listed));
+    const paired = await plugin.listDevices({ nearby: false });
+    if (gen !== btPrinterScanGen) return;
+    btPrinterScanResults = mergeBtPrinterResults(btListedDevices(paired));
+    renderBtPrinterSetupModal();
+    const nearby = await plugin.listDevices({ nearby: true });
+    if (gen !== btPrinterScanGen) return;
+    btPrinterScanResults = mergeBtPrinterResults(btListedDevices(nearby));
   } catch (err) {
+    if (gen !== btPrinterScanGen) return;
     btPrinterScanResults = mergeBtPrinterResults(btPrinterScanResults);
     showAppToast(btPluginError(err, "Принтер хайж чадсангүй"), "error");
   } finally {
-    btPrinterScanning = false;
-    renderBtPrinterSetupModal();
+    if (gen === btPrinterScanGen) {
+      btPrinterScanning = false;
+      renderBtPrinterSetupModal();
+    }
   }
 }
 
@@ -30481,7 +30505,7 @@ function shouldUseBluetoothReceiptPrint() {
 
 let tomudaBluetoothPrinterPlugin = null;
 const BT_PRINTER_PLUGIN_OPTS = {
-  listDevices: { timeout: 30000 },
+  listDevices: { timeout: 45000 },
   connect: { timeout: 30000 },
   write: { timeout: 30000 },
   requestPermission: { timeout: 120000 },
