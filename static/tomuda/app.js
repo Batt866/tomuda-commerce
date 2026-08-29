@@ -530,7 +530,8 @@ const RECEIPT_GRAND_BG = "#C5CAD0";
 const RECEIPT_SETTLE_BG = "#FFF2CC"; // Gold, Accent 4, Lighter 80%
 const RECEIPT_SETTLE_BORDER = "#E6E6A8";
 const RECEIPT_SETTLE_BG_XLSX = "FFFFF2CC";
-const RECEIPT_WARN_BG = RECEIPT_GRAND_BG;
+/** Excel fill 7 — warn rows (not the grand-total bar). */
+const RECEIPT_WARN_BG = "#E8EBEE";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
@@ -1002,7 +1003,23 @@ function receiptIsDirectPay(o) {
 }
 /** PaymentInformation — ҮНДСЭН wording (нийлүүлэгч тал). */
 function receiptWarningRowsHtml() {
-  return `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-box"><p class="receipt-grid__warn-line">Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр</b>,<br><b class="receipt-grid__warn-em">ААН-ийн РЕГИСТР</b>-ийг бичээрэй.</p><p class="receipt-grid__warn-line receipt-grid__warn-line--bold">Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.</p><p class="receipt-grid__warn-line">Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно</p><p class="receipt-grid__warn-line receipt-grid__warn-line--last">Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!</p></td></tr>`;
+  const row = (text, extra = "") =>
+    `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-line${extra}">${text}</td></tr>`;
+  return (
+    row(
+      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр</b>, <b class="receipt-grid__warn-em">ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
+      " receipt-grid__warn-line--first",
+    ) +
+    row(
+      "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
+      " receipt-grid__warn-line--bold",
+    ) +
+    row("Өөр дансруу шилжүүлсэн төлбөрийг нийлүүлэгч тал хариуцахгүй болно") +
+    row(
+      "Барааг сайтар шалгаж тоо ширхгийг тулгаж хүлээн авахыг анхаарна уу!",
+      " receipt-grid__warn-line--last",
+    )
+  );
 }
 function PaymentInformation() {
   return receiptWarningRowsHtml();
@@ -9678,7 +9695,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
-  border: 1px solid #000 !important;
+  border: 0.4pt solid #666 !important;
   padding: 1px 3px;
   vertical-align: middle;
   background: #fff;
@@ -9718,7 +9735,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__promo > td {
   border: none !important;
-  border-bottom: 1px solid #000 !important;
+  border-bottom: 0.4pt solid #666 !important;
   padding: 2px 4px;
   vertical-align: middle;
   font-size: 9px;
@@ -9751,7 +9768,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-label {
   font-weight: 700;
-  font-size: 11px;
+  font-size: 9px;
   white-space: nowrap;
   text-align: right;
 }
@@ -9760,7 +9777,7 @@ td, th { border: none; }
   font-size: 9px;
   text-align: left;
 }
-.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 700; font-size: 9px; }
+.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9px; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
   text-align: right;
   white-space: nowrap;
@@ -9771,9 +9788,9 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
   text-align: right;
   white-space: nowrap;
-  font-size: 11px;
-  font-weight: 400;
-  color: ${RECEIPT_TEXT} !important;
+  font-size: 9px;
+  font-weight: 700;
+  color: #2E86C1 !important;
 }
 .receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 1px 0 !important; }
 .receipt-grid--sheet tr.receipt-grid__items-wrap--promo > td.receipt-grid__items-cell { padding: 1px 0 0 !important; }
@@ -10051,7 +10068,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
 .receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #000 !important; font-weight: 700; }
-.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: ${RECEIPT_TEXT} !important; }
+.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #2E86C1 !important; }
 .receipt-grid--sheet .receipt-grid__return td {
   padding: 0;
   height: auto;
@@ -10392,20 +10409,22 @@ tbody.receipt-footer-keep {
   color: ${RECEIPT_TEXT};
   box-sizing: border-box;
 }
-.receipt-grid__warn td { border: none; padding: 1px 0 !important; }
-.receipt-grid__warn-box {
+.receipt-grid__warn td { border: none; padding: 0 !important; }
+.receipt-grid__warn-line {
   background: ${RECEIPT_WARN_BG} !important;
   text-align: center;
   padding: 2px 6px !important;
   border: none !important;
   box-sizing: border-box;
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.35;
+  color: ${RECEIPT_TEXT};
+  font-weight: 400;
 }
-.receipt-grid__warn-line { margin: 0 0 1px; font-size: 8px; line-height: 1.35; color: ${RECEIPT_TEXT}; font-weight: 400; }
-.receipt-grid__warn-line:first-child { line-height: 1.45; padding-bottom: 1px; }
-.receipt-grid__warn-line:last-child,
-.receipt-grid__warn-line--last { margin-bottom: 0; }
-.receipt-grid__warn-line--bold { font-weight: 700; }
-.receipt-grid__warn-em { font-weight: 700; font-size: 8.5px; }
+.receipt-grid__warn-line--first { line-height: 1.45; }
+.receipt-grid__warn-line--bold { font-weight: 700; font-size: 9px; }
+.receipt-grid__warn-em { font-weight: 700; font-size: 8px; }
 .receipt-grid__sign-label {
   font-size: 11px;
   font-weight: 400;
@@ -10458,7 +10477,7 @@ tbody.receipt-footer-keep {
   .receipt-grid--sheet tr.receipt-items__row > td,
   .receipt-items th,
   .receipt-items td {
-    border: 1px solid #000 !important;
+    border: 0.4pt solid #666 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -10467,10 +10486,12 @@ tbody.receipt-footer-keep {
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price,
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
     border: none !important;
-    border-bottom: 1px solid #000 !important;
-    color: ${RECEIPT_TEXT} !important;
+    border-bottom: 0.4pt solid #666 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
+    color: #2E86C1 !important;
   }
   .receipt-grid--sheet tr.receipt-items__promo > td:first-child,
   .receipt-grid--sheet tr.receipt-items__promo > td:nth-child(2),
@@ -30574,23 +30595,33 @@ function printOrdersViaBrowser(orders) {
     const logoSrc =
       (await getReceiptExcelLogoDataUri().catch(() => "")) ||
       RECEIPT_LOGO_DATA_URI;
-    const root = printRootEl();
-    document.documentElement.classList.add("receipt-a4-print");
-    root.innerHTML = `<style>${RECEIPT_EXCEL_STYLES}</style>${orders
+    const pages = orders
       .map((o) => receiptExcelPage(orderReceiptSnapshot(o), logoSrc))
-      .join("")}`;
+      .join("");
+    const html = `<!DOCTYPE html><html class="receipt-a4-print"><head><meta charset="utf-8"><title></title><style>${RECEIPT_EXCEL_STYLES}</style></head><body>${pages}</body></html>`;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
     const cleanup = () => {
-      document.documentElement.classList.remove(
-        "thermal-receipt-print",
-        "receipt-a4-print",
-      );
-      root.innerHTML = "";
+      iframe.remove();
     };
-    window.addEventListener("afterprint", cleanup, { once: true });
+    if (!doc || !win) {
+      cleanup();
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    win.addEventListener("afterprint", cleanup, { once: true });
     setTimeout(() => {
-      window.print();
-      setTimeout(cleanup, 1500);
-    }, 120);
+      win.focus();
+      win.print();
+      setTimeout(cleanup, 2000);
+    }, 150);
   })();
 }
 
