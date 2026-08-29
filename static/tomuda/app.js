@@ -12493,8 +12493,7 @@ function customerStoreRatingHtml(c) {
   const pct = customerStoreRating(c);
   const editable = canEditStoreRating();
   const label = storeRatingLabel(pct);
-  const top = `${100 - pct}%`;
-  return `<div class="store-rating store-rating--vertical"><div class="store-rating__bar"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" oninput="this.nextElementSibling.style.top=(100-Number(this.value))+'%'" onchange="setCustomerStoreRating('${esc(c.id)}', this.value, event)"><span class="store-rating__marker" style="top:${top}"></span></div></div>`;
+  return `<div class="store-rating" onclick="event.stopPropagation()"><div class="store-rating__bar"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" oninput="this.nextElementSibling.style.left=this.value+'%'" onchange="setCustomerStoreRating('${esc(c.id)}', this.value, event)"><span class="store-rating__marker" style="left:${pct}%"></span></div></div>`;
 }
 function setCustomerStoreRating(id, value, event) {
   event?.preventDefault?.();
@@ -13065,7 +13064,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerStoreRatingHtml(c)}${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c)}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
