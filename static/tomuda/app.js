@@ -20094,7 +20094,7 @@ const WAREHOUSE_PREPARE_SIGN_HANDED_NAME = "Хүлээлгэн өгсөн ажи
 const WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME = "Хүлээн авсан ажилтны нэр:";
 const WAREHOUSE_PREPARE_SIGN_MARK_LABEL = "гарын үсэг:";
 const WAREHOUSE_PREPARE_CAT_ROW_HEIGHT = 21.95;
-/** «Урамшууллын бараа» — category 9pt-аас илт том (16pt / xf 31). */
+/** «Урамшууллын бараа» — category 9pt-аас илт том (18pt title font / xf 31). */
 const WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT = 30;
 const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 5;
 const WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT = 36;
