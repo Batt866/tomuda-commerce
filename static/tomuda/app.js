@@ -9708,11 +9708,11 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
   border: 0.4pt solid #666 !important;
-  padding: 1px 3px;
+  padding: 3px 5px;
   vertical-align: middle;
   background: #fff;
   color: ${RECEIPT_TEXT};
-  line-height: 1.12;
+  line-height: 1.25;
   font-size: 9pt;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
@@ -9720,11 +9720,11 @@ td, th { border: none; }
   font-weight: 700;
   font-size: 9pt;
   text-align: center;
-  padding: 2px 3px;
+  padding: 4px 5px;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: right;
-  padding: 1px 2px;
+  padding: 3px 4px;
   font-size: 9pt;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
@@ -9749,9 +9749,10 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__promo > td {
   border: none !important;
   border-bottom: 0.4pt solid #666 !important;
-  padding: 2px 4px;
+  padding: 5px 6px;
   vertical-align: middle;
   font-size: 9pt;
+  line-height: 1.3;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
 }
@@ -9769,7 +9770,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--promo-gap > td {
   border: none !important;
-  height: 8px;
+  height: 4mm;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -9784,11 +9785,13 @@ td, th { border: none; }
   font-size: 9pt;
   white-space: nowrap;
   text-align: right;
+  padding-right: 8px !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-name {
   font-weight: 400;
   font-size: 9pt;
   text-align: left;
+  padding-left: 6px !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9pt; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
