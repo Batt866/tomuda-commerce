@@ -20115,7 +20115,7 @@ const WAREHOUSE_PREPARE_SIGN_HANDED_NAME = "Хүлээлгэн өгсөн ажи
 const WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME = "Хүлээн авсан ажилтны нэр:";
 const WAREHOUSE_PREPARE_SIGN_MARK_LABEL = "гарын үсэг:";
 const WAREHOUSE_PREPARE_CAT_ROW_HEIGHT = 21.95;
-/** «Урамшууллын бараа» — category 9pt-аас илт том (18pt title font / xf 31). */
+/** «Урамшууллын бараа» — 18pt title font; taller than category 11pt. */
 const WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT = 30;
 const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 5;
 const WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT = 36;
@@ -20130,6 +20130,9 @@ const WAREHOUSE_PREPARE_COL_WIDTHS = [
 const WAREHOUSE_PREPARE_UNIT_WRAP_STYLE = 28;
 const WAREHOUSE_PREPARE_BARCODE_CENTER_STYLE = 29;
 const WAREHOUSE_PREPARE_UNIT_BODY_STYLE = 30;
+/** Template fontId 4 = 18pt Roboto bold (fontId 3 is 8pt Arial). */
+const WAREHOUSE_PREPARE_PROMO_HEAD_XF =
+  '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="0"/></xf>';
 const WAREHOUSE_PREPARE_PROMO_HEAD_STYLE = 31;
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
@@ -20530,10 +20533,9 @@ function warehousePreparePatchStylesXml(
   if (!out.includes(unitWrapXf)) appendXfs.push(unitWrapXf);
   if (!out.includes(barcodeCenterXf)) appendXfs.push(barcodeCenterXf);
   if (!out.includes(unitBodyXf)) appendXfs.push(unitBodyXf);
-  // Title fontId 3 is 18pt bold — unique xf (shrinkToFit=0) so this is always xf 31.
-  const promoHeadXf =
-    '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="0"/></xf>';
-  if (!out.includes(promoHeadXf)) appendXfs.push(promoHeadXf);
+  // Template fontId 3 = 8pt Arial (tiny). Title is fontId 4 = 18pt Roboto bold.
+  if (!out.includes(WAREHOUSE_PREPARE_PROMO_HEAD_XF))
+    appendXfs.push(WAREHOUSE_PREPARE_PROMO_HEAD_XF);
   if (appendXfs.length) {
     out = out.replace(
       /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
@@ -20877,7 +20879,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 700; height: 22px; padding: 4px 0; white-space: nowrap; border: none !important; background: none !important; }
 .cat-gap td { height: 6px; border: none !important; background: none !important; }
-.promo-head { border: none !important; font-size: 18px; font-weight: 800; height: 32px; padding: 6px 0; }
+.promo-head { border: none !important; font-size: 22px; font-weight: 800; height: 36px; padding: 8px 0; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
