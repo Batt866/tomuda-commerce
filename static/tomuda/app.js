@@ -731,7 +731,7 @@ function receiptPaymentTermDisplay(o) {
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title-gap"><td colspan="11"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -9641,7 +9641,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
 }
 /* B+C fits «Худалдааны төлөөлөгчийн утас:»; C stays modest for IBAN */
-.receipt-grid__a { width: 3.6%; } .receipt-grid__b { width: 17.5%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 14.5%; }
+.receipt-grid__a { width: 16mm; } .receipt-grid__b { width: 15%; } .receipt-grid__c { width: 9.5%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 14.5%; }
 .receipt-grid__f { width: 10.8%; } .receipt-grid__g { width: 6.7%; } .receipt-grid__h { width: 5.8%; } .receipt-grid__i { width: 4.5%; } .receipt-grid__j { width: 11.1%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -9678,11 +9678,14 @@ td, th { border: none; }
   font-weight: 700 !important;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
-  vertical-align: middle;
-  padding: 0 !important;
-  overflow: visible;
+  vertical-align: top;
+  padding: 1mm 1mm 0 0 !important;
+  overflow: hidden;
+  width: 16mm;
+  min-width: 16mm;
+  max-width: 16mm;
   position: relative;
-  z-index: 2;
+  z-index: 1;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
   width: 14mm !important;
@@ -9692,6 +9695,7 @@ td, th { border: none; }
   min-height: 14mm !important;
   max-height: 14mm !important;
   display: block;
+  object-fit: contain;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
@@ -10243,14 +10247,21 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 11px;
   font-weight: 700;
-  padding: 0 0 0 6mm !important;
+  padding: 0 0 0 2mm !important;
   margin: 0;
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
   text-align: left;
 }
+.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 7mm; }
+.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 9mm; }
+.receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
+  height: 5mm;
+  padding: 0 !important;
+  border: none !important;
+}
 .receipt-grid__header--r2 .receipt-grid__address {
-  padding-left: 6mm !important;
+  padding-left: 2mm !important;
 }
 .receipt-grid__address,
 .receipt-grid__phone {
@@ -10291,7 +10302,7 @@ tbody.receipt-footer-keep {
   line-height: 1.35;
   box-sizing: border-box;
 }
-.receipt-grid__header--title td { padding-top: 8px !important; padding-bottom: 8px !important; height: 30px; }
+.receipt-grid__header--title td { padding-top: 2px !important; padding-bottom: 8px !important; height: 30px; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
 .receipt-grid__meta td { font-size: 9px; line-height: 1.15; padding: 1px 2px !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
@@ -10460,6 +10471,18 @@ tbody.receipt-footer-keep {
   .receipt-grid { max-width: none; font-size: 9px; }
   .receipt-title { font-size: 14px; }
   .receipt-grid__brand { font-size: 11px; }
+  .receipt-grid--sheet .receipt-grid__logo-cell {
+    overflow: hidden !important;
+    width: 16mm !important;
+  }
+  .receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
+    height: 5mm !important;
+  }
+  .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand,
+  .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
+    color: ${RECEIPT_TEXT} !important;
+    background: ${RECEIPT_GRAND_BG} !important;
+  }
   .receipt-items,
   .receipt-items__row,
   .receipt-grid__summary--grand,
