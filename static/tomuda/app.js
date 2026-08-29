@@ -20076,7 +20076,7 @@ const WAREHOUSE_PREPARE_SIGN_HANDED_NAME = "Хүлээлгэн өгсөн ажи
 const WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME = "Хүлээн авсан ажилтны нэр:";
 const WAREHOUSE_PREPARE_SIGN_MARK_LABEL = "гарын үсэг:";
 const WAREHOUSE_PREPARE_CAT_ROW_HEIGHT = 21.95;
-const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 9.95;
+const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 5;
 const WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT = 36;
 const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 24;
 /**
@@ -20089,6 +20089,7 @@ const WAREHOUSE_PREPARE_COL_WIDTHS = [
 const WAREHOUSE_PREPARE_UNIT_WRAP_STYLE = 28;
 const WAREHOUSE_PREPARE_BARCODE_CENTER_STYLE = 29;
 const WAREHOUSE_PREPARE_UNIT_BODY_STYLE = 30;
+const WAREHOUSE_PREPARE_PROMO_HEAD_STYLE = 31;
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
 /** Том/х · Жижиг/х · Тоо/ш — each column is header then cell (light → dark). */
@@ -20113,6 +20114,7 @@ const WAREHOUSE_PREPARE_SHEET_STYLES = {
   barcode: WAREHOUSE_PREPARE_BARCODE_CENTER_STYLE,
   text: WAREHOUSE_PREPARE_TEXT_CELL_STYLE,
   category: 15,
+  promo: WAREHOUSE_PREPARE_PROMO_HEAD_STYLE,
   stock: 10,
   qtyLargeHead: WAREHOUSE_PREPARE_LARGE_HEAD_STYLE,
   qtySmallHead: WAREHOUSE_PREPARE_SMALL_HEAD_STYLE,
@@ -20487,6 +20489,14 @@ function warehousePreparePatchStylesXml(
   if (!out.includes(unitWrapXf)) appendXfs.push(unitWrapXf);
   if (!out.includes(barcodeCenterXf)) appendXfs.push(barcodeCenterXf);
   if (!out.includes(unitBodyXf)) appendXfs.push(unitBodyXf);
+  const promoFont =
+    '<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>';
+  if (!out.includes('sz val="14"/><color rgb="FF000000"/><name val="Arial"/><family val="2"/></font>')) {
+    out = xlsxStylesAppendPart(out, "fonts", [promoFont]);
+  }
+  const promoFontId = Math.max(0, xlsxStylesCountPart(out, "fonts") - 1);
+  const promoHeadXf = `<xf numFmtId="0" fontId="${promoFontId}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`;
+  if (!out.includes(promoHeadXf)) appendXfs.push(promoHeadXf);
   if (appendXfs.length) {
     out = out.replace(
       /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
@@ -20641,13 +20651,17 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
   const qtyLarge = WAREHOUSE_PREPARE_LARGE_CELL_STYLE;
   const qtySmall = WAREHOUSE_PREPARE_SMALL_CELL_STYLE;
   const qtyPiece = WAREHOUSE_PREPARE_PIECE_CELL_STYLE;
-  const pushPrepareGroups = (groups) => {
+  const pushPrepareGroups = (groups, skipFirstGap = false) => {
+    let firstCat = true;
     for (const item of groups) {
       if (item.type === "cat") {
-        pushRow(
-          WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
-          emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
-        );
+        if (!(skipFirstGap && firstCat)) {
+          pushRow(
+            WAREHOUSE_PREPARE_CAT_GAP_HEIGHT,
+            emptyCells(rowNum, "A", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
+          );
+        }
+        firstCat = false;
         const r = rowNum;
         merges.push(`A${r}:${WAREHOUSE_PREPARE_LAST_COL}${r}`);
         pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
@@ -20685,11 +20699,16 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
-      xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
+    pushRow(26, [
+      xlsxCellXml(
+        `A${promoHeadRow}`,
+        s.promo ?? WAREHOUSE_PREPARE_PROMO_HEAD_STYLE,
+        si(PROMO_PRODUCT_LABEL),
+        "s",
+      ),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
-    pushPrepareGroups(sections.promo);
+    pushPrepareGroups(sections.promo, true);
   }
   pushRow(
     WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT,
@@ -20778,11 +20797,15 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
         )
         .join("")
     : `<tr><td class="meta-label" colspan="2">Захиалга авсан ажилтан: -</td><td colspan="4" style="border:none"></td><td class="date-label" colspan="4">Хэвлэсэн огноо: ${h(printedDateValue)}</td></tr>`;
-  const renderGroupRows = (groups) =>
+  const renderGroupRows = (groups, skipFirstCatGap = false) =>
     groups
-      .map((item) => {
+      .map((item, index) => {
         if (item.type === "cat") {
-          return `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat">${h(item.name)}</td></tr>`;
+          const gap =
+            skipFirstCatGap && index === 0
+              ? ""
+              : `<tr class="cat-gap"><td colspan="10"></td></tr>`;
+          return `${gap}<tr><td colspan="10" class="cat">${h(item.name)}</td></tr>`;
         }
         const p = item.product;
         const parts = warehousePreparePrintParts(item, p);
@@ -20790,7 +20813,7 @@ function exportWarehousePrepareExcelFallback(orders, workerIds) {
       })
       .join("");
   const promoRows = sections.promo.length
-    ? `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo)}`
+    ? `<tr class="cat-gap"><td colspan="10"></td></tr><tr><td colspan="10" class="cat promo-head">${PROMO_PRODUCT_LABEL}</td></tr>${renderGroupRows(sections.promo, true)}`
     : "";
   const html = `<!doctype html><!-- tomuda-stock-xls-v680 --><html><head><meta charset="utf-8"><style>
 @page { size: A4 portrait; margin: 10mm 7mm; }
@@ -20820,9 +20843,9 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-large { background: #f2f2f2; white-space: nowrap; }
 .head th.qty-small { background: #d9d9d9; white-space: nowrap; }
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
-.cat { text-align: center; font-weight: 800; height: 24px; padding: 8px 0; white-space: nowrap; border: none !important; background: none !important; }
-.cat-gap td { height: 10px; border: none !important; background: none !important; }
-.promo-head { border: none !important; }
+.cat { text-align: center; font-weight: 700; height: 22px; padding: 4px 0; white-space: nowrap; border: none !important; background: none !important; }
+.cat-gap td { height: 6px; border: none !important; background: none !important; }
+.promo-head { border: none !important; font-weight: 800; font-size: 14px; height: 26px; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
