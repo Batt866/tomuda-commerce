@@ -674,6 +674,139 @@ textarea.text-sm,
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><polygon points='1,2 9,2 5,8' fill='%23000000'/></svg>");
 }
 
+.store-rating-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  padding: 10px 8px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hex-muted-foreground);
+  direction: ltr;
+}
+
+.store-rating-legend__bar {
+  flex: 1 1 88px;
+  min-width: 72px;
+  max-width: 180px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16a34a 0%, #eab308 52%, #111 100%);
+}
+
+.store-rating-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.store-rating-legend__dot--good {
+  background: #16a34a;
+}
+
+.store-rating-legend__dot--bad {
+  background: #111;
+}
+
+.store-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 220px;
+  direction: ltr;
+}
+
+.store-rating__bar {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16a34a 0%, #eab308 52%, #111 100%);
+}
+
+.store-rating__input {
+  position: absolute;
+  inset: -8px 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.store-rating__input:disabled {
+  cursor: default;
+}
+
+.store-rating__marker {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #0f766e;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.store-rating__value {
+  flex-shrink: 0;
+  min-width: 2.4em;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--hex-foreground);
+}
+
+.perm-role-presets {
+  padding: 12px 14px;
+  border: 1px solid var(--hex-border);
+  border-radius: 12px;
+  background: var(--hex-card);
+}
+
+.perm-role-presets__label {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--hex-muted-foreground);
+}
+
+.perm-role-presets__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.perm-role-presets__btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--hex-border);
+  background: var(--hex-secondary);
+  color: var(--hex-foreground);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.perm-role-presets__hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--hex-muted-foreground);
+}
+
 .customer-list__head {
   display: none;
 }
@@ -718,19 +851,21 @@ textarea.text-sm,
 
 .customer-card__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
   grid-area: head;
 }
 
 .customer-card__avatar-img {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  background: transparent;
+  background: #fff;
   border: none;
   box-shadow: none;
-  border-radius: 0;
+  border-radius: 10px;
+  width: 44px;
+  height: 56px;
 }
 
 .customer-image-upload {
@@ -1334,17 +1469,19 @@ textarea.text-sm,
 
 .customer-card__avatar {
   flex-shrink: 0;
-  width: var(--avatar-lg);
-  height: var(--avatar-lg);
-  border-radius: 0;
+  width: 44px;
+  height: 56px;
+  min-width: 44px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: var(--hex-primary);
   color: var(--hex-primary-foreground);
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 800;
-  border: none;
+  border: 1px solid var(--hex-border);
   box-shadow: none;
+  overflow: hidden;
 }
 
 .employee-card__avatar-img {
@@ -1950,9 +2087,9 @@ img.worker-pick-card__avatar {
 
 .list-panel--customers .customer-card__avatar,
 .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-  width: 52px;
-  height: 52px;
-  min-width: 52px;
+  width: 44px;
+  height: 56px;
+  min-width: 44px;
   border-radius: 10px;
   border: 1px solid var(--hex-border);
   background: #fff;
@@ -1963,7 +2100,7 @@ img.worker-pick-card__avatar {
 }
 
 .list-panel--customers .customer-card__avatar-img {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   background: #fff;
 }
@@ -3613,9 +3750,9 @@ img[data-product-img],
 
   .list-panel--customers .customer-card__avatar,
   .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
+    width: 48px;
+    height: 64px;
+    min-width: 48px;
     border-radius: 10px;
     border: 1px solid var(--hex-border);
     background: #fff;

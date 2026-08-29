@@ -17,6 +17,7 @@ PERM_ACTIONS: list[dict[str, str]] = [
     {"id": "create", "label": "Нэмэх"},
     {"id": "edit", "label": "Засах"},
     {"id": "delete", "label": "Устгах"},
+    {"id": "rate", "label": "Үнэлгээ"},
 ]
 
 CRUD: list[str] = ["view", "create", "edit", "delete"]
@@ -26,7 +27,7 @@ PERM_GROUPS: list[dict[str, Any]] = [
         "id": "general",
         "label": "Ерөнхий эрх",
         "modules": [
-            {"id": "customers", "label": "Харилцагч", "actions": CRUD},
+            {"id": "customers", "label": "Харилцагч", "actions": CRUD + ["rate"]},
             {"id": "products", "label": "Бараа", "actions": CRUD},
             {"id": "warehouse", "label": "Агуулах", "actions": CRUD},
             {"id": "employees", "label": "Ажилтан", "actions": CRUD},
@@ -100,6 +101,7 @@ ACTION_LABELS: dict[str, str] = {
     "create": "нэмэх",
     "edit": "засах",
     "delete": "устгах",
+    "rate": "үнэлгээ",
     "markDelivered": "хүргэлт тэмдэглэх",
     "confirmDelivery": "хүргэлт баталгаажуулах",
 }
@@ -240,6 +242,7 @@ PERMISSION_FALLBACKS: dict[str, list[str]] = {
         "customerAdd.edit",
         "customerAdd.create",
     ],
+    "customers.rate": ["customers.edit"],
     "products.create": ["productAdd.create", "productAdd.view"],
     "employees.create": ["employeeAdd.create", "employeeAdd.view"],
     "dashboard.view": ["settings.view", "permissions.view"],
@@ -281,6 +284,8 @@ def expand_legacy_permissions(raw: list[str]) -> list[str]:
         _add_crud(keys, "receipts")
     if "customers.create" in keys:
         _add_crud(keys, "customerAdd")
+    if "customers.edit" in keys and "customers.rate" in ALL_PERMISSION_KEY_SET:
+        keys.add("customers.rate")
     if "products.create" in keys:
         _add_crud(keys, "productAdd")
         _add_crud(keys, "categoryAdd")
@@ -314,6 +319,7 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "customers.view",
         "customers.create",
         "customers.edit",
+        "customers.rate",
         "customerAdd.view",
         "customerAdd.create",
         "products.view",
@@ -343,6 +349,31 @@ ROLE_TEMPLATES: dict[str, list[str]] = {
         "productCost.view",
     ],
     "delivery": ["orders.view", "orderDeliveryMark.view"],
+    "manager": [
+        "dashboard.view",
+        "orders.view",
+        "orders.create",
+        "orders.edit",
+        "customers.view",
+        "customers.create",
+        "customers.edit",
+        "customers.rate",
+        "customerAdd.view",
+        "customerAdd.create",
+        "products.view",
+        "warehouse.view",
+        "receipts.view",
+        "reports.view",
+        "excelExport.view",
+        "excelExport.create",
+        "employees.view",
+    ],
+    "user": [
+        "orders.view",
+        "customers.view",
+        "customers.rate",
+        "products.view",
+    ],
 }
 
 

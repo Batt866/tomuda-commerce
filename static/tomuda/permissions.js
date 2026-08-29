@@ -7,6 +7,7 @@
     { id: "create", label: "Нэмэх" },
     { id: "edit", label: "Засах" },
     { id: "delete", label: "Устгах" },
+    { id: "rate", label: "Үнэлгээ" },
   ];
 
   const CRUD = ["view", "create", "edit", "delete"];
@@ -16,7 +17,7 @@
       id: "general",
       label: "Ерөнхий эрх",
       modules: [
-        { id: "customers", label: "Харилцагч", actions: CRUD },
+        { id: "customers", label: "Харилцагч", actions: [...CRUD, "rate"] },
         { id: "products", label: "Бараа", actions: CRUD },
         { id: "warehouse", label: "Агуулах", actions: CRUD },
         { id: "employees", label: "Ажилтан", actions: CRUD },
@@ -91,6 +92,7 @@
     create: "нэмэх",
     edit: "засах",
     delete: "устгах",
+    rate: "үнэлгээ",
     markDelivered: "хүргэлт тэмдэглэх",
     confirmDelivery: "хүргэлт баталгаажуулах",
   };
@@ -223,6 +225,7 @@
       "customerAdd.edit",
       "customerAdd.create",
     ],
+    "customers.rate": ["customers.edit"],
     "products.create": ["productAdd.create", "productAdd.view"],
     "employees.create": ["employeeAdd.create", "employeeAdd.view"],
     "dashboard.view": ["settings.view", "permissions.view"],
@@ -258,6 +261,9 @@
     }
     if (set.has("warehouse.view") || set.has("warehouse.edit")) addCrud("receipts");
     if (set.has("customers.create")) addCrud("customerAdd");
+    if (set.has("customers.edit") && ALL_KEY_SET.has("customers.rate")) {
+      set.add("customers.rate");
+    }
     if (set.has("products.create")) {
       addCrud("productAdd");
       addCrud("categoryAdd");
@@ -294,6 +300,7 @@
       "customers.view",
       "customers.create",
       "customers.edit",
+      "customers.rate",
       "customerAdd.view",
       "customerAdd.create",
       "products.view",
@@ -323,6 +330,31 @@
       "productCost.view",
     ],
     delivery: ["orders.view", "orderDeliveryMark.view"],
+    manager: [
+      "dashboard.view",
+      "orders.view",
+      "orders.create",
+      "orders.edit",
+      "customers.view",
+      "customers.create",
+      "customers.edit",
+      "customers.rate",
+      "customerAdd.view",
+      "customerAdd.create",
+      "products.view",
+      "warehouse.view",
+      "receipts.view",
+      "reports.view",
+      "excelExport.view",
+      "excelExport.create",
+      "employees.view",
+    ],
+    user: [
+      "orders.view",
+      "customers.view",
+      "customers.rate",
+      "products.view",
+    ],
   };
 
   const VIEW_PERMISSION = {
@@ -594,7 +626,7 @@
         .join("");
       return `<section class="perm-group" data-perm-group="${esc(group.id)}"><h3 class="perm-group__title">${esc(group.label)}</h3><div class="perm-matrix-wrap"><div class="perm-matrix"><div class="perm-matrix__row perm-matrix__row--head" aria-hidden="true"><span class="perm-matrix__module">Эрх</span>${headCells}</div>${rows}</div></div></section>`;
     }).join("");
-    return `<section class="perm-panel"${formAttr}><div class="perm-panel__head"><div><p class="perm-panel__title">Эрх</p><p class="perm-panel__hint">Ерөнхий, дотоод, системийн эрхүүдийг харах / нэмэх / засах / устгах-аар сонгоно.</p></div>${resetBtn}</div>${groupsHtml}</section>`;
+    return `<section class="perm-panel"${formAttr}><div class="perm-panel__head"><div><p class="perm-panel__title">Эрх</p><p class="perm-panel__hint">Ерөнхий, дотоод, системийн эрхүүдийг харах / нэмэх / засах / устгах / үнэлгээ-ээр сонгоно. Дээрх албан тушаалын загвараар хурдан бөглөнө.</p></div>${resetBtn}</div>${groupsHtml}</section>`;
   }
 
   function templateForRole(role) {

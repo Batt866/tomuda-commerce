@@ -217,15 +217,25 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
             -1,
         )
         if existing_idx >= 0:
-            if not (
+            can_edit = (
                 has_permission(employee, "customers.edit")
                 or has_permission(employee, "customers.create")
                 or has_permission(employee, "customerAdd.edit")
                 or has_permission(employee, "customerAdd.create")
-            ):
+            )
+            can_rate = has_permission(employee, "customers.rate")
+            if not can_edit and not can_rate:
                 raise HttpError(403, "Харилцагч засах эрхгүй")
             previous = customers[existing_idx]
-            merged_customer = {**previous, **customer}
+            if can_edit:
+                merged_customer = {**previous, **customer}
+            else:
+                merged_customer = dict(previous)
+                if "storeRating" in customer:
+                    merged_customer["storeRating"] = customer.get("storeRating")
+                if "payMark" in customer:
+                    merged_customer["payMark"] = customer.get("payMark")
+                merged_customer["updatedAt"] = customer.get("updatedAt")
             if not merged_customer.get("image") and previous.get("image"):
                 merged_customer["image"] = previous["image"]
             cid = str(previous.get("id") or customer_id)
