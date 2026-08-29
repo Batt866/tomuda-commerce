@@ -731,7 +731,7 @@ function receiptPaymentTermDisplay(o) {
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"><img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title-gap"><td colspan="11"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" class="receipt-grid__logo-cell"></td><td colspan="5" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td colspan="3"></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="8" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title-gap"><td colspan="11"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td colspan="10" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -1124,7 +1124,11 @@ function receiptSheetHtml(o, logoSrc, opts = {}) {
     }),
     receiptFooterRows(o, { footerMode, pushDown: opts.pushDown }),
   ].join("");
-  return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${rows}</table>`;
+  const overlay =
+    withHeader && logoSrc
+      ? `<img src="${esc(logoSrc)}" alt="ТОМУДА" class="receipt-logo receipt-logo--overlay">`
+      : "";
+  return `${overlay}<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${rows}</table>`;
 }
 function receiptPageHtml(o, logoSrc) {
   return receiptSheetHtml(o, logoSrc);
@@ -9616,6 +9620,7 @@ td, th { border: none; }
 .receipt-excel-sheet { display: block; background: #fff; color: ${RECEIPT_TEXT}; font-family: ${RECEIPT_FONT}; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page {
+  position: relative;
   width: 184mm;
   max-width: 184mm;
   margin: 0;
@@ -9628,6 +9633,22 @@ td, th { border: none; }
   background: #fff;
   color: ${RECEIPT_TEXT};
   overflow: visible;
+}
+.receipt-logo.receipt-logo--overlay {
+  position: absolute;
+  left: 0;
+  top: 4mm;
+  width: 14mm !important;
+  height: 14mm !important;
+  min-width: 14mm !important;
+  max-width: 14mm !important;
+  min-height: 14mm !important;
+  max-height: 14mm !important;
+  object-fit: contain;
+  display: block;
+  margin: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 .receipt-page--footer-only { display: flex; flex-direction: column; }
 .receipt-page--footer-only .receipt-grid--sheet { flex: 1 1 auto; height: 100%; }
@@ -9680,24 +9701,9 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: top;
   padding: 0 !important;
-  overflow: hidden;
+  overflow: visible;
   width: 6mm;
   min-width: 6mm;
-  position: relative;
-  z-index: 1;
-}
-.receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 14mm !important;
-  height: 14mm !important;
-  min-width: 14mm !important;
-  max-width: 14mm !important;
-  min-height: 14mm !important;
-  max-height: 14mm !important;
-  display: block;
-  object-fit: contain;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
@@ -10257,7 +10263,7 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 11px;
   font-weight: 700;
-  padding: 0 0 0 10mm !important;
+  padding: 0 0 0 16mm !important;
   margin: 0;
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
@@ -10271,7 +10277,7 @@ tbody.receipt-footer-keep {
   border: none !important;
 }
 .receipt-grid__header--r2 .receipt-grid__address {
-  padding-left: 10mm !important;
+  padding-left: 16mm !important;
 }
 .receipt-grid__address,
 .receipt-grid__phone {
@@ -10469,6 +10475,7 @@ tbody.receipt-footer-keep {
     print-color-adjust: exact !important;
   }
   .receipt-page {
+    position: relative;
     width: 184mm;
     max-width: 184mm;
     min-height: auto;
@@ -10478,18 +10485,22 @@ tbody.receipt-footer-keep {
     overflow: visible;
     font-size: 9px;
   }
+  .receipt-logo.receipt-logo--overlay {
+    top: 0;
+    width: 14mm !important;
+    height: 14mm !important;
+    min-width: 14mm !important;
+    max-width: 14mm !important;
+    min-height: 14mm !important;
+    max-height: 14mm !important;
+  }
   .receipt-grid { max-width: none; font-size: 9px; }
   .receipt-title { font-size: 14px; }
-  .receipt-grid__brand { font-size: 11px; }
+  .receipt-grid__brand { font-size: 11px; padding-left: 16mm !important; }
+  .receipt-grid__header--r2 .receipt-grid__address { padding-left: 16mm !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
-    overflow: hidden !important;
+    overflow: visible !important;
     width: 6mm !important;
-    position: relative;
-  }
-  .receipt-grid--sheet .receipt-grid__logo-cell .receipt-logo {
-    position: absolute;
-    left: 0;
-    top: 0;
   }
   .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
     border: none !important;
