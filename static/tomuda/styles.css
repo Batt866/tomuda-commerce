@@ -675,68 +675,43 @@ textarea.text-sm,
 }
 
 .store-rating-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px 8px;
-  padding: 10px 8px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--hex-muted-foreground);
-  direction: ltr;
-}
-
-.store-rating-legend__bar {
-  flex: 1 1 88px;
-  min-width: 72px;
-  max-width: 180px;
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #16a34a 0%, #eab308 52%, #111 100%);
-}
-
-.store-rating-legend__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.store-rating-legend__dot--good {
-  background: #16a34a;
-}
-
-.store-rating-legend__dot--bad {
-  background: #111;
+  display: none;
 }
 
 .store-rating {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  max-width: 220px;
+  align-items: stretch;
+  flex-shrink: 0;
+  width: 18px;
+  align-self: stretch;
+  margin: 0;
+  max-width: none;
   direction: ltr;
 }
 
 .store-rating__bar {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 10px;
+  width: 8px;
+  min-height: 56px;
+  height: 100%;
+  margin: 0 auto;
   border-radius: 999px;
-  background: linear-gradient(90deg, #16a34a 0%, #eab308 52%, #111 100%);
+  background: linear-gradient(180deg, #16a34a 0%, #eab308 52%, #111 100%);
 }
 
 .store-rating__input {
   position: absolute;
-  inset: -8px 0;
-  width: 100%;
+  inset: -4px -8px;
+  width: auto;
+  height: auto;
   margin: 0;
   opacity: 0;
   cursor: pointer;
   z-index: 2;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  appearance: slider-vertical;
+  -webkit-appearance: slider-vertical;
 }
 
 .store-rating__input:disabled {
@@ -745,26 +720,21 @@ textarea.text-sm,
 
 .store-rating__marker {
   position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin-left: -7px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
   border-radius: 50%;
   background: #fff;
   border: 2px solid #0f766e;
   box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
-  transform: translateY(-50%);
   pointer-events: none;
   z-index: 1;
 }
 
 .store-rating__value {
-  flex-shrink: 0;
-  min-width: 2.4em;
-  font-size: 11px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--hex-foreground);
+  display: none;
 }
 
 .perm-role-presets {
@@ -2086,7 +2056,9 @@ img.worker-pick-card__avatar {
 }
 
 .list-panel--customers .customer-card__avatar,
-.list-panel--customers .customer-card__avatar.customer-card__avatar-img {
+.list-panel--customers .customer-card__avatar.customer-card__avatar-img,
+.line-panel--customers .customer-card__avatar,
+.line-panel--customers .customer-card__avatar.customer-card__avatar-img {
   width: 44px;
   height: 56px;
   min-width: 44px;
@@ -2095,11 +2067,13 @@ img.worker-pick-card__avatar {
   background: #fff;
 }
 
-.list-panel--customers .customer-card__avatar {
+.list-panel--customers .customer-card__avatar,
+.line-panel--customers .customer-card__avatar {
   font-size: 18px;
 }
 
-.list-panel--customers .customer-card__avatar-img {
+.list-panel--customers .customer-card__avatar-img,
+.line-panel--customers .customer-card__avatar-img {
   object-fit: cover;
   object-position: center;
   background: #fff;
@@ -3748,8 +3722,15 @@ img[data-product-img],
     background: var(--hex-card);
   }
 
+  .list-panel--customers .store-rating__bar,
+  .line-panel--customers .store-rating__bar {
+    min-height: 64px;
+  }
+
   .list-panel--customers .customer-card__avatar,
-  .list-panel--customers .customer-card__avatar.customer-card__avatar-img {
+  .list-panel--customers .customer-card__avatar.customer-card__avatar-img,
+  .line-panel--customers .customer-card__avatar,
+  .line-panel--customers .customer-card__avatar.customer-card__avatar-img {
     width: 48px;
     height: 64px;
     min-width: 48px;
@@ -3758,7 +3739,8 @@ img[data-product-img],
     background: #fff;
   }
 
-  .list-panel--customers .customer-card__avatar {
+  .list-panel--customers .customer-card__avatar,
+  .line-panel--customers .customer-card__avatar {
     font-size: 18px;
   }
 

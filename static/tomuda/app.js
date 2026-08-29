@@ -3555,7 +3555,7 @@ function employeePermissionsView() {
   );
   const saveBtn = `<button type="button" onclick="saveGrantedPermissions()" class="btn btn--primary btn--sm shrink-0">Хадгалах</button>`;
   const pctHtml = permissionPercentDiscountFieldHtml(selectedEmployees);
-  const rolePresets = `<section class="perm-role-presets"><p class="perm-role-presets__label">Албан тушаал</p><div class="perm-role-presets__row"><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('admin')">Админ</button><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('manager')">Менежер</button><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('staff')">Ажилтан</button><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('user')">Хэрэглэгч</button></div><p class="perm-role-presets__hint">Загвар нь доорх эрхүүдийг бөглөнө. Хадгалахаасаа өмнө засна.</p></section>`;
+  const rolePresets = `<section class="perm-role-presets"><p class="perm-role-presets__label">Албан тушаал</p><div class="perm-role-presets__row"><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('manager')">Менежер</button><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('staff')">Ажилтан</button><button type="button" class="perm-role-presets__btn" onclick="applyPermissionRolePreset('user')">Хэрэглэгч</button></div><p class="perm-role-presets__hint">Загвар нь доорх эрхүүдийг бөглөнө. Хадгалахаасаа өмнө засна. Админы эрхийг энд засах шаардлагагүй.</p></section>`;
   return `<div class="space-y-4 perm-grant-page">${pageHead("Эрхийн тохиргоо", saveBtn)}<section class="perm-grant-employees"><p class="perm-grant-employees__label">Ажилтан сонгох</p>${permissionEmployeePickerHtml()}${selectedEmployees.length ? `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">${selectedEmployees.length} ажилтан сонгогдсон</p>` : `<p class="perm-grant-employees__meta text-xs text-muted-foreground mt-2">Нэг эсвэл олон ажилтан сонгоно уу</p>`}</section>${rolePresets}${pctHtml}${permHtml}</div>`;
 }
 const EMPLOYEE_EMAIL_DEFAULTS = {
@@ -12486,14 +12486,15 @@ function payMarkFromStoreRating(pct) {
   return "";
 }
 function storeRatingLegendHtml() {
-  return `<div class="store-rating-legend"><span>Сайн дэлгүүр</span><span aria-hidden="true">←</span><span class="store-rating-legend__dot store-rating-legend__dot--good" aria-hidden="true"></span><span class="store-rating-legend__bar" aria-hidden="true"></span><span class="store-rating-legend__dot store-rating-legend__dot--bad" aria-hidden="true"></span><span aria-hidden="true">→</span><span>Муу дэлгүүр</span></div>`;
+  return "";
 }
 function customerStoreRatingHtml(c) {
   if (!c?.id || !canViewStoreRating()) return "";
   const pct = customerStoreRating(c);
   const editable = canEditStoreRating();
   const label = storeRatingLabel(pct);
-  return `<div class="store-rating"><div class="store-rating__bar"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)} ${pct}%" oninput="this.nextElementSibling.style.left=this.value+'%';this.closest('.store-rating').querySelector('.store-rating__value').textContent=this.value+'%'" onchange="setCustomerStoreRating('${esc(c.id)}', this.value, event)"><span class="store-rating__marker" style="left:${pct}%"></span></div><span class="store-rating__value">${pct}%</span></div>`;
+  const top = `${100 - pct}%`;
+  return `<div class="store-rating store-rating--vertical"><div class="store-rating__bar"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" oninput="this.nextElementSibling.style.top=(100-Number(this.value))+'%'" onchange="setCustomerStoreRating('${esc(c.id)}', this.value, event)"><span class="store-rating__marker" style="top:${top}"></span></div></div>`;
 }
 function setCustomerStoreRating(id, value, event) {
   event?.preventDefault?.();
@@ -13064,7 +13065,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}${customerStoreRatingHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerStoreRatingHtml(c)}${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
@@ -13126,7 +13127,7 @@ function customersView() {
       hasPermission("customerAdd.view")
         ? pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer")
         : "";
-  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}${canViewStoreRating() ? storeRatingLegendHtml() : ""}<div class="customer-list">${customersListHtml()}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${customersListHtml()}</div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Мэдээлэл татах уу?") {
   confirmModal(title, message, {
