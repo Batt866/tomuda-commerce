@@ -20115,8 +20115,8 @@ const WAREHOUSE_PREPARE_SIGN_HANDED_NAME = "Хүлээлгэн өгсөн ажи
 const WAREHOUSE_PREPARE_SIGN_RECEIVED_NAME = "Хүлээн авсан ажилтны нэр:";
 const WAREHOUSE_PREPARE_SIGN_MARK_LABEL = "гарын үсэг:";
 const WAREHOUSE_PREPARE_CAT_ROW_HEIGHT = 21.95;
-/** «Урамшууллын бараа» — 18pt title font; taller than category 11pt. */
-const WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT = 30;
+/** «Урамшууллын бараа» — 14pt (ангилал 11pt, гарчиг 18pt). */
+const WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT = 24;
 const WAREHOUSE_PREPARE_CAT_GAP_HEIGHT = 5;
 const WAREHOUSE_PREPARE_SIGN_GAP_HEIGHT = 36;
 const WAREHOUSE_PREPARE_SIGN_ROW_HEIGHT = 24;
@@ -20130,9 +20130,11 @@ const WAREHOUSE_PREPARE_COL_WIDTHS = [
 const WAREHOUSE_PREPARE_UNIT_WRAP_STYLE = 28;
 const WAREHOUSE_PREPARE_BARCODE_CENTER_STYLE = 29;
 const WAREHOUSE_PREPARE_UNIT_BODY_STYLE = 30;
-/** Template fontId 4 = 18pt Roboto bold (fontId 3 is 8pt Arial). */
-const WAREHOUSE_PREPARE_PROMO_HEAD_XF =
-  '<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="0"/></xf>';
+/** 14pt Roboto bold — between category 11pt and title 18pt. Unique so includes() is stable. */
+const WAREHOUSE_PREPARE_PROMO_FONT =
+  '<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Roboto"/><family val="2"/><scheme val="none"/></font>';
+const WAREHOUSE_PREPARE_PROMO_FONT_MARK =
+  'sz val="14"/><color rgb="FF000000"/><name val="Roboto"/><family val="2"/><scheme val="none"/>';
 const WAREHOUSE_PREPARE_PROMO_HEAD_STYLE = 31;
 /** Style ids after warehousePreparePatchStylesXml (template starts with 19 xfs). */
 const WAREHOUSE_PREPARE_SIGN_LINE_STYLE = 19;
@@ -20533,9 +20535,15 @@ function warehousePreparePatchStylesXml(
   if (!out.includes(unitWrapXf)) appendXfs.push(unitWrapXf);
   if (!out.includes(barcodeCenterXf)) appendXfs.push(barcodeCenterXf);
   if (!out.includes(unitBodyXf)) appendXfs.push(unitBodyXf);
-  // Template fontId 3 = 8pt Arial (tiny). Title is fontId 4 = 18pt Roboto bold.
-  if (!out.includes(WAREHOUSE_PREPARE_PROMO_HEAD_XF))
-    appendXfs.push(WAREHOUSE_PREPARE_PROMO_HEAD_XF);
+  if (!out.includes(WAREHOUSE_PREPARE_PROMO_FONT_MARK)) {
+    out = xlsxStylesAppendPart(out, "fonts", [WAREHOUSE_PREPARE_PROMO_FONT]);
+  }
+  const promoFontId = Math.max(
+    0,
+    xlsxStylesCountPart(out, "fonts") - 1,
+  );
+  const promoHeadXf = `<xf numFmtId="0" fontId="${promoFontId}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="0"/></xf>`;
+  if (!out.includes(promoHeadXf)) appendXfs.push(promoHeadXf);
   if (appendXfs.length) {
     out = out.replace(
       /(<cellXfs count=")(\d+)(">)([\s\S]*?)(<\/cellXfs>)/,
@@ -20738,8 +20746,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
-      xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
+    pushRow(WAREHOUSE_PREPARE_PROMO_HEAD_ROW_HEIGHT, [
+      xlsxCellXml(`A${promoHeadRow}`, s.promo, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
     pushPrepareGroups(sections.promo, true);
@@ -20879,7 +20887,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 700; height: 22px; padding: 4px 0; white-space: nowrap; border: none !important; background: none !important; }
 .cat-gap td { height: 6px; border: none !important; background: none !important; }
-.promo-head { border: none !important; }
+.promo-head { border: none !important; font-size: 14px; font-weight: 700; height: 24px; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
