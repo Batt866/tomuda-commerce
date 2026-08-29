@@ -10263,7 +10263,7 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 11px;
   font-weight: 700;
-  padding: 0 0 0 16mm !important;
+  padding: 0 0 0 10mm !important;
   margin: 0;
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
@@ -10277,7 +10277,7 @@ tbody.receipt-footer-keep {
   border: none !important;
 }
 .receipt-grid__header--r2 .receipt-grid__address {
-  padding-left: 16mm !important;
+  padding-left: 10mm !important;
 }
 .receipt-grid__address,
 .receipt-grid__phone {
@@ -10496,8 +10496,8 @@ tbody.receipt-footer-keep {
   }
   .receipt-grid { max-width: none; font-size: 9px; }
   .receipt-title { font-size: 14px; }
-  .receipt-grid__brand { font-size: 11px; padding-left: 16mm !important; }
-  .receipt-grid__header--r2 .receipt-grid__address { padding-left: 16mm !important; }
+  .receipt-grid__brand { font-size: 11px; padding-left: 10mm !important; }
+  .receipt-grid__header--r2 .receipt-grid__address { padding-left: 10mm !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
     width: 6mm !important;
@@ -30679,7 +30679,12 @@ function printOrdersViaBrowser(orders) {
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument;
     const win = iframe.contentWindow;
+    const prevTitle = document.title;
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      document.title = prevTitle;
       iframe.remove();
     };
     if (!doc || !win) {
@@ -30689,6 +30694,8 @@ function printOrdersViaBrowser(orders) {
     doc.open();
     doc.write(html);
     doc.close();
+    document.title = " ";
+    doc.title = " ";
     const waitForImages = Promise.all(
       [...doc.images].map((img) =>
         img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
@@ -30699,7 +30706,6 @@ function printOrdersViaBrowser(orders) {
     setTimeout(() => {
       win.focus();
       win.print();
-      setTimeout(cleanup, 2000);
     }, 80);
   })();
 }
