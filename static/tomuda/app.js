@@ -30664,8 +30664,6 @@ function printOrdersViaBrowser(orders) {
     openBtPrinterSetup(null, orders[0]?.id);
     return;
   }
-  // Open about:blank in the click stack so Chrome headers do not show tomudagroup.mn.
-  const printWin = window.open("about:blank", "tomuda-receipt-print");
   void (async () => {
     const logoSrc =
       (await getReceiptExcelLogoDataUri().catch(() => "")) ||
@@ -30674,59 +30672,37 @@ function printOrdersViaBrowser(orders) {
       .map((o) => receiptExcelPage(orderReceiptSnapshot(o), logoSrc))
       .join("");
     const html = `<!DOCTYPE html><html class="receipt-a4-print"><head><meta charset="utf-8"><title> </title><style>${RECEIPT_EXCEL_STYLES}</style></head><body>${pages}</body></html>`;
-    const waitImages = (doc) =>
-      Promise.all(
-        [...doc.images].map((img) =>
-          img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
-        ),
-      );
-    const runPrint = async (doc, win, onDone) => {
-      if (!doc || !win) {
-        onDone();
-        return;
-      }
-      doc.open();
-      doc.write(html);
-      doc.close();
-      doc.title = " ";
-      win.addEventListener("afterprint", onDone, { once: true });
-      await waitImages(doc);
-      setTimeout(() => {
-        win.focus();
-        win.print();
-      }, 80);
-    };
-    if (printWin) {
-      let closed = false;
-      const closeWin = () => {
-        if (closed) return;
-        closed = true;
-        try {
-          printWin.close();
-        } catch {
-          /* ignore */
-        }
-      };
-      await runPrint(printWin.document, printWin, closeWin);
-      return;
-    }
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
-    iframe.src = "about:blank";
     iframe.style.cssText =
       "position:fixed;left:-100vw;top:0;width:210mm;height:297mm;border:0;visibility:hidden;background:#fff";
     document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    const win = iframe.contentWindow;
     let cleaned = false;
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
       iframe.remove();
     };
-    await new Promise((resolve) => {
-      iframe.onload = resolve;
-      setTimeout(resolve, 50);
-    });
-    await runPrint(iframe.contentDocument, iframe.contentWindow, cleanup);
+    if (!doc || !win) {
+      cleanup();
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    doc.title = " ";
+    const waitForImages = Promise.all(
+      [...doc.images].map((img) =>
+        img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
+      ),
+    );
+    win.addEventListener("afterprint", cleanup, { once: true });
+    await waitForImages;
+    setTimeout(() => {
+      win.print();
+    }, 80);
   })();
 }
 
