@@ -20699,13 +20699,8 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     merges.push(
       `A${promoHeadRow}:${WAREHOUSE_PREPARE_LAST_COL}${promoHeadRow}`,
     );
-    pushRow(26, [
-      xlsxCellXml(
-        `A${promoHeadRow}`,
-        s.promo ?? WAREHOUSE_PREPARE_PROMO_HEAD_STYLE,
-        si(PROMO_PRODUCT_LABEL),
-        "s",
-      ),
+    pushRow(WAREHOUSE_PREPARE_CAT_ROW_HEIGHT, [
+      xlsxCellXml(`A${promoHeadRow}`, s.category, si(PROMO_PRODUCT_LABEL), "s"),
       ...emptyCells(promoHeadRow, "B", WAREHOUSE_PREPARE_LAST_COL, s.spacer),
     ]);
     pushPrepareGroups(sections.promo, true);
@@ -20845,7 +20840,7 @@ table.prepare { width: 100%; border-collapse: collapse; table-layout: fixed; fon
 .head th.qty-piece { background: #bfbfbf; white-space: nowrap; }
 .cat { text-align: center; font-weight: 700; height: 22px; padding: 4px 0; white-space: nowrap; border: none !important; background: none !important; }
 .cat-gap td { height: 6px; border: none !important; background: none !important; }
-.promo-head { border: none !important; font-weight: 800; font-size: 14px; height: 26px; }
+.promo-head { border: none !important; }
 .barcode { mso-number-format:"\\@"; text-align: center; font-size: 11px; white-space: nowrap; }
 .num { text-align: center; font-weight: 700; white-space: nowrap; }
 .num.qty-large { background: #f2f2f2; }
