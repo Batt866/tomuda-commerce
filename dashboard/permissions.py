@@ -135,6 +135,13 @@ ALL_PERMISSION_KEYS: list[str] = [
     p["key"] for cat in PERMISSION_CATALOG for p in cat["permissions"]
 ]
 ALL_PERMISSION_KEY_SET: set[str] = set(ALL_PERMISSION_KEYS)
+VISIBLE_GRANT_KEYS: list[str] = [
+    permission_key(mod["id"], action)
+    for group in PERM_GROUPS
+    for mod in group["modules"]
+    for action in mod["actions"]
+    if permission_key(mod["id"], action) in ALL_PERMISSION_KEY_SET
+]
 
 PERMISSION_FALLBACKS: dict[str, list[str]] = {
     "count.view": ["warehouse.edit"],
@@ -383,12 +390,43 @@ def normalize_permissions(raw: Any) -> list[str]:
     return expand_legacy_permissions([k for k in raw if isinstance(k, str)])
 
 
+def complete_app_access(keys: set[str]) -> set[str]:
+    """Fill hidden catalog keys the grant UI cannot tick (orders/dashboard/settings)."""
+    if VISIBLE_GRANT_KEYS and all(k in keys for k in VISIBLE_GRANT_KEYS):
+        keys.update(ALL_PERMISSION_KEY_SET)
+        return keys
+    if "customers.view" in keys and "products.view" in keys:
+        keys.add("orders.view")
+        if (
+            "customers.create" in keys
+            or "customerAdd.create" in keys
+            or "customerAdd.view" in keys
+        ):
+            keys.add("orders.create")
+            keys.add("orders.edit")
+    if "orderDeliveryMark.view" in keys or "orderDeliveryConfirm.view" in keys:
+        keys.add("orders.view")
+        keys.add("orders.markDelivered")
+        keys.add("orders.confirmDelivery")
+    if keys & {
+        "promotions.view",
+        "stockAlert.view",
+        "percentDiscount.view",
+        "orderHistory.view",
+        "deletionLog.view",
+        "permissions.view",
+    }:
+        keys.add("dashboard.view")
+        keys.add("settings.view")
+    return keys
+
+
 def resolve_permissions(employee: dict[str, Any] | None) -> set[str]:
     if not employee:
         return set()
     custom = normalize_permissions(employee.get("permissions"))
     if custom:
-        return set(custom)
+        return complete_app_access(set(custom))
     role = str(employee.get("role") or "sales")
     return set(ROLE_TEMPLATES.get(role, ROLE_TEMPLATES["sales"]))
 

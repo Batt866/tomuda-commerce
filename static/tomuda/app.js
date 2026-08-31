@@ -1255,11 +1255,18 @@ function percentDiscountRate() {
 }
 function canApplyPercentDiscount(emp = state.currentEmployee) {
   if (!emp) return false;
-  if (emp.role === "admin") return percentDiscountRate() > 0;
-  if (emp.role !== "sales") return false;
+  if (percentDiscountRate() <= 0) return false;
   if (emp.allowPercentDiscount === false) return false;
-  if (emp.allowPercentDiscount == null) return percentDiscountRate() > 0;
-  return !!emp.allowPercentDiscount && percentDiscountRate() > 0;
+  if (emp.role === "admin") return true;
+  if (
+    hasPermission("percentDiscount.view", emp) ||
+    hasPermission("percentDiscount.create", emp)
+  ) {
+    return true;
+  }
+  if (emp.role !== "sales") return false;
+  if (emp.allowPercentDiscount == null) return true;
+  return !!emp.allowPercentDiscount;
 }
 function isCashPayment(term = state.paymentTerm) {
   return (term || "cash") === "cash";
@@ -3134,7 +3141,10 @@ function canEditCustomer() {
   );
 }
 function canSetEmployeePassword(emp = state.currentEmployee) {
-  return (emp?.role || currentRole()) === "admin";
+  return (
+    (emp?.role || currentRole()) === "admin" ||
+    hasPermission("employees.edit", emp)
+  );
 }
 function canManageEmployeePermissions(emp = state.currentEmployee) {
   return (
@@ -3947,7 +3957,12 @@ function bottomNavForRole(role) {
     ],
     delivery: [["delivery", "Хүргэлт"]],
   };
-  const items = specs[role] || specs.sales;
+  const fullAccess =
+    canAccessView("admin") &&
+    canAccessView("worker") &&
+    canAccessView("warehouse") &&
+    canAccessView("employees");
+  const items = fullAccess ? specs.admin : specs[role] || specs.sales;
   return items.filter(([id]) => {
     if (id === "warehouse") return canWh;
     if (id === "inventory") return canInv;

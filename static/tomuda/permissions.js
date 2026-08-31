@@ -117,6 +117,9 @@
 
   const ALL_KEYS = CATALOG.flatMap((c) => c.permissions.map((p) => p.key));
   const ALL_KEY_SET = new Set(ALL_KEYS);
+  const VISIBLE_GRANT_KEYS = PERM_GROUPS.flatMap((g) =>
+    g.modules.flatMap((m) => m.actions.map((a) => permissionKey(m.id, a))),
+  ).filter((k) => ALL_KEY_SET.has(k));
 
   /** If employee has any of these, treat requested key as granted (legacy + aliases). */
   const PERMISSION_FALLBACKS = {
@@ -403,10 +406,52 @@
     return templateForRole(emp.role || "sales");
   }
 
+  /** Hidden UI keys (orders/dashboard/settings) that grant form cannot tick. */
+  function completeAppAccess(set) {
+    if (
+      VISIBLE_GRANT_KEYS.length &&
+      VISIBLE_GRANT_KEYS.every((k) => set.has(k))
+    ) {
+      ALL_KEYS.forEach((k) => set.add(k));
+      return set;
+    }
+    if (set.has("customers.view") && set.has("products.view")) {
+      set.add("orders.view");
+      if (
+        set.has("customers.create") ||
+        set.has("customerAdd.create") ||
+        set.has("customerAdd.view")
+      ) {
+        set.add("orders.create");
+        set.add("orders.edit");
+      }
+    }
+    if (
+      set.has("orderDeliveryMark.view") ||
+      set.has("orderDeliveryConfirm.view")
+    ) {
+      set.add("orders.view");
+      set.add("orders.markDelivered");
+      set.add("orders.confirmDelivery");
+    }
+    if (
+      set.has("promotions.view") ||
+      set.has("stockAlert.view") ||
+      set.has("percentDiscount.view") ||
+      set.has("orderHistory.view") ||
+      set.has("deletionLog.view") ||
+      set.has("permissions.view")
+    ) {
+      set.add("dashboard.view");
+      set.add("settings.view");
+    }
+    return set;
+  }
+
   function resolveEmployeePermissions(emp) {
     if (!emp) return new Set();
     const custom = normalizeKeys(emp.permissions);
-    if (custom.length) return new Set(custom);
+    if (custom.length) return completeAppAccess(new Set(custom));
     const role = emp.role || "sales";
     return new Set(ROLE_TEMPLATES[role] || []);
   }
@@ -513,6 +558,7 @@
       set.add("dashboard.view");
     }
     ensureModuleViewDeps(set);
+    completeAppAccess(set);
     return [...set].filter((k) => ALL_KEY_SET.has(k));
   }
 
