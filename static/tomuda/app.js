@@ -13100,7 +13100,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c)}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
@@ -14636,7 +14636,7 @@ function workerPickCard(c) {
   const subHtml = line2
     ? `<span class="worker-pick-card__sub">${esc(line2)}</span>`
     : "";
-  return `<div class="worker-pick-card${active ? " is-selected" : ""}"><button type="button" class="worker-pick-card__main" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerAvatarHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span></button>${customerPayMarkHtml(c)}${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</div>`;
+  return `<div class="worker-pick-card${active ? " is-selected" : ""}"><button type="button" class="worker-pick-card__main" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}"><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span></button>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</div>`;
 }
 function focusSavedProduct(productId, productName, opts = {}) {
   const name = String(productName || "Бараа").trim() || "Бараа";
@@ -26569,7 +26569,7 @@ function workerStorePickRestHtml() {
     ? state.customers.find((c) => c.id === state.workerCustomer)
     : null;
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div><button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected)}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
   const listHtml = rows.length
     ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>`

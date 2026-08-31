@@ -1882,6 +1882,11 @@ a.customer-card__line .customer-card__icon {
   color: var(--hex-primary);
 }
 
+.worker-pick-selected .store-rating {
+  max-width: 100%;
+  margin: 4px 0 2px;
+}
+
 .worker-pick-selected__store .worker-order-store__name {
   font-size: 17px;
 }
