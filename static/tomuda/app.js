@@ -1974,7 +1974,7 @@ function customerEditReceivableSectionHtml(customerId) {
   const orders = customerUnpaidOrders(customerId);
   if (!orders.length) return "";
   const total = customerReceivableTotal(customerId);
-  const list = workerReceivableHtml(customerId, { withPayActions: true });
+  const list = workerReceivableHtml(customerId, { withPayActions: false });
   return `<div class="customer-edit-receivable rounded-lg border border-border bg-secondary/40 p-4 space-y-3" data-customer-receivable><div class="flex items-center justify-between gap-3"><div><p class="text-sm font-semibold m-0">Тооцоо</p><p class="text-xs text-muted-foreground m-0 mt-0.5">${orders.length} баримт · төлөөгүй</p></div><p class="text-base font-bold text-tone-danger m-0">${fmt(total)}</p></div>${list}</div>`;
 }
 function refreshCustomerEditReceivable(customerId) {
@@ -12508,13 +12508,17 @@ function payMarkFromStoreRating(pct) {
 function storeRatingLegendHtml() {
   return "";
 }
-function customerStoreRatingHtml(c) {
+function customerStoreRatingHtml(c, opts = {}) {
   if (!c?.id || !canViewStoreRating()) return "";
   const pct = customerStoreRating(c);
-  const editable = canEditStoreRating();
+  const readOnly = !!opts.readOnly || !canEditStoreRating();
   const label = storeRatingLabel(pct);
   const slider = storeRatingToSlider(pct);
-  return `<div class="store-rating" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" ${editable ? "" : "disabled "}aria-label="${esc(label)}" onwheel="event.preventDefault()" onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"></div>`;
+  const wide = opts.wide ? " store-rating--wide" : "";
+  const change = readOnly
+    ? ""
+    : ` onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"`;
+  return `<div class="store-rating${wide}${readOnly ? " store-rating--readonly" : ""}" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" ${readOnly ? "disabled " : ""}aria-label="${esc(label)}" tabindex="${readOnly ? "-1" : "0"}" onwheel="event.preventDefault()"${change}></div>`;
 }
 function askCustomerStoreRating(id, input, event) {
   event?.preventDefault?.();
@@ -13115,7 +13119,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c)}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c, { wide: true })}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
@@ -26584,7 +26588,7 @@ function workerStorePickRestHtml() {
     ? state.customers.find((c) => c.id === state.workerCustomer)
     : null;
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected)}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { readOnly: true, wide: true })}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
   const listHtml = rows.length
     ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>`
@@ -28235,7 +28239,7 @@ function customerModal(id, draft = null) {
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c, identityLocked)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${c.id && canViewStoreRating() ? `<div class="store-rating-field"><span class="block text-sm font-medium mb-2">Үнэлгээ</span>${customerStoreRatingHtml(c, { wide: true })}</div>` : ""}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c, identityLocked)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
