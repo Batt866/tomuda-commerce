@@ -28220,7 +28220,7 @@ function customerModal(id, draft = null) {
     : "";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c, identityLocked)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}${field("locationText", "Олж очих заавар (түгээгчид)", c.locationText || "", "text", "Жишээ: 12-р байрны 1 давхар, улаан хаалга")}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c, identityLocked)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -28393,7 +28393,6 @@ async function applyCustomerSave(data, id) {
   if (!name && company) data.name = company;
   else data.name = name;
   data.companyName = company;
-  data.locationText = String(data.locationText || "").trim();
   applyCustomerPhoneFields(
     data,
     Array.isArray(data.phones)
@@ -28418,7 +28417,9 @@ async function applyCustomerSave(data, id) {
     }
     const prevImage = storedEntityImage(existing);
     const prevPayMark = normalizeCustomerPayMark(existing.payMark);
+    const prevLocationText = existing.locationText;
     Object.assign(existing, data);
+    existing.locationText = prevLocationText;
     existing.payMark = Object.prototype.hasOwnProperty.call(data, "payMark")
       ? normalizeCustomerPayMark(data.payMark)
       : prevPayMark;
@@ -28435,6 +28436,7 @@ async function applyCustomerSave(data, id) {
     customer = existing;
   } else {
     customer = { ...data, id: newEntityId("c") };
+    delete customer.locationText;
     customer.payMark = normalizeCustomerPayMark(customer.payMark) || "good";
     customer.storeRating = Number.isFinite(Number(customer.storeRating))
       ? customerStoreRating(customer)
