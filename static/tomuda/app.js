@@ -12500,14 +12500,14 @@ function customerStoreRatingHtml(c, opts = {}) {
   const label = storeRatingLabel(pct);
   const slider = storeRatingToSlider(pct);
   if (opts.variant === "rail") {
-    return `<div class="store-rating store-rating--rail" style="--rating-pos:${slider}%" role="img" aria-label="${esc(label)}"></div>`;
+    return `<div class="store-rating store-rating--rail" style="--rating-pos:${slider}%" role="img" aria-label="${esc(label)}"><span class="store-rating__track"></span><span class="store-rating__ticks" aria-hidden="true"></span></div>`;
   }
   const readOnly = !!opts.readOnly || !canEditStoreRating();
   const wide = opts.wide ? " store-rating--wide" : "";
   const change = readOnly
     ? ""
     : ` onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"`;
-  return `<div class="store-rating${wide}${readOnly ? " store-rating--readonly" : ""}" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" ${readOnly ? "disabled " : ""}aria-label="${esc(label)}" tabindex="${readOnly ? "-1" : "0"}" onwheel="event.preventDefault()"${change}></div>`;
+  return `<div class="store-rating${wide}${readOnly ? " store-rating--readonly" : ""}" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" ${readOnly ? "disabled " : ""}aria-label="${esc(label)}" tabindex="${readOnly ? "-1" : "0"}" onwheel="event.preventDefault()"${change}><span class="store-rating__ticks" aria-hidden="true"></span></div>`;
 }
 function askCustomerStoreRating(id, input, event) {
   event?.preventDefault?.();
