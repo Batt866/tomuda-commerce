@@ -12511,9 +12511,12 @@ function storeRatingLegendHtml() {
 function customerStoreRatingHtml(c, opts = {}) {
   if (!c?.id || !canViewStoreRating()) return "";
   const pct = customerStoreRating(c);
-  const readOnly = !!opts.readOnly || !canEditStoreRating();
   const label = storeRatingLabel(pct);
   const slider = storeRatingToSlider(pct);
+  if (opts.variant === "rail") {
+    return `<div class="store-rating store-rating--rail" style="--rating-pos:${slider}%" role="img" aria-label="${esc(label)}"></div>`;
+  }
+  const readOnly = !!opts.readOnly || !canEditStoreRating();
   const wide = opts.wide ? " store-rating--wide" : "";
   const change = readOnly
     ? ""
@@ -13119,7 +13122,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c, { wide: true })}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}">${customerStoreRatingHtml(c, { variant: "rail" })}<header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
