@@ -700,18 +700,15 @@ textarea.text-sm,
 }
 
 .store-rating--rail {
-  grid-area: rate;
   position: relative;
-  width: 8px;
-  min-height: 76px;
-  height: 100%;
-  align-self: stretch;
-  justify-self: start;
-  margin: 0;
+  width: 100%;
+  height: 8px;
+  min-height: 8px;
+  margin: 8px 0 0;
   padding: 0;
   border-radius: 999px;
   background: linear-gradient(
-    180deg,
+    90deg,
     #1d4ed8 0%,
     #2563eb 12%,
     #eab308 50%,
@@ -724,15 +721,15 @@ textarea.text-sm,
 .store-rating--rail::after {
   content: "";
   position: absolute;
-  left: 50%;
-  top: var(--rating-pos, 50%);
-  width: 12px;
-  height: 7px;
+  top: 50%;
+  left: var(--rating-pos, 50%);
+  width: 10px;
+  height: 14px;
   transform: translate(-50%, -50%);
   background: #fff;
-  border: 1.5px solid var(--hex-primary);
-  border-radius: 2px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.22);
+  border: 2px solid var(--hex-primary);
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
 }
 
 .store-rating__input {
@@ -865,15 +862,15 @@ textarea.text-sm,
 
 .customer-card {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "rate head actions"
-    "rate addr actions";
+    "head actions"
+    "addr actions";
   gap: 6px 8px;
   align-items: start;
   flex-shrink: 0;
   min-height: auto;
-  padding: 10px 8px 10px 4px;
+  padding: 10px 8px 10px 0;
   border-radius: 0;
   border: none;
   border-bottom: 1px solid var(--hex-border);
@@ -2101,49 +2098,12 @@ img.worker-pick-card__avatar {
   line-height: 1;
 }
 
-.customer-pay-mark {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--hex-secondary);
-  color: var(--hex-muted-foreground);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.customer-pay-mark__icon {
-  width: 20px;
-  height: 20px;
-  display: block;
-}
-
-.customer-pay-mark--good {
-  color: #0f9d8e;
-  background: color-mix(in srgb, #0f9d8e 16%, transparent);
-}
-
-.customer-pay-mark--bad {
-  color: #b42318;
-  background: color-mix(in srgb, #b42318 16%, transparent);
-}
-
-.worker-order-store__name .customer-pay-mark {
-  width: 32px;
-  height: 32px;
-}
-
 .list-panel--customers {
   border-top: none;
 }
 
 .list-panel--customers .customer-card {
-  padding-left: 4px;
+  padding-left: 0;
 }
 
 .list-panel--customers .customer-card__avatar,
@@ -3787,7 +3747,7 @@ img[data-product-img],
 
   .customer-list__head {
     display: grid;
-    grid-template-columns: 10px minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) minmax(
         200px,
         auto
       );
@@ -3809,14 +3769,10 @@ img[data-product-img],
     text-align: right;
   }
 
-  .customer-list__head > :first-child {
-    grid-column: 2;
-  }
-
   .customer-card {
     display: grid;
-    grid-template-columns: 10px minmax(240px, 1.25fr) minmax(220px, 1.35fr) auto;
-    grid-template-areas: "rate head addr actions";
+    grid-template-columns: minmax(240px, 1.25fr) minmax(220px, 1.35fr) auto;
+    grid-template-areas: "head addr actions";
     gap: 10px 16px;
     align-items: start;
     min-height: auto;

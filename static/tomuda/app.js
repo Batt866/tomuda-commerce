@@ -12458,20 +12458,6 @@ function normalizeCustomerPayMark(value) {
   const s = String(value || "").trim();
   return s === "good" || s === "bad" ? s : "";
 }
-function customerPayMarkLabel(mark) {
-  if (mark === "good") return "Шууд төлдөг";
-  if (mark === "bad") return "Новшсон тооцоо";
-  return "Төлбөрийн тэмдэг";
-}
-function customerPayMarkIcon(mark) {
-  if (mark === "good") {
-    return `<svg class="customer-pay-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-6.7-4.2-9.5-8.4C.4 9.2 1.9 4.8 5.8 3.9 8 3.3 10.1 4.4 12 6.5c1.9-2.1 4-3.2 6.2-2.6 3.9.9 5.4 5.3 3.3 8.7C18.7 16.8 12 21 12 21z"/></svg>`;
-  }
-  if (mark === "bad") {
-    return `<svg class="customer-pay-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 1 21h22L12 2zm1 14h-2v2h2v-2zm0-7h-2v5h2V9z"/></svg>`;
-  }
-  return `<svg class="customer-pay-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
-}
 function canViewStoreRating() {
   return (
     hasPermission("customers.view") ||
@@ -12586,28 +12572,6 @@ function applyPermissionRolePreset(preset) {
   });
   api.syncAllPermissionRowDeps?.(root);
   if (window.state) window.state.permissionGrantDirty = true;
-}
-function customerPayMarkHtml(c) {
-  if (!c?.id) return "";
-  const mark = normalizeCustomerPayMark(c.payMark);
-  const label = customerPayMarkLabel(mark);
-  const cls = mark ? ` customer-pay-mark--${mark}` : "";
-  return `<button type="button" class="customer-pay-mark${cls}" onclick="cycleCustomerPayMark('${esc(c.id)}',event)" aria-label="${esc(label)}" title="${esc(label)}">${customerPayMarkIcon(mark)}</button>`;
-}
-function cycleCustomerPayMark(id, event) {
-  event?.preventDefault?.();
-  event?.stopPropagation?.();
-  const c = state.customers.find((x) => String(x.id) === String(id));
-  if (!c) return;
-  const cur = normalizeCustomerPayMark(c.payMark);
-  c.payMark = cur === "" ? "good" : cur === "good" ? "bad" : "";
-  c.storeRating = c.payMark === "good" ? 90 : c.payMark === "bad" ? 25 : 90;
-  c.updatedAt = new Date().toISOString();
-  render();
-  void upsertCustomerOnServer(c).catch((err) => {
-    console.warn("Pay mark save failed", err);
-  });
-  criticalBackendSave();
 }
 function customerImageField(c) {
   const preview = c.image || customerStoreImage(c);
@@ -12879,7 +12843,7 @@ function customerDetailHtml(c) {
     ),
     customerDetailRow("Байршил", mapsHtml, customerCardPinIcon()),
   ].join("");
-  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name"><span class="customer-detail__name-text">${esc(displayName)}</span>${customerPayMarkHtml(c)}</p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div>${customerHistorySectionHtml(c.id)}</div>`;
+  return `<div class="customer-detail"><header class="customer-detail__hero">${customerAvatarHtml(c, "customer-detail__avatar")}<div class="customer-detail__hero-text"><p class="customer-detail__name"><span class="customer-detail__name-text">${esc(displayName)}</span></p>${c.companyName && String(c.companyName).trim() !== displayName ? `<p class="customer-detail__company">${esc(c.companyName)}</p>` : ""}${rd ? `<span class="customer-detail__badge">РД ${esc(rd)}</span>` : ""}</div></header><div class="customer-detail__panel">${rows}${c.locationText ? `<p class="customer-detail__note">${esc(c.locationText)}</p>` : ""}</div>${customerHistorySectionHtml(c.id)}</div>`;
 }
 function customerSubtitle(c) {
   const name = String(c.name || "").trim();
@@ -13122,7 +13086,7 @@ function customerListHead() {
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}">${customerStoreRatingHtml(c, { variant: "rail" })}<header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p></div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c, { variant: "rail" })}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
@@ -26546,8 +26510,8 @@ function workerStoreSummary(c, compact = false) {
     ? `<span class="worker-order-store__loc">${esc(loc)}</span>`
     : "";
   if (compact)
-    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${customerPayMarkHtml(c)}${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
-  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${customerPayMarkHtml(c)}${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
+    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
 }
 function workerOrderAgentField() {
   ensureOrderEmployeeSelection();
@@ -26591,7 +26555,7 @@ function workerStorePickRestHtml() {
     ? state.customers.find((c) => c.id === state.workerCustomer)
     : null;
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { readOnly: true, wide: true })}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { variant: "rail" })}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
   const listHtml = rows.length
     ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>`
@@ -32875,7 +32839,6 @@ Object.assign(window, {
   centerCustomerMapOnUser,
   openDeviceLocationSettings,
   saveCustomer,
-  cycleCustomerPayMark,
   customerDetail,
   clearCustomerHistoryRange,
   setCustomerHistoryFrom,
