@@ -12454,6 +12454,11 @@ function customerAvatarHtml(c, className = "customer-card__avatar") {
   }
   return `<span class="${className}" aria-hidden="true">${initial}</span>`;
 }
+function customerPhotoHtml(c, className) {
+  const src = customerStoreImage(c);
+  const initial = esc(deliveryInitial(customerDisplayName(c)));
+  return `<img src="${esc(src)}" alt="" class="${className} customer-card__avatar-img" loading="lazy" decoding="async" onerror="this.outerHTML='<span class=\\'${className}\\' aria-hidden=\\'true\\'>${initial}</span>'">`;
+}
 function normalizeCustomerPayMark(value) {
   const s = String(value || "").trim();
   return s === "good" || s === "bad" ? s : "";
@@ -14629,7 +14634,7 @@ function workerPickCard(c) {
   const subHtml = line2
     ? `<span class="worker-pick-card__sub">${esc(line2)}</span>`
     : "";
-  return `<div class="worker-pick-card${active ? " is-selected" : ""}"><button type="button" class="worker-pick-card__main" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}"><span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span></button>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</div>`;
+  return `<div class="worker-pick-card${active ? " is-selected" : ""}"><button type="button" class="worker-pick-card__main" onclick="pickWorkerStore('${id}')" aria-pressed="${active ? "true" : "false"}">${customerPhotoHtml(c, "worker-pick-card__avatar")}<span class="worker-pick-card__text"><span class="worker-pick-card__name">${esc(customerDisplayName(c))}${loc ? `<span class="worker-pick-card__loc">${esc(loc)}</span>` : ""}</span>${subHtml}</span></button>${active ? `<span class="worker-pick-card__check" aria-hidden="true">✓</span>` : ""}</div>`;
 }
 function focusSavedProduct(productId, productName, opts = {}) {
   const name = String(productName || "Бараа").trim() || "Бараа";
@@ -26517,8 +26522,8 @@ function workerStoreSummary(c, compact = false) {
     ? `<span class="worker-order-store__loc">${esc(loc)}</span>`
     : "";
   if (compact)
-    return `<div class="worker-order-store"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div>`;
-  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div>`;
+    return `<div class="worker-order-store">${customerPhotoHtml(c, "worker-order-store__avatar")}<div class="worker-order-store__body"><p class="worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p class="worker-order-store__reg"><span class="worker-order-store__reg-label">Регистр</span> ${esc(reg)}</p></div></div>`;
+  return `<div class="rounded bg-primary/10 p-3 text-sm space-y-0.5 worker-order-store">${customerPhotoHtml(c, "worker-order-store__avatar")}<div class="worker-order-store__body"><p class="font-semibold worker-order-store__name"><span class="worker-order-store__name-text">${esc(customerDisplayName(c))}</span>${locHtml}</p><p><span class="text-muted-foreground">Регистр:</span> ${esc(reg)}</p><p class="text-xs text-muted-foreground worker-store-extra truncate">${esc(addr || "")}</p></div></div>`;
 }
 function workerOrderAgentField() {
   ensureOrderEmployeeSelection();
