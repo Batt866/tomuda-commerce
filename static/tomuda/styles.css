@@ -706,9 +706,9 @@ textarea.text-sm,
 .store-rating--rail {
   position: relative;
   width: 100%;
-  height: 22px;
-  min-height: 22px;
-  margin: 10px 0 2px;
+  height: 14px;
+  min-height: 14px;
+  margin: 8px 0 2px;
   padding: 0;
   border-radius: 0;
   background: none;
@@ -725,7 +725,7 @@ textarea.text-sm,
   left: 0;
   right: 0;
   top: 3px;
-  height: 16px;
+  height: 8px;
   border-radius: 2px;
   background: var(--store-rating-fill);
 }
@@ -736,8 +736,8 @@ textarea.text-sm,
   top: 50%;
   left: var(--rating-pos, 50%);
   z-index: 2;
-  width: 16px;
-  height: 16px;
+  width: 10px;
+  height: 10px;
   transform: translate(-50%, -50%);
   background: #fff;
   border: 1.5px solid #333;
@@ -778,7 +778,7 @@ textarea.text-sm,
   z-index: 3;
   box-sizing: border-box;
   width: 100%;
-  height: 22px;
+  height: 14px;
   margin: 0;
   padding: 0;
   opacity: 0;
@@ -803,7 +803,7 @@ textarea.text-sm,
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
-  height: 22px;
+  height: 14px;
   background: transparent;
   border: none;
   box-shadow: none;
