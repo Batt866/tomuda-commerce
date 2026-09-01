@@ -12494,20 +12494,25 @@ function payMarkFromStoreRating(pct) {
 function storeRatingLegendHtml() {
   return "";
 }
+function storeRatingTicksHtml() {
+  return `<span class="store-rating__ticks" aria-hidden="true">${"<i></i>".repeat(11)}</span>`;
+}
+function syncStoreRatingPos(input) {
+  const wrap = input?.closest?.(".store-rating");
+  if (!wrap || !input) return;
+  wrap.style.setProperty("--rating-pos", `${input.value}%`);
+}
 function customerStoreRatingHtml(c, opts = {}) {
   if (!c?.id || !canViewStoreRating()) return "";
   const pct = customerStoreRating(c);
   const label = storeRatingLabel(pct);
   const slider = storeRatingToSlider(pct);
-  if (opts.variant === "rail") {
-    return `<div class="store-rating store-rating--rail" style="--rating-pos:${slider}%" role="img" aria-label="${esc(label)}"><span class="store-rating__track"></span><span class="store-rating__ticks" aria-hidden="true"></span></div>`;
-  }
-  const readOnly = !!opts.readOnly || !canEditStoreRating();
-  const wide = opts.wide ? " store-rating--wide" : "";
-  const change = readOnly
+  const readOnly =
+    !!opts.readOnly || opts.variant === "rail" || !canEditStoreRating();
+  const input = readOnly
     ? ""
-    : ` onchange="askCustomerStoreRating('${esc(c.id)}', this, event)"`;
-  return `<div class="store-rating${wide}${readOnly ? " store-rating--readonly" : ""}" onclick="event.stopPropagation()"><input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" ${readOnly ? "disabled " : ""}aria-label="${esc(label)}" tabindex="${readOnly ? "-1" : "0"}" onwheel="event.preventDefault()"${change}><span class="store-rating__ticks" aria-hidden="true"></span></div>`;
+    : `<input type="range" class="store-rating__input" min="0" max="100" step="1" value="${slider}" data-saved="${pct}" aria-label="${esc(label)}" oninput="syncStoreRatingPos(this)" onwheel="event.preventDefault()" onchange="askCustomerStoreRating('${esc(c.id)}', this, event)">`;
+  return `<div class="store-rating store-rating--rail${readOnly ? " store-rating--readonly" : ""}" style="--rating-pos:${slider}%" ${readOnly ? `role="img" aria-label="${esc(label)}"` : `onclick="event.stopPropagation()"`}>${input}<span class="store-rating__track"></span>${storeRatingTicksHtml()}</div>`;
 }
 function askCustomerStoreRating(id, input, event) {
   event?.preventDefault?.();
@@ -12521,6 +12526,7 @@ function askCustomerStoreRating(id, input, event) {
   if (next === prev) return;
   if (!canEditStoreRating()) {
     input.value = String(storeRatingToSlider(prev));
+    syncStoreRatingPos(input);
     return;
   }
   confirmModal(
@@ -12535,6 +12541,7 @@ function askCustomerStoreRating(id, input, event) {
       },
       onCancel: () => {
         input.value = String(storeRatingToSlider(prev));
+        syncStoreRatingPos(input);
       },
     },
   );
