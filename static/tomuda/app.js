@@ -12495,7 +12495,7 @@ function storeRatingLegendHtml() {
   return "";
 }
 function storeRatingTicksHtml() {
-  return `<span class="store-rating__ticks" aria-hidden="true">${"<i></i>".repeat(11)}</span>`;
+  return `<span class="store-rating__ticks" aria-hidden="true">${"<i></i>".repeat(6)}</span>`;
 }
 function syncStoreRatingPos(input) {
   const wrap = input?.closest?.(".store-rating");
