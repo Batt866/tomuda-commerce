@@ -1259,7 +1259,6 @@ function percentDiscountRate() {
 function canApplyPercentDiscount(emp = state.currentEmployee) {
   if (!emp) return false;
   if (percentDiscountRate() <= 0) return false;
-  if (emp.allowPercentDiscount === false) return false;
   if (emp.role === "admin") return true;
   if (
     hasPermission("percentDiscount.view", emp) ||
@@ -1267,9 +1266,10 @@ function canApplyPercentDiscount(emp = state.currentEmployee) {
   ) {
     return true;
   }
+  // allowPercentDiscount тугийг зөвхөн худалдааны төлөөлөгчид тохируулдаг тул
+  // бусад ролийн хувьд эрхээ л шалгана — ажилтны маягт тэдэнд false бичдэг.
   if (emp.role !== "sales") return false;
-  if (emp.allowPercentDiscount == null) return true;
-  return !!emp.allowPercentDiscount;
+  return emp.allowPercentDiscount !== false;
 }
 function isCashPayment(term = state.paymentTerm) {
   return (term || "cash") === "cash";

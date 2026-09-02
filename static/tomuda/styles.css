@@ -734,7 +734,8 @@ textarea.text-sm,
   content: "";
   position: absolute;
   top: 50%;
-  left: var(--rating-pos, 50%);
+  /* Хагас өргөнөөр нь дотогш татаж, 0 ба 100 дээр захаараа тасрахаас сэргийлнэ. */
+  left: clamp(7px, var(--rating-pos, 50%), calc(100% - 7px));
   z-index: 2;
   width: 14px;
   height: 14px;
