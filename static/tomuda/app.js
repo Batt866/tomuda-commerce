@@ -10439,8 +10439,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
 .receipt-grid__spacer--pay-warn td { height: 12px; padding: 0; }
-.receipt-grid__spacer--sign td { height: 2mm; }
-.receipt-grid__fill td { height: 1.5mm; padding: 0; border: none !important; }
+.receipt-grid__spacer--sign td { height: 6mm; }
+.receipt-grid__fill td { height: 6mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
 .receipt-grid__summary-pad { border: none !important; background: transparent !important; padding: 0 !important; }
