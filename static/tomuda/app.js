@@ -371,6 +371,7 @@ let backendLastSaved = "";
 let serverUpdatedAt = "";
 let backendSaving = false;
 let backendPollTimer = null;
+let dayRolloverTimer = null;
 let countRenderPending = false;
 let countBlurSaveTimer = null;
 let countFocusedProductId = "";
@@ -410,6 +411,7 @@ let tombudaHistoryDepth = 0;
 let tombudaSkipPopstate = false;
 let suppressHistoryPush = false;
 const BACKEND_POLL_MS = 4000;
+const DAY_ROLLOVER_CHECK_MS = 30000;
 const BOOT_WAKE_MAX = 20;
 const BOOT_WAKE_BASE_MS = 2500;
 const BOOT_STATE_MAX = 5;
@@ -6469,12 +6471,18 @@ async function pollBackendState() {
 function startBackendPoll() {
   stopBackendPoll();
   backendPollTimer = setInterval(pollBackendState, BACKEND_POLL_MS);
+  // Компьютер өдөржин нээлттэй бол visibilitychange асахгүй тул тусад нь хардаг.
+  dayRolloverTimer = setInterval(() => {
+    if (syncAppDayRollover()) render();
+  }, DAY_ROLLOVER_CHECK_MS);
   document.addEventListener("visibilitychange", onVisibilityPoll);
   window.addEventListener("focus", onVisibilityPoll);
 }
 function stopBackendPoll() {
   if (backendPollTimer) clearInterval(backendPollTimer);
   backendPollTimer = null;
+  if (dayRolloverTimer) clearInterval(dayRolloverTimer);
+  dayRolloverTimer = null;
   document.removeEventListener("visibilitychange", onVisibilityPoll);
   window.removeEventListener("focus", onVisibilityPoll);
 }
@@ -13556,6 +13564,7 @@ function warehouseDateDisplayText(day = state.filters.warehouseDate || "") {
   return iso.replace(/-/g, ".");
 }
 function ensureWarehouseDateDefault() {
+  syncAppDayRollover();
   if (!normalizeIsoDateInput(state.filters.warehouseDate)) {
     state.filters.warehouseDate = todayIso();
   }
@@ -22020,6 +22029,7 @@ function normalizeStockReportKindInput(kind) {
   return { kind };
 }
 function ensureStockReportDateDefault() {
+  syncAppDayRollover();
   if (!normalizeIsoDateInput(state.filters.stockReportDate)) {
     state.filters.stockReportDate = todayIso();
   }
