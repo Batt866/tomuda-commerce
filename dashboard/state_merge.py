@@ -344,6 +344,17 @@ def _count_session_ms(value: Any) -> float:
         return 0.0
 
 
+def merge_settings(remote: Any, local: Any) -> dict[str, Any]:
+    """Newest settings blob wins so a stale device cannot revert a fresh change."""
+    remote_settings = _as_dict(remote)
+    local_settings = _as_dict(local)
+    if _count_session_ms(remote_settings.get("updatedAt")) > _count_session_ms(
+        local_settings.get("updatedAt")
+    ):
+        return {**local_settings, **remote_settings}
+    return {**remote_settings, **local_settings}
+
+
 def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None) -> dict[str, Any]:
     """
     Merge server (remote) state with an incoming device save (local).
@@ -413,10 +424,7 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
         local_state.get("promotionRules"),
         promotion_deletion_log,
     )
-    merged["settings"] = {
-        **_as_dict(remote_state.get("settings")),
-        **_as_dict(local_state.get("settings")),
-    }
+    merged["settings"] = merge_settings(remote_state.get("settings"), local_state.get("settings"))
     merged["extraCategories"] = list(
         dict.fromkeys(
             [

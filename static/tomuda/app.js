@@ -1251,6 +1251,12 @@ function ensureSettings() {
   if (state.settings.orderRetentionDays == null)
     state.settings.orderRetentionDays = 30;
 }
+// Тохиргоо бол нэг блоб учраас хуучин төхөөрөмжийн санах ой шинэ утгыг
+// дарж болзошгүй. Цагийн тэмдэгээр хамгийн сүүлийн өөрчлөлтийг ялгана.
+function markSettingsUpdated() {
+  ensureSettings();
+  state.settings.updatedAt = new Date().toISOString();
+}
 function percentDiscountRate() {
   ensureSettings();
   const n = Number(state.settings.percentDiscountRate);
@@ -4596,6 +4602,14 @@ function mergeEntityRecordByUpdatedAt(remoteItem, localItem, preferRemote) {
     ? { ...localItem, ...remoteItem }
     : { ...remoteItem, ...localItem };
 }
+function mergeSettingsStates(remote = {}, local = {}) {
+  const remoteSettings = remote || {};
+  const localSettings = local || {};
+  const remoteMs = entityUpdatedAtMs(remoteSettings);
+  const localMs = entityUpdatedAtMs(localSettings);
+  if (remoteMs > localMs) return { ...localSettings, ...remoteSettings };
+  return { ...remoteSettings, ...localSettings };
+}
 function preferredEntityImage(localImage, remoteImage) {
   const local = String(localImage || "").trim();
   const remote = String(remoteImage || "").trim();
@@ -5485,10 +5499,7 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
       continue;
     }
     if (key === "settings") {
-      merged.settings = {
-        ...(remote.settings || {}),
-        ...(local.settings || {}),
-      };
+      merged.settings = mergeSettingsStates(remote.settings, local.settings);
       continue;
     }
     if (key === "extraCategories") {
@@ -9345,6 +9356,7 @@ function savePercentDiscountSettings(e) {
     100,
     Math.max(0, Number.isFinite(raw) ? raw : RECEIPT_PERCENT_DISCOUNT),
   );
+  markSettingsUpdated();
   if (!canApplyPercentDiscount()) state.applyPercentDiscount = false;
   closeModal();
   render();
@@ -9370,10 +9382,19 @@ function saveOrderRetentionSettings(e) {
   const raw =
     e.target?.elements?.orderRetentionDays?.value ??
     new FormData(e.target).get("orderRetentionDays");
-  state.settings.orderRetentionDays = clampOrderRetentionDays(raw);
+  const digits = String(raw ?? "").replace(/[^\d]/g, "");
+  const days = Number(digits);
+  if (!digits || !Number.isFinite(days) || days < 7 || days > 365) {
+    return alertModal(
+      "Буруу утга",
+      "Хадгалах хоногийг 7–365 хооронд тоогоор оруулна уу.",
+    );
+  }
+  state.settings.orderRetentionDays = days;
+  markSettingsUpdated();
   closeModal();
   render();
-  showInstallToast("Захиалгын түүх хадгалах хугацаа шинэчлэгдлээ");
+  showInstallToast(`Захиалгын түүх ${days} хоног хадгалахаар тохирлоо`);
   criticalBackendSave();
 }
 function deletionLogLabel(entry) {
@@ -9511,6 +9532,7 @@ function applyStockAlertSettings(data) {
     0,
     Number(data.get("stockAlertMin")) || 0,
   );
+  markSettingsUpdated();
   state.products.forEach((p) => {
     const raw = data.get(`minStock_${p.id}`);
     if (raw == null) return;

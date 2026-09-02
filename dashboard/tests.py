@@ -953,6 +953,32 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertEqual(shared["name"], "Shared updated")
         self.assertEqual(shared["phone1"], "99000001")
 
+    def test_merge_keeps_newest_settings_when_stale_device_saves(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "settings": {"orderRetentionDays": 120, "updatedAt": "2026-09-02T10:00:00.000Z"},
+        }
+        local = {
+            "settings": {"orderRetentionDays": 31, "updatedAt": "2026-08-20T08:00:00.000Z"},
+        }
+
+        merged = merge_app_states(remote, local)
+        self.assertEqual(merged["settings"]["orderRetentionDays"], 120)
+
+    def test_merge_applies_fresh_settings_from_saving_device(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "settings": {"orderRetentionDays": 31, "updatedAt": "2026-08-20T08:00:00.000Z"},
+        }
+        local = {
+            "settings": {"orderRetentionDays": 120, "updatedAt": "2026-09-02T10:00:00.000Z"},
+        }
+
+        merged = merge_app_states(remote, local)
+        self.assertEqual(merged["settings"]["orderRetentionDays"], 120)
+
     def test_merge_keeps_newer_customer_fields_from_upsert(self):
         from dashboard.state_merge import merge_app_states
 
