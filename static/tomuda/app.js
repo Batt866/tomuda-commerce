@@ -12322,21 +12322,16 @@ function orderReceiptsPanel({
   const toolbarActions = `${exportBtn}${showCreate ? pageToolbarPrimaryBtn("+ Шинэ", "orderModal()") : ""}`;
   return `<section class="bg-card rounded overflow-hidden"><div class="p-3 border-b border-border"><h2 class="page-head__title">${title}</h2></div><div class="px-3 pb-3">${pageToolbarHtml({ filters: toolbarFilters, actions: toolbarActions })}</div><div class="overflow-x-auto"><table class="w-full"><thead class="bg-secondary/50"><tr><th class="px-4 py-3 text-left text-xs font-semibold">Захиалга</th><th class="px-4 py-3 text-left text-xs font-semibold">Ажилтан</th><th class="px-4 py-3 text-left text-xs font-semibold">Бараа</th><th class="px-4 py-3 text-left text-xs font-semibold">Төлөв</th><th class="px-4 py-3 text-right text-xs font-semibold">Дүн</th><th class="px-4 py-3 text-right text-xs font-semibold">Үйлдэл</th></tr></thead><tbody class="divide-y divide-border">${rows.map(orderRow).join("")}</tbody></table></div>${rows.length ? "" : `<div class="p-12 text-center text-muted-foreground">Захиалга олдсонгүй</div>`}</section>`;
 }
+// Баримтууд дээр хүргэлт тэмдэглэхгүй — тэр үйлдэл Хүргэлт хэсэгт байна.
 function warehouseOrderStatusActions(o) {
   if (o.status === "pending") {
     let html = `<button type="button" onclick="setOrder('${o.id}','confirmed')" class="btn btn--sm tone tone--success">Батлах</button>`;
-    if (canMarkOrderDelivered(o)) {
-      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">${DELIVERY_MARK_ACTION_LABEL}</button>`;
-    }
     if (canDelete())
       html += `<button type="button" onclick="confirmCancelOrder('${o.id}')" class="btn btn--sm tone tone--danger">Цуцлах</button>`;
     return html;
   }
   if (o.status === "confirmed") {
     let html = "";
-    if (canMarkOrderDelivered(o)) {
-      html += `<button type="button" onclick="confirmMarkOrderDelivered('${o.id}')" class="btn btn--sm tone tone--info">${DELIVERY_MARK_ACTION_LABEL}</button>`;
-    }
     if (canConfirmOrderDelivery(o)) {
       html += `<button type="button" onclick="confirmOrderDeliveryModal('${o.id}')" class="btn btn--sm tone tone--success">Баталгаажуулах</button>`;
     }
@@ -26619,17 +26614,32 @@ function pickWorkerStore(id) {
   state.workerCustomer = nextId;
   render();
   if (!nextId) return;
-  // Жагсаалтаас доош сонгосны дараа сонгосон баннер дээр автоматаар гарна.
-  requestAnimationFrame(() => {
-    scrollPageToTop();
+  scrollWorkerPickToTop();
+}
+/**
+ * Жагсаалтын доороос дэлгүүр сонгоход хуудас яг хамгийн дээрээ буцна.
+ * Баннер нэмэгдэхэд өндөр өөрчлөгддөг тул зөөлөн гүйлгэлтийн дараа дахин тулгана.
+ */
+function scrollWorkerPickToTop(behavior = "smooth") {
+  const run = (mode) => {
+    scrollTopScrollTargets().forEach((el) => {
+      try {
+        el.scrollTo({ top: 0, left: 0, behavior: mode });
+      } catch {
+        el.scrollTop = 0;
+      }
+    });
+    const doc = document.scrollingElement || document.documentElement;
     try {
-      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0, left: 0, behavior: mode });
     } catch {
       window.scrollTo(0, 0);
     }
-    document
-      .querySelector(".worker-pick-selected")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (doc && mode === "auto") doc.scrollTop = 0;
+  };
+  requestAnimationFrame(() => {
+    run(behavior);
+    setTimeout(() => run("auto"), 400);
   });
 }
 function confirmWorkerStore() {
