@@ -1011,7 +1011,8 @@ function receiptWarningRowsHtml() {
     `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-line${extra}">${text}</td></tr>`;
   return (
     row(
-      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр</b>, <b class="receipt-grid__warn-em">ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
+      // Excel хувилбартай ижил — «ААН-ийн РЕГИСТР» доод мөрөнд бүтнээрээ орно.
+      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр</b>,<br><b class="receipt-grid__warn-em">ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
       " receipt-grid__warn-line--first",
     ) +
     row(
@@ -10211,7 +10212,7 @@ tbody.receipt-footer-keep {
   letter-spacing: 0;
   background: ${RECEIPT_GRAND_BG} !important;
   white-space: nowrap;
-  text-align: right !important;
+  text-align: left !important;
   padding-right: 6px !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-note {
@@ -10466,7 +10467,7 @@ tbody.receipt-footer-keep {
   border: none !important;
 }
 .receipt-grid__summary-label--vat { font-weight: 700 !important; }
-.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9pt !important; letter-spacing: 0; white-space: nowrap; text-align: right !important; }
+.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9pt !important; letter-spacing: 0; white-space: nowrap; text-align: left !important; }
 .receipt-grid__summary-value {
   text-align: right;
   font-size: 9pt;
@@ -10517,7 +10518,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__warn-line--first { line-height: 1.45; }
 .receipt-grid__warn-line--bold { font-weight: 700; font-size: 9pt; }
-.receipt-grid__warn-em { font-weight: 700; font-size: 9pt; }
+.receipt-grid__warn-em { font-weight: 700; font-size: 9pt; white-space: nowrap; }
 .receipt-grid__sign-label {
   font-size: 9pt;
   font-weight: 400;
