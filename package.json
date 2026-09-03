@@ -19,5 +19,9 @@
     "@capacitor/core": "^8.3.4",
     "@capacitor/geolocation": "^8.2.0",
     "@capacitor/ios": "^8.3.4"
-  }
+  },
+  "devDependencies": {
+    "nx": "23.1.1"
+  },
+  "nx": {}
 }

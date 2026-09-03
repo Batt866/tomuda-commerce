@@ -25,3 +25,9 @@ logs/
 android/keystore.properties
 android/*.keystore
 android/tomuda-release.keystore
+
+
+
+.nx/cache
+.nx/workspace-data
+.nx/migrate-runs
