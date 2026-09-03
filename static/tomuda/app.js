@@ -2803,6 +2803,26 @@ function initWorkerStoreSearchHandlers() {
     document.addEventListener(type, onEvent, true),
   );
 }
+/**
+ * Хайлтын талбар цэвэрлэх × товч. Товч нь ямар ч хайлтын талбар дээр
+ * ажиллана — утгыг нь арилгаад input event илгээхэд тухайн талбарын
+ * өөрийн oninput дахин ажиллаж жагсаалт шинэчлэгдэнэ.
+ */
+function searchClearBtnHtml(extraClass = "") {
+  return `<button type="button" class="search-field__clear${extraClass ? ` ${extraClass}` : ""}" tabindex="-1" aria-label="Хайлт цэвэрлэх" onmousedown="event.preventDefault()" onclick="clearSearchField(this)"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`;
+}
+function clearSearchField(btn) {
+  const scope = btn?.closest?.(".search-field") || btn?.parentElement;
+  const input = scope?.querySelector("input");
+  if (!input) return;
+  input.value = "";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus();
+}
+/** Дан хайлтын талбарыг × товчтой болгож ороож өгнө. */
+function searchFieldHtml(inputHtml, wrapClass = "") {
+  return `<span class="search-field${wrapClass ? ` ${wrapClass}` : ""}">${inputHtml}${searchClearBtnHtml()}</span>`;
+}
 function pageToolbarSearch({
   focusKey,
   value = "",
@@ -2811,7 +2831,9 @@ function pageToolbarSearch({
 } = {}) {
   const handler =
     oninput || (focusKey ? `search('${focusKey}',this.value)` : "");
-  return `<input data-focus="${esc(focusKey || "")}" type="text" inputmode="search" value="${esc(value)}" oninput="${handler}" placeholder="${esc(placeholder)}" class="page-toolbar__search app-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-search-${esc(focusKey || "q")}">`;
+  return searchFieldHtml(
+    `<input data-focus="${esc(focusKey || "")}" type="text" inputmode="search" value="${esc(value)}" oninput="${handler}" placeholder="${esc(placeholder)}" class="page-toolbar__search app-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-search-${esc(focusKey || "q")}">`,
+  );
 }
 function pageToolbarPrimaryBtn(label, onclick, extraClass = "") {
   return `<button type="button" onclick="${onclick}" class="btn btn--toolbar btn--toolbar-primary ${extraClass}">${esc(label)}</button>`;
@@ -9657,7 +9679,7 @@ function stockAlertModal() {
     : `<p class="text-sm text-muted-foreground text-center py-6">Бараа олдсонгүй</p>`;
   box(
     "Үлдэгдэл сануулах",
-    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 space-y-2 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label><label class="flex items-center justify-between gap-3 text-sm"><span>Ерөнхий доод үлдэгдэл</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="stockAlertMin" min="0" step="1" value="${defaultMin}" class="stock-alert-row__input app-input w-20" aria-label="Ерөнхий доод үлдэгдэл"></label>${low.length ? `<p class="text-sm font-semibold text-tone-warning m-0">Татан авалт: ${low.length}</p>` : ""}</div><input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search shrink-0 w-full px-3 py-2 bg-secondary rounded text-sm mb-2"><div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
+    `<form onsubmit="saveStockAlertSettings(event)" class="stock-alert-form p-5 flex flex-col min-h-0 max-h-[85vh]"><div class="stock-alert-form__head shrink-0 space-y-2 mb-2"><label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" name="stockAlertEnabled" ${alertOn ? "checked" : ""} class="w-4 h-4 rounded"><span>Идэвхтэй</span></label><label class="flex items-center justify-between gap-3 text-sm"><span>Ерөнхий доод үлдэгдэл</span><input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" name="stockAlertMin" min="0" step="1" value="${defaultMin}" class="stock-alert-row__input app-input w-20" aria-label="Ерөнхий доод үлдэгдэл"></label>${low.length ? `<p class="text-sm font-semibold text-tone-warning m-0">Татан авалт: ${low.length}</p>` : ""}</div>${searchFieldHtml(`<input type="search" value="${esc(state.searches.stockAlert || "")}" oninput="search('stockAlert',this.value);stockAlertModal()" placeholder="Хайх..." class="stock-alert-form__search w-full px-3 py-2 bg-secondary rounded text-sm">`, "shrink-0 mb-2")}<div class="stock-alert-list modal-scroll flex-1 min-h-0 overflow-y-auto -mx-1 px-1">${rows}</div><div class="stock-alert-form__foot shrink-0 pt-3 mt-2 border-t border-border grid grid-cols-2 gap-2"><button type="button" onclick="closeModal()" class="py-2.5 bg-secondary rounded font-medium text-sm">Буцах</button><button type="submit" class="py-2.5 bg-primary text-primary-foreground rounded font-medium text-sm">Хадгалах</button></div></form>`,
     "max-w-xl",
   );
 }
@@ -16458,6 +16480,7 @@ function stockInScanToolbarHtml() {
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="stockInBarcodeInput" data-focus="stockInScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockInScanFocus()" onblur="stockInScanBlur()" aria-label="Бараа хайх">
+      ${searchClearBtnHtml("search-field__clear--inline")}
       <button type="button" class="stock-in-sheet__search-go" onclick="stockInScanSubmit()">Хайх</button>
     </span>
   </label>
@@ -16492,6 +16515,7 @@ function stockOutScanToolbarHtml() {
     <span class="stock-in-sheet__search-box">
       <svg class="stock-in-sheet__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="stockOutBarcodeInput" data-focus="stockOutScan" type="text" inputmode="text" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-sheet__search-input" placeholder="Барааны нэр эсвэл SKU..." value="${q}" onfocus="stockOutScanFocus()" onblur="stockOutScanBlur()" aria-label="Бараа хайх">
+      ${searchClearBtnHtml("search-field__clear--inline")}
       <button type="button" class="stock-in-sheet__search-go" onclick="stockOutScanSubmit()">Хайх</button>
     </span>
   </label>
@@ -18595,7 +18619,7 @@ function countView() {
       : `<p class="count-view__hint">Тоо оруулах эсвэл «Шинэ» дарж тооллого эхлүүлнэ.</p>`;
   const countListPanel = state.countDone
     ? ""
-    : `<div class="line-panel">${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх бараа", handler: "setCountCategory" })}<input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input"><div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
+    : `<div class="line-panel">${categoryFilterChipsHtml({ active: cat, allLabel: "Бүх бараа", handler: "setCountCategory" })}${searchFieldHtml(`<input data-focus="count" value="${esc(q)}" oninput="search('count',this.value)" placeholder="Хайх..." class="line-panel__search app-input">`)}<div class="count-list">${list.length ? list.map(countRow).join("") : `<p class="line-panel__empty">Бараа олдсонгүй</p>`}</div></div>`;
   return `<div class="space-y-4 count-view">${pageHead("Тооллого")}${sessionHint}${metricsHtml}${countListPanel}<div class="grid grid-cols-2 gap-2"><button onclick="confirmFinishCount()" class="py-3 bg-primary text-primary-foreground rounded font-medium">Дуусгах</button><button type="button" onclick="confirmNewCount()" class="py-3 bg-secondary rounded font-medium">Шинэ</button></div>${state.countDone ? countResult(mismatches) : ""}</div>`;
 }
 function countRow(p) {
@@ -23331,7 +23355,7 @@ function promotionSheetPickerBlock({
   const searchIcon = `<span class="promo-search-combo__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>`;
   const chevron = `<button type="button" class="promo-search-combo__toggle" onclick="togglePromoSearchDropdown(${jsStringArg(pickKey)})" aria-label="${searchOpen ? "Хайлт хураах" : "Бараа харах"}" aria-expanded="${searchOpen ? "true" : "false"}"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`;
   const dropdownHtml = `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown" ${searchOpen ? "" : "hidden"}>${searchOpen ? promoSearchDropdownInnerHtml(pickKey, ids) : ""}</div>`;
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo${searchOpen ? " is-open" : ""}" data-promo-search-combo="${esc(pickKey)}"><div class="promo-search-combo__field">${searchIcon}${searchInput}${chevron}</div>${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo${searchOpen ? " is-open" : ""}" data-promo-search-combo="${esc(pickKey)}"><div class="promo-search-combo__field search-field">${searchIcon}${searchInput}${chevron}${searchClearBtnHtml()}</div>${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoSheetSectionHtml({
@@ -23619,7 +23643,9 @@ function promotionProductPickerBlock(
       addAction: "select",
       selectedId,
     }),
-    searchInput = `<input data-promo-pick="${fieldName}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input" autocomplete="off">`,
+    searchInput = searchFieldHtml(
+      `<input data-promo-pick="${fieldName}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoProductSearch('${fieldName}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input" autocomplete="off">`,
+    ),
     inputRow = promotionSearchQtyRow(searchInput, opts?.qty || null),
     badge = variant === "buy" ? "1" : variant === "free" ? "2" : "",
     head = badge
@@ -24410,7 +24436,9 @@ function promotionMultiProductPickerBlock({
         (id) => `<input type="hidden" name="${fieldName}" value="${esc(id)}">`,
       )
       .join(""),
-    searchInput = `<input data-promo-pick="${pickKey}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input" autocomplete="off">`,
+    searchInput = searchFieldHtml(
+      `<input data-promo-pick="${pickKey}" type="search" inputmode="search" value="${esc(rawQ)}" oninput="promoPickSearch('${pickKey}',this.value)" placeholder="${esc(placeholder)}" class="promo-search-input" autocomplete="off">`,
+    ),
     inputRow = promotionSearchQtyRow(searchInput, null),
     countBadge =
       ids.length > 0
@@ -26273,7 +26301,7 @@ function deliveryStorePickStep() {
     banner = deliveryUndeliveredBanner(
       currentRole() === "delivery" ? "delivery" : "all",
     );
-  return `<section class="delivery-view"><div class="delivery-view__head">${pageHead("Хүргэлт")}<p class="delivery-view__lead">Захиалгатай дэлгүүр сонгоно уу</p></div>${banner}<div class="delivery-view__toolbar"><input data-focus="deliveryStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Нэр, утас, хаягаар хайх..." class="delivery-view__search app-input" autocomplete="off" aria-label="Дэлгүүр хайх"></div>${rows.length ? `<div class="delivery-store-grid">${rows.map((entry) => deliveryStoreCard(entry, state.deliveryStoreId === entry.customer.id)).join("")}</div>` : `<p class="delivery-view__empty">${q ? "Олдсонгүй" : "Захиалгатай дэлгүүр байхгүй"}</p>`}</section>`;
+  return `<section class="delivery-view"><div class="delivery-view__head">${pageHead("Хүргэлт")}<p class="delivery-view__lead">Захиалгатай дэлгүүр сонгоно уу</p></div>${banner}<div class="delivery-view__toolbar">${searchFieldHtml(`<input data-focus="deliveryStore" type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Нэр, утас, хаягаар хайх..." class="delivery-view__search app-input" autocomplete="off" aria-label="Дэлгүүр хайх">`)}</div>${rows.length ? `<div class="delivery-store-grid">${rows.map((entry) => deliveryStoreCard(entry, state.deliveryStoreId === entry.customer.id)).join("")}</div>` : `<p class="delivery-view__empty">${q ? "Олдсонгүй" : "Захиалгатай дэлгүүр байхгүй"}</p>`}</section>`;
 }
 function deliveryOrdersForStore(customerId) {
   return deliveryRelevantOrders()
@@ -26313,7 +26341,7 @@ function deliveryStoreMapStep() {
     .filter((entry) => entry.customer.id !== selected.id)
     .map((entry) => deliveryStoreCard(entry, false))
     .join("");
-  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(displayName)}</h2></div>${banner}<div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-store-detail__maps-row delivery-store-detail__maps-row--top">${maps ? `<a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps нээх</a>${apple ? `<a href="${apple}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps delivery-store-detail__maps--apple">Apple Maps</a>` : ""}` : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`}</div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div><div class="delivery-view__toolbar"><input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off"></div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
+  return `<section class="delivery-view delivery-view--map"><div class="delivery-view__head delivery-view__head--row"><button type="button" onclick="clearDeliveryStore()" class="btn btn--secondary btn--sm">← Дэлгүүр солих</button><h2 class="delivery-view__title">${esc(displayName)}</h2></div>${banner}<div id="deliveryMap" class="delivery-map" role="region" aria-label="Дэлгүүрийн байршил"></div><p id="deliveryMapStatus" class="delivery-map__status"></p><div class="delivery-store-detail__maps-row delivery-store-detail__maps-row--top">${maps ? `<a href="${maps}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps">Google Maps нээх</a>${apple ? `<a href="${apple}" target="_blank" rel="noopener noreferrer" class="delivery-store-detail__maps delivery-store-detail__maps--apple">Apple Maps</a>` : ""}` : `<p class="delivery-store-detail__hint">Байршил бүртгэгдээгүй</p>`}</div><article class="delivery-store-detail">${selectedEntry ? deliveryStoreCard(selectedEntry, true) : ""}<div class="delivery-store-detail__extra"><p class="delivery-store-detail__addr">${esc(addr)}</p>${selected.locationText ? `<p class="delivery-store-detail__hint">${esc(selected.locationText)}</p>` : ""}</div></article><div class="delivery-orders"><h3 class="delivery-orders__title">Захиалга (${orders.length})</h3><div class="delivery-orders__list">${orderList}</div></div><div class="delivery-view__toolbar">${searchFieldHtml(`<input type="search" inputmode="search" value="${esc(q)}" oninput="search('deliveryStore',this.value)" placeholder="Бусад дэлгүүр хайх..." class="delivery-view__search app-input" autocomplete="off">`)}</div>${otherStores ? `<div class="delivery-other-stores"><h3 class="delivery-other-stores__title">Бусад дэлгүүр</h3><div class="delivery-store-grid delivery-store-grid--compact">${otherStores}</div></div>` : ""}</section>`;
 }
 function deliveryView() {
   if (!state.deliveryStoreReady || !state.deliveryStoreId) {
@@ -26641,7 +26669,7 @@ function deliveryPickerModal() {
     q = state.searches.deliveryPick || "",
     activeDesc = selected ? deliveryOptionId(selected) : "";
   const body = list.length
-    ? `<div class="p-5 delivery-picker modal-scroll max-h-[75vh] overflow-y-auto"><p id="delivery-picker-desc" class="delivery-picker__desc">Хүргэлт хийх түгээгчийг сонгоно уу.</p><label class="sr-only" for="delivery-picker-search">Түгээгч хайх</label><div class="delivery-picker__search-wrap"><input id="delivery-picker-search" data-focus="deliveryPick" type="search" inputmode="search" autocomplete="off" value="${esc(q)}" oninput="deliveryPickerSearch(this.value)" placeholder="Нэр, утсаар хайх..." class="delivery-picker__search app-input" aria-describedby="delivery-picker-desc"><span class="delivery-picker__search-icon" aria-hidden="true">⌕</span></div><div role="listbox" id="delivery-picker-list" class="delivery-picker-list" aria-label="Түгээгчүүд"${activeDesc ? ` aria-activedescendant="${activeDesc}"` : ""} data-delivery-list>${deliveryPickerRows(selected, q)}</div><div class="delivery-picker-footer"><button type="button" onclick="clearDeliveryEmployee();render();deliveryPickerModal()" class="delivery-picker-footer__btn delivery-picker-footer__btn--secondary" aria-label="Сонголтыг цэвэрлэх">Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="delivery-picker-footer__btn delivery-picker-footer__btn--primary">Хаах</button></div></div>`
+    ? `<div class="p-5 delivery-picker modal-scroll max-h-[75vh] overflow-y-auto"><p id="delivery-picker-desc" class="delivery-picker__desc">Хүргэлт хийх түгээгчийг сонгоно уу.</p><label class="sr-only" for="delivery-picker-search">Түгээгч хайх</label><div class="delivery-picker__search-wrap search-field"><input id="delivery-picker-search" data-focus="deliveryPick" type="search" inputmode="search" autocomplete="off" value="${esc(q)}" oninput="deliveryPickerSearch(this.value)" placeholder="Нэр, утсаар хайх..." class="delivery-picker__search app-input" aria-describedby="delivery-picker-desc"><span class="delivery-picker__search-icon" aria-hidden="true">⌕</span>${searchClearBtnHtml()}</div><div role="listbox" id="delivery-picker-list" class="delivery-picker-list" aria-label="Түгээгчүүд"${activeDesc ? ` aria-activedescendant="${activeDesc}"` : ""} data-delivery-list>${deliveryPickerRows(selected, q)}</div><div class="delivery-picker-footer"><button type="button" onclick="clearDeliveryEmployee();render();deliveryPickerModal()" class="delivery-picker-footer__btn delivery-picker-footer__btn--secondary" aria-label="Сонголтыг цэвэрлэх">Цэвэрлэх</button><button type="button" onclick="closeModal();render()" class="delivery-picker-footer__btn delivery-picker-footer__btn--primary">Хаах</button></div></div>`
     : `<div class="p-5 delivery-picker modal-scroll"><div class="delivery-picker-empty-state" role="status"><span class="delivery-picker-empty-state__icon" aria-hidden="true"><svg class="ui-icon ui-icon--lg" viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 4v5h-7v-9z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg></span><p class="delivery-picker-empty-state__title">Түгээгч бүртгэлгүй</p><p class="delivery-picker-empty-state__text">Админ → Ажилтан → «Түгээгч» эрхээр нэмнэ.</p></div><button type="button" onclick="closeModal();render()" class="delivery-picker-footer__btn delivery-picker-footer__btn--primary w-full">Хаах</button></div>`;
   box("Түгээгч сонгох", body, "max-w-md", {
     dialog: true,
@@ -26822,7 +26850,7 @@ function patchWorkerStorePickList() {
 }
 function workerStorePickStep() {
   const q = state.searches.workerStore || "";
-  return `<section class="worker-pick"><div class="worker-pick__toolbar"><input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" onfocus="workerStoreSearchFocus()" onblur="workerStoreSearchBlur()" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх"></div>${workerStorePickRestHtml()}</section>`;
+  return `<section class="worker-pick"><div class="worker-pick__toolbar">${searchFieldHtml(`<input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" onfocus="workerStoreSearchFocus()" onblur="workerStoreSearchBlur()" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх">`)}</div>${workerStorePickRestHtml()}</section>`;
 }
 function pickWorkerStore(id) {
   const nextId = state.workerCustomer === id ? "" : id;
@@ -31312,7 +31340,7 @@ function pickerProductsInView() {
 }
 function pickerSearchToolsHtml() {
   const q = state.searches.workerProduct || "";
-  return `<div class="picker-search-tools"><input data-picker-search type="search" inputmode="search" value="${esc(q)}" oninput="pickerSearch(this.value)" placeholder="утгаар хайх" class="picker-search-input app-input" autocomplete="off" aria-label="утгаар хайх"><button type="button" data-picker-clear-search class="btn btn--secondary btn--sm picker-search-clear"${q ? "" : " hidden"}>Цэвэрлэх</button></div>`;
+  return `<div class="picker-search-tools"><span class="search-field"><input data-picker-search type="search" inputmode="search" value="${esc(q)}" oninput="pickerSearch(this.value)" placeholder="утгаар хайх" class="picker-search-input app-input" autocomplete="off" aria-label="утгаар хайх"><button type="button" data-picker-clear-search class="search-field__clear" tabindex="-1" aria-label="Хайлт цэвэрлэх" onmousedown="event.preventDefault()"${q ? "" : " hidden"}><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span></div>`;
 }
 function pickerSearch(value) {
   state.searches.workerProduct = String(value || "");
@@ -32071,7 +32099,7 @@ function storePickerModal() {
     );
   box(
     "Харилцагч сонгох",
-    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]"><input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, РД-ээр хайх..." class="w-full px-3 py-3 bg-secondary rounded"><div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${esc(customerDisplayName(c))}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${customerPhonesList(c)[0] || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
+    `<div class="p-5 space-y-4 modal-scroll overflow-y-auto max-h-[80vh]">${searchFieldHtml(`<input data-store-search value="${esc(state.searches.workerStore || "")}" oninput="storePickerSearch(this.value)" placeholder="Нэр, РД-ээр хайх..." class="w-full px-3 py-3 bg-secondary rounded">`)}<div class="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-3"><div class="store-picker-list space-y-2">${rows.length ? rows.map((c) => `<button type="button" onclick="state.workerCustomer='${c.id}';storePickerModal()" class="w-full text-left rounded p-3 ${state.workerCustomer === c.id ? "bg-primary/10 border border-primary" : "bg-secondary/50"}"><p class="font-medium">${esc(customerDisplayName(c))}</p><p class="text-xs text-muted-foreground">${c.companyName || "-"} · ${customerPhonesList(c)[0] || "-"}</p></button>`).join("") : `<p class="text-sm text-muted-foreground p-3">Харилцагч олдсонгүй</p>`}</div><div>${selected ? workerStoreSummary(selected) : `<p class="text-sm text-muted-foreground">Жагсаалтаас харилцагч сонгоно уу</p>`}</div></div><button onclick="selectWorkerCustomer(state.workerCustomer)" class="w-full py-3 bg-primary text-primary-foreground rounded font-medium" ${selected ? "" : "disabled"}>Сонгох</button></div>`,
     "max-w-3xl",
   );
   const el = document.querySelector("[data-store-search]");
@@ -33043,6 +33071,7 @@ Object.assign(window, {
   go,
   appBack,
   search,
+  clearSearchField,
   render,
   scrollPageToTop,
   closeModal,

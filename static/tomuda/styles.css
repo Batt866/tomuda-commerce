@@ -22503,7 +22503,10 @@ label.excel-import-toolbar__upload {
 .promo-search-combo__field .promo-search-input,
 .promo-search-combo__field .promo-sheet-search {
   padding-left: 38px;
-  padding-right: 42px;
+  padding-right: 78px;
+}
+.promo-search-combo__field .search-field__clear {
+  right: 42px;
 }
 .promo-search-combo__field .promo-search-input::-webkit-search-cancel-button,
 .promo-search-combo__field .promo-search-input::-webkit-search-decoration {
@@ -22752,5 +22755,96 @@ label.excel-import-toolbar__upload {
 
 .bt-setup__disconnect:disabled {
   opacity: 0.45;
+}
+
+/* ── Хайлтын талбарын цэвэрлэх (×) товч ─────────────────────────── */
+/* Босоо flex доторх эцэг элементэд өндөр нь суналгүйн тулд flex-basis өгөхгүй */
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.search-field > input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  padding-right: 40px;
+}
+
+.search-field__clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--hex-muted-foreground, #64748b);
+  background: color-mix(
+    in srgb,
+    var(--hex-muted-foreground, #64748b) 16%,
+    transparent
+  );
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease;
+}
+
+.search-field__clear .ui-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.4;
+}
+
+.search-field__clear:active {
+  background: color-mix(
+    in srgb,
+    var(--hex-muted-foreground, #64748b) 30%,
+    transparent
+  );
+}
+
+/* Талбар хоосон үед товч харагдахгүй */
+input:placeholder-shown ~ .search-field__clear {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Аль хэдийн өөрийн товчтой хайлтын мөрд эгнээнд нь суулгах хувилбар */
+.search-field__clear--inline {
+  position: static;
+  transform: none;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+}
+
+/* Эцэг элементийн layout-д input-ийн оронд зөв суух тохиргоо */
+.page-toolbar__filters > .search-field {
+  flex: 1 1 160px;
+}
+
+.list-action-toolbar .search-field,
+.page-toolbar--products .search-field,
+.sales-report-dash__filters .search-field {
+  width: 100%;
+  flex: none;
+}
+
+.delivery-picker__search-wrap .delivery-picker__search {
+  padding-right: 42px !important;
 }
 
