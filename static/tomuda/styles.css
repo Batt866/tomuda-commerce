@@ -5625,7 +5625,7 @@ button:focus-visible,
 }
 
 .mobile-top-bar--worker-orders .mobile-top-bar__title {
-  color: #117d8d;
+  color: var(--hex-foreground);
 }
 
 .mobile-top-bar--worker-orders-arrived {
