@@ -1736,7 +1736,7 @@ function orderRetentionExpiresAt(o) {
 }
 function orderWithinRetention(o, now = Date.now()) {
   // Авлага (төлөөгүй) баримт хугацаа дууссан ч устгахгүй.
-  if (o && o.status !== "cancelled" && !orderIsPaid(o)) return true;
+  if (orderHasOpenReceivable(o)) return true;
   const expires = orderRetentionExpiresAt(o);
   return !expires || expires >= now;
 }
@@ -1911,13 +1911,20 @@ function orderIsPaid(o) {
   }
   return !!o.isPaid;
 }
+function orderIsCancelled(o) {
+  return String(o?.status || "").toLowerCase() === "cancelled";
+}
+/** Цуцалсан баримт авлага үүсгэхгүй — backend-ийн дүрэмтэй ижил. */
+function orderHasOpenReceivable(o) {
+  return !!o && !orderIsCancelled(o) && !orderIsPaid(o);
+}
 function customerHasOpenBalance(customerId) {
   return customerReceivableTotal(customerId) > 0.009;
 }
 function customerUnpaidOrders(customerId) {
   if (!customerId) return [];
   return retainedOrders(state.orders || [])
-    .filter((o) => o.customerId === customerId && !orderIsPaid(o))
+    .filter((o) => o.customerId === customerId && orderHasOpenReceivable(o))
     .sort(compareOrdersNewestFirst);
 }
 function canViewCustomerOrderHistory() {
@@ -1930,7 +1937,7 @@ function canViewCustomerOrderHistory() {
 function customerAllOrders(customerId) {
   if (!customerId) return [];
   return retainedOrders(state.orders || [])
-    .filter((o) => o.customerId === customerId && o.status !== "cancelled")
+    .filter((o) => o.customerId === customerId && !orderIsCancelled(o))
     .sort(compareOrdersNewestFirst);
 }
 function customerHistoryFromDay() {
@@ -3729,7 +3736,7 @@ function isOrderReadyForDeliveryMark(o) {
   return o?.status === "confirmed" || o?.status === "pending";
 }
 function isOrderUndelivered(o) {
-  if (!o || o.status === "cancelled" || o.status === "delivered") return false;
+  if (!o || orderIsCancelled(o) || o.status === "delivered") return false;
   if (!isOrderReadyForDeliveryMark(o)) return false;
   return !isOrderDeliveryMarked(o);
 }
@@ -5964,7 +5971,7 @@ function pendingLocalStockProductIds(serverState = {}) {
   }
   for (const order of state.orders || []) {
     if (remoteOrderIds.has(String(order?.id ?? ""))) continue;
-    if (String(order?.status || "") === "cancelled") continue;
+    if (orderIsCancelled(order)) continue;
     addLineProducts(order?.items);
   }
   for (const log of state.inventoryLogs || []) {
@@ -8875,12 +8882,9 @@ function warehouseLiveFilterBannerHtml() {
   ensureWarehouseDateDefault();
   const day = normalizeIsoDateInput(state.filters.warehouseDate) || todayIso();
   const today = todayIso();
-  const total = (state.orders || []).filter(
-    (o) => o.status !== "cancelled",
-  ).length;
-  const visible = filterWarehouseOrders(
-    (state.orders || []).filter((o) => o.status !== "cancelled"),
-  ).length;
+  const active = (state.orders || []).filter((o) => !orderIsCancelled(o));
+  const total = active.length;
+  const visible = filterWarehouseOrders(active).length;
   const hidden = Math.max(0, total - visible);
   const dayLabel =
     day === today
@@ -9738,10 +9742,10 @@ function orderReceiptRowsFiltered(
   const deliveryIds = idList(opts.deliveryIds);
   const skipWarehouseDate = opts.skipWarehouseDate || searchKey === "orders";
   const requireWorkerScope = !!opts.requireWorkerScope;
+  // Цуцалсан баримт зөвхөн «Цуцалсан» төлөв сонгосон жагсаалтад л гарна.
+  const showCancelled = state.filters.order === "cancelled";
   let rows = state.orders.filter((o) => {
-    const status = String(o.status || "").toLowerCase();
-    const warehouseView = !skipWarehouseDate;
-    if (warehouseView && status === "cancelled") return false;
+    if (!showCancelled && orderIsCancelled(o)) return false;
     return (
       (requireWorkerScope
         ? workerIds.length > 0 && workerIds.includes(o.employeeId)
@@ -12429,7 +12433,7 @@ function orderReceiptExportSnapshots(
     // Fall back to raw order lookup so a stale filter cannot empty a valid check.
     return selectedIds
       .map((id) => state.orders.find((o) => String(o.id) === id))
-      .filter(Boolean)
+      .filter((o) => o && !orderIsCancelled(o))
       .map(orderReceiptSnapshot);
   }
   return filtered.map(orderReceiptSnapshot);
@@ -12497,6 +12501,7 @@ function confirmOrderReceiptsExcel(
 function confirmSingleOrderReceiptExcel(orderId) {
   const o = state.orders.find((x) => x.id === orderId);
   if (!o) return alert("Захиалга олдсонгүй");
+  if (orderIsCancelled(o)) return alert("Цуцалсан захиалга татахгүй");
   void exportOrderReceiptsExcel([orderReceiptSnapshot(o)]);
 }
 function ordersView() {
@@ -13487,7 +13492,7 @@ function receiptPrintWorkerOrders(workerIds = receiptPrintWorkerIds()) {
     state.orders.filter(
       (o) =>
         ids.has(o.employeeId) &&
-        String(o.status || "").toLowerCase() !== "cancelled" &&
+        !orderIsCancelled(o) &&
         (state.filters.order === "all" || o.status === state.filters.order),
     ),
   );
@@ -13526,9 +13531,7 @@ function receiptPrintDisplayOrders(
     ? receiptPrintWorkerOrders(workerIds)
     : rows;
   return sourceRows.filter(
-    (o) =>
-      o.status !== "delivered" &&
-      String(o.status || "").toLowerCase() !== "cancelled",
+    (o) => o.status !== "delivered" && !orderIsCancelled(o),
   );
 }
 function selectAllReceiptPrintOrders(
@@ -13735,7 +13738,7 @@ function ensureWarehouseWorkerSelection() {
   if (!emp || emp.role === "sales") return;
   if (idList(state.selectedWorkers).length) return;
   const todayOrders = filterWarehouseOrders(
-    (state.orders || []).filter((o) => o.status !== "cancelled"),
+    (state.orders || []).filter((o) => !orderIsCancelled(o)),
   );
   const workerIds = [
     ...new Set(todayOrders.map((o) => o.employeeId).filter(Boolean)),
@@ -13748,9 +13751,7 @@ function warehouseOrdersForSelectedWorkers() {
   if (!scopeIds.length) return [];
   const idSet = new Set(scopeIds);
   const orders = filterWarehouseOrders(
-    state.orders.filter(
-      (o) => idSet.has(o.employeeId) && o.status !== "cancelled",
-    ),
+    state.orders.filter((o) => idSet.has(o.employeeId) && !orderIsCancelled(o)),
   );
   return sortOrdersBySelectedPeople(orders, scopeIds);
 }
@@ -18232,7 +18233,7 @@ function countSoldQty(productId) {
   const since = countSessionSinceMs();
   let total = 0;
   for (const o of state.orders) {
-    if (String(o.status || "").toLowerCase() === "cancelled") continue;
+    if (orderIsCancelled(o)) continue;
     if (since) {
       const ms = new Date(o.createdAt).getTime();
       if (Number.isFinite(ms) && ms < since) continue;
@@ -21469,9 +21470,9 @@ function reportOrdersFiltered(periodOverride = null) {
   const statusFilter = String(state.filters.reportOrderStatus || "all").trim();
   let list = retainedOrders(state.orders);
   if (statusFilter === "cancelled") {
-    list = list.filter((o) => o.status === "cancelled");
+    list = list.filter((o) => orderIsCancelled(o));
   } else {
-    list = list.filter((o) => o.status !== "cancelled");
+    list = list.filter((o) => !orderIsCancelled(o));
     if (statusFilter && statusFilter !== "all") {
       list = list.filter((o) => String(o.status || "") === statusFilter);
     }
@@ -21711,7 +21712,8 @@ function salesReportCustomerRows(orders) {
     }
     row.orderCount += 1;
     if (!lineFilter) row.sales += orderAmount(o);
-    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderRemainingAmount(o);
+    if (orderHasOpenReceivable(o) && !lineFilter)
+      row.receivable += orderRemainingAmount(o);
     if (o.employeeName) row.employeeNames.add(String(o.employeeName));
     for (const it of o.items || []) {
       salesReportAddItemTotals(row, it, salesReportProductForItem(it));
@@ -21749,7 +21751,8 @@ function salesReportEmployeeRows(orders) {
     }
     row.orderCount += 1;
     if (!lineFilter) row.sales += orderAmount(o);
-    if (!orderIsPaid(o) && !lineFilter) row.receivable += orderRemainingAmount(o);
+    if (orderHasOpenReceivable(o) && !lineFilter)
+      row.receivable += orderRemainingAmount(o);
     for (const it of o.items || []) {
       salesReportAddItemTotals(row, it, salesReportProductForItem(it));
     }
@@ -21769,7 +21772,8 @@ function salesReportEmployeeRows(orders) {
     }
     cust.orderCount += 1;
     if (!lineFilter) cust.sales += orderAmount(o);
-    if (!orderIsPaid(o) && !lineFilter) cust.receivable += orderRemainingAmount(o);
+    if (orderHasOpenReceivable(o) && !lineFilter)
+      cust.receivable += orderRemainingAmount(o);
     for (const it of o.items || []) {
       salesReportAddItemTotals(cust, it, salesReportProductForItem(it));
     }
@@ -22025,7 +22029,7 @@ function salesReportKpiFromOrders(orders) {
     orderCount: orders.length,
     qty,
     receivable: orders
-      .filter((o) => !orderIsPaid(o))
+      .filter(orderHasOpenReceivable)
       .reduce((s, o) => s + orderAmount(o), 0),
   };
 }
@@ -22689,7 +22693,7 @@ function salesInfoDetailView() {
   const orderCount = filtered.length;
   const total = filtered.reduce((s, o) => s + orderAmount(o), 0);
   const receivable = filtered
-    .filter((o) => !orderIsPaid(o))
+    .filter(orderHasOpenReceivable)
     .reduce((s, o) => s + orderAmount(o), 0);
   return `<div class="space-y-4">${pageHead("Борлуулалтын мэдээ")}${reportDateFiltersHtml("confirmSalesInfoExport()")}${metricsBar(`${card("Борлуулалт", fmt(total))}${card("Авлага", fmt(receivable))}${card("Захиалга", orderCount)}`, 3)}<div class="line-panel"><div class="line-panel__section-title">Захиалгууд · ${orderCount}</div><div class="line-list">${reportPaymentListHtml(filtered, q ? "Олдсонгүй" : "Захиалга байхгүй")}</div></div></div>`;
 }
@@ -22730,20 +22734,28 @@ function reportsView() {
   return salesReportDetailView();
 }
 function paymentRow(o) {
-  const paid = orderIsPaid(o),
+  const cancelled = orderIsCancelled(o),
+    paid = orderIsPaid(o),
     amount = orderAmount(o),
     remaining = orderRemainingAmount(o),
     paidSoFar = orderPaidAmount(o),
     term = paymentTermLabel(o.paymentTerm),
-    status = paid
-      ? "Тооцоо дууссан"
-      : paidSoFar > 0.009
-        ? `Үлдэгдэл ${fmt(remaining)}`
-        : "Төлбөрийн үлдэгдэлтэй",
-    actions = paid
-      ? ""
-      : `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Төлбөр баталгаажуулах</button>`;
-  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(orderCustomerName(o))}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(remaining > 0.009 ? remaining : amount)}</b><span class="text-sm font-medium ${paid ? "text-tone-success" : "text-tone-danger"}">${status}</span><div class="payment-row__actions">${actions}</div></div>`;
+    status = cancelled
+      ? "Цуцалсан"
+      : paid
+        ? "Тооцоо дууссан"
+        : paidSoFar > 0.009
+          ? `Үлдэгдэл ${fmt(remaining)}`
+          : "Төлбөрийн үлдэгдэлтэй",
+    statusClass = cancelled
+      ? "text-muted-foreground"
+      : paid
+        ? "text-tone-success"
+        : "text-tone-danger",
+    actions = orderHasOpenReceivable(o)
+      ? `<button type="button" onclick="confirmSetPaid('${esc(o.id)}')" class="px-3 py-2 rounded text-sm bg-primary text-primary-foreground">Төлбөр баталгаажуулах</button>`
+      : "";
+  return `<div class="line-list__row line-list__row--static payment-row"><div class="payment-row__main"><div class="payment-row__title-row"><span class="payment-row__customer">${esc(orderCustomerName(o))}</span>${receiptNo(o, "xs")}</div><p class="line-list__meta">${esc(o.employeeName || "-")} · ${term} · Хүргэлт ${dte(orderDeliveryDay(o))}</p></div><b class="line-list__amount">${fmt(remaining > 0.009 ? remaining : amount)}</b><span class="text-sm font-medium ${statusClass}">${status}</span><div class="payment-row__actions">${actions}</div></div>`;
 }
 function parsePayMoney(value) {
   const n = Number(String(value ?? "").replace(/[^\d.]/g, ""));
@@ -22751,7 +22763,7 @@ function parsePayMoney(value) {
 }
 function confirmSetPaid(id) {
   const o = state.orders.find((x) => x.id === id);
-  if (!o || orderIsPaid(o)) return;
+  if (!orderHasOpenReceivable(o)) return;
   const due = orderAmount(o);
   const paid = orderPaidAmount(o);
   const remaining = orderRemainingAmount(o);
@@ -25324,7 +25336,7 @@ function orderItemsWithPromos(o) {
  * үнэгүй барааг items-д нэмнэ/шинэчилнэ. Үлдэгдлийг зөрүүгээр засварлана.
  */
 function syncOrderPromoItemsFromRules(o, { adjustStock = true } = {}) {
-  if (!o || o.status === "cancelled") return false;
+  if (!o || orderIsCancelled(o)) return false;
   const paid = orderPaidItems(o);
   if (!paid.length) return false;
   const generated = orderPromotionLines(paid, o.paymentTerm || "cash");
@@ -26020,7 +26032,7 @@ function loginView() {
   return `<div class="auth-screen"><div class="auth-card"><div class="auth-card__brand"><img src="${BRAND.logoBlue}" alt="ТОМУДА" class="auth-card__logo" width="72" height="72" decoding="async"><h1 class="auth-card__title">ТОМУДА</h1><p class="auth-card__subtitle">Импорт, түгээлт удирдлага</p></div><form onsubmit="login(event)" class="auth-form" aria-label="Нэвтрэх"><label class="field-label" for="loginEmail">Email</label><input id="loginEmail" type="email" inputmode="email" autocomplete="username" placeholder="name@company.mn" value="${esc(saved?.email || "")}" class="field-input app-input"><label class="field-label" for="loginPassword">Нууц үг</label><div class="login-password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" value="${esc(saved?.password || "")}" class="field-input app-input"><button type="button" id="loginPasswordToggle" onclick="toggleLoginPassword()" class="login-password-toggle" aria-label="Нууц үг харах">Харах</button></div><label class="login-remember"><input id="loginRemember" type="checkbox" ${remember ? "checked" : ""}><span>Нэвтрэх мэдээлэл санах</span></label><div id="loginError" class="auth-form__error" role="alert"></div><button type="submit" class="btn btn--primary btn--lg btn--block">Нэвтрэх</button>${installBtn}</form></div></div>`;
 }
 function workerOrdersList() {
-  let list = state.orders.filter((o) => o.status !== "cancelled");
+  let list = state.orders.filter((o) => !orderIsCancelled(o));
   if (state.currentEmployee?.role === "sales") {
     list = list.filter((o) => o.employeeId === state.currentEmployee.id);
   }
@@ -26132,7 +26144,7 @@ function deliveryRelevantOrders() {
   const scoped = deliveryScopedToAssignee();
   const today = todayIso();
   return state.orders.filter((o) => {
-    if (o.status === "cancelled" || o.status === "delivered") return false;
+    if (orderIsCancelled(o) || o.status === "delivered") return false;
     if (isOrderDeliveryMarked(o)) return false;
     if (scoped) {
       const delId = o.deliveryEmployeeId || "";
@@ -26906,7 +26918,7 @@ function clearWorkerOrderEditState() {
   state.editingOrderOriginalItems = null;
 }
 function canEditWorkerOrder(order) {
-  if (!order || order.status === "cancelled") return false;
+  if (!order || orderIsCancelled(order)) return false;
   if (
     state.currentEmployee?.role === "sales" &&
     String(order.employeeId) !== String(state.currentEmployee.id)
@@ -26922,7 +26934,7 @@ function canEditWorkerOrder(order) {
 function canCancelWorkerOrder(order) {
   if (!order) return false;
   const status = String(order.status || "").toLowerCase();
-  if (status === "cancelled" || status === "delivered") return false;
+  if (orderIsCancelled(order) || status === "delivered") return false;
   if (
     state.currentEmployee?.role === "sales" &&
     String(order.employeeId) !== String(state.currentEmployee.id)
@@ -26936,12 +26948,26 @@ function canCancelWorkerOrder(order) {
     currentRole() === "admin"
   );
 }
+/**
+ * Баримтыг агуулах/хэвлэх/засварын сонголтоос салгана — цуцалсан эсвэл
+ * устгасан захиалга хаана ч үлдэж болохгүй.
+ */
+function detachOrderFromViews(id) {
+  if (String(state.selectedWarehouseOrderId) === String(id)) {
+    state.selectedWarehouseOrderId = "";
+    warehouseReceiptScrollId = "";
+  }
+  state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
+    (x) => String(x) !== String(id),
+  );
+  if (String(state.receiptEditOrderId) === String(id)) clearReceiptEdit();
+}
 function cancelWorkerOrderNow(id) {
   const order = state.orders.find((x) => String(x.id) === String(id));
   if (!canCancelWorkerOrder(order)) {
     return alertModal("Эрхгүй", "Захиалга цуцлах эрхгүй.");
   }
-  if (String(order.status || "").toLowerCase() !== "cancelled") {
+  if (!orderIsCancelled(order)) {
     (order.items || []).forEach((i) => {
       if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
     });
@@ -26955,13 +26981,7 @@ function cancelWorkerOrderNow(id) {
     resetWorkerCart();
     state.filters.worker = "orders";
   }
-  if (state.selectedWarehouseOrderId === id) {
-    state.selectedWarehouseOrderId = "";
-    warehouseReceiptScrollId = "";
-  }
-  state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
-    (x) => String(x) !== String(id),
-  );
+  detachOrderFromViews(id);
   showAppToast("Захиалга цуцлагдлаа", "success");
   requestAnimationFrame(() => render());
   void criticalBackendSave({ fast: true });
@@ -30270,6 +30290,7 @@ async function downloadOrderReceiptExcelNow(id) {
   }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return alert("Захиалга олдсонгүй");
+  if (orderIsCancelled(o)) return alert("Цуцалсан захиалга татахгүй");
   const exportOrder =
     !hadChanges && state.receiptEditOrderId === id && state.receiptEditItems
       ? receiptEditDraftOrder()
@@ -31090,10 +31111,15 @@ function printOrdersViaBrowser(orders) {
 
 function printOrderReceiptsNow(ids) {
   const idOrder = idList(ids);
-  const orders = idOrder
+  const found = idOrder
     .map((id) => state.orders.find((o) => o.id === id))
     .filter(Boolean);
-  if (!orders.length) return alert("Захиалга олдсонгүй");
+  const orders = found.filter((o) => !orderIsCancelled(o));
+  if (!orders.length) {
+    return alert(
+      found.length ? "Цуцалсан захиалга хэвлэхгүй" : "Захиалга олдсонгүй",
+    );
+  }
   if (shouldUseBluetoothReceiptPrint()) {
     if (!getSavedBtPrinter()) {
       showAppToast("Эхлээд Bluetooth принтерээ сонгоно уу", "error");
@@ -32716,21 +32742,14 @@ function deleteReceiptNow(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
   const receiptLabel = formatReceiptNumber(o);
-  if (o.status !== "cancelled") {
+  if (!orderIsCancelled(o)) {
     (o.items || []).forEach((i) => {
       if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
     });
   }
   recordDeletion("order", id);
   state.orders = state.orders.filter((x) => x.id !== id);
-  if (state.selectedWarehouseOrderId === id) {
-    state.selectedWarehouseOrderId = "";
-    warehouseReceiptScrollId = "";
-  }
-  state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
-    (x) => x !== id,
-  );
-  if (state.receiptEditOrderId === id) clearReceiptEdit();
+  detachOrderFromViews(id);
   closeModal();
   showAppToast(`Баримт ${receiptLabel} устгагдлаа`, "success");
   requestAnimationFrame(() => render());
@@ -32819,17 +32838,11 @@ function setOrder(id, s) {
   }
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
-  if (s === "cancelled" && o.status !== "cancelled") {
+  if (s === "cancelled" && !orderIsCancelled(o)) {
     (o.items || []).forEach((i) => {
       if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
     });
-    if (state.selectedWarehouseOrderId === id) {
-      state.selectedWarehouseOrderId = "";
-      warehouseReceiptScrollId = "";
-    }
-    state.receiptPrintOrderIds = idList(state.receiptPrintOrderIds).filter(
-      (x) => String(x) !== String(id),
-    );
+    detachOrderFromViews(id);
   }
   o.status = s;
   requestAnimationFrame(() => render());
@@ -32837,7 +32850,7 @@ function setOrder(id, s) {
 }
 function setPaid(id, isPaid) {
   const o = state.orders.find((order) => order.id === id);
-  if (!o) return;
+  if (!o || orderIsCancelled(o)) return;
   const due = orderAmount(o);
   if (isPaid) {
     o.paidAmount = due;
@@ -32853,7 +32866,7 @@ function setPaid(id, isPaid) {
 }
 function recordOrderPayment(id, amount) {
   const o = state.orders.find((order) => order.id === id);
-  if (!o || orderIsPaid(o)) return;
+  if (!orderHasOpenReceivable(o)) return;
   const remaining = orderRemainingAmount(o);
   const add = Math.round(Number(amount));
   if (!Number.isFinite(add) || add <= 0) {
