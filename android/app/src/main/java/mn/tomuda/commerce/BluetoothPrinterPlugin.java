@@ -166,21 +166,20 @@ public class BluetoothPrinterPlugin extends Plugin {
 
     @PluginMethod
     public void connect(PluginCall call) {
-        String address = call.getString("address", "");
-        if (address == null || address.isEmpty()) {
-            call.reject("Принтерийн хаяг дутуу");
-            return;
-        }
+        String address = call.getString("address", M58_MAC);
+        if (address == null || address.isEmpty()) address = M58_MAC;
+        final String mac = formatMac(address);
         io.execute(() -> {
             try {
                 ensurePinReceiver();
-                openSocket(address);
+                openSocket(mac);
                 JSObject ret = new JSObject();
                 ret.put("ok", true);
-                ret.put("address", address);
-                call.resolve(ret);
+                ret.put("address", mac);
+                resolveOnMain(call, ret);
             } catch (Exception e) {
-                call.reject(
+                rejectOnMain(
+                    call,
                     e.getMessage() != null ? e.getMessage() : "Принтертэй холбогдсонгүй"
                 );
             }
@@ -190,36 +189,54 @@ public class BluetoothPrinterPlugin extends Plugin {
     @PluginMethod
     public void write(PluginCall call) {
         String address = call.getString("address", connectedAddress);
+        if (address == null || address.isEmpty()) address = M58_MAC;
+        final String mac = formatMac(address);
         String data = call.getString("data", "");
         if (data == null || data.isEmpty()) {
-            call.reject("Хэвлэх өгөгдөл хоосон");
+            rejectOnMain(call, "Хэвлэх өгөгдөл хоосон");
             return;
         }
         io.execute(() -> {
             try {
-                if (output == null || socket == null || !socket.isConnected()
-                    || (address != null && !address.isEmpty() && !address.equals(connectedAddress))) {
-                    if (address == null || address.isEmpty()) {
-                        call.reject("Принтер холбогдоогүй");
-                        return;
-                    }
-                    openSocket(address);
-                }
-                byte[] bytes = Base64.decode(data, Base64.DEFAULT);
-                int offset = 0;
-                while (offset < bytes.length) {
-                    int chunk = Math.min(1024, bytes.length - offset);
-                    output.write(bytes, offset, chunk);
-                    output.flush();
-                    offset += chunk;
-                    if (offset < bytes.length) Thread.sleep(20);
-                }
+                writeBytes(mac, Base64.decode(data, Base64.DEFAULT));
                 JSObject ret = new JSObject();
                 ret.put("ok", true);
-                call.resolve(ret);
+                resolveOnMain(call, ret);
             } catch (Exception e) {
                 closeSocket();
-                call.reject(e.getMessage() != null ? e.getMessage() : "Хэвлэж чадсангүй");
+                rejectOnMain(
+                    call,
+                    e.getMessage() != null ? e.getMessage() : "Хэвлэж чадсангүй"
+                );
+            }
+        });
+    }
+
+    @PluginMethod
+    public void print(PluginCall call) {
+        String address = call.getString("address", M58_MAC);
+        if (address == null || address.isEmpty()) address = M58_MAC;
+        final String mac = formatMac(address);
+        String data = call.getString("data", "");
+        if (data == null || data.isEmpty()) {
+            rejectOnMain(call, "Хэвлэх өгөгдөл хоосон");
+            return;
+        }
+        byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+        io.execute(() -> {
+            try {
+                ensurePinReceiver();
+                writeBytes(mac, bytes);
+                JSObject ret = new JSObject();
+                ret.put("ok", true);
+                ret.put("address", mac);
+                resolveOnMain(call, ret);
+            } catch (Exception e) {
+                closeSocket();
+                rejectOnMain(
+                    call,
+                    e.getMessage() != null ? e.getMessage() : "Хэвлэж чадсангүй"
+                );
             }
         });
     }
@@ -230,53 +247,94 @@ public class BluetoothPrinterPlugin extends Plugin {
             closeSocket();
             JSObject ret = new JSObject();
             ret.put("ok", true);
-            call.resolve(ret);
+            resolveOnMain(call, ret);
         });
+    }
+
+    private void writeBytes(String address, byte[] bytes) throws Exception {
+        if (output == null || socket == null || !socket.isConnected()
+            || address == null || !address.equalsIgnoreCase(connectedAddress)) {
+            openSocket(address);
+        }
+        int offset = 0;
+        while (offset < bytes.length) {
+            int chunk = Math.min(1024, bytes.length - offset);
+            output.write(bytes, offset, chunk);
+            output.flush();
+            offset += chunk;
+            if (offset < bytes.length) Thread.sleep(20);
+        }
     }
 
     @SuppressLint("MissingPermission")
     private void openSocket(String address) throws Exception {
-        if (socket != null && socket.isConnected() && address.equals(connectedAddress)) return;
+        String mac = formatMac(address);
+        if (socket != null && socket.isConnected() && mac.equalsIgnoreCase(connectedAddress)) {
+            return;
+        }
         closeSocket();
         BluetoothAdapter adapter = adapter();
         if (adapter == null) throw new IOException("Bluetooth дэмжихгүй");
         if (!adapter.isEnabled()) throw new IOException("Bluetooth унтраалттай байна");
-        BluetoothDevice device = adapter.getRemoteDevice(address);
+        if (!BluetoothAdapter.checkBluetoothAddress(mac)) {
+            throw new IOException("Принтерийн хаяг буруу");
+        }
+        BluetoothDevice device = adapter.getRemoteDevice(mac);
         try {
             adapter.cancelDiscovery();
         } catch (Exception ignored) {}
-        Thread.sleep(300);
-        ensureBonded(device);
-        Exception last = null;
-        boolean zijiang =
-            isZijiangName(deviceName(device)) || isPreferredMac(device.getAddress());
-        if (zijiang) {
-            last = tryHiddenChannel(device, 1);
-            if (last == null) return;
-            last = tryConnect(device, SPP_UUID, true);
-            if (last == null) return;
-            last = tryConnect(device, SPP_UUID, false);
-            if (last == null) return;
-        }
-        for (int attempt = 0; attempt < 2; attempt++) {
-            if (attempt > 0) Thread.sleep(400);
-            for (UUID uuid : sppUuids(device)) {
-                last = tryConnect(device, uuid, true);
-                if (last == null) return;
-                last = tryConnect(device, uuid, false);
-                if (last == null) return;
-            }
-            last = tryHiddenChannels(device);
+        Thread.sleep(200);
+        Exception last = tryPreferredConnect(device);
+        if (last == null) return;
+        if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
+            ensureBonded(device);
+            try {
+                adapter.cancelDiscovery();
+            } catch (Exception ignored) {}
+            Thread.sleep(200);
+            last = tryPreferredConnect(device);
             if (last == null) return;
         }
-        String detail = last != null && last.getMessage() != null
-            ? last.getMessage()
-            : "";
+        String detail = last.getMessage() != null ? last.getMessage() : "";
         throw new IOException(
             "M58-L принтертэй холбогдсонгүй"
                 + (detail.isEmpty() ? "" : ": " + detail)
-                + ". BlueTooth Printer гэсэн нэрэн дээр дарна. PIN 1234 эсвэл 0000."
+                + ". Принтерээ асаагаад Bluetooth-ыг ойртуулна уу."
         );
+    }
+
+    @SuppressLint("MissingPermission")
+    private Exception tryPreferredConnect(BluetoothDevice device) {
+        Exception last = tryInsecureChannel(device, 1);
+        if (last == null) return null;
+        last = tryHiddenChannel(device, 1);
+        if (last == null) return null;
+        last = tryConnect(device, SPP_UUID, true);
+        if (last == null) return null;
+        last = tryConnect(device, SPP_UUID, false);
+        if (last == null) return null;
+        last = tryHiddenChannels(device);
+        if (last == null) return null;
+        last = tryInsecureChannel(device, 2);
+        if (last == null) return null;
+        return last;
+    }
+
+    private String formatMac(String address) {
+        String hex = normalizeBtAddress(address);
+        if (hex.length() != 12) {
+            return address == null || address.isEmpty() ? M58_MAC : address;
+        }
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < 12; i += 2) {
+            if (i > 0) out.append(':');
+            out.append(hex, i, i + 2);
+        }
+        return out.toString();
+    }
+
+    private void resolveOnMain(PluginCall call, JSObject ret) {
+        runOnMain(() -> call.resolve(ret));
     }
 
     @SuppressLint("MissingPermission")
@@ -291,6 +349,27 @@ public class BluetoothPrinterPlugin extends Plugin {
             output = next.getOutputStream();
             connectedAddress = device.getAddress();
             return null;
+        } catch (Exception e) {
+            closeQuietly(next);
+            return e;
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private Exception tryInsecureChannel(BluetoothDevice device, int channel) {
+        BluetoothSocket next = null;
+        try {
+            Method method =
+                device.getClass().getMethod("createInsecureRfcommSocket", int.class);
+            next = (BluetoothSocket) method.invoke(device, channel);
+            if (next == null) return new IOException("RFCOMM socket null");
+            next.connect();
+            socket = next;
+            output = next.getOutputStream();
+            connectedAddress = device.getAddress();
+            return null;
+        } catch (NoSuchMethodException missing) {
+            return tryHiddenChannel(device, channel);
         } catch (Exception e) {
             closeQuietly(next);
             return e;

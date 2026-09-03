@@ -1,8 +1,9 @@
 (function () {
   var PLUGIN_OPTIONS = {
     listDevices: { timeout: 45000 },
-    connect: { timeout: 30000 },
-    write: { timeout: 30000 },
+    connect: { timeout: 60000 },
+    write: { timeout: 60000 },
+    print: { timeout: 60000 },
     requestPermission: { timeout: 120000 },
   };
 
@@ -24,7 +25,8 @@
     var tries = 0;
     var timer = setInterval(function () {
       tries += 1;
-      if (registerTomudaBluetoothPrinter() || tries >= 120) clearInterval(timer);
+      if (registerTomudaBluetoothPrinter() || tries >= 120)
+        clearInterval(timer);
     }, 50);
   }
 
