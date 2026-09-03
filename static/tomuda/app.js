@@ -423,6 +423,12 @@ const LOCAL_BACKEND_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const LOCAL_BACKEND_CACHE_MAX_BYTES = 4 * 1024 * 1024;
 const MAX_INLINE_IMAGE_CHARS = 180000;
 const PRODUCT_IMAGE_UPLOAD_MAX_BYTES = 150000;
+const PROFILE_IMAGE_UPLOAD_TIMEOUT_MS = 45000;
+const PROFILE_IMAGE_UPLOAD_ATTEMPTS = 3;
+const PENDING_PROFILE_IMAGES_KEY = "tomuda-pending-profile-images";
+const PENDING_PROFILE_IMAGE_MAX = 20;
+const ENTITY_UPSERT_TIMEOUT_MS = 25000;
+let flushingProfileImages = false;
 let productImageCompressTask = null;
 let customerImageCompressTask = null;
 let employeeImageCompressTask = null;
@@ -4776,7 +4782,7 @@ function readCustomerImageFromForm(form) {
   return image;
 }
 async function saveProductImagePayload(productId, payload) {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${API_BASE}/products/${encodeURIComponent(productId)}/image`,
     {
       method: "POST",
@@ -4795,6 +4801,7 @@ async function saveProductImagePayload(productId, payload) {
       }),
       cache: "no-store",
     },
+    PROFILE_IMAGE_UPLOAD_TIMEOUT_MS,
   );
   if (!res.ok) {
     let msg = "Зураг хадгалж чадсангүй";
@@ -4821,7 +4828,7 @@ async function saveProfileImagePayload(profileKind, entityId, dataUrl) {
         ? "customers"
         : "";
   if (!segment) throw new Error("Зурагны төрөл буруу байна");
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${API_BASE}/${segment}/${encodeURIComponent(entityId)}/image`,
     {
       method: "POST",
@@ -4840,6 +4847,7 @@ async function saveProfileImagePayload(profileKind, entityId, dataUrl) {
       }),
       cache: "no-store",
     },
+    PROFILE_IMAGE_UPLOAD_TIMEOUT_MS,
   );
   if (!res.ok) {
     let msg = "Зураг хадгалж чадсангүй";
@@ -4861,30 +4869,127 @@ async function uploadEmployeeImage(employeeId, dataUrl) {
 async function uploadCustomerImage(customerId, dataUrl) {
   return saveProfileImagePayload("customer", customerId, dataUrl);
 }
+function readPendingProfileImages() {
+  try {
+    const raw = localStorage.getItem(PENDING_PROFILE_IMAGES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function writePendingProfileImages(list) {
+  try {
+    if (!list.length) localStorage.removeItem(PENDING_PROFILE_IMAGES_KEY);
+    else
+      localStorage.setItem(
+        PENDING_PROFILE_IMAGES_KEY,
+        JSON.stringify(list.slice(-PENDING_PROFILE_IMAGE_MAX)),
+      );
+  } catch (error) {
+    console.warn("Pending profile image queue write failed", error);
+  }
+}
+function dropPendingProfileImage(profileKind, entityId) {
+  const list = readPendingProfileImages();
+  const next = list.filter(
+    (row) =>
+      !(row?.kind === profileKind && String(row?.id) === String(entityId)),
+  );
+  if (next.length !== list.length) writePendingProfileImages(next);
+}
+function queuePendingProfileImage(profileKind, entityId, dataUrl) {
+  const list = readPendingProfileImages().filter(
+    (row) =>
+      !(row?.kind === profileKind && String(row?.id) === String(entityId)),
+  );
+  list.push({ kind: profileKind, id: String(entityId), image: dataUrl });
+  writePendingProfileImages(list);
+}
+async function uploadProfileImageOnce(profileKind, entityId, dataUrl) {
+  if (profileKind === "employee") return uploadEmployeeImage(entityId, dataUrl);
+  if (profileKind === "customer") return uploadCustomerImage(entityId, dataUrl);
+  return "";
+}
+async function uploadProfileImageWithRetry(profileKind, entityId, dataUrl) {
+  for (
+    let attempt = 0;
+    attempt < PROFILE_IMAGE_UPLOAD_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      return (await uploadProfileImageOnce(profileKind, entityId, dataUrl)) || "";
+    } catch (error) {
+      if (attempt + 1 >= PROFILE_IMAGE_UPLOAD_ATTEMPTS) {
+        console.warn("Profile image upload failed", error);
+        return "";
+      }
+      await sleep(600 * (attempt + 1));
+    }
+  }
+  return "";
+}
+function applyUploadedProfileImage(entity, entityId, url) {
+  if (entity) entity.image = url;
+  if (state.currentEmployee?.id === entityId) {
+    state.currentEmployee.image = url;
+    saveAuthSession();
+  }
+}
 async function persistProfileImageToMedia(entity, profileKind) {
   const entityId = String(entity?.id || "").trim();
   const image = String(entity?.image || "").trim();
   if (!entityId || !image) return "";
   if (!image.startsWith("data:image/")) return image;
-  try {
-    const url =
-      profileKind === "employee"
-        ? await uploadEmployeeImage(entityId, image)
-        : profileKind === "customer"
-          ? await uploadCustomerImage(entityId, image)
-          : "";
-    if (url) {
-      entity.image = url;
-      if (state.currentEmployee?.id === entityId) {
-        state.currentEmployee.image = url;
-        saveAuthSession();
-      }
-    }
-    return url || "";
-  } catch (error) {
-    console.warn("Profile image upload failed", error);
+  const url = await uploadProfileImageWithRetry(profileKind, entityId, image);
+  if (!url) {
+    // Inline data URL-ийг бүх хадгалах payload хасдаг тул серверт хүрэхгүй бол
+    // энд ээлжинд тавьж, холбоо сэргэмэгц дахин илгээнэ.
+    queuePendingProfileImage(profileKind, entityId, image);
     return "";
   }
+  dropPendingProfileImage(profileKind, entityId);
+  applyUploadedProfileImage(entity, entityId, url);
+  return url;
+}
+async function flushPendingProfileImages() {
+  if (flushingProfileImages || !backendReady) return 0;
+  const queued = readPendingProfileImages();
+  if (!queued.length) return 0;
+  flushingProfileImages = true;
+  let uploaded = 0;
+  try {
+    for (const row of queued) {
+      const kind = row?.kind === "employee" ? "employee" : "customer";
+      const entityId = String(row?.id || "").trim();
+      const image = String(row?.image || "").trim();
+      if (!entityId || !image.startsWith("data:image/")) {
+        dropPendingProfileImage(kind, entityId);
+        continue;
+      }
+      const list = kind === "employee" ? state.employees : state.customers;
+      const entity = (list || []).find(
+        (item) => String(item?.id) === entityId,
+      );
+      if (!entity) {
+        dropPendingProfileImage(kind, entityId);
+        continue;
+      }
+      const url = await uploadProfileImageWithRetry(kind, entityId, image);
+      // Хоосон буцвал холбоо тасарсан хэвээр — үлдсэнийг ээлжинд нь орхино.
+      if (!url) break;
+      dropPendingProfileImage(kind, entityId);
+      applyUploadedProfileImage(entity, entityId, url);
+      uploaded += 1;
+    }
+  } finally {
+    flushingProfileImages = false;
+  }
+  if (uploaded) {
+    scheduleBackendSave();
+    safeRender();
+  }
+  return uploaded;
 }
 function storedEntityImage(item) {
   const raw = String(item?.image || "").trim();
@@ -6483,6 +6588,22 @@ async function fetchWithTimeout(url, opts = {}, ms = 20000) {
     clearTimeout(timer);
   }
 }
+// fetchWithTimeout нь AbortError шиддэг тул түүнийг ч сүлжээний алдаа гэж үзнэ.
+function connectionErrorMessage(error) {
+  const raw = String(error?.message || error || "").trim();
+  if (!raw) return "";
+  if (/abort|timeout|timed out|хугацаа/i.test(raw)) {
+    return "Сервер хугацаандаа хариулсангүй. Интернетээ шалгаад дахин оролдоно уу.";
+  }
+  if (
+    /failed to fetch|networkerror|load failed|network request failed|connection/i.test(
+      raw,
+    )
+  ) {
+    return "Сервертэй холбогдож чадсангүй. Интернетээ шалгаад дахин оролдоно уу.";
+  }
+  return "";
+}
 async function fetchBackendPayload() {
   try {
     const res = await fetchWithTimeout(
@@ -6537,6 +6658,8 @@ async function pollBackendState() {
     applyRemoteState(payload);
   } catch (error) {
     console.warn("Backend poll failed", error);
+  } finally {
+    flushPendingProfileImages().catch(() => {});
   }
 }
 function startBackendPoll() {
@@ -6614,6 +6737,7 @@ function completeBootUiInit(options = {}) {
   } else if (localStateDirty() || readLocalPendingState()) {
     scheduleBackendSave();
   }
+  flushPendingProfileImages().catch(() => {});
   initNoZoom();
   initNestedScrollChain();
   initScrollRenderGuard();
@@ -11838,14 +11962,8 @@ function appendReceiptSheetRows(
   }
   const promoLines = promoItems.map(enrichPromoLineForReceipt);
   // Keep Урамшуулал → signatures together; page-break only before this block.
-  if (promoLines.length) {
-    footerKeepStart = rowNum;
-    const gapR = rowNum;
-    pushRow(18, [
-      xlsxCellXml(`A${gapR}`, 1, si("\u00A0"), "s"),
-      ...emptyCells(gapR, "B", RECEIPT_XLSX_LAST_COL, 1),
-    ]);
-  }
+  // Дээрх "gap before totals" мөр зайг аль хэдийн гаргасан тул давхар хоосон мөр нэмэхгүй.
+  if (promoLines.length) footerKeepStart = rowNum;
   // Урамшуулал: no borders on A–D (left of name); grid only on E→K data cells
   promoLines.forEach((item, idx) => {
     const r = rowNum;
@@ -28446,21 +28564,24 @@ async function upsertCustomerOnServer(customer) {
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const res = await fetch(`${API_BASE}/customers/upsert`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          customer: bodyCustomer,
-          actor: state.currentEmployee
-            ? {
-                id: state.currentEmployee.id,
-                email: state.currentEmployee.email,
-              }
-            : null,
-        }),
-        cache: "no-store",
-        credentials: "same-origin",
-      });
+      const res = await fetchWithTimeout(
+        `${API_BASE}/customers/upsert`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            customer: bodyCustomer,
+            actor: state.currentEmployee
+              ? {
+                  id: state.currentEmployee.id,
+                  email: state.currentEmployee.email,
+                }
+              : null,
+          }),
+          cache: "no-store",
+        },
+        ENTITY_UPSERT_TIMEOUT_MS,
+      );
       if (!res.ok) {
         let msg = "Харилцагч серверт хадгалахад алдаа гарлаа";
         try {
@@ -28478,13 +28599,8 @@ async function upsertCustomerOnServer(customer) {
     }
   }
   const raw = String(lastError?.message || lastError || "").trim();
-  if (
-    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
-  ) {
-    throw new Error(
-      "Сервертэй холбогдож чадсангүй. Интернетээ шалгаад дахин оролдоно уу.",
-    );
-  }
+  const connectionMsg = connectionErrorMessage(raw);
+  if (connectionMsg) throw new Error(connectionMsg);
   throw lastError instanceof Error
     ? lastError
     : new Error(raw || "Хадгалах амжилтгүй");
@@ -29105,21 +29221,24 @@ async function upsertProductOnServer(product) {
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const res = await fetch(`${API_BASE}/products/upsert`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          product: bodyProduct,
-          actor: state.currentEmployee
-            ? {
-                id: state.currentEmployee.id,
-                email: state.currentEmployee.email,
-              }
-            : null,
-        }),
-        cache: "no-store",
-        credentials: "same-origin",
-      });
+      const res = await fetchWithTimeout(
+        `${API_BASE}/products/upsert`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            product: bodyProduct,
+            actor: state.currentEmployee
+              ? {
+                  id: state.currentEmployee.id,
+                  email: state.currentEmployee.email,
+                }
+              : null,
+          }),
+          cache: "no-store",
+        },
+        ENTITY_UPSERT_TIMEOUT_MS,
+      );
       if (!res.ok) {
         let msg = "Бараа серверт хадгалахад алдаа гарлаа";
         try {
@@ -29137,13 +29256,8 @@ async function upsertProductOnServer(product) {
     }
   }
   const raw = String(lastError?.message || lastError || "").trim();
-  if (
-    /failed to fetch|networkerror|load failed|network request failed/i.test(raw)
-  ) {
-    throw new Error(
-      "Сервертэй холбогдож чадсангүй. Интернетээ шалгаад дахин оролдоно уу.",
-    );
-  }
+  const connectionMsg = connectionErrorMessage(raw);
+  if (connectionMsg) throw new Error(connectionMsg);
   throw lastError instanceof Error
     ? lastError
     : new Error(raw || "Хадгалах амжилтгүй");
@@ -31986,15 +32100,25 @@ async function upsertOrderOnServer(order, previousItems = null) {
       : null,
   };
   if (Array.isArray(previousItems)) body.previousItems = previousItems;
-  const res = await fetch(`${API_BASE}/orders/upsert`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
+  let res;
+  try {
+    res = await fetchWithTimeout(
+      `${API_BASE}/orders/upsert`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      },
+      ENTITY_UPSERT_TIMEOUT_MS,
+    );
+  } catch (error) {
+    const connectionMsg = connectionErrorMessage(error);
+    throw connectionMsg ? new Error(connectionMsg) : error;
+  }
   if (!res.ok) {
     let msg = "Захиалга серверт хадгалахад алдаа гарлаа";
     try {
