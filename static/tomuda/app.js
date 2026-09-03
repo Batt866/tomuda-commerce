@@ -741,21 +741,13 @@ function receiptHeaderHtml(logoSrc, o) {
 function InvoiceHeader(logoSrc, o) {
   return receiptHeaderRows(logoSrc, o);
 }
-/** Max paid lines alone on one A4 body (header/info already take space). */
+/** Fallback cap for paid lines on one A4 body until measurement narrows it. */
 const RECEIPT_PAGE_PAID_MAX = 26;
-/**
- * Soft capacity for paid lines before Урамшуулал→signatures.
- * Keep that block together: if crowded, break before Урамшуулал (next page).
- */
-const RECEIPT_PAGE_SOFT_MAX = 12;
 function receiptPaidItems(o) {
   return (o.items || []).filter((i) => !i.isPromoFree);
 }
 function receiptPromoItems(o) {
   return (o.items || []).filter((i) => i.isPromoFree);
-}
-function receiptHasPromoSection(o) {
-  return receiptPromoItems(o).length > 0 || !!receiptPromoSettleNote(o);
 }
 function receiptItemsHeadRow() {
   // Sample R14: empty A, name B:D, unit E, barcode F:G, qty H:I, price J, total K — no gray № header.
@@ -1138,9 +1130,17 @@ function receiptSheetHtml(o, logoSrc, opts = {}) {
 function receiptPageHtml(o, logoSrc) {
   return receiptSheetHtml(o, logoSrc);
 }
-function receiptPrintPageHtml(o, logoSrc) {
+/**
+ * @param opts.splitFooter Урамшуулал→гарын үсгийг тусдаа хуудас руу шилжүүлэх.
+ * @param opts.itemsPerPage Нэг хуудсанд багтах төлбөртэй мөрийн тоо.
+ */
+function receiptPrintPageHtml(o, logoSrc, opts = {}) {
+  const splitFooter = !!opts.splitFooter;
+  const itemsPerPage = Math.max(
+    1,
+    Math.floor(Number(opts.itemsPerPage) || RECEIPT_PAGE_PAID_MAX),
+  );
   const items = receiptPaidItems(o);
-  const hasPromo = receiptHasPromoSection(o);
   const page = (html, continued = false, footerOnly = false) => {
     const cls = [
       "receipt-page",
@@ -1166,8 +1166,8 @@ function receiptPrintPageHtml(o, logoSrc) {
     );
 
   // Prefer keeping all paid lines on page 1; if crowded, cut from promo downward.
-  if (items.length <= RECEIPT_PAGE_PAID_MAX) {
-    if (hasPromo && items.length >= RECEIPT_PAGE_SOFT_MAX) {
+  if (items.length <= itemsPerPage) {
+    if (splitFooter) {
       return (
         page(
           receiptSheetHtml(o, logoSrc, {
@@ -1182,9 +1182,9 @@ function receiptPrintPageHtml(o, logoSrc) {
 
   // Paid list alone overflows: fill pages with paid lines; promo+below only after last paid chunk.
   const parts = [];
-  for (let i = 0; i < items.length; i += RECEIPT_PAGE_PAID_MAX) {
-    const chunk = items.slice(i, i + RECEIPT_PAGE_PAID_MAX);
-    const isLast = i + RECEIPT_PAGE_PAID_MAX >= items.length;
+  for (let i = 0; i < items.length; i += itemsPerPage) {
+    const chunk = items.slice(i, i + itemsPerPage);
+    const isLast = i + itemsPerPage >= items.length;
     const continued = i > 0;
     if (!isLast) {
       parts.push(
@@ -1202,7 +1202,7 @@ function receiptPrintPageHtml(o, logoSrc) {
       );
       continue;
     }
-    if (hasPromo && chunk.length >= RECEIPT_PAGE_SOFT_MAX) {
+    if (splitFooter) {
       parts.push(
         page(
           receiptSheetHtml(o, logoSrc, {
@@ -1233,6 +1233,65 @@ function receiptPrintPageHtml(o, logoSrc) {
     }
   }
   return parts.join("");
+}
+/** A4 body height (297mm − 18mm дээд − 12mm доод margin) in the print document. */
+function receiptPrintableHeightPx(doc) {
+  const probe = doc.createElement("div");
+  probe.style.cssText =
+    "position:absolute;left:-9999px;top:0;width:1mm;height:267mm;";
+  doc.body.appendChild(probe);
+  const px = probe.getBoundingClientRect().height;
+  probe.remove();
+  return px;
+}
+/** Table height, not the padded page box — print drops that padding. */
+function receiptRenderedSheetHeightPx(pageEl) {
+  const table = pageEl.querySelector(".receipt-grid--sheet");
+  return (table || pageEl).getBoundingClientRect().height;
+}
+function receiptFitItemsPerPage(pageEl, limitPx) {
+  const rows = [...pageEl.querySelectorAll("tr.receipt-items__row")];
+  if (!rows.length) return 0;
+  const itemsPx = rows.reduce(
+    (sum, row) => sum + row.getBoundingClientRect().height,
+    0,
+  );
+  const rowPx = itemsPx / rows.length;
+  if (!(rowPx > 0)) return 0;
+  const overhead = receiptRenderedSheetHeightPx(pageEl) - itemsPx;
+  return Math.max(1, Math.floor((limitPx - overhead) / rowPx));
+}
+/**
+ * Widen the layout of every receipt whose page still spills past A4.
+ * First move Урамшуулал→signatures to their own page, then shrink the paid
+ * list. Returns true when something changed and the document must be redrawn.
+ */
+function receiptRelayoutOverflowPages(doc, layouts) {
+  const limitPx = receiptPrintableHeightPx(doc);
+  if (!(limitPx > 0)) return false;
+  let changed = false;
+  [...doc.querySelectorAll(".receipt-excel-sheet")].forEach((sheet, index) => {
+    const layout = layouts[index];
+    if (!layout) return;
+    const pageEls = [...sheet.querySelectorAll(".receipt-page")];
+    if (!pageEls.length) return;
+    const tallest = pageEls.reduce(
+      (max, el) => Math.max(max, receiptRenderedSheetHeightPx(el)),
+      0,
+    );
+    if (tallest <= limitPx + 1) return;
+    if (!layout.splitFooter) {
+      layout.splitFooter = true;
+      changed = true;
+      return;
+    }
+    const fit = receiptFitItemsPerPage(pageEls[0], limitPx);
+    if (fit && fit < layout.itemsPerPage) {
+      layout.itemsPerPage = fit;
+      changed = true;
+    }
+  });
+  return changed;
 }
 function ensureSettings() {
   if (!state.settings || typeof state.settings !== "object") {
@@ -9667,6 +9726,10 @@ function receiptExcelPage(o, logoSrc) {
   // Same single-sheet layout as Баримтууд on-screen preview.
   return `<div class="receipt-excel-sheet"><div class="receipt-page">${receiptSheetHtml(o, logoSrc)}</div></div>`;
 }
+/** Same wrapper as receiptExcelPage, but the sheet may span several A4 pages. */
+function receiptExcelPages(o, logoSrc, opts = {}) {
+  return `<div class="receipt-excel-sheet">${receiptPrintPageHtml(o, logoSrc, opts)}</div>`;
+}
 const RECEIPT_EXCEL_STYLES = `
 @page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
 @page {
@@ -10461,8 +10524,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
 .receipt-grid__spacer--pay-warn td { height: 12px; padding: 0; }
-.receipt-grid__spacer--sign td { height: 6mm; }
-.receipt-grid__fill td { height: 6mm; padding: 0; border: none !important; }
+.receipt-grid__spacer--sign td { height: 2mm; }
+.receipt-grid__fill td { height: 1.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
 .receipt-grid__summary-pad { border: none !important; background: transparent !important; padding: 0 !important; }
@@ -30859,10 +30922,17 @@ function printOrdersViaBrowser(orders) {
     const logoSrc =
       (await getReceiptExcelLogoDataUri().catch(() => "")) ||
       RECEIPT_LOGO_DATA_URI;
-    const pages = orders
-      .map((o) => receiptExcelPage(orderReceiptSnapshot(o), logoSrc))
-      .join("");
-    const html = `<!DOCTYPE html><html class="receipt-a4-print"><head><meta charset="utf-8"><title> </title><style>${RECEIPT_EXCEL_STYLES}</style></head><body>${pages}</body></html>`;
+    const snapshots = orders.map((o) => orderReceiptSnapshot(o));
+    const layouts = snapshots.map(() => ({
+      splitFooter: false,
+      itemsPerPage: RECEIPT_PAGE_PAID_MAX,
+    }));
+    const buildHtml = () => {
+      const pages = snapshots
+        .map((o, i) => receiptExcelPages(o, logoSrc, layouts[i]))
+        .join("");
+      return `<!DOCTYPE html><html class="receipt-a4-print"><head><meta charset="utf-8"><title> </title><style>${RECEIPT_EXCEL_STYLES}</style></head><body>${pages}</body></html>`;
+    };
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText =
@@ -30880,17 +30950,24 @@ function printOrdersViaBrowser(orders) {
       cleanup();
       return;
     }
-    doc.open();
-    doc.write(html);
-    doc.close();
-    doc.title = " ";
-    const waitForImages = Promise.all(
-      [...doc.images].map((img) =>
-        img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
-      ),
-    );
+    const writeDoc = async () => {
+      doc.open();
+      doc.write(buildHtml());
+      doc.close();
+      doc.title = " ";
+      await Promise.all(
+        [...doc.images].map((img) =>
+          img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
+        ),
+      );
+    };
+    await writeDoc();
+    // A4-д багтахгүй бол Урамшууллаас доошхыг бүтнээр нь дараагийн хуудсанд.
+    for (let pass = 0; pass < 3; pass += 1) {
+      if (!receiptRelayoutOverflowPages(doc, layouts)) break;
+      await writeDoc();
+    }
     win.addEventListener("afterprint", cleanup, { once: true });
-    await waitForImages;
     setTimeout(() => {
       win.print();
     }, 80);
