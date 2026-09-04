@@ -10565,7 +10565,7 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 7mm; }
 .receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 9mm; }
 .receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
-  height: 5mm;
+  height: 2.5mm;
   padding: 0 !important;
   border: none !important;
 }
@@ -10635,7 +10635,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__iban-b {
   text-align: left !important;
   white-space: nowrap;
-  font-size: 9px !important;
+  font-size: 9pt !important;
   font-weight: 400;
   vertical-align: top !important;
   padding-top: 1px !important;
@@ -10644,7 +10644,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__iban-c {
   text-align: right !important;
   font-weight: 400;
-  font-size: 9px;
+  font-size: 9pt;
   white-space: nowrap;
   padding-right: 0 !important;
   padding-left: 0 !important;
@@ -10674,8 +10674,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
 .receipt-grid__spacer--pay-warn td { height: 12px; padding: 0; }
-.receipt-grid__spacer--sign td { height: 2mm; }
-.receipt-grid__fill td { height: 1.5mm; padding: 0; border: none !important; }
+.receipt-grid__spacer--sign td { height: 6mm; }
+.receipt-grid__fill td { height: 5.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
 .receipt-grid__summary-pad { border: none !important; background: transparent !important; padding: 0 !important; }
@@ -10809,7 +10809,7 @@ tbody.receipt-footer-keep {
     border-bottom: 0.75pt dotted #000 !important;
   }
   .receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
-    height: 5mm !important;
+    height: 2.5mm !important;
   }
   .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand,
   .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
