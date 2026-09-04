@@ -543,6 +543,8 @@ const RECEIPT_WARN_BG = "#E8EBEE";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
+/** Ахиулбал баримтын дугаарын шахалт бүх төхөөрөмж дээр дахин нэг удаа ажиллана. */
+const RECEIPT_SEQ_COMPACT_VERSION = 1;
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
@@ -1881,6 +1883,15 @@ function nextReceiptSeq(month) {
   }
   return max + 1;
 }
+/** Устгасан баримтын дугаарын цоорхойг тухайн сарын доторх дараагийнхаар нөхнө. */
+function closeReceiptSeqGap(month, removedSeq) {
+  if (!month || !(removedSeq > 0)) return;
+  for (const o of state.orders || []) {
+    if ((o.receiptMonth || receiptMonthKey(o)) !== month) continue;
+    const seq = Number(o.receiptSeq);
+    if (seq > removedSeq) o.receiptSeq = seq - 1;
+  }
+}
 function paidFromPaymentTerm(_term) {
   // Бэлэн / зээл аль нь ч төлбөр баталгаажуулахаас өмнө төлөөгүй.
   return false;
@@ -2208,6 +2219,41 @@ function normalizeOrderReceiptNumbers() {
     if (!usedByMonth[month]) usedByMonth[month] = new Set();
     usedByMonth[month].add(o.receiptSeq);
   }
+  compactOrderReceiptNumbersOnce();
+}
+/**
+ * Хуучин устгалтаас үлдсэн цоорхойг нэг л удаа шахна. Захиалгын түүх хадгалах
+ * хугацаа дуусахад ч захиалга жагсаалтаас хасагддаг тул үүнийг ачаалал бүрд
+ * ажиллуулбал амьд баримтуудын дугаар өдөр бүр гулсах байсан.
+ */
+function compactOrderReceiptNumbersOnce() {
+  ensureSettings();
+  if (state.settings.receiptSeqCompactVersion === RECEIPT_SEQ_COMPACT_VERSION) {
+    return;
+  }
+  const byMonth = new Map();
+  for (const o of state.orders || []) {
+    const month = o.receiptMonth || receiptMonthKey(o);
+    if (!month) continue;
+    if (!byMonth.has(month)) byMonth.set(month, []);
+    byMonth.get(month).push(o);
+  }
+  let changed = false;
+  for (const list of byMonth.values()) {
+    list.sort(
+      (a, b) =>
+        (Number(a.receiptSeq) || 0) - (Number(b.receiptSeq) || 0) ||
+        new Date(a.createdAt) - new Date(b.createdAt),
+    );
+    list.forEach((o, i) => {
+      if (Number(o.receiptSeq) === i + 1) return;
+      o.receiptSeq = i + 1;
+      changed = true;
+    });
+  }
+  state.settings.receiptSeqCompactVersion = RECEIPT_SEQ_COMPACT_VERSION;
+  // Шахалт нэг л удаа ажиллах тул үр дүнг нь тэр дороо бичиж үлдээнэ.
+  if (changed) scheduleBackendSave();
 }
 function nextOrderId() {
   let max = 0;
@@ -32770,6 +32816,8 @@ function deleteReceiptNow(id) {
   const o = state.orders.find((x) => x.id === id);
   if (!o) return;
   const receiptLabel = formatReceiptNumber(o);
+  const freedMonth = o.receiptMonth || receiptMonthKey(o);
+  const freedSeq = Number(o.receiptSeq);
   if (!orderIsCancelled(o)) {
     (o.items || []).forEach((i) => {
       if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
@@ -32777,6 +32825,7 @@ function deleteReceiptNow(id) {
   }
   recordDeletion("order", id);
   state.orders = state.orders.filter((x) => x.id !== id);
+  closeReceiptSeqGap(freedMonth, freedSeq);
   detachOrderFromViews(id);
   closeModal();
   showAppToast(`Баримт ${receiptLabel} устгагдлаа`, "success");
