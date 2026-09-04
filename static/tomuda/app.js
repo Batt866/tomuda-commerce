@@ -543,8 +543,6 @@ const RECEIPT_WARN_BG = "#E8EBEE";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Ахиулбал баримтын дугаарын шахалт бүх төхөөрөмж дээр дахин нэг удаа ажиллана. */
-const RECEIPT_SEQ_COMPACT_VERSION = 1;
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
@@ -2219,18 +2217,26 @@ function normalizeOrderReceiptNumbers() {
     if (!usedByMonth[month]) usedByMonth[month] = new Set();
     usedByMonth[month].add(o.receiptSeq);
   }
-  compactOrderReceiptNumbersOnce();
+  compactRetainedReceiptSeqs();
 }
 /**
- * Хуучин устгалтаас үлдсэн цоорхойг нэг л удаа шахна. Захиалгын түүх хадгалах
- * хугацаа дуусахад ч захиалга жагсаалтаас хасагддаг тул үүнийг ачаалал бүрд
- * ажиллуулбал амьд баримтуудын дугаар өдөр бүр гулсах байсан.
+ * Тухайн сарын нэг ч захиалга хадгалах хугацаанаасаа хараахан гараагүй эсэх.
+ * Гараагүй бол жагсаалтад байгаа нь тэр сарын бүх баримт гэсэн үг тул дугаарын
+ * цоорхой зөвхөн устгалтаас үүссэн байна.
  */
-function compactOrderReceiptNumbersOnce() {
-  ensureSettings();
-  if (state.settings.receiptSeqCompactVersion === RECEIPT_SEQ_COMPACT_VERSION) {
-    return;
-  }
+function receiptMonthFullyRetained(month, now = Date.now()) {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ""))) return false;
+  const firstDay = new Date(`${month}-01T23:59:59`);
+  if (Number.isNaN(firstDay.getTime())) return false;
+  firstDay.setDate(firstDay.getDate() + orderRetentionDays());
+  return firstDay.getTime() >= now;
+}
+/**
+ * Устгалтаас үлдсэн цоорхойг шахна. Хадгалах хугацаа дуусахад захиалга
+ * жагсаалтаас хасагддаг тул тэр сарыг хөндөхгүй — эс бөгөөс амьд баримтуудын
+ * дугаар өдөр бүр гулсах байсан.
+ */
+function compactRetainedReceiptSeqs(now = Date.now()) {
   const byMonth = new Map();
   for (const o of state.orders || []) {
     const month = o.receiptMonth || receiptMonthKey(o);
@@ -2239,7 +2245,8 @@ function compactOrderReceiptNumbersOnce() {
     byMonth.get(month).push(o);
   }
   let changed = false;
-  for (const list of byMonth.values()) {
+  for (const [month, list] of byMonth) {
+    if (!receiptMonthFullyRetained(month, now)) continue;
     list.sort(
       (a, b) =>
         (Number(a.receiptSeq) || 0) - (Number(b.receiptSeq) || 0) ||
@@ -2251,8 +2258,6 @@ function compactOrderReceiptNumbersOnce() {
       changed = true;
     });
   }
-  state.settings.receiptSeqCompactVersion = RECEIPT_SEQ_COMPACT_VERSION;
-  // Шахалт нэг л удаа ажиллах тул үр дүнг нь тэр дороо бичиж үлдээнэ.
   if (changed) scheduleBackendSave();
 }
 function nextOrderId() {
