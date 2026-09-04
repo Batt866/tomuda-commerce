@@ -9962,7 +9962,7 @@ td, th { border: none; }
   /* A4: left/top margin via @page; right smaller than left. */
   padding: 4mm 0 2mm 0;
   box-sizing: border-box;
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.15;
   font-family: ${RECEIPT_FONT};
   background: #fff;
@@ -9992,7 +9992,7 @@ td, th { border: none; }
   max-width: none;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
@@ -10022,7 +10022,7 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__bank .receipt-grid__address-cell {
   vertical-align: top;
   font-weight: 400;
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.35;
   color: #000;
   white-space: normal;
@@ -10048,19 +10048,19 @@ td, th { border: none; }
   background: #fff;
   color: ${RECEIPT_TEXT};
   line-height: 1.25;
-  font-size: 7.5pt;
+  font-size: 9pt;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
   background: ${RECEIPT_HEADER_BG} !important;
   font-weight: 700;
-  font-size: 7.5pt;
+  font-size: 9pt;
   text-align: center;
   padding: 4px 5px;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: right;
   padding: 3px 4px;
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
@@ -10070,7 +10070,7 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__qty { font-weight: 700; }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__barcode {
   text-align: center;
-  font-size: 7.5pt;
+  font-size: 9pt;
   word-break: break-all;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__price,
@@ -10078,7 +10078,7 @@ td, th { border: none; }
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 400;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td {
@@ -10086,7 +10086,7 @@ td, th { border: none; }
   border-bottom: 0.4pt solid #666 !important;
   padding: 5px 6px;
   vertical-align: middle;
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.3;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
@@ -10123,29 +10123,29 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-label {
   font-weight: 700;
-  font-size: 7.5pt;
+  font-size: 9pt;
   white-space: nowrap;
   text-align: right;
   padding-right: 8px !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-name {
   font-weight: 400;
-  font-size: 7.5pt;
+  font-size: 9pt;
   text-align: left;
   padding-left: 6px !important;
 }
-.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 7.5pt; }
+.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9pt; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
   text-align: right;
   white-space: nowrap;
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 700;
   color: #000 !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
   text-align: right;
   white-space: nowrap;
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 700;
   color: #2E86C1 !important;
 }
@@ -10168,7 +10168,7 @@ td, th { border: none; }
   column-gap: 4px;
   align-items: start;
   margin: 0 0 3px;
-  font-size: 7.5px;
+  font-size: 9px;
   line-height: 1.25;
 }
 .receipt-info__l {
@@ -10201,7 +10201,7 @@ td, th { border: none; }
   width: 48%;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
-  font-size: 7.5px;
+  font-size: 9px;
   padding-right: 4px;
   text-align: left;
   white-space: normal;
@@ -10211,7 +10211,7 @@ td, th { border: none; }
 .receipt-info__value {
   width: 52%;
   font-weight: 700;
-  font-size: 7.5px;
+  font-size: 9px;
   color: ${RECEIPT_TEXT};
   text-align: left;
   white-space: normal;
@@ -10230,7 +10230,7 @@ td, th { border: none; }
 }
 .receipt-info__iban-label {
   font-weight: 400;
-  font-size: 7.5px;
+  font-size: 9px;
   line-height: 1.3;
   white-space: nowrap;
   color: ${RECEIPT_TEXT};
@@ -10238,7 +10238,7 @@ td, th { border: none; }
 }
 .receipt-info__iban-nums {
   font-weight: 700;
-  font-size: 7.5px;
+  font-size: 9px;
   line-height: 1.35;
   color: ${RECEIPT_TEXT};
 }
@@ -10251,14 +10251,14 @@ td, th { border: none; }
 }
 .receipt-info__address-label {
   font-weight: 400;
-  font-size: 7.5px;
+  font-size: 9px;
   line-height: 1.3;
   color: ${RECEIPT_TEXT};
   margin: 0 0 2px;
 }
 .receipt-info__address-text {
   font-weight: 700;
-  font-size: 7.5px;
+  font-size: 9px;
   /* Keep delivery address as one block (not a row per fragment). */
   line-height: 1.4;
   color: ${RECEIPT_TEXT};
@@ -10281,7 +10281,7 @@ td, th { border: none; }
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 8.5px;
+  font-size: 10px;
   line-height: 1.12;
   page-break-inside: avoid;
 }
@@ -10303,7 +10303,7 @@ td, th { border: none; }
   border: 0.4pt solid #777 !important;
   background: ${RECEIPT_HEADER_BG} !important;
   font-weight: 700;
-  font-size: 7.5px;
+  font-size: 9px;
   text-align: center;
   color: ${RECEIPT_TEXT};
   min-height: 18px;
@@ -10321,8 +10321,8 @@ tbody.receipt-footer-keep {
   break-inside: avoid;
   -webkit-column-break-inside: avoid;
 }
-.receipt-items__row td { font-size: 8.5px; }
-.receipt-items__num { width: 2%; text-align: right; max-width: 20px; padding-right: 2px; font-size: 7.5px; color: #555; }
+.receipt-items__row td { font-size: 10px; }
+.receipt-items__num { width: 2%; text-align: right; max-width: 20px; padding-right: 2px; font-size: 9px; color: #555; }
 .receipt-items__name {
   width: 38%;
   text-align: left;
@@ -10344,7 +10344,7 @@ tbody.receipt-footer-keep {
   overflow: visible;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
-  font-size: 7px;
+  font-size: 8px;
   line-height: 1.15;
 }
 .receipt-items__qty { width: 7%; text-align: center; }
@@ -10357,7 +10357,7 @@ tbody.receipt-footer-keep {
   background: #fff !important;
   padding: 3px 6px;
   height: auto;
-  font-size: 8.5px;
+  font-size: 10px;
   line-height: 1.25;
 }
 .receipt-items--promo .receipt-items__promo td {
@@ -10376,7 +10376,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-items--promo .receipt-items__promo-settle {
   font-weight: 600;
-  font-size: 8.5px;
+  font-size: 10px;
   display: block;
   width: 100%;
 }
@@ -10390,7 +10390,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
-  font-size: 9.5px;
+  font-size: 11px;
   text-align: right;
   white-space: nowrap;
   vertical-align: middle;
@@ -10407,7 +10407,7 @@ tbody.receipt-footer-keep {
   overflow-wrap: break-word;
   overflow: visible;
   font-weight: 600;
-  font-size: 8.5px;
+  font-size: 10px;
   line-height: 1.2;
   letter-spacing: 0;
   font-variant-numeric: normal;
@@ -10415,7 +10415,7 @@ tbody.receipt-footer-keep {
 .receipt-items--promo .receipt-items__promo-barcode {
   text-align: right !important;
   padding-right: 4px;
-  font-size: 7px;
+  font-size: 8px;
   line-height: 1.15;
   white-space: normal;
   word-break: break-all;
@@ -10430,7 +10430,7 @@ tbody.receipt-footer-keep {
   padding: 0;
   height: auto;
   min-height: 0;
-  font-size: 7.5px;
+  font-size: 9px;
   border: none !important;
   background: transparent !important;
 }
@@ -10448,7 +10448,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__return-label {
   font-weight: 400;
   text-align: center;
-  font-size: 7.5px;
+  font-size: 9px;
   line-height: 1.3;
 }
 .receipt-grid__return-line { min-height: 12px; }
@@ -10457,13 +10457,13 @@ tbody.receipt-footer-keep {
   height: 16px;
   padding: 0 6px;
   font-weight: 700;
-  font-size: 7.5px;
+  font-size: 9px;
   border: none !important;
 }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-label {
   text-align: right;
   padding-right: 8px !important;
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 700;
   background: #d9d9d9 !important;
   border: none !important;
@@ -10475,13 +10475,13 @@ tbody.receipt-footer-keep {
   background: #d9d9d9 !important;
 }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__money {
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 700;
 }
 .receipt-grid--sheet .receipt-grid__summary td {
   height: 16px;
   padding: 0 6px;
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.15;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
@@ -10490,11 +10490,11 @@ tbody.receipt-footer-keep {
   height: 16px;
   padding: 0 6px;
   font-weight: 700;
-  font-size: 7.5pt;
+  font-size: 9pt;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   font-weight: 700 !important;
-  font-size: 7.5pt !important;
+  font-size: 9pt !important;
   letter-spacing: 0;
   background: ${RECEIPT_GRAND_BG} !important;
   white-space: nowrap;
@@ -10504,25 +10504,25 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-note {
   background: ${RECEIPT_GRAND_BG} !important;
   font-weight: 400 !important;
-  font-size: 7pt !important;
+  font-size: 8pt !important;
   text-align: center !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-value--grand {
   background: ${RECEIPT_GRAND_BG} !important;
   font-weight: 700 !important;
-  font-size: 7.5pt !important;
+  font-size: 9pt !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 7.5pt; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 9pt; }
 .receipt-grid__summary-note {
   text-align: center;
-  font-size: 7px !important;
+  font-size: 8px !important;
   font-weight: 400 !important;
   border-top: 0.4pt solid #777 !important;
   border-bottom: 0.4pt solid #777 !important;
 }
 .receipt-grid__pay-opt {
   text-align: right;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 400;
   color: ${RECEIPT_TEXT};
 }
@@ -10532,7 +10532,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__settle-note td { padding: 1px 0 !important; }
 .receipt-grid__settle-note-text {
   text-align: center !important;
-  font-size: 6.5px;
+  font-size: 7.5px;
   line-height: 1.25;
   padding: 3px 6px !important;
   color: ${RECEIPT_TEXT};
@@ -10597,7 +10597,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-header-date {
   white-space: nowrap;
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.2;
   padding-top: 1px;
   text-align: right;
@@ -10605,7 +10605,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__brand {
   font-family: ${RECEIPT_FONT_TITLE};
-  font-size: 9.5pt;
+  font-size: 11pt;
   font-weight: 700;
   padding: 0 0 0 10mm !important;
   margin: 0;
@@ -10625,7 +10625,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__address,
 .receipt-grid__phone {
-  font-size: 7.5pt;
+  font-size: 9pt;
   line-height: 1.35;
   white-space: normal;
   word-break: break-word;
@@ -10641,7 +10641,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__phone { font-weight: 400; }
 .receipt-grid__date-label,
 .receipt-grid__date {
-  font-size: 7.5pt;
+  font-size: 9pt;
   text-align: right;
   white-space: nowrap;
   color: ${RECEIPT_TEXT};
@@ -10661,7 +10661,7 @@ tbody.receipt-footer-keep {
 .receipt-title {
   text-align: center;
   font-family: ${RECEIPT_FONT_TITLE};
-  font-size: 12pt;
+  font-size: 14pt;
   font-weight: 700;
   padding: 8px 4px !important;
   margin: 0;
@@ -10672,21 +10672,21 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__header--title td { padding-top: 2px !important; padding-bottom: 8px !important; height: 30px; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 7.5pt; line-height: 1.15; padding: 1px 2px !important; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
-  font-size: 7.5pt !important;
+  font-size: 9pt !important;
   font-weight: 400 !important;
 }
-.receipt-grid__label { color: ${RECEIPT_TEXT}; white-space: nowrap; font-weight: 400; font-size: 7.5pt; }
-.receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 7.5pt; }
+.receipt-grid__label { color: ${RECEIPT_TEXT}; white-space: nowrap; font-weight: 400; font-size: 9pt; }
+.receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9pt; }
 .receipt-grid__value b { font-weight: 700; font-size: inherit; }
-.receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 7.5pt; }
-.receipt-grid__iban-nums { font-weight: 700; font-size: 7.5pt !important; line-height: 1.25; }
-.receipt-grid__iban-nums b { font-size: 7.5pt !important; font-weight: 700; }
+.receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9pt; }
+.receipt-grid__iban-nums { font-weight: 700; font-size: 9pt !important; line-height: 1.25; }
+.receipt-grid__iban-nums b { font-size: 9pt !important; font-weight: 700; }
 .receipt-grid__iban-b {
   text-align: left !important;
   white-space: nowrap;
-  font-size: 7.5pt !important;
+  font-size: 9pt !important;
   font-weight: 400;
   vertical-align: top !important;
   padding-top: 1px !important;
@@ -10695,7 +10695,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__iban-c {
   text-align: right !important;
   font-weight: 400;
-  font-size: 7.5pt;
+  font-size: 9pt;
   white-space: nowrap;
   padding-right: 0 !important;
   padding-left: 0 !important;
@@ -10728,24 +10728,24 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--sign td { height: 6mm; }
 .receipt-grid__fill td { height: 5.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.receipt-grid__money--strong { font-weight: 700; font-size: 7.5pt; }
+.receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
 .receipt-grid__summary-pad { border: none !important; background: transparent !important; padding: 0 !important; }
 .receipt-grid__gross-label {
   text-align: right;
-  font-size: 7.5pt !important;
+  font-size: 9pt !important;
   font-weight: 700 !important;
   padding-right: 8px !important;
   border: none !important;
 }
 .receipt-grid__gross .receipt-grid__money {
-  font-size: 7.5pt !important;
+  font-size: 9pt !important;
   font-weight: 700 !important;
   text-align: right;
 }
 .receipt-grid__summary-label {
   background: transparent;
   font-weight: 400;
-  font-size: 9.5px;
+  font-size: 11px;
   text-align: left;
   color: ${RECEIPT_TEXT};
   padding-right: 6px !important;
@@ -10753,10 +10753,10 @@ tbody.receipt-footer-keep {
   border: none !important;
 }
 .receipt-grid__summary-label--vat { font-weight: 700 !important; }
-.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 7.5pt !important; letter-spacing: 0; white-space: nowrap; text-align: left !important; }
+.receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9pt !important; letter-spacing: 0; white-space: nowrap; text-align: left !important; }
 .receipt-grid__summary-value {
   text-align: right;
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   font-weight: 400;
@@ -10772,15 +10772,15 @@ tbody.receipt-footer-keep {
   border-top: none !important;
   border-bottom: none !important;
 }
-.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 7.5pt !important; }
-.receipt-grid__summary-value--grand { font-size: 7.5pt !important; font-weight: 700 !important; }
+.receipt-grid__summary--grand .receipt-grid__summary-value { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 9pt !important; }
+.receipt-grid__summary-value--grand { font-size: 9pt !important; font-weight: 700 !important; }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   border: none !important;
 }
 .receipt-grid__settle td { padding: 2px 0 !important; }
 .receipt-grid__settle-text {
   text-align: center;
-  font-size: 6.5px;
+  font-size: 7.5px;
   line-height: 1.15;
   padding: 3px 4px !important;
   background: transparent !important;
@@ -10797,16 +10797,16 @@ tbody.receipt-footer-keep {
   border: none !important;
   box-sizing: border-box;
   margin: 0;
-  font-size: 7pt;
+  font-size: 8pt;
   line-height: 1.35;
   color: ${RECEIPT_TEXT};
   font-weight: 400;
 }
 .receipt-grid__warn-line--first { line-height: 1.45; }
-.receipt-grid__warn-line--bold { font-weight: 700; font-size: 7.5pt; }
-.receipt-grid__warn-em { font-weight: 700; font-size: 7.5pt; white-space: nowrap; }
+.receipt-grid__warn-line--bold { font-weight: 700; font-size: 9pt; }
+.receipt-grid__warn-em { font-weight: 700; font-size: 9pt; white-space: nowrap; }
 .receipt-grid__sign-label {
-  font-size: 7.5pt;
+  font-size: 9pt;
   font-weight: 400;
   font-family: ${RECEIPT_FONT};
   padding: 2px 4px 1px 0;
@@ -10836,7 +10836,7 @@ tbody.receipt-footer-keep {
     margin: 0;
     box-shadow: none !important;
     overflow: visible;
-    font-size: 7.5pt;
+    font-size: 9pt;
   }
   .receipt-logo.receipt-logo--overlay {
     top: 0;
@@ -10847,9 +10847,9 @@ tbody.receipt-footer-keep {
     min-height: 14mm !important;
     max-height: 14mm !important;
   }
-  .receipt-grid { max-width: none; font-size: 7.5pt; }
-  .receipt-title { font-size: 12pt; }
-  .receipt-grid__brand { font-size: 9.5pt; padding-left: 10mm !important; }
+  .receipt-grid { max-width: none; font-size: 9pt; }
+  .receipt-title { font-size: 14pt; }
+  .receipt-grid__brand { font-size: 11pt; padding-left: 10mm !important; }
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 10mm !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
@@ -11199,7 +11199,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="16"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="7.5"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="7.5"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="15"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="12"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="7"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9.5"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="7"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="13.5"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="9.5"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="12"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="7.5"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9.5"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="13.5"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="7.5"/><color rgb="FF2E86C1"/><name val="Arial"/></font><font><sz val="6.5"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_SETTLE_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="9"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="68"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="15" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="16"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF2E86C1"/><name val="Arial"/></font><font><sz val="7.5"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_SETTLE_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC5CAD0"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="9"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="68"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="15" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="3"/></xf><xf numFmtId="0" fontId="5" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="11" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
