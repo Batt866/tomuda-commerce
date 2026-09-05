@@ -1011,8 +1011,8 @@ function receiptWarningRowsHtml() {
     `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-line${extra}">${text}</td></tr>`;
   return (
     row(
-      // Excel хувилбартай ижил — «ААН-ийн РЕГИСТР» доод мөрөнд бүтнээрээ орно.
-      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр</b>,<br><b class="receipt-grid__warn-em">ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
+      // Хоёр мөр: эхний мөр «гүйлгээний утга дээр» хүртэл, доод мөрөнд бүтэн «дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.»
+      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр<br><b class="receipt-grid__warn-em">дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
       " receipt-grid__warn-line--first",
     ) +
     row(
@@ -11044,7 +11044,7 @@ const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
 /** «ЗАРЛАГЫН БАРИМТ» row — breathing room above/below 14pt title. */
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 30;
 /** First payment-warning row — taller for wrapped text. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 28;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 75 → indices 0–74). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -12187,13 +12187,8 @@ function appendReceiptSheetRows(
           sz: 9,
         },
         { t: "гүйлгээний утга", b: true, sz: 9 },
-        {
-          t: " дээр ",
-          sz: 9,
-        },
-        { t: "дэлгүүрийн нэр", b: true, sz: 9 },
-        { t: ",\n", sz: 9 },
-        { t: "ААН-ийн РЕГИСТР", b: true, sz: 9 },
+        { t: " дээр\n", sz: 9 },
+        { t: "дэлгүүрийн нэр, ААН-ийн РЕГИСТР", b: true, sz: 9 },
         { t: "-ийг бичээрэй.", sz: 9 },
       ],
     ],
