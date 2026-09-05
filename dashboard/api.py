@@ -250,11 +250,6 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
                 merged_customer["registrationNumber"] = previous.get(
                     "registrationNumber"
                 )
-                for key in ("phones", "phone1", "phone2"):
-                    if key in previous:
-                        merged_customer[key] = previous[key]
-                    else:
-                        merged_customer.pop(key, None)
             customers[existing_idx] = merged_customer
             saved_customer = merged_customer
         else:

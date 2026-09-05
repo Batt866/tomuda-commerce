@@ -1124,6 +1124,15 @@ textarea.text-sm,
   color: var(--hex-muted-foreground);
 }
 
+.customer-registry-status {
+  margin-top: 0.5rem;
+}
+.customer-registry-status--locked,
+.customer-registry-status:not(:empty) {
+  margin-top: 0.85rem;
+  margin-bottom: 1rem;
+}
+
 .customer-phones {
   display: flex;
   flex-direction: column;
