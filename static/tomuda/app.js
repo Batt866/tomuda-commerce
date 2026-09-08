@@ -3490,7 +3490,24 @@ function canViewDeletionLog() {
 function canViewReportsHub() {
   return canViewStockReports() || canViewSalesReport() || canViewSalesInfo();
 }
+function isAdminRole(emp = state.currentEmployee) {
+  return (emp?.role || currentRole()) === "admin";
+}
+function canAccessSettingsView(emp = state.currentEmployee) {
+  return (
+    hasPermission("stockAlert.view", emp) ||
+    hasPermission("stockAlert.edit", emp) ||
+    hasPermission("percentDiscount.view", emp) ||
+    hasPermission("percentDiscount.edit", emp) ||
+    hasPermission("orderHistory.view", emp) ||
+    hasPermission("orderHistory.edit", emp) ||
+    hasPermission("deletionLog.view", emp) ||
+    hasPermission("settings.view", emp)
+  );
+}
 function canAccessView(viewId) {
+  if (viewId === "admin" && !isAdminRole()) return false;
+  if (viewId === "settings") return canAccessSettingsView();
   if (viewId === "employeePermissions" && canManageEmployeePermissions()) {
     return true;
   }
@@ -3989,7 +4006,7 @@ function canPageBack() {
       "promotions",
       "warehouseReceipts",
       "count",
-    ].includes(state.currentView) && canAccessView("admin")
+    ].includes(state.currentView) && isAdminRole()
   );
 }
 const pageHead = (title, action = "", opts = {}) => {
@@ -4012,6 +4029,10 @@ const MOBILE_NAV_SHORT = {
   reports: "Борлуулалтын тайлан",
   stockReports: "Тайлан",
   promotions: "Урамшуулал",
+  warehouseReceipts: "Баримтууд",
+  employeePermissions: "Эрх",
+  settings: "Тохиргоо",
+  suppliers: "Нийлүүлэгч",
   admin: "Админ",
 };
 const MOBILE_NAV_SVG = {
@@ -4035,6 +4056,14 @@ const MOBILE_NAV_SVG = {
     '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 17V9"/><path d="M12 17V7"/><path d="M16 17v-4"/>',
   promotions:
     '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+  warehouseReceipts:
+    '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',
+  employeePermissions:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M15 11h6M18 8v6"/>',
+  settings:
+    '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  suppliers:
+    '<path d="M3 9h18v12H3z"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/>',
   admin:
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
 };
@@ -4064,7 +4093,6 @@ function sidebarNavForRole(role) {
       ["products", "Бараа"],
       ["warehouse", "Агуулах"],
       ["inventory", "Нярав"],
-      ["admin", "Админ"],
     ].filter(
       ([id]) =>
         allowedNavIds().includes(id) ||
@@ -4078,8 +4106,8 @@ function sidebarNavForRole(role) {
     if (id === "inventory") return ["inventory", "Нярав"];
     return [id, label];
   });
-  // Admin: Нярав (үлдэгдэл) is under Админ hub — keep Агуулах on menu.
-  if (nav.some(([id]) => id === "admin")) {
+  // Admin role: Нярав stays under the Админ hub — keep Агуулах on the menu.
+  if (isAdminRole() && nav.some(([id]) => id === "admin")) {
     nav = nav.filter(([id]) => id !== "inventory");
     if (canAccessView("warehouse") && !nav.some(([id]) => id === "warehouse")) {
       const adminIdx = nav.findIndex(([id]) => id === "admin");
@@ -4113,11 +4141,7 @@ function bottomNavForRole(role) {
     ],
     delivery: [["delivery", "Хүргэлт"]],
   };
-  const fullAccess =
-    canAccessView("admin") &&
-    canAccessView("worker") &&
-    canAccessView("warehouse") &&
-    canAccessView("employees");
+  const fullAccess = isAdminRole();
   const items = fullAccess ? specs.admin : specs[role] || specs.sales;
   return items.filter(([id]) => {
     if (id === "warehouse") return canWh;
@@ -4136,6 +4160,7 @@ function mobileNavActive(viewId, navId) {
   if (viewId === navId) return true;
   if (
     navId === "admin" &&
+    isAdminRole() &&
     (viewId === "inventory" ||
       viewId === "warehouseReceipts" ||
       viewId === "count" ||
@@ -4144,7 +4169,9 @@ function mobileNavActive(viewId, navId) {
       viewId === "employeePermissions" ||
       viewId === "reports" ||
       viewId === "stockReports" ||
-      viewId === "promotions")
+      viewId === "promotions" ||
+      viewId === "suppliers" ||
+      viewId === "settings")
   ) {
     return true;
   }
@@ -4203,6 +4230,8 @@ function currentPageTitle(nav) {
     warehouseReceipts: "Баримтууд",
     count: "Тооллого",
     delivery: "Хүргэлт",
+    settings: "Тохиргоо",
+    suppliers: "Нийлүүлэгч",
   };
   if (extra[state.currentView]) return extra[state.currentView];
   const hit = nav.find(([id]) => mobileNavActive(state.currentView, id));
@@ -6938,7 +6967,7 @@ function canAppBack() {
     "warehouseReceipts",
     "count",
   ];
-  if (subAdminViews.includes(state.currentView) && canAccessView("admin")) {
+  if (subAdminViews.includes(state.currentView) && isAdminRole()) {
     return true;
   }
   const defaultView = defaultViewForRole(currentRole());
@@ -7047,7 +7076,8 @@ function handleAppBack() {
       clearDeliveryStore();
       return true;
     }
-    go("admin", { silent: true });
+    if (isAdminRole()) go("admin", { silent: true });
+    else go(defaultViewForRole(currentRole()), { silent: true });
     return true;
   }
 
@@ -7079,7 +7109,7 @@ function handleAppBack() {
     "warehouseReceipts",
     "count",
   ];
-  if (subAdminViews.includes(state.currentView) && canAccessView("admin")) {
+  if (subAdminViews.includes(state.currentView) && isAdminRole()) {
     go("admin", { silent: true });
     return true;
   }
@@ -9499,6 +9529,47 @@ function adminHubActionCard(action, label, iconKey) {
   const svg = ADMIN_METRIC_ICONS[iconKey] || ADMIN_METRIC_ICONS.stock;
   return `<button type="button" onclick="${action}" class="admin-hub-card admin-hub-card--settings"><span class="admin-hub-card__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24">${svg}</svg></span><span class="admin-hub-card__label">${esc(label)}</span><svg class="ui-icon admin-hub-card__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>`;
 }
+function adminSettingsCards() {
+  const settings = [];
+  if (canManageStockAlert()) {
+    settings.push(["stockAlertModal()", "Үлдэгдэл сануулах", "stock"]);
+  }
+  if (canManagePercentDiscountSettings()) {
+    settings.push([
+      "percentDiscountSettingsModal()",
+      "Шууд төлөлтийн хувь оруулах",
+      "employees",
+    ]);
+  }
+  if (canManageOrderHistorySettings()) {
+    settings.push([
+      "orderRetentionSettingsModal()",
+      `Захиалгын түүх хадгалах (${orderRetentionDays()} хоног)`,
+      "reports",
+    ]);
+  }
+  if (
+    canManageStockAlert() ||
+    canManageOrderHistorySettings() ||
+    canViewDeletionLog()
+  ) {
+    settings.push(["deletionLogModal()", "Устгасан бүртгэл", "inventory"]);
+  }
+  return settings;
+}
+function adminSettingsSectionHtml() {
+  const settings = adminSettingsCards();
+  if (!settings.length) return "";
+  return `<h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div>`;
+}
+function settingsView() {
+  ensureSettings();
+  const html = adminSettingsSectionHtml();
+  return `<div class="admin-page space-y-4">${pageHead("Тохиргоо")}${
+    html ||
+    `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`
+  }</div>`;
+}
 function adminHubHtml() {
   const main = [
     ["employees", "Ажилтан", "employees", "employees.view"],
@@ -9525,34 +9596,7 @@ function adminHubHtml() {
     if (id === "count") return canManageCount();
     return hasPermission(perm);
   });
-  const settings = [];
-  if (canManageStockAlert()) {
-    settings.push(["stockAlertModal()", "Үлдэгдэл сануулах", "stock"]);
-  }
-  if (canManagePercentDiscountSettings()) {
-    settings.push([
-      "percentDiscountSettingsModal()",
-      "Шууд төлөлтийн хувь оруулах",
-      "employees",
-    ]);
-  }
-  if (canManageOrderHistorySettings()) {
-    settings.push([
-      "orderRetentionSettingsModal()",
-      `Захиалгын түүх хадгалах (${orderRetentionDays()} хоног)`,
-      "reports",
-    ]);
-  }
-  if (
-    canManageStockAlert() ||
-    canManageOrderHistorySettings() ||
-    canViewDeletionLog()
-  ) {
-    settings.push(["deletionLogModal()", "Устгасан бүртгэл", "inventory"]);
-  }
-  const settingsHtml = settings.length
-    ? `<h3 class="admin-hub__heading admin-hub__heading--settings">Тохиргоо</h3><div class="admin-hub__settings">${settings.map(([action, label, icon]) => adminHubActionCard(action, label, icon)).join("")}</div>`
-    : "";
+  const settingsHtml = adminSettingsSectionHtml();
   if (!main.length && !settingsHtml) {
     return `<section class="admin-hub"><p class="text-sm text-muted-foreground">Харах эрхтэй хэсэг байхгүй.</p></section>`;
   }
@@ -27389,6 +27433,7 @@ function render() {
     warehouseReceipts: warehouseReceiptsView,
     delivery: deliveryView,
     count: countView,
+    settings: settingsView,
   };
   const view = map[state.currentView] || workerView;
   whReceiptPickerSkipAnim = isWhReceiptPickerOpen();

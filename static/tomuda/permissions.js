@@ -377,6 +377,7 @@
     warehouseReceipts: "receipts.view",
     delivery: "orders.view",
     orders: "orders.view",
+    settings: "settings.view",
   };
 
   const NAV_ITEMS = [
@@ -389,8 +390,25 @@
     ["suppliers", "Нийлүүлэгч", "suppliers.view"],
     ["stockReports", "Тайлан", "reports.view"],
     ["promotions", "Урамшуулал", "promotions.view"],
+    ["warehouseReceipts", "Баримтууд", "receipts.view"],
+    ["count", "Тооллого", "count.view"],
+    ["delivery", "Хүргэлт", "orders.view"],
+    ["employeePermissions", "Эрхийн тохиргоо", "permissions.view"],
+    ["settings", "Тохиргоо", "settings.view"],
     ["admin", "Админ", "dashboard.view"],
   ];
+
+  /** Admin role keeps these on the sidebar; the rest stay inside the Админ hub. */
+  const ADMIN_ROLE_NAV_IDS = new Set([
+    "worker",
+    "customers",
+    "products",
+    "warehouse",
+    "employees",
+    "stockReports",
+    "promotions",
+    "admin",
+  ]);
 
   function normalizeKeys(list) {
     if (!Array.isArray(list)) return [];
@@ -505,11 +523,41 @@
         hasPermission("promotions.view", emp) || hasPermission("settings.view", emp)
       );
     }
+    if (viewId === "suppliers") {
+      return (
+        hasPermission("suppliers.view", emp) ||
+        hasPermission("suppliers.create", emp) ||
+        hasPermission("suppliers.edit", emp) ||
+        hasPermission("warehouse.view", emp) ||
+        hasPermission("warehouse.edit", emp)
+      );
+    }
+    if (viewId === "employeePermissions") {
+      return (
+        hasPermission("permissions.view", emp) ||
+        hasPermission("permissions.edit", emp) ||
+        hasPermission("permissions.create", emp) ||
+        hasPermission("employees.edit", emp)
+      );
+    }
+    if (viewId === "settings") {
+      return (
+        hasPermission("stockAlert.view", emp) ||
+        hasPermission("stockAlert.edit", emp) ||
+        hasPermission("percentDiscount.view", emp) ||
+        hasPermission("percentDiscount.edit", emp) ||
+        hasPermission("orderHistory.view", emp) ||
+        hasPermission("orderHistory.edit", emp) ||
+        hasPermission("deletionLog.view", emp) ||
+        hasPermission("settings.view", emp)
+      );
+    }
     if (viewId === "admin") {
       return (
-        hasPermission("dashboard.view", emp) ||
-        hasPermission("settings.view", emp) ||
-        hasPermission("permissions.view", emp)
+        emp?.role === "admin" &&
+        (hasPermission("dashboard.view", emp) ||
+          hasPermission("settings.view", emp) ||
+          hasPermission("permissions.view", emp))
       );
     }
     return hasPermission(perm, emp);
@@ -517,7 +565,13 @@
 
   function allowedNavForEmployee(emp) {
     if (emp?.role === "delivery") return [["delivery", "Хүргэлт"]];
-    return NAV_ITEMS.filter(([, , perm]) => hasPermission(perm, emp));
+    const isAdminRole = emp?.role === "admin";
+    return NAV_ITEMS.filter(([id]) => {
+      if (id === "admin") return isAdminRole && canAccessView("admin", emp);
+      if (id === "settings") return !isAdminRole && canAccessView("settings", emp);
+      if (isAdminRole && !ADMIN_ROLE_NAV_IDS.has(id)) return false;
+      return canAccessView(id, emp);
+    }).map(([id, label]) => [id, label]);
   }
 
   function ensureModuleViewDeps(set) {
