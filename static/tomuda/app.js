@@ -12199,23 +12199,35 @@ function appendReceiptSheetRows(
   // Шууд төлөлтийн анхааруулга — Төлбөрийн нөхцөлөөс дээш, төвлөрсөн
   if (receiptShouldShowCashSettleNote(o)) {
     const r = rowNum;
+    const note = receiptCashSettleNoteText();
+    const noteColW = RECEIPT_XLSX_COL_WIDTHS.slice(1, 11).reduce(
+      (sum, width) => sum + width,
+      0,
+    );
+    const noteH = receiptXlsxWrappedRowHeight(note, noteColW, {
+      min: RECEIPT_XLSX_ROW_HEIGHT,
+      linePt: 10,
+      pad: 4,
+      max: 28,
+    });
     merges.push(`B${r}:K${r}`);
-    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-      xlsxCellXml(`B${r}`, 2, si(receiptCashSettleNoteText()), "s"),
+    pushRow(noteH, [
+      xlsxCellXml(`B${r}`, 2, si(note), "s"),
       ...emptyCells(r, "C", "K", 2),
     ]);
   }
 
-  // Төлбөрийн нөхцөл — анхааруулгын доор
+  // Төлбөрийн нөхцөл — label B:D, value H:K (HTML colspan 4). K alone clips «Шууд төлөх».
   {
     const r = rowNum;
     const term = receiptPaymentTermDisplay(o);
-    merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
+    merges.push(`B${r}:D${r}`, `H${r}:K${r}`);
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
       xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.payLabel, si("Төлбөрийн нөхцөл"), "s"),
-      xlsxCellXml(`K${r}`, RECEIPT_XLSX_STYLE.payValue, si(term), "s"),
+      xlsxCellXml(`H${r}`, RECEIPT_XLSX_STYLE.payValue, si(term), "s"),
       ...emptyCells(r, "C", "D", RECEIPT_XLSX_STYLE.payLabel),
-      ...emptyCells(r, "E", "J", 1),
+      ...emptyCells(r, "E", "G", 1),
+      ...emptyCells(r, "I", "K", RECEIPT_XLSX_STYLE.payValue),
     ]);
   }
 
