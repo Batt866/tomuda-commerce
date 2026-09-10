@@ -755,7 +755,7 @@ function InvoiceHeader(logoSrc, o) {
   return receiptHeaderRows(logoSrc, o);
 }
 /** Fallback cap for paid lines on one A4 body until measurement narrows it. */
-const RECEIPT_PAGE_PAID_MAX = 16;
+const RECEIPT_PAGE_PAID_MAX = 26;
 function receiptPaidItems(o) {
   return (o.items || []).filter((i) => !i.isPromoFree);
 }
@@ -10077,9 +10077,9 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A = №, B starts product name; C holds brand. A+B matches Excel 11. */
-.receipt-grid__a { width: 4mm; } .receipt-grid__b { width: 10.4%; } .receipt-grid__c { width: 19.6%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
-.receipt-grid__f { width: 10.5%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 6.1%; } .receipt-grid__i { width: 5.9%; } .receipt-grid__j { width: 11.9%; } .receipt-grid__k { width: 11.4%; }
+/* A–K match Excel 5 / 6 / 17 / 2.875 / 12 / 8.625 / 5.625 / 5.125 / 5 / 10 / 9.5. */
+.receipt-grid__a { width: 5.76%; } .receipt-grid__b { width: 6.92%; } .receipt-grid__c { width: 19.60%; } .receipt-grid__d { width: 3.31%; } .receipt-grid__e { width: 13.83%; }
+.receipt-grid__f { width: 9.94%; } .receipt-grid__g { width: 6.48%; } .receipt-grid__h { width: 5.91%; } .receipt-grid__i { width: 5.76%; } .receipt-grid__j { width: 11.53%; } .receipt-grid__k { width: 10.95%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -10118,40 +10118,33 @@ td, th { border: none; }
   vertical-align: top;
   padding: 0 !important;
   overflow: visible;
-  width: 4mm;
-  min-width: 4mm;
-}
-.receipt-grid--sheet tr.receipt-items__head,
-.receipt-grid--sheet tr.receipt-items__row,
-.receipt-grid--sheet tr.receipt-items__promo {
-  height: 8mm;
+  width: 5.76%;
+  min-width: 10mm;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
   border: 0.4pt solid #666 !important;
-  padding: 2.2mm 1.4mm;
-  height: 8mm;
-  min-height: 8mm;
+  padding: 3px 5px;
   vertical-align: middle;
   background: #fff;
   color: ${RECEIPT_TEXT};
-  line-height: 1.35;
-  font-size: 10pt;
+  line-height: 1.25;
+  font-size: 9pt;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
   background: ${RECEIPT_HEADER_BG} !important;
   font-weight: 700;
   font-size: 9pt;
   text-align: center;
-  padding: 2mm 1.4mm;
+  padding: 4px 5px;
 }
 .receipt-grid--sheet tr.receipt-items__head > td.receipt-items__name {
   text-align: center;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: center;
-  padding: 2.2mm 0.6mm;
-  font-size: 11pt;
+  padding: 3px 2px;
+  font-size: 10pt;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
@@ -10175,11 +10168,9 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__promo > td {
   border: none !important;
   border-bottom: 0.4pt solid #666 !important;
-  padding: 2.2mm 1.6mm;
-  height: 8mm;
-  min-height: 8mm;
+  padding: 5px 6px;
   vertical-align: middle;
-  font-size: 10pt;
+  font-size: 9pt;
   line-height: 1.3;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
@@ -10414,9 +10405,9 @@ tbody.receipt-footer-keep {
   break-inside: avoid;
   -webkit-column-break-inside: avoid;
 }
-.receipt-items__row td { font-size: 10pt; height: 8mm; min-height: 8mm; padding-top: 2.2mm; padding-bottom: 2.2mm; }
+.receipt-items__row td { font-size: 10px; }
 .receipt-items__gutter { width: 0; padding: 0 !important; border: none !important; }
-.receipt-items__num { width: 6mm; text-align: center; padding: 2px 2px; font-size: 10pt; font-weight: 700; color: ${RECEIPT_TEXT}; }
+.receipt-items__num { width: 10.6mm; text-align: center; padding: 2px 2px; font-size: 10pt; font-weight: 700; color: ${RECEIPT_TEXT}; }
 .receipt-items__name {
   width: 38%;
   text-align: left;
@@ -10974,7 +10965,8 @@ tbody.receipt-footer-keep {
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
-    width: 4mm !important;
+    width: 5.76% !important;
+    min-width: 10mm !important;
   }
   .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
     border: none !important;
@@ -11000,26 +10992,6 @@ tbody.receipt-footer-keep {
     print-color-adjust: exact !important;
     color: ${RECEIPT_TEXT} !important;
     background: #fff !important;
-  }
-  .receipt-grid--sheet tr.receipt-items__head,
-  .receipt-grid--sheet tr.receipt-items__row,
-  .receipt-grid--sheet tr.receipt-items__promo {
-    height: 8mm !important;
-  }
-  .receipt-grid--sheet tr.receipt-items__head > td,
-  .receipt-grid--sheet tr.receipt-items__row > td,
-  .receipt-grid--sheet tr.receipt-items__promo > td {
-    height: 8mm !important;
-    min-height: 8mm !important;
-    padding-top: 2.2mm !important;
-    padding-bottom: 2.2mm !important;
-    line-height: 1.35 !important;
-  }
-  .receipt-grid--sheet tr.receipt-items__row > td {
-    font-size: 10pt !important;
-  }
-  .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
-    font-size: 11pt !important;
   }
   .receipt-grid--sheet tr.receipt-items__head > td,
   .receipt-grid--sheet tr.receipt-items__row > td,
@@ -11179,8 +11151,8 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 /** Uniform body/spacer row height — avoid hairline spacer rows (6–8pt). */
 const RECEIPT_XLSX_ROW_HEIGHT = 15;
-/** Item table header + product/promo lines — taller than body spacers. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 20;
+/** Item table header + product/promo lines match body row height. */
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
 /** Slightly taller title / signature labels only. */
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
 /** «ЗАРЛАГЫН БАРИМТ» row — breathing room above/below 14pt title. */
@@ -11210,7 +11182,7 @@ const RECEIPT_XLSX_COL_WIDTHS = [
   5.0, 6.0, 17.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
 ];
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
-const RECEIPT_XLSX_PAGE_ROWS = 40;
+const RECEIPT_XLSX_PAGE_ROWS = 52;
 /** True when keep-together block starting at keepStartRow would not fit on its page. */
 function receiptXlsxNeedsBreakBefore(
   keepStartRow,
