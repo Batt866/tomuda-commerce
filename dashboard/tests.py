@@ -922,6 +922,133 @@ class StockInPermissionTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class MultiDeviceStateMergeTests(TestCase):
+    def test_merge_keeps_server_stock_when_stale_device_saves(self):
+        from dashboard.state_merge import merge_app_states
+
+        order = {
+            "id": "o1",
+            "status": "pending",
+            "items": [{"productId": "p1", "quantity": 5}],
+        }
+        remote = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 45}],
+            "orders": [order],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        local = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 50}],
+            "orders": [],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(
+            next(p["stock"] for p in merged["products"] if p["id"] == "p1"),
+            45,
+        )
+        self.assertIn("o1", {o["id"] for o in merged["orders"]})
+
+    def test_merge_deducts_new_incoming_order_from_server_stock(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 45}],
+            "orders": [
+                {
+                    "id": "o-a",
+                    "status": "pending",
+                    "items": [{"productId": "p1", "quantity": 5}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        local = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 95}],
+            "orders": [
+                {
+                    "id": "o-b",
+                    "status": "pending",
+                    "items": [{"productId": "p1", "quantity": 8}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(
+            next(p["stock"] for p in merged["products"] if p["id"] == "p1"),
+            37,
+        )
+        self.assertEqual({o["id"] for o in merged["orders"]}, {"o-a", "o-b"})
+
+    def test_merge_restores_stock_when_incoming_cancels_order(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 45}],
+            "orders": [
+                {
+                    "id": "o1",
+                    "status": "pending",
+                    "items": [{"productId": "p1", "quantity": 5}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        local = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 50}],
+            "orders": [
+                {
+                    "id": "o1",
+                    "status": "cancelled",
+                    "items": [{"productId": "p1", "quantity": 5}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(
+            next(p["stock"] for p in merged["products"] if p["id"] == "p1"),
+            50,
+        )
+
+    def test_merge_adds_stock_from_new_stock_in_receipt(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 45}],
+            "orders": [],
+            "stockInReceipts": [],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        local = {
+            "products": [{"id": "p1", "name": "Cola", "stock": 65}],
+            "orders": [],
+            "stockInReceipts": [
+                {"id": "si1", "lines": [{"productId": "p1", "quantity": 20}]},
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(
+            next(p["stock"] for p in merged["products"] if p["id"] == "p1"),
+            65,
+        )
+
     def test_merge_keeps_customer_added_on_other_device(self):
         from dashboard.state_merge import merge_app_states
 
@@ -1436,4 +1563,8 @@ class OrderUpsertApiTests(TestCase):
 
         row = AppState.objects.get(key="main")
         self.assertIn("o-device-b", {o["id"] for o in row.data["orders"]})
+        self.assertEqual(
+            next(p["stock"] for p in row.data["products"] if p["id"] == "p1"),
+            45,
+        )
 

@@ -355,6 +355,144 @@ def merge_settings(remote: Any, local: Any) -> dict[str, Any]:
     return {**remote_settings, **local_settings}
 
 
+def _by_id(items: Any) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for item in _as_list(items):
+        if isinstance(item, dict) and item.get("id") is not None:
+            out[str(item["id"])] = item
+    return out
+
+
+def _qty(value: Any) -> float:
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return amount if amount > 0 else 0.0
+
+
+def _order_is_cancelled(order: Any) -> bool:
+    return isinstance(order, dict) and str(order.get("status") or "").lower() == "cancelled"
+
+
+def _items_qty_for_product(items: Any, product_id: str) -> float:
+    total = 0.0
+    for item in _as_list(items):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("productId") or "") != product_id:
+            continue
+        total += _qty(item.get("quantity"))
+    return total
+
+
+def _order_qty_for_product(order: Any, product_id: str) -> float:
+    if not isinstance(order, dict) or _order_is_cancelled(order):
+        return 0.0
+    return _items_qty_for_product(order.get("items"), product_id)
+
+
+def _new_receipt_qty(old_receipts: Any, new_receipts: Any, product_id: str) -> float:
+    old_ids = set(_by_id(old_receipts))
+    total = 0.0
+    for receipt_id, receipt in _by_id(new_receipts).items():
+        if receipt_id in old_ids:
+            continue
+        for line in _as_list(receipt.get("lines")):
+            if not isinstance(line, dict):
+                continue
+            if str(line.get("productId") or "") != product_id:
+                continue
+            total += _qty(line.get("quantity"))
+    return total
+
+
+def _orphan_log_qty(old_logs: Any, new_logs: Any, product_id: str, log_type: str) -> float:
+    old_ids = set(_by_id(old_logs))
+    total = 0.0
+    for log_id, log in _by_id(new_logs).items():
+        if log_id in old_ids:
+            continue
+        if log.get("receiptId"):
+            continue
+        if str(log.get("type") or "") != log_type:
+            continue
+        if str(log.get("productId") or "") != product_id:
+            continue
+        total += _qty(log.get("quantity"))
+    return total
+
+
+def _stock_value(value: float) -> float | int:
+    if abs(value - round(value)) < 0.0001:
+        return int(round(value))
+    return value
+
+
+def apply_merged_product_stock(
+    remote_state: dict[str, Any],
+    merged_state: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """
+    Keep server stock, then apply only mutations that survived the merge.
+
+    Incoming product.stock is ignored so a stale device cannot rewind
+    үлдэгдэл after another device already sold / received stock.
+    """
+    remote_products = _by_id(remote_state.get("products"))
+    remote_orders = _by_id(remote_state.get("orders"))
+    merged_orders = _by_id(merged_state.get("orders"))
+    products: list[dict[str, Any]] = []
+    for product in _as_list(merged_state.get("products")):
+        if not isinstance(product, dict) or product.get("id") is None:
+            continue
+        next_product = dict(product)
+        product_id = str(next_product["id"])
+        remote_product = remote_products.get(product_id)
+        if not remote_product:
+            products.append(next_product)
+            continue
+        try:
+            stock = float(remote_product.get("stock") or 0)
+        except (TypeError, ValueError):
+            stock = 0.0
+        for order_id, order in merged_orders.items():
+            if order_id not in remote_orders:
+                stock -= _order_qty_for_product(order, product_id)
+            else:
+                stock += _order_qty_for_product(
+                    remote_orders[order_id], product_id
+                ) - _order_qty_for_product(order, product_id)
+        for order_id, remote_order in remote_orders.items():
+            if order_id not in merged_orders:
+                stock += _order_qty_for_product(remote_order, product_id)
+        stock += _new_receipt_qty(
+            remote_state.get("stockInReceipts"),
+            merged_state.get("stockInReceipts"),
+            product_id,
+        )
+        stock -= _new_receipt_qty(
+            remote_state.get("stockOutReceipts"),
+            merged_state.get("stockOutReceipts"),
+            product_id,
+        )
+        stock += _orphan_log_qty(
+            remote_state.get("inventoryLogs"),
+            merged_state.get("inventoryLogs"),
+            product_id,
+            "in",
+        )
+        stock -= _orphan_log_qty(
+            remote_state.get("inventoryLogs"),
+            merged_state.get("inventoryLogs"),
+            product_id,
+            "out",
+        )
+        next_product["stock"] = _stock_value(max(0.0, stock))
+        products.append(next_product)
+    return products
+
+
 def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None) -> dict[str, Any]:
     """
     Merge server (remote) state with an incoming device save (local).
@@ -461,5 +599,6 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
     merged["countOpeningStock"] = dict(_as_dict(count_src.get("countOpeningStock")))
     merged["countSessionStartedAt"] = count_src.get("countSessionStartedAt")
     merged["countDone"] = bool(count_src.get("countDone"))
+    merged["products"] = apply_merged_product_stock(remote_state, merged)
 
     return merged

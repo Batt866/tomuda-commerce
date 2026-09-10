@@ -4034,6 +4034,7 @@ const MOBILE_NAV_SHORT = {
   settings: "Тохиргоо",
   suppliers: "Нийлүүлэгч",
   admin: "Админ",
+  __more__: "Цэс",
 };
 const MOBILE_NAV_SVG = {
   worker:
@@ -4066,7 +4067,32 @@ const MOBILE_NAV_SVG = {
     '<path d="M3 9h18v12H3z"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/>',
   admin:
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  __more__: '<path d="M4 6h16M4 12h16M4 18h16"/>',
 };
+const BOTTOM_NAV_PRIORITY = [
+  "worker",
+  "customers",
+  "products",
+  "warehouse",
+  "inventory",
+  "warehouseReceipts",
+  "delivery",
+  "count",
+  "stockReports",
+  "promotions",
+  "employees",
+  "suppliers",
+  "settings",
+  "employeePermissions",
+  "admin",
+];
+const BOTTOM_NAV_ROLE_FIRST = {
+  delivery: ["delivery"],
+  warehouse: ["warehouse", "inventory"],
+  admin: ["worker", "customers", "products", "warehouse", "admin"],
+  sales: ["worker", "customers", "products", "inventory"],
+};
+const BOTTOM_NAV_MAX = 4;
 function sidebarNavForRole(role) {
   let nav;
   if (permApi() && state.currentEmployee) {
@@ -4119,36 +4145,24 @@ function sidebarNavForRole(role) {
   return nav;
 }
 function bottomNavForRole(role) {
-  const canWh = canViewWarehousePrepare();
-  const canInv = canAccessView("inventory") || hasPermission("warehouse.view");
-  const specs = {
-    admin: [
-      ["worker", "Захиалга"],
-      ["customers", "Харилцагч"],
-      ["products", "Бараа"],
-      ["warehouse", "Агуулах"],
-      ["admin", "Админ"],
-    ],
-    sales: [
-      ["worker", "Захиалга"],
-      ["customers", "Харилцагч"],
-      ["products", "Бараа"],
-      ["inventory", "Нярав"],
-    ],
-    warehouse: [
-      ["warehouse", "Агуулах"],
-      ["inventory", "Нярав"],
-    ],
-    delivery: [["delivery", "Хүргэлт"]],
-  };
-  const fullAccess = isAdminRole();
-  const items = fullAccess ? specs.admin : specs[role] || specs.sales;
-  return items.filter(([id]) => {
-    if (id === "warehouse") return canWh;
-    if (id === "inventory") return canInv;
-    if (id === "admin") return canAccessView("admin");
-    return canAccessView(id);
-  });
+  const sidebar = sidebarNavForRole(role);
+  const byId = new Map(sidebar.map((row) => [row[0], row]));
+  const priority = [
+    ...(BOTTOM_NAV_ROLE_FIRST[role] || BOTTOM_NAV_ROLE_FIRST.sales),
+    ...BOTTOM_NAV_PRIORITY,
+  ];
+  const items = [];
+  const seen = new Set();
+  for (const id of priority) {
+    if (seen.has(id) || !byId.has(id)) continue;
+    seen.add(id);
+    items.push(byId.get(id));
+    if (items.length >= BOTTOM_NAV_MAX) break;
+  }
+  if (sidebar.some(([id]) => !seen.has(id))) {
+    items.push(["__more__", "Цэс"]);
+  }
+  return items;
 }
 function mobileNavIcon(id) {
   const paths = MOBILE_NAV_SVG[id];
@@ -4189,6 +4203,9 @@ function mobileBottomNav(nav) {
   if (!nav.length) return "";
   return `<nav class="mobile-bottom-nav lg:hidden" aria-label="Үндсэн цэс">${nav
     .map(([id, label]) => {
+      if (id === "__more__") {
+        return `<button type="button" onclick="state.mobileOpen=true;render()" class="mobile-bottom-nav__item" aria-label="Цэс"><span class="mobile-bottom-nav__icon" aria-hidden="true">${mobileNavIcon("__more__")}</span><span class="mobile-bottom-nav__label">${MOBILE_NAV_SHORT.__more__ || label}</span></button>`;
+      }
       const active = mobileNavActive(state.currentView, id);
       return `<button type="button" onclick="go('${id}');state.mobileOpen=false;render()" class="mobile-bottom-nav__item ${active ? "is-active" : ""}" aria-current="${active ? "page" : "false"}"><span class="mobile-bottom-nav__icon" aria-hidden="true">${mobileNavIcon(id)}</span><span class="mobile-bottom-nav__label">${MOBILE_NAV_SHORT[id] || label}</span></button>`;
     })
@@ -9516,7 +9533,7 @@ function shell(content) {
   const backBtn = canAppBack()
     ? `<button type="button" class="mobile-top-bar__back" onclick="appBack()" aria-label="Буцах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>`
     : `<span class="mobile-top-bar__back-spacer" aria-hidden="true"></span>`;
-  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${stockSheetFocus ? " app-shell--stock-in" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section hidden lg:block">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div><button type="button" onclick="confirmLogout()" class="btn btn--sidebar shrink-0">Гарах</button></div>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${scrollTopFabHtml()}${useBottomNav ? mobileBottomNav(bottomNav) : ""}</div>`;
+  return `<div class="app-shell min-h-screen bg-background flex ${useBottomNav ? "app-shell--bottom-nav" : ""}${stockSheetFocus ? " app-shell--stock-in" : ""}${workerOrdersList ? " app-shell--worker-orders" : ""}"><button type="button" onclick="state.mobileOpen=!state.mobileOpen;render()" class="mobile-menu-button lg:hidden fixed z-50 bg-sidebar text-sidebar-foreground rounded ${state.mobileOpen ? "mobile-menu-button--open" : ""} ${useBottomNav ? "mobile-menu-button--sheet" : ""}" aria-label="${state.mobileOpen ? "Цэс хаах" : "Цэс нээх"}">${state.mobileOpen ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>` : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>`}</button>${state.mobileOpen ? `<div onclick="state.mobileOpen=false;render()" class="mobile-menu-overlay lg:hidden fixed inset-0 bg-black/50 z-30"></div>` : ""}<header class="mobile-top-bar lg:hidden${workerOrdersList ? " mobile-top-bar--worker-orders" : ""}${workerOrdersArrived ? " mobile-top-bar--worker-orders-arrived" : ""}">${backBtn}<p class="mobile-top-bar__title">${esc(pageTitle)}</p>${emp ? `<button type="button" class="mobile-top-bar__user" onclick="state.mobileOpen=true;render()" aria-label="Профайл, гарах">${employeeAvatarHtml(emp, "mobile-top-bar__user-avatar")}</button>` : ""}</header><aside class="app-sidebar mobile-sidebar fixed lg:sticky lg:top-0 inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ${state.mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"} flex flex-col"><div class="sidebar-brand p-6 border-b border-sidebar-border"><div class="sidebar-brand__row flex items-center gap-3 min-w-0"><img src="${BRAND.logoWhite}" alt="ТОМУДА" class="tomuda-logo" width="44" height="44" decoding="async"><div class="min-w-0"><h1 class="text-lg font-bold text-sidebar-primary truncate">ТОМУДА</h1><p class="sidebar-brand__tag hidden lg:block">Борлуулалт · Агуулах</p></div></div></div><nav class="app-sidebar-nav flex-col flex-1 min-h-0 overflow-y-auto p-3 lg:p-4 gap-1" aria-label="Үндсэн цэс"><p class="sidebar-nav-section">Цэс</p>${sidebarNavItems(sidebarNav)}${pwaInstallSidebarBtn()}</nav><div class="sidebar-foot p-4 border-t border-sidebar-border">${emp ? `<div class="sidebar-user">${employeeAvatarHtml(emp, "sidebar-user__avatar")}<div class="sidebar-user__meta"><p class="sidebar-user__name">${esc(emp.name)}</p><p class="sidebar-user__role">${esc(role(emp.role))}</p></div></div><button type="button" onclick="confirmLogout()" class="sidebar-logout-btn" aria-label="Системээс гарах"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span>Гарах</span></button>` : ""}</div></aside><main class="app-main flex-1 overflow-auto"><div class="app-main__inner max-w-7xl mx-auto">${dataSaveBannerHtml()}${content}</div></main>${scrollTopFabHtml()}${useBottomNav ? mobileBottomNav(bottomNav) : ""}</div>`;
 }
 function adminHubCard(view, label, iconKey) {
   const svg =
@@ -16172,7 +16189,9 @@ function applyStockOutReceipt(receipt) {
   const saved = finalizeStockOutReceipt(receipt);
   if (state.stockOutReceipts.some((r) => r.id === saved.id)) return saved;
   for (const line of saved.lines) {
-    const p = state.products.find((x) => x.id === line.productId);
+    const p = state.products.find(
+      (x) => String(x.id) === String(line.productId ?? ""),
+    );
     if (!p) continue;
     const qty = Number(line.quantity) || 0;
     if (qty <= 0) continue;
@@ -16226,7 +16245,9 @@ function confirmFinishStockOut() {
   const receipt = buildStockOutReceiptSnapshot();
   if (!receipt?.lines?.length) return;
   for (const line of receipt.lines) {
-    const p = state.products.find((x) => x.id === line.productId);
+    const p = state.products.find(
+      (x) => String(x.id) === String(line.productId ?? ""),
+    );
     const stockNow = Number(p?.stock) || 0;
     if ((Number(line.quantity) || 0) > stockNow) {
       return alert(
@@ -18357,9 +18378,10 @@ function nextInventoryLogId() {
 }
 function countInventoryQty(productId, type) {
   const since = countSessionSinceMs();
+  const want = String(productId ?? "");
   return state.inventoryLogs
     .filter((l) => l.type === type)
-    .filter((l) => inventoryLogProductId(l) === productId)
+    .filter((l) => String(inventoryLogProductId(l) ?? "") === want)
     .filter((l) => {
       if (!since) return true;
       const ms = new Date(l.date).getTime();
@@ -18369,6 +18391,7 @@ function countInventoryQty(productId, type) {
 }
 function countSoldQty(productId) {
   const since = countSessionSinceMs();
+  const want = String(productId ?? "");
   let total = 0;
   for (const o of state.orders) {
     if (orderIsCancelled(o)) continue;
@@ -18377,7 +18400,7 @@ function countSoldQty(productId) {
       if (Number.isFinite(ms) && ms < since) continue;
     }
     for (const item of o.items || []) {
-      if (item.productId === productId) {
+      if (String(item.productId ?? "") === want) {
         total += Number(item.quantity) || 0;
       }
     }
@@ -30334,7 +30357,8 @@ function adjustReceiptEditStock(beforeItems, afterItems) {
     const map = {};
     (items || []).forEach((i) => {
       if (!i?.productId) return;
-      map[i.productId] = (map[i.productId] || 0) + (Number(i.quantity) || 0);
+      const pid = String(i.productId);
+      map[pid] = (map[pid] || 0) + (Number(i.quantity) || 0);
     });
     return map;
   };
@@ -31302,7 +31326,7 @@ function receipt(o) {
   return receiptExcelPage(orderReceiptSnapshot(o), RECEIPT_LOGO_DATA_URI);
 }
 function stock(id, qty, type) {
-  const p = state.products.find((x) => x.id === id);
+  const p = state.products.find((x) => String(x.id) === String(id ?? ""));
   if (!p) return;
   const current = Number(p.stock) || 0;
   const q = Number(qty) || 0;
@@ -31349,7 +31373,7 @@ function applyOrderStock(items) {
   (items || []).forEach((i) => stock(i.productId, i.quantity, "out"));
 }
 function applyStock(id, type, qty, costPrice) {
-  const p = state.products.find((x) => x.id === id);
+  const p = state.products.find((x) => String(x.id) === String(id ?? ""));
   if (!p) return false;
   const q =
     qty != null

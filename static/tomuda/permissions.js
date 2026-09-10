@@ -564,12 +564,20 @@
   }
 
   function allowedNavForEmployee(emp) {
-    if (emp?.role === "delivery") return [["delivery", "Хүргэлт"]];
     const isAdminRole = emp?.role === "admin";
+    const isDelivery = emp?.role === "delivery";
     return NAV_ITEMS.filter(([id]) => {
       if (id === "admin") return isAdminRole && canAccessView("admin", emp);
       if (id === "settings") return !isAdminRole && canAccessView("settings", emp);
       if (isAdminRole && !ADMIN_ROLE_NAV_IDS.has(id)) return false;
+      if (
+        isDelivery &&
+        id === "worker" &&
+        !hasPermission("orders.create", emp) &&
+        !hasPermission("orders.edit", emp)
+      ) {
+        return false;
+      }
       return canAccessView(id, emp);
     }).map(([id, label]) => [id, label]);
   }

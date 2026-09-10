@@ -5459,10 +5459,7 @@ button:focus-visible,
 }
 
 @media (max-width: 1023px) {
-  .app-shell--bottom-nav .app-sidebar-nav {
-    display: none !important;
-  }
-
+  .mobile-sidebar.translate-x-0 .app-sidebar-nav,
   .app-shell:not(.app-shell--bottom-nav) .app-sidebar-nav {
     display: flex !important;
   }
@@ -5470,6 +5467,46 @@ button:focus-visible,
 
 .sidebar-foot {
   flex-shrink: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid
+    color-mix(in srgb, #fff 16%, var(--hex-sidebar-border));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f3f6f9;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-logout-btn .ui-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sidebar-logout-btn:hover,
+.sidebar-logout-btn:active:not(:disabled) {
+  background: rgba(220, 80, 80, 0.2);
+  border-color: rgba(220, 80, 80, 0.4);
+  color: #ffd6d6;
 }
 
 .sidebar-pwa-btn {
@@ -5529,14 +5566,8 @@ button:focus-visible,
     pointer-events: none;
   }
 
-  .sidebar-user {
-    flex-wrap: wrap;
-  }
-
-  .sidebar-user .btn--sidebar {
-    flex: 1 1 100%;
-    margin-top: 4px;
-    justify-content: center;
+  .sidebar-foot {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   }
 }
 
