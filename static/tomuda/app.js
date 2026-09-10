@@ -10596,13 +10596,13 @@ tbody.receipt-footer-keep {
   background: ${RECEIPT_GRAND_BG} !important;
   font-weight: 700 !important;
   font-size: 12pt !important;
-  border-top: 0.75pt solid #000 !important;
-  border-bottom: 0.75pt solid #000 !important;
+  border-top: 0.4pt solid #888 !important;
+  border-bottom: 0.4pt solid #888 !important;
 }
 .receipt-grid--sheet .receipt-grid__summary .receipt-grid__summary-rule,
 .receipt-grid--sheet .receipt-grid__summary .receipt-grid__summary-value {
   border: none !important;
-  border-bottom: 0.75pt solid #000 !important;
+  border-bottom: 0.4pt solid #888 !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--pay td { height: 16px; font-size: 11pt; }
 .receipt-grid--sheet .receipt-grid__summary--pay .receipt-grid__summary-label { font-weight: 700; }
@@ -10856,14 +10856,14 @@ tbody.receipt-footer-keep {
   font-weight: 400;
   color: ${RECEIPT_TEXT};
   border: none !important;
-  border-bottom: 0.75pt solid #000 !important;
+  border-bottom: 0.4pt solid #888 !important;
 }
 .receipt-grid__summary-rule {
   padding: 0 !important;
 }
 .receipt-grid__summary-rule--grand {
   background: ${RECEIPT_GRAND_BG} !important;
-  border-top: 0.75pt solid #000 !important;
+  border-top: 0.4pt solid #888 !important;
 }
 .receipt-grid__summary:first-of-type .receipt-grid__summary-value {
   border-top: none !important;
@@ -11026,11 +11026,11 @@ tbody.receipt-footer-keep {
   .receipt-grid__summary-value,
   .receipt-grid__summary-value--grand {
     border: none !important;
-    border-bottom: 0.75pt solid #000 !important;
+    border-bottom: 0.4pt solid #888 !important;
   }
   .receipt-grid__summary-rule--grand,
   .receipt-grid__summary-value--grand {
-    border-top: 0.75pt solid #000 !important;
+    border-top: 0.4pt solid #888 !important;
   }
 }
 `;
