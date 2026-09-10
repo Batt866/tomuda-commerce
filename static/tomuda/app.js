@@ -758,8 +758,8 @@ function receiptPromoItems(o) {
   return (o.items || []).filter((i) => i.isPromoFree);
 }
 function receiptItemsHeadRow() {
-  // Sample R14: empty A, name B:D, unit E, barcode F:G, qty H:I, price J, total K — no gray № header.
-  return `<tr class="receipt-items__head"><td class="receipt-items__num"></td><td colspan="3" class="receipt-items__name">Барааны нэр</td><td class="receipt-items__unit">Хэмжих нэгж</td><td colspan="2" class="receipt-items__barcode">Баркод</td><td colspan="2" class="receipt-items__qty">Тоо/ш</td><td class="receipt-items__price">Нэгж үнэ</td><td class="receipt-items__total">Нийт үнэ</td></tr>`;
+  // A gutter, № in thin B, name C:D, unit E, barcode F:G, qty H:I, price J, total K.
+  return `<tr class="receipt-items__head"><td class="receipt-items__gutter"></td><td class="receipt-items__num"></td><td colspan="2" class="receipt-items__name">Барааны нэр</td><td class="receipt-items__unit">Хэмжих нэгж</td><td colspan="2" class="receipt-items__barcode">Баркод</td><td colspan="2" class="receipt-items__qty">Тоо/ш</td><td class="receipt-items__price">Нэгж үнэ</td><td class="receipt-items__total">Нийт үнэ</td></tr>`;
 }
 function receiptTableRowsHtml(
   o,
@@ -775,7 +775,7 @@ function receiptTableRowsHtml(
         hasPromoAfter && n === list.length - 1
           ? " receipt-items__row--before-promo"
           : "";
-      return `<tr class="receipt-items__row${beforePromo}"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(receiptProductNameText(i.productName))}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__row${beforePromo}"><td class="receipt-items__gutter"></td><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="2" class="receipt-items__name">${esc(receiptProductNameText(i.productName))}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
 }
@@ -10120,10 +10120,16 @@ td, th { border: none; }
   text-align: center;
   padding: 4px 5px;
 }
+.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__gutter,
+.receipt-grid--sheet tr.receipt-items__row > td.receipt-items__gutter {
+  border: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
-  text-align: right;
-  padding: 3px 4px;
-  font-size: 9pt;
+  text-align: center;
+  padding: 3px 1px;
+  font-size: 8pt;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
@@ -10385,7 +10391,8 @@ tbody.receipt-footer-keep {
   -webkit-column-break-inside: avoid;
 }
 .receipt-items__row td { font-size: 10px; }
-.receipt-items__num { width: 2%; text-align: right; max-width: 20px; padding-right: 2px; font-size: 9px; color: #555; }
+.receipt-items__gutter { width: 0; padding: 0 !important; border: none !important; }
+.receipt-items__num { width: 2.9%; text-align: center; max-width: 18px; padding: 2px 1px; font-size: 8px; color: #555; }
 .receipt-items__name {
   width: 38%;
   text-align: left;
@@ -10951,6 +10958,12 @@ tbody.receipt-footer-keep {
     border: 0.4pt solid #666 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .receipt-grid--sheet tr.receipt-items__head > td.receipt-items__gutter,
+  .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__gutter {
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
   }
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-name,
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty,
@@ -12000,19 +12013,20 @@ function appendReceiptSheetRows(
   // Items header
   const headerRow = rowNum;
   merges.push(
-    `B${headerRow}:D${headerRow}`,
+    `C${headerRow}:D${headerRow}`,
     `F${headerRow}:G${headerRow}`,
     `H${headerRow}:I${headerRow}`,
   );
   pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
-    xlsxCellXml(`A${headerRow}`, 7, null, "empty"),
-    xlsxCellXml(`B${headerRow}`, 7, si("Барааны нэр"), "s"),
+    xlsxCellXml(`A${headerRow}`, 1, null, "empty"),
+    xlsxCellXml(`B${headerRow}`, 7, null, "empty"),
+    xlsxCellXml(`C${headerRow}`, 7, si("Барааны нэр"), "s"),
     xlsxCellXml(`E${headerRow}`, 7, si("Хэмжих нэгж"), "s"),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
     xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
-    ...emptyCells(headerRow, "C", "D", 7),
+    ...emptyCells(headerRow, "D", "D", 7),
     ...emptyCells(headerRow, "G", "G", 7),
     ...emptyCells(headerRow, "I", "I", 7),
   ]);
@@ -12029,10 +12043,11 @@ function appendReceiptSheetRows(
     const barcodeText = String(p.barcode || item.barcode || "").trim() || "-";
     const nameText = receiptProductNameText(item.productName);
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
-    merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
+    merges.push(`C${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
-      xlsxCellXml(`A${r}`, 9, si(String(index + 1)), "s"),
-      xlsxCellXml(`B${r}`, 8, si(nameText), "s"),
+      xlsxCellXml(`A${r}`, 1, null, "empty"),
+      xlsxCellXml(`B${r}`, 9, si(String(index + 1)), "s"),
+      xlsxCellXml(`C${r}`, 8, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 9, si(unitText), "s"),
       barcodeText !== "-"
         ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
@@ -12040,7 +12055,7 @@ function appendReceiptSheetRows(
       xlsxCellXml(`H${r}`, 11, qty, "n"),
       xlsxCellXml(`J${r}`, 10, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`K${r}`, 10, Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "C", "D", 8),
+      ...emptyCells(r, "D", "D", 8),
       ...emptyCells(r, "G", "G", 34),
       ...emptyCells(r, "I", "I", 11),
     ]);
