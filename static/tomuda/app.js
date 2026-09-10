@@ -755,7 +755,7 @@ function InvoiceHeader(logoSrc, o) {
   return receiptHeaderRows(logoSrc, o);
 }
 /** Fallback cap for paid lines on one A4 body until measurement narrows it. */
-const RECEIPT_PAGE_PAID_MAX = 26;
+const RECEIPT_PAGE_PAID_MAX = 16;
 function receiptPaidItems(o) {
   return (o.items || []).filter((i) => !i.isPromoFree);
 }
@@ -10121,32 +10121,37 @@ td, th { border: none; }
   width: 4mm;
   min-width: 4mm;
 }
+.receipt-grid--sheet tr.receipt-items__head,
+.receipt-grid--sheet tr.receipt-items__row,
+.receipt-grid--sheet tr.receipt-items__promo {
+  height: 8mm;
+}
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
   border: 0.4pt solid #666 !important;
-  padding: 6px 5px;
-  height: 22px;
-  min-height: 22px;
+  padding: 2.2mm 1.4mm;
+  height: 8mm;
+  min-height: 8mm;
   vertical-align: middle;
   background: #fff;
   color: ${RECEIPT_TEXT};
   line-height: 1.35;
-  font-size: 9pt;
+  font-size: 10pt;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
   background: ${RECEIPT_HEADER_BG} !important;
   font-weight: 700;
   font-size: 9pt;
   text-align: center;
-  padding: 4px 5px;
+  padding: 2mm 1.4mm;
 }
 .receipt-grid--sheet tr.receipt-items__head > td.receipt-items__name {
   text-align: center;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: center;
-  padding: 3px 2px;
-  font-size: 10pt;
+  padding: 2.2mm 0.6mm;
+  font-size: 11pt;
   font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
@@ -10170,9 +10175,11 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__promo > td {
   border: none !important;
   border-bottom: 0.4pt solid #666 !important;
-  padding: 5px 6px;
+  padding: 2.2mm 1.6mm;
+  height: 8mm;
+  min-height: 8mm;
   vertical-align: middle;
-  font-size: 9pt;
+  font-size: 10pt;
   line-height: 1.3;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
@@ -10407,7 +10414,7 @@ tbody.receipt-footer-keep {
   break-inside: avoid;
   -webkit-column-break-inside: avoid;
 }
-.receipt-items__row td { font-size: 10px; height: 22px; min-height: 22px; padding-top: 6px; padding-bottom: 6px; }
+.receipt-items__row td { font-size: 10pt; height: 8mm; min-height: 8mm; padding-top: 2.2mm; padding-bottom: 2.2mm; }
 .receipt-items__gutter { width: 0; padding: 0 !important; border: none !important; }
 .receipt-items__num { width: 6mm; text-align: center; padding: 2px 2px; font-size: 10pt; font-weight: 700; color: ${RECEIPT_TEXT}; }
 .receipt-items__name {
@@ -10993,6 +11000,26 @@ tbody.receipt-footer-keep {
     print-color-adjust: exact !important;
     color: ${RECEIPT_TEXT} !important;
     background: #fff !important;
+  }
+  .receipt-grid--sheet tr.receipt-items__head,
+  .receipt-grid--sheet tr.receipt-items__row,
+  .receipt-grid--sheet tr.receipt-items__promo {
+    height: 8mm !important;
+  }
+  .receipt-grid--sheet tr.receipt-items__head > td,
+  .receipt-grid--sheet tr.receipt-items__row > td,
+  .receipt-grid--sheet tr.receipt-items__promo > td {
+    height: 8mm !important;
+    min-height: 8mm !important;
+    padding-top: 2.2mm !important;
+    padding-bottom: 2.2mm !important;
+    line-height: 1.35 !important;
+  }
+  .receipt-grid--sheet tr.receipt-items__row > td {
+    font-size: 10pt !important;
+  }
+  .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
+    font-size: 11pt !important;
   }
   .receipt-grid--sheet tr.receipt-items__head > td,
   .receipt-grid--sheet tr.receipt-items__row > td,
