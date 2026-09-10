@@ -737,7 +737,7 @@ function receiptPaymentTermDisplay(o) {
   if (term === "credit") return "Зээлээр";
   return "Шууд төлөх";
 }
-/** InvoiceHeader — logo A, B is logo gap, brand/address from C (C:H / C:I). */
+/** InvoiceHeader — logo sits in A; B is a narrow gap; brand/address from C. */
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
@@ -10059,8 +10059,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* B+C fits «Худалдааны төлөөлөгчийн утас:»; C stays modest for IBAN */
-.receipt-grid__a { width: 6mm; } .receipt-grid__b { width: 17.5%; } .receipt-grid__c { width: 8.8%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
+/* A holds the logo; B is a narrow gap; B+C still fits the left labels */
+.receipt-grid__a { width: 20mm; } .receipt-grid__b { width: 10.1%; } .receipt-grid__c { width: 8.8%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
 .receipt-grid__f { width: 10.5%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 6.1%; } .receipt-grid__i { width: 5.9%; } .receipt-grid__j { width: 11.9%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -10100,8 +10100,8 @@ td, th { border: none; }
   vertical-align: top;
   padding: 0 !important;
   overflow: visible;
-  width: 6mm;
-  min-width: 6mm;
+  width: 20mm;
+  min-width: 20mm;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
@@ -10917,7 +10917,7 @@ tbody.receipt-footer-keep {
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
-    width: 6mm !important;
+    width: 20mm !important;
   }
   .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
     border: none !important;
@@ -11124,10 +11124,10 @@ const RECEIPT_XLSX_STYLE = {
   payValue: 68,
   promoLabel: 73,
 };
-// ҮНДСЭН A–K: H/I/J from the №260941 Excel drag (Тоо/ш, Нэгж үнэ);
-// C/E give the extra width back so A–K stay ~86.75 (A4 fitToWidth=1).
+// ҮНДСЭН A–K: A fits the 16.5mm logo; B is a narrow gap (was 15, crushed the logo
+// on the A|B grid). C/E/H/I/J keep A4 fitToWidth=1 (sum 86.75).
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 15.0, 10.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
+  9.25, 8.75, 10.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
 ];
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
 const RECEIPT_XLSX_PAGE_ROWS = 52;
@@ -11612,10 +11612,10 @@ async function assembleStockReceiptXlsxZip({
   return zip;
 }
 function receiptDrawingXml() {
-  // Fixed ~16.5mm logo via oneCellAnchor (size does not depend on narrow column A).
-  // Brand/address in B share the same left edge (parallel).
+  // Logo lives in column A (wide enough for 16.5mm) so the A|B grid does not
+  // cut through it. B stays a narrow gap before the brand in C.
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  const pad = Math.round((0.15 / 25.4) * 914400);
+  const pad = Math.round((0.4 / 25.4) * 914400);
   const logoEmu = Math.round((16.5 / 25.4) * 914400);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
@@ -11754,7 +11754,7 @@ function appendReceiptSheetRows(
   const vat = payable - sub;
   const gross = orderGrossTotal(o);
   const deliveryDateText = receiptDeliveryDateDisplay(o);
-  // Address shares the brand's C-left edge (B is the logo gap).
+  // Address shares the brand's C-left edge (B is a narrow gap after the logo).
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
   // Header: logo A; B spacer; brand C:H; address C:I; title B:K; date J:K / K.
