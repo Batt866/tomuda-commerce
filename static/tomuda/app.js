@@ -10059,8 +10059,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A+B hold the 16.5mm logo without covering C; names/brand start at C. */
-.receipt-grid__a { width: 6mm; } .receipt-grid__b { width: 8.1%; } .receipt-grid__c { width: 20.7%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
+/* A a bit wider; B width unchanged; C holds brand + names. */
+.receipt-grid__a { width: 8mm; } .receipt-grid__b { width: 8.1%; } .receipt-grid__c { width: 19.6%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
 .receipt-grid__f { width: 10.5%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 6.1%; } .receipt-grid__i { width: 5.9%; } .receipt-grid__j { width: 11.9%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -10100,8 +10100,8 @@ td, th { border: none; }
   vertical-align: top;
   padding: 0 !important;
   overflow: visible;
-  width: 6mm;
-  min-width: 6mm;
+  width: 8mm;
+  min-width: 8mm;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
@@ -10924,7 +10924,7 @@ tbody.receipt-footer-keep {
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
-    width: 6mm !important;
+    width: 8mm !important;
   }
   .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
     border: none !important;
@@ -11137,10 +11137,9 @@ const RECEIPT_XLSX_STYLE = {
   payValue: 68,
   promoLabel: 73,
 };
-// ҮНДСЭН A–K: A+B (~18.5mm) fit the 16.5mm logo so it never covers C.
-// Brand/names stay on C. D–K unchanged. Sum 86.75.
+// ҮНДСЭН A–K: A nudged wider; B stays 7.0. Extra taken from C. Sum 86.75.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 7.0, 18.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
+  4.0, 7.0, 17.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
 ];
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
 const RECEIPT_XLSX_PAGE_ROWS = 52;
