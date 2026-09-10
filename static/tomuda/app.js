@@ -10124,11 +10124,13 @@ td, th { border: none; }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
   border: 0.4pt solid #666 !important;
-  padding: 3px 5px;
+  padding: 6px 5px;
+  height: 22px;
+  min-height: 22px;
   vertical-align: middle;
   background: #fff;
   color: ${RECEIPT_TEXT};
-  line-height: 1.25;
+  line-height: 1.35;
   font-size: 9pt;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
@@ -10405,7 +10407,7 @@ tbody.receipt-footer-keep {
   break-inside: avoid;
   -webkit-column-break-inside: avoid;
 }
-.receipt-items__row td { font-size: 10px; }
+.receipt-items__row td { font-size: 10px; height: 22px; min-height: 22px; padding-top: 6px; padding-bottom: 6px; }
 .receipt-items__gutter { width: 0; padding: 0 !important; border: none !important; }
 .receipt-items__num { width: 6mm; text-align: center; padding: 2px 2px; font-size: 10pt; font-weight: 700; color: ${RECEIPT_TEXT}; }
 .receipt-items__name {
@@ -11150,8 +11152,8 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 /** Uniform body/spacer row height — avoid hairline spacer rows (6–8pt). */
 const RECEIPT_XLSX_ROW_HEIGHT = 15;
-/** Fixed height for item table header + product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT;
+/** Item table header + product/promo lines — taller than body spacers. */
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 20;
 /** Slightly taller title / signature labels only. */
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
 /** «ЗАРЛАГЫН БАРИМТ» row — breathing room above/below 14pt title. */
@@ -11181,7 +11183,7 @@ const RECEIPT_XLSX_COL_WIDTHS = [
   5.0, 6.0, 17.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
 ];
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
-const RECEIPT_XLSX_PAGE_ROWS = 52;
+const RECEIPT_XLSX_PAGE_ROWS = 40;
 /** True when keep-together block starting at keepStartRow would not fit on its page. */
 function receiptXlsxNeedsBreakBefore(
   keepStartRow,
