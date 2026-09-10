@@ -271,12 +271,12 @@
     </style>
     <link
       rel="preload"
-      href="{% static 'tomuda/styles.css' %}?v=20260910-nav-logout"
+      href="{% static 'tomuda/styles.css' %}?v=20260910-stock-product"
       as="style"
     />
     <link
       rel="preload"
-      href="{% static 'tomuda/app.js' %}?v=20260910-a-thin-b"
+      href="{% static 'tomuda/app.js' %}?v=20260910-receipt-stable"
       as="script"
     />
     <script src="{% static 'tomuda/vendor/tailwindcdn.js' %}?v=20260604-picker-qty-big"></script>
@@ -314,7 +314,7 @@
     />
     <link
       rel="stylesheet"
-      href="{% static 'tomuda/styles.css' %}?v=20260910-nav-logout"
+      href="{% static 'tomuda/styles.css' %}?v=20260910-stock-product"
     />
   </head>
   <body>
@@ -446,7 +446,7 @@
       };
       window.__loadTomudaApp = function () {
         var sources = [
-          "{% static 'tomuda/app.js' %}?v=20260910-a-thin-b",
+          "{% static 'tomuda/app.js' %}?v=20260910-receipt-stable",
           "{% static 'tomuda/app.js' %}?v=" + Date.now(),
           "{% static 'tomuda/app.js' %}",
         ];

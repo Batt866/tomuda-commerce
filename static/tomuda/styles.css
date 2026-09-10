@@ -18413,9 +18413,17 @@ img.worker-order-store__avatar {
   font-size: 13px;
 }
 
+.sales-report-filters--stock {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 @media (min-width: 768px) {
   .sales-report-filters--dash {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sales-report-filters--stock {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .sales-report-dash__kpis {
@@ -22004,6 +22012,11 @@ input.stock-in-sheet__input::placeholder {
 
 .stock-in-report-list__amount {
   font-weight: 700;
+}
+
+.stock-in-report-list__when {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-in-report-list__summary {
