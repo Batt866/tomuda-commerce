@@ -10059,8 +10059,8 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* Thin A/B like the Excel grid; C holds brand + names. Logo image stays 16.5mm. */
-.receipt-grid__a { width: 6mm; } .receipt-grid__b { width: 4%; } .receipt-grid__c { width: 24.8%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
+/* A+B hold the 16.5mm logo without covering C; names/brand start at C. */
+.receipt-grid__a { width: 6mm; } .receipt-grid__b { width: 8.1%; } .receipt-grid__c { width: 20.7%; } .receipt-grid__d { width: 4.6%; } .receipt-grid__e { width: 13.8%; }
 .receipt-grid__f { width: 10.5%; } .receipt-grid__g { width: 6.5%; } .receipt-grid__h { width: 6.1%; } .receipt-grid__i { width: 5.9%; } .receipt-grid__j { width: 11.9%; } .receipt-grid__k { width: 11.4%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
@@ -11137,10 +11137,10 @@ const RECEIPT_XLSX_STYLE = {
   payValue: 68,
   promoLabel: 73,
 };
-// ҮНДСЭН A–K: thin A/B (logo + №), brand/names from C. D–K unchanged.
-// Sum 86.75 for A4 fitToWidth=1. Logo drawing stays 16.5mm.
+// ҮНДСЭН A–K: A+B (~18.5mm) fit the 16.5mm logo so it never covers C.
+// Brand/names stay on C. D–K unchanged. Sum 86.75.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  3.0, 3.5, 21.5, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
+  3.0, 7.0, 18.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 9.5,
 ];
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
 const RECEIPT_XLSX_PAGE_ROWS = 52;
@@ -11625,8 +11625,7 @@ async function assembleStockReceiptXlsxZip({
   return zip;
 }
 function receiptDrawingXml() {
-  // Fixed 16.5mm square in column A — A is wide enough that the picture
-  // stays left of B and is not squashed by the grid.
+  // Fixed 16.5mm square from A; A+B are wide enough that it ends before C.
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
   const pad = Math.round((0.25 / 25.4) * 914400);
   const logoEmu = Math.round((16.5 / 25.4) * 914400);
