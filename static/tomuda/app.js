@@ -963,7 +963,7 @@ function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const vatRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label receipt-grid__summary-label--vat">НӨАТ</td><td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value">${receiptMoneyDetailed(vat)}</td></tr>`;
   const noteCell = grandNote
     ? `<td colspan="6" class="receipt-grid__summary-note">${esc(grandNote)}</td><td class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`
-    : `<td colspan="6" class="receipt-grid__summary-rule receipt-grid__summary-rule--grand"></td><td class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`;
+    : `<td colspan="7" class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`;
   const grandRow = `<tr class="receipt-grid__summary receipt-grid__summary--grand"><td></td><td colspan="3" class="receipt-grid__summary-label receipt-grid__summary-label--grand">Таны нийт төлөх дүн</td>${noteCell}</tr>`;
   const term = payTerm || receiptPaymentTermDisplay(o);
   const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td></td><td colspan="3" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="3"></td><td colspan="4" class="receipt-grid__pay-opt receipt-grid__pay-opt--on">${esc(term)}</td></tr>`;
@@ -10570,12 +10570,15 @@ tbody.receipt-footer-keep {
   line-height: 1.15;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
-  background: transparent !important;
+  background: ${RECEIPT_GRAND_BG} !important;
   color: ${RECEIPT_TEXT} !important;
   height: 16px;
   padding: 0 6px;
   font-weight: 700;
   font-size: 12pt;
+}
+.receipt-grid--sheet .receipt-grid__summary--grand td:first-child {
+  background: transparent !important;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand .receipt-grid__summary-label--grand {
   font-weight: 700 !important;
@@ -12213,8 +12216,14 @@ function appendReceiptSheetRows(
       : decimals
         ? RECEIPT_XLSX_STYLE.summaryValueDec
         : 47;
-    const midStyle = grand ? 60 : 1;
-    merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
+    const midStyle = grand ? RECEIPT_XLSX_STYLE.grandLabel : 1;
+    if (grand) {
+      merges.push(`B${r}:D${r}`);
+      if (note) merges.push(`E${r}:J${r}`);
+      else merges.push(`E${r}:K${r}`);
+    } else {
+      merges.push(`B${r}:D${r}`, `E${r}:J${r}`);
+    }
     const cells = [
       xlsxCellXml(`A${r}`, 1, null, "empty"),
       xlsxCellXml(`B${r}`, labelStyle, si(label), "s"),
@@ -12228,9 +12237,8 @@ function appendReceiptSheetRows(
         cells.push(...emptyCells(r, "F", "J", midStyle));
         cells.push(xlsxCellXml(`K${r}`, valueStyle, Number(amount) || 0, "n"));
       } else {
-        cells.push(xlsxCellXml(`E${r}`, valueStyle, null, "empty"));
-        cells.push(...emptyCells(r, "F", "J", valueStyle));
-        cells.push(xlsxCellXml(`K${r}`, valueStyle, Number(amount) || 0, "n"));
+        cells.push(xlsxCellXml(`E${r}`, valueStyle, Number(amount) || 0, "n"));
+        cells.push(...emptyCells(r, "F", "K", valueStyle));
       }
       pushRow(RECEIPT_XLSX_ROW_HEIGHT, cells);
       return;
