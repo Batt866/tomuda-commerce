@@ -960,7 +960,7 @@ function receiptGrossRowHtml(o) {
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
   const subRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">Бараа ажил үйлчилгээний дүн</td><td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value">${receiptMoneyDetailed(sub)}</td></tr>`;
-  const vatRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label receipt-grid__summary-label--vat">НӨАТ</td><td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value">${receiptMoneyDetailed(vat)}</td></tr>`;
+  const vatRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">НӨАТ</td><td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value">${receiptMoneyDetailed(vat)}</td></tr>`;
   const noteCell = grandNote
     ? `<td colspan="6" class="receipt-grid__summary-note">${esc(grandNote)}</td><td class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`
     : `<td colspan="7" class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`;
@@ -10852,7 +10852,6 @@ tbody.receipt-footer-keep {
   white-space: nowrap;
   border: none !important;
 }
-.receipt-grid__summary-label--vat { font-weight: 700 !important; }
 .receipt-grid__summary-label--grand { font-weight: 700; color: ${RECEIPT_TEXT} !important; font-size: 12pt !important; letter-spacing: 0; white-space: nowrap; text-align: right !important; }
 .receipt-grid__summary-rule,
 .receipt-grid__summary-value {
@@ -11170,7 +11169,6 @@ const RECEIPT_XLSX_STYLE = {
   signLine: 57,
   summaryLabel: 68,
   summaryValueDec: 69,
-  vatLabel: 70,
   grandLabel: 71,
   grandValue: 72,
   payLabel: 70,
@@ -12210,16 +12208,14 @@ function appendReceiptSheetRows(
   const pushSummaryAmountRow = (
     label,
     amount,
-    { grand = false, decimals = false, note = "", vat = false } = {},
+    { grand = false, decimals = false, note = "" } = {},
   ) => {
     const r = rowNum;
     // Non-grand: label B:D right, amount E:K.
     // Grand: same span B:D / E:K, right-aligned; 12pt bold fill (71/72), note centered (60).
     const labelStyle = grand
       ? RECEIPT_XLSX_STYLE.grandLabel
-      : vat
-        ? RECEIPT_XLSX_STYLE.vatLabel
-        : RECEIPT_XLSX_STYLE.summaryLabel;
+      : RECEIPT_XLSX_STYLE.summaryLabel;
     const valueStyle = grand
       ? RECEIPT_XLSX_STYLE.grandValue
       : decimals
@@ -12261,7 +12257,7 @@ function appendReceiptSheetRows(
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, cells);
   };
   pushSummaryAmountRow("Бараа ажил үйлчилгээний дүн", sub, { decimals: true });
-  pushSummaryAmountRow("НӨАТ", vat, { decimals: true, vat: true });
+  pushSummaryAmountRow("НӨАТ", vat, { decimals: true });
   const grandNote = receiptGrandNote(o);
   pushSummaryAmountRow("Таны нийт төлөх дүн", payable, {
     grand: true,
