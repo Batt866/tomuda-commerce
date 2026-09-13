@@ -550,11 +550,6 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Gap between «Дансны дугаар:» and IBAN inside their shared Excel cell. */
-const RECEIPT_BANK_IBAN_GAP = " ".repeat(4);
-/** Renders as wide as «Дансны дугаар:» in 9pt Arial — keeps the account number
- *  under the IBAN on the row below. */
-const RECEIPT_BANK_IBAN_PAD = " ".repeat(27);
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
@@ -714,7 +709,7 @@ function receiptInfoRows(o) {
   }
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА», «Регистрийн».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="4" class="receipt-grid__label"><span class="receipt-grid__iban-key">Дансны дугаар:</span><span class="receipt-grid__iban-val">IBAN: ${RECEIPT_BANK_IBAN_SHORT}</span></td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="4" class="receipt-grid__label"><span class="receipt-grid__iban-key"></span><span class="receipt-grid__iban-val">${RECEIPT_BANK_ACCOUNT}</span></td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label receipt-grid__iban-b">Дансны дугаар:</td><td class="receipt-grid__iban-c">IBAN:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td></td><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -10786,10 +10781,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9pt; }
 .receipt-grid__value b { font-weight: 700; font-size: inherit; }
 .receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9pt; }
-/* Дансны дугаар: keeps its place; the spacer puts IBAN and the account number
-   at the same offset inside the shared cell. */
-.receipt-grid__iban-key { display: inline-block; min-width: 27mm; }
-.receipt-grid__iban-val { font-weight: 700; font-size: 9pt; white-space: nowrap; }
+.receipt-grid__iban-nums { font-weight: 700; font-size: 9pt !important; line-height: 1.25; }
+.receipt-grid__iban-nums b { font-size: 9pt !important; font-weight: 700; }
 .receipt-grid__iban-b {
   text-align: left !important;
   white-space: nowrap;
@@ -10812,7 +10805,13 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
   vertical-align: top !important;
+}
+.receipt-grid__iban-nums {
+  text-align: left !important;
+  vertical-align: top !important;
   line-height: 1.25;
+  white-space: nowrap;
+  padding-top: 1px !important;
 }
 .receipt-info__value,
 .receipt-info__address-text,
@@ -11181,6 +11180,8 @@ const RECEIPT_XLSX_STYLE = {
 const RECEIPT_XLSX_COL_WIDTHS = [
   5.0, 6.0, 17.0, 2.875, 12.0, 8.625, 5.625, 5.125, 5.0, 10.0, 12.0,
 ];
+/** Cell padding + slack (px) held back so right-flush text never wraps. */
+const RECEIPT_XLSX_CELL_PAD = 6;
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
 const RECEIPT_XLSX_PAGE_ROWS = 52;
 /** True when keep-together block starting at keepStartRow would not fit on its page. */
@@ -11219,6 +11220,31 @@ function receiptXlsxLabelUnits(text) {
     else units += 0.95;
   }
   return units;
+}
+/** 9pt Arial width in px — Excel draws 9pt as 12px on a 96dpi screen. */
+function receiptXlsxTextPx(text) {
+  const ctx = (receiptXlsxTextPx._ctx ||=
+    typeof document === "undefined"
+      ? null
+      : document.createElement("canvas").getContext("2d"));
+  if (!ctx) return receiptXlsxLabelUnits(text) * 7;
+  ctx.font = "12px Arial, Helvetica, sans-serif";
+  return ctx.measureText(String(text ?? "")).width;
+}
+/**
+ * Spaces that push `tail` flush to the right edge of the merged `cols`.
+ * Excel clips a cell whose neighbour holds text, so a left label and a
+ * right-flush tail have to share one merged cell padded by spaces.
+ */
+function receiptXlsxRightFlushGap(head, tail, cols) {
+  const cellPx = cols.reduce((sum, w) => sum + Math.round(w * 7 + 5), 0);
+  const space = receiptXlsxTextPx(" ") || 3.34;
+  const room =
+    cellPx -
+    RECEIPT_XLSX_CELL_PAD -
+    receiptXlsxTextPx(head) -
+    receiptXlsxTextPx(tail);
+  return " ".repeat(Math.max(1, Math.floor(room / space)));
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
 function xlsxFitColWidth(
@@ -11956,10 +11982,11 @@ function appendReceiptSheetRows(
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // Дансны дугаар: shares one B:E cell with the IBAN so the number sits next
-    // to the label instead of starting over at D.
-    `B${bankR4}:E${bankR4}`,
-    `B${bankR5}:E${bankR5}`,
+    // B:C = Дансны дугаар: + IBAN: right-flush (one cell — B alone clips);
+    // D:E = the numbers only.
+    `B${bankR4}:C${bankR4}`,
+    `D${bankR4}:E${bankR4}`,
+    `D${bankR5}:E${bankR5}`,
   );
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
     xlsxCellXml(
@@ -12019,30 +12046,39 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
+  const ibanGap = receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
+    RECEIPT_XLSX_COL_WIDTHS[1],
+    RECEIPT_XLSX_COL_WIDTHS[2],
+  ]);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
       siRich([
         { t: "Дансны дугаар:", sz: 9 },
-        { t: RECEIPT_BANK_IBAN_GAP, sz: 9 },
-        { t: `IBAN: ${RECEIPT_BANK_IBAN_SHORT}`, b: true, sz: 9 },
+        { t: ibanGap, sz: 9 },
+        { t: "IBAN:", sz: 9 },
       ]),
       "s",
     ),
-    ...emptyCells(bankR4, "C", "E", RECEIPT_XLSX_STYLE.metaNormal),
+    xlsxCellXml(
+      `D${bankR4}`,
+      RECEIPT_XLSX_STYLE.metaBold,
+      si(RECEIPT_BANK_IBAN_SHORT),
+      "s",
+    ),
+    ...emptyCells(bankR4, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.metaBold),
   ]);
   pushRow(perBankH, [
     xlsxCellXml(
-      `B${bankR5}`,
-      RECEIPT_XLSX_STYLE.metaNormal,
-      siRich([
-        { t: `${RECEIPT_BANK_IBAN_PAD}${RECEIPT_BANK_IBAN_GAP}`, sz: 9 },
-        { t: RECEIPT_BANK_ACCOUNT, b: true, sz: 9 },
-      ]),
+      `D${bankR5}`,
+      RECEIPT_XLSX_STYLE.metaBold,
+      si(RECEIPT_BANK_ACCOUNT),
       "s",
     ),
-    ...emptyCells(bankR5, "C", "E", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR5, "B", "C", RECEIPT_XLSX_STYLE.metaNormal),
+    ...emptyCells(bankR5, "E", "E", RECEIPT_XLSX_STYLE.metaBold),
   ]);
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
