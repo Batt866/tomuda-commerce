@@ -24128,6 +24128,7 @@ function promotionSheetPickerBlock({
   showCategory = true,
   compact = false,
   extraBeforeStepper = "",
+  extraAfterStepper = "",
   perProductQty = false,
 }) {
   const ids = Array.isArray(selectedIds) ? selectedIds : [];
@@ -24155,11 +24156,12 @@ function promotionSheetPickerBlock({
     ? `<div class="promo-sheet-stepper">${stepperCaption}${promoQtyStepperHtml(qtyStepper.name, qtyStepper.defaultValue, { min: qtyStepper.min ?? 0, label: qtyStepper.label || "" })}</div>`
     : "";
   const extraHtml = extraBeforeStepper || "";
+  const afterStepperHtml = extraAfterStepper || "";
   const head = `<div class="promo-sheet-section__head"><p class="promo-sheet-section__title">${esc(title)}${countBadge}</p>${hint ? `<p class="promo-sheet-section__hint">${esc(hint)}</p>` : ""}</div>`;
   const searchIcon = `<span class="promo-search-combo__icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>`;
   const chevron = `<button type="button" class="promo-search-combo__toggle" onclick="togglePromoSearchDropdown(${jsStringArg(pickKey)})" aria-label="${searchOpen ? "Хайлт хураах" : "Бараа харах"}" aria-expanded="${searchOpen ? "true" : "false"}"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`;
   const dropdownHtml = `<div data-promo-search-dropdown="${esc(pickKey)}" class="promo-search-dropdown" ${searchOpen ? "" : "hidden"}>${searchOpen ? promoSearchDropdownInnerHtml(pickKey, ids) : ""}</div>`;
-  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo${searchOpen ? " is-open" : ""}" data-promo-search-combo="${esc(pickKey)}"><div class="promo-search-combo__field search-field">${searchIcon}${searchInput}${chevron}${searchClearBtnHtml()}</div>${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}`;
+  const inner = `${hiddenInputs}${head}<div class="promo-sheet-filters"><div class="promo-search-combo${searchOpen ? " is-open" : ""}" data-promo-search-combo="${esc(pickKey)}"><div class="promo-search-combo__field search-field">${searchIcon}${searchInput}${chevron}${searchClearBtnHtml()}</div>${dropdownHtml}</div>${categoryHtml}</div>${gridHtml}${extraHtml}${stepperHtml}${afterStepperHtml}`;
   return `<div class="promo-sheet-section promo-sheet-section--${variant || "default"}${compact ? " promo-sheet-section--compact" : ""}"><div class="promo-sheet-section__body">${inner}</div></div>`;
 }
 function promoSheetSectionHtml({
@@ -24700,9 +24702,44 @@ function quantityPromoCombinedThreshold(rule) {
   }
   return Math.max(buyQty, fromMapMax);
 }
-function quantityPromoSets(rule, qtyByProduct) {
+function quantityPromoMinAmount(rule) {
+  return Math.max(0, Number(rule?.minAmount) || 0);
+}
+function quantityPromoUsesAmount(rule) {
+  return quantityPromoMinAmount(rule) > 0;
+}
+function quantityPromoPoolAmount(rule, amountByProduct) {
+  return promotionBuyProductIds(rule).reduce((sum, id) => {
+    const key = Object.keys(amountByProduct || {}).find(
+      (k) => String(k) === String(id),
+    );
+    const val =
+      key != null
+        ? amountByProduct[key]
+        : amountByProduct?.[id] ?? amountByProduct?.[String(id)];
+    return sum + (Number(val) || 0);
+  }, 0);
+}
+function quantityPromoAmountByProductFromLines(lines) {
+  const map = {};
+  (lines || []).forEach((line) => {
+    if (line?.isPromoFree) return;
+    const id = String(line?.productId || "");
+    if (!id) return;
+    map[id] = (map[id] || 0) + (Number(line.total) || 0);
+  });
+  return map;
+}
+function workerAmountByProduct() {
+  return quantityPromoAmountByProductFromLines(workerPaidLines());
+}
+function quantityPromoSets(rule, qtyByProduct, amountByProduct) {
   const buyIds = promotionBuyProductIds(rule);
   if (!buyIds.length) return 0;
+  const minAmount = quantityPromoMinAmount(rule);
+  if (minAmount > 0) {
+    return Math.floor(quantityPromoPoolAmount(rule, amountByProduct) / minAmount);
+  }
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
   const haveOf = (id) => promoMixQtyOf(counts, id);
   const buyQty = quantityPromoCombinedThreshold(rule);
@@ -24711,8 +24748,11 @@ function quantityPromoSets(rule, qtyByProduct) {
   return Math.floor(combinedQty / buyQty);
 }
 function quantityPromoOrderQty(rule, sets = 1) {
-  const buyIds = promotionBuyProductIds(rule);
   const n = Math.max(1, Math.floor(Number(sets) || 0));
+  if (quantityPromoUsesAmount(rule)) {
+    return quantityPromoMinAmount(rule) * n;
+  }
+  const buyIds = promotionBuyProductIds(rule);
   const buyMode = quantityPromoBuyMode(rule);
   if ((buyMode === "each" || buyMode === "any") && buyIds.length) {
     return buyIds.reduce(
@@ -24730,8 +24770,14 @@ function quantityPromoFreeQty(rule, sets = 1) {
   return freeQty < 1 ? 0 : freeQty * n;
 }
 function quantityPromoExampleLine(rule, sets = 1) {
-  const order = quantityPromoOrderQty(rule, sets);
   const promo = quantityPromoFreeQty(rule, sets);
+  if (!promo) return "";
+  if (quantityPromoUsesAmount(rule)) {
+    const order = quantityPromoOrderQty(rule, sets);
+    if (!order) return "";
+    return `${fmt(order)} захиалгад ${promo} ш урамшуулал`;
+  }
+  const order = quantityPromoOrderQty(rule, sets);
   if (!order || !promo) return "";
   return `${order} ш захиалгад ${promo} ш урамшуулал`;
 }
@@ -24782,6 +24828,12 @@ function quantityPromoRuleFormulaExtended(rule) {
     }
   }
   const buyQty = Math.floor(Number(rule?.buyQty) || 0);
+  if (quantityPromoUsesAmount(rule)) {
+    return [1, 2, 3]
+      .map((sets) => quantityPromoExampleLine(rule, sets))
+      .filter(Boolean)
+      .join(" · ");
+  }
   if (buyQty < 1) return "";
   return [1, 2, 3]
     .map((sets) => quantityPromoExampleLine(rule, sets))
@@ -24796,7 +24848,7 @@ function workerQtyByProduct() {
   });
   return qtyByProduct;
 }
-function quantityPromoRuleProgress(rule, qtyByProduct) {
+function quantityPromoRuleProgress(rule, qtyByProduct, amountByProduct) {
   const buyIds = promotionBuyProductIds(rule);
   const freeIds = promotionFreeProductIds(rule);
   const freeQty = Math.floor(Number(rule.freeQty) || 0);
@@ -24806,18 +24858,32 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
   const qtyOf = (id) => promoMixQtyOf(counts, id);
   const buyQty = quantityPromoCombinedThreshold(rule);
-  if (!buyIds.length || !freeIds.length || freeQty < 1 || buyQty < 1)
-    return null;
+  const minAmount = quantityPromoMinAmount(rule);
+  const usesAmount = minAmount > 0;
+  if (!buyIds.length || !freeIds.length || freeQty < 1) return null;
+  if (!usesAmount && buyQty < 1) return null;
+  const amounts = amountByProduct || {};
+  const combinedAmount = quantityPromoPoolAmount(rule, amounts);
   const combinedQty = buyIds.reduce((sum, id) => sum + qtyOf(id), 0);
-  const sets = quantityPromoSets(rule, qtyByProduct);
+  const sets = quantityPromoSets(rule, qtyByProduct, amounts);
   const grantedFree = sets * freeQty;
   const readyTypes = buyIds.filter(
     (id) => qtyOf(id) >= quantityPromoBuyQtyForProduct(rule, id),
   ).length;
   const missingTypes = Math.max(0, buyIds.length - readyTypes);
-  const remainder = buyQty > 0 ? combinedQty % buyQty : 0;
-  const needForNext =
-    remainder === 0 ? (combinedQty > 0 ? buyQty : buyQty) : buyQty - remainder;
+  let remainder;
+  let needForNext;
+  if (usesAmount) {
+    remainder = minAmount > 0 ? combinedAmount % minAmount : 0;
+    needForNext =
+      remainder === 0
+        ? minAmount
+        : minAmount - remainder;
+  } else {
+    remainder = buyQty > 0 ? combinedQty % buyQty : 0;
+    needForNext =
+      remainder === 0 ? (combinedQty > 0 ? buyQty : buyQty) : buyQty - remainder;
+  }
   return {
     rule,
     buyIds,
@@ -24827,7 +24893,10 @@ function quantityPromoRuleProgress(rule, qtyByProduct) {
     buyUnit,
     freeQty,
     buyMode,
+    minAmount,
+    usesAmount,
     combinedQty,
+    combinedAmount,
     readyTypes,
     missingTypes,
     sets,
@@ -24842,6 +24911,25 @@ function productQuantityPromoRules(productId) {
   );
 }
 function quantityPromoProgressMeter(prog, qtyByProduct) {
+  if (prog?.usesAmount) {
+    const goal = Math.max(1, Number(prog.minAmount) || 0);
+    const combined = Math.max(0, Number(prog.combinedAmount) || 0);
+    const rem = goal > 0 ? combined % goal : 0;
+    const sets = Math.max(0, Math.floor(Number(prog?.sets) || 0));
+    const current =
+      rem === 0 && sets > 0
+        ? goal
+        : rem === 0
+          ? Math.min(combined, goal)
+          : rem;
+    return {
+      current,
+      goal,
+      pct: Math.min(100, Math.round((current / goal) * 100)),
+      unit: "₮",
+      usesAmount: true,
+    };
+  }
   const buyIds = prog?.buyIds || [];
   const buyQty = Math.max(1, Math.floor(Number(prog?.buyQty) || 0));
   const sets = Math.max(0, Math.floor(Number(prog?.sets) || 0));
@@ -24863,11 +24951,15 @@ function quantityPromoProgressMeter(prog, qtyByProduct) {
     goal: buyQty,
     pct: Math.min(100, Math.round((current / buyQty) * 100)),
     unit: unitLabel,
+    usesAmount: false,
   };
 }
 function quantityPromoOfferText(prog) {
   const freeNames = promotionProductLabels(prog.freeIds) || "урамшуулал";
   const freeQty = Math.max(1, Math.floor(Number(prog.freeQty) || 1));
+  if (prog.usesAmount) {
+    return `Сонгосон бараанаас нийт ${fmt(prog.minAmount)} (хольж эсвэл нэг бараанаас) авахад ${freeNames} ${freeQty} ш урамшуулал.`;
+  }
   const unit = quantityPromoUnitLabel(prog.buyUnit || "piece");
   if (prog.buyMode === "total") {
     if (prog.buyUnit === "pack") {
@@ -24954,7 +25046,8 @@ function promoMixSheetHtml() {
   const rule = rules[idx];
   if (!rule) return "";
   const qtyByProduct = workerQtyByProduct();
-  const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+  const amountByProduct = workerAmountByProduct();
+  const prog = quantityPromoRuleProgress(rule, qtyByProduct, amountByProduct);
   if (!prog) return "";
   const meter = quantityPromoProgressMeter(prog, qtyByProduct);
   const title = quantityPromoDisplayTitle(prog);
@@ -24963,8 +25056,9 @@ function promoMixSheetHtml() {
     short: true,
   });
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
-  const meterLabel =
-    prog.buyMode === "each"
+  const meterLabel = meter.usesAmount
+    ? `${fmt(meter.current)} / ${fmt(meter.goal)}`
+    : prog.buyMode === "each"
       ? `${meter.current} / ${meter.goal} төрөл`
       : `${meter.current} / ${meter.goal} ${unitShort}`;
   const tileCount = prog.buyIds.length;
@@ -24994,8 +25088,9 @@ function promoMixSheetHtml() {
     .filter(Boolean)
     .join("");
   const freeNames = promotionProductLabels(prog.freeIds) || "Урамшуулал";
-  const footNote =
-    prog.buyMode === "total" && prog.buyQty
+  const footNote = prog.usesAmount
+    ? `Урамшуулал: «${freeNames} — ${fmt(prog.minAmount)}»`
+    : prog.buyMode === "total" && prog.buyQty
       ? `Урамшуулал: «${freeNames} — ${prog.buyQty} ${unitShort}»`
       : `Урамшуулал: «${freeNames}»`;
   const ctaLabel = ready
@@ -25042,10 +25137,11 @@ function workerQtyPromoProgressCardHtml(prog, qtyByProduct) {
     .filter(Boolean)
     .join("");
   const status = isActive
-    ? `Урамшуулал идэвхтэй · <b>${prog.grantedFree} ш</b>${prog.needForNext > 0 ? ` · дараагийн багц хүртэл <b>${prog.needForNext}</b> ${meter.unit}` : ""}`
-    : `Дараагийн урамшуулал хүртэл <b>${prog.needForNext}</b> ${meter.unit}`;
-  const meterLabel =
-    prog.buyMode === "each"
+    ? `Урамшуулал идэвхтэй · <b>${prog.grantedFree} ш</b>${prog.needForNext > 0 ? ` · дараагийн багц хүртэл <b>${meter.usesAmount ? fmt(prog.needForNext) : prog.needForNext}</b> ${meter.unit}` : ""}`
+    : `Дараагийн урамшуулал хүртэл <b>${meter.usesAmount ? fmt(prog.needForNext) : prog.needForNext}</b> ${meter.unit}`;
+  const meterLabel = meter.usesAmount
+    ? `${fmt(meter.current)} / ${fmt(meter.goal)}`
+    : prog.buyMode === "each"
       ? `${meter.current} / ${meter.goal} төрөл`
       : `${meter.current} / ${meter.goal}`;
   return `<article class="worker-promo-progress${isActive ? " is-active" : ""}" data-promo-progress>
@@ -25070,9 +25166,10 @@ function workerPromoMixEntriesHtml() {
   const rules = state.promotionRules?.quantity || [];
   if (!rules.length) return "";
   const qtyByProduct = workerQtyByProduct();
+  const amountByProduct = workerAmountByProduct();
   const cards = [];
   rules.forEach((rule, i) => {
-    const prog = quantityPromoRuleProgress(rule, qtyByProduct);
+    const prog = quantityPromoRuleProgress(rule, qtyByProduct, amountByProduct);
     if (!prog?.buyIds?.length) return;
     const title = quantityPromoDisplayTitle(prog);
     const ready = prog.sets > 0;
@@ -25393,6 +25490,9 @@ function selectPromoProduct(fieldName, id) {
 function promotionQtyBuyPartText(r) {
   const buyIds = promotionBuyProductIds(r);
   if (!buyIds.length) return "-";
+  if (quantityPromoUsesAmount(r)) {
+    return `${promotionProductLabels(buyIds)}-аас нийт ${fmt(quantityPromoMinAmount(r))} авахад`;
+  }
   const buyMode = quantityPromoBuyMode(r);
   const unit = quantityPromoUnitLabel(quantityPromoBuyUnit(r), { short: true });
   const qtyMap = quantityPromoBuyQtyMap(r);
@@ -25516,10 +25616,16 @@ function promotionQtyRuleCard(r, i) {
     buyProducts = buyIds
       .map((id) => state.products.find((p) => p.id === id))
       .filter(Boolean),
+    usesAmount = quantityPromoUsesAmount(r),
+    minAmount = quantityPromoMinAmount(r),
     thresholdQty = quantityPromoCombinedThreshold(r),
-    formula = `${thresholdQty} ш захиалгад ${Math.floor(Number(r.freeQty) || 1)} ш урамшуулал`,
-    threshold =
-      thresholdQty > 0
+    freeQty = Math.floor(Number(r.freeQty) || 1),
+    formula = usesAmount
+      ? `${fmt(minAmount)} захиалгад ${freeQty} ш урамшуулал`
+      : `${thresholdQty} ш захиалгад ${freeQty} ш урамшуулал`,
+    threshold = usesAmount
+      ? promoRuleAmountHtml(`Нийлбэр босго · ${fmt(minAmount)}`)
+      : thresholdQty > 0
         ? promoRuleAmountHtml(`Нийлбэр босго · ${thresholdQty} ш`)
         : "";
   return promoApprovedRuleCard({
@@ -25657,6 +25763,7 @@ function promotionQtyModal() {
     freeIds = state.promoPick.freeProductIds;
   const buyQtyDefault = promoFormDraftVal("buyQty", "8") || "8";
   const freeQtyDefault = promoFormDraftVal("freeQty", "1") || "1";
+  const minAmountField = `<div class="promo-sheet-stepper promo-sheet-stepper--amount"><p class="promo-sheet-stepper__label">Босго дүн (₮)</p>${promoAmountInputHtml("minAmount", { placeholder: "320000", value: promoFormDraftVal("minAmount") })}<p class="promo-form-field__hint">Дүн оруулбал босго дүнгээр тооцогдоно. Аль ч сонгосон бараанаас нийлбэр.</p></div>`;
   const buyQtyStepper = {
     name: "buyQty",
     defaultValue: buyQtyDefault,
@@ -25687,6 +25794,7 @@ function promotionQtyModal() {
       placeholder: "Хайх...",
       variant: "buy",
       qtyStepper: buyQtyStepper,
+      extraAfterStepper: minAmountField,
       compact: true,
     });
   } else {
@@ -25699,6 +25807,7 @@ function promotionQtyModal() {
       placeholder: "Хайх...",
       variant: "buy",
       perProductQty: true,
+      extraAfterStepper: minAmountField,
       compact: true,
     });
   }
@@ -25869,18 +25978,24 @@ function savePromotionQty(e) {
     const buyMode =
       buyModeRaw === "each" || buyModeRaw === "any" ? buyModeRaw : "total";
     const buyUnit = "piece";
+    const minAmount = Math.max(
+      0,
+      Number(f.get("minAmount") || draft.minAmount || 0) || 0,
+    );
     const buyQtyByProduct = {};
     let buyQtyNum = 0;
     if (buyMode === "total") {
       buyQtyNum = Math.floor(
         Number(f.get("buyQty")) || Number(draft.buyQty) || 0,
       );
-      if (buyQtyNum < 1) {
-        alert("Нийт тоо 1-с дээш оруулна уу");
+      if (minAmount < 1 && buyQtyNum < 1) {
+        alert("Нийт тоо эсвэл босго дүн оруулна уу");
         return;
       }
-      for (const id of finalBuyProductIds) {
-        buyQtyByProduct[id] = buyQtyNum;
+      if (buyQtyNum >= 1) {
+        for (const id of finalBuyProductIds) {
+          buyQtyByProduct[id] = buyQtyNum;
+        }
       }
     } else {
       for (const id of finalBuyProductIds) {
@@ -25888,14 +26003,18 @@ function savePromotionQty(e) {
         const q = Math.floor(
           Number(f.get(qtyKey)) || Number(draft[qtyKey]) || 0,
         );
-        if (q < 1) {
+        if (minAmount < 1 && q < 1) {
           alert("Захиалгын бараа бүрт 1-с дээш тоо оруулна уу");
           return;
         }
-        buyQtyByProduct[id] = q;
+        if (q >= 1) buyQtyByProduct[id] = q;
       }
       const buyQtyValues = Object.values(buyQtyByProduct);
       buyQtyNum = buyQtyValues.length ? Math.min(...buyQtyValues) : 0;
+      if (minAmount < 1 && buyQtyNum < 1) {
+        alert("Нийт тоо эсвэл босго дүн оруулна уу");
+        return;
+      }
     }
     if (buyUnit === "pack" || buyUnit === "large") {
       const missingPack = finalBuyProductIds.filter((id) => {
@@ -25918,6 +26037,7 @@ function savePromotionQty(e) {
       buyQtyByProduct,
       buyMode,
       buyUnit,
+      ...(minAmount > 0 ? { minAmount } : {}),
       freeProductIds: finalFreeProductIds,
       freeProductId: finalFreeProductIds[0],
       freeQty: Math.max(1, Math.floor(Number(f.get("freeQty")) || 1)),
@@ -26106,6 +26226,7 @@ function workerPaidProductsInCart() {
 function applyQuantityPromotions(lines, promoOpts = {}) {
   const result = lines.map((line) => ({ ...line }));
   const qtyByProduct = {};
+  const amountByProduct = quantityPromoAmountByProductFromLines(result);
   result.forEach((line) => {
     if (line.isPromoFree) return;
     const id = String(line.productId || "");
@@ -26113,7 +26234,7 @@ function applyQuantityPromotions(lines, promoOpts = {}) {
     qtyByProduct[id] = (qtyByProduct[id] || 0) + (Number(line.quantity) || 0);
   });
   (state.promotionRules.quantity || []).forEach((rule) => {
-    const sets = quantityPromoSets(rule, qtyByProduct);
+    const sets = quantityPromoSets(rule, qtyByProduct, amountByProduct);
     const freeQty = Math.floor(Number(rule.freeQty) || 0);
     if (sets < 1 || freeQty < 1) return;
     appendPromoFreeLines(
@@ -28295,7 +28416,7 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
   if (!wasOpen) pushAppHistory();
 }
 const IMAGE_LIGHTBOX_SKIP =
-  ".receipt-logo, .boot-screen__logo, .wh-receipt-sheet__logo, .auth-card__logo, .tomuda-logo, #image-lightbox img";
+  ".receipt-logo, .boot-screen__logo, .wh-receipt-sheet__logo, .auth-card__logo, .tomuda-logo, #image-lightbox img, .promo-page, .modal-panel--promo, [data-promo-modal]";
 let imageLightboxEl = null;
 function imageLightboxOpen() {
   return imageLightboxEl && !imageLightboxEl.hidden;

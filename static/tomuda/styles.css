@@ -17223,6 +17223,23 @@ img.worker-order-store__avatar {
   color: var(--promo-sheet-muted);
 }
 
+.modal-panel--promo-qty .promo-sheet-stepper--amount,
+.modal-panel--promo-sheet .promo-sheet-stepper--amount {
+  width: 100%;
+  align-items: stretch;
+}
+
+.modal-panel--promo-qty .promo-sheet-stepper--amount .app-input,
+.modal-panel--promo-sheet .promo-sheet-stepper--amount .app-input {
+  width: 100%;
+  text-align: left;
+}
+
+.modal-panel--promo-qty .promo-sheet-stepper--amount .promo-form-field__hint,
+.modal-panel--promo-sheet .promo-sheet-stepper--amount .promo-form-field__hint {
+  text-align: center;
+}
+
 .modal-panel--promo-qty .promo-qty-stepper,
 .modal-panel--promo-sheet .promo-qty-stepper {
   display: inline-flex;
@@ -19432,6 +19449,12 @@ body.image-lightbox-open {
 .picker-qty-sheet img,
 [data-picker-qty-sheet] img {
   cursor: zoom-in;
+}
+
+.promo-page img,
+.modal-panel--promo img,
+[data-promo-modal] img {
+  cursor: pointer;
 }
 
 /* ── Stock-in sheet (Барааны орлого) ── */
