@@ -104,6 +104,8 @@ const state = {
   suppliers: [],
   stockInEmployeeId: "",
   stockInSupplierId: "",
+  stockInSupplierPickerOpen: false,
+  stockInSupplierQuery: "",
   stockInWarehouseName: "",
   stockInDraft: {},
   stockInDone: false,
@@ -5978,6 +5980,9 @@ function applyPersistentState(data) {
   if (state.stockOutWarehouseName == null) state.stockOutWarehouseName = "";
   if (state.stockOutScanQuery == null) state.stockOutScanQuery = "";
   if (state.stockInSupplierId == null) state.stockInSupplierId = "";
+  if (state.stockInSupplierPickerOpen == null)
+    state.stockInSupplierPickerOpen = false;
+  if (state.stockInSupplierQuery == null) state.stockInSupplierQuery = "";
   if (state.stockInWarehouseName == null) state.stockInWarehouseName = "";
   state.deletionLog = normalizeDeletionLog(state.deletionLog);
   state.promotionDeletionLog = normalizePromotionDeletionLog(
@@ -6183,6 +6188,7 @@ function shouldDeferBackendSync() {
   if (isEditingStockInScan()) return true;
   if (isEditingWorkerStoreSearch()) return true;
   if (isWhReceiptPickerOpen()) return true;
+  if (isStockInSupplierPickerOpen()) return true;
   if (isReceiptStatusSelecting()) return true;
   if (isToolbarSelectActive()) return true;
   if (isUserScrolling()) return true;
@@ -6209,7 +6215,7 @@ function isToolbarSelectActive() {
   if (Date.now() < toolbarSelectActiveUntil) return true;
   const el = document.activeElement;
   return !!el?.matches?.(
-    ".page-toolbar__select, .page-toolbar__search, select.app-input, .worker-orders-filters select, .worker-orders-filters input[type=date]",
+    ".page-toolbar__select, .page-toolbar__search, select.app-input, .worker-orders-filters select, .worker-orders-filters input[type=date], #stockInSupplierSelect, #stockInSupplierQuery",
   );
 }
 function toolbarSelectFocus() {
@@ -11232,19 +11238,21 @@ function receiptXlsxTextPx(text) {
   return ctx.measureText(String(text ?? "")).width;
 }
 /**
- * Spaces that push `tail` flush to the right edge of the merged `cols`.
+ * Padding that pushes `tail` flush to the right edge of the merged `cols`.
  * Excel clips a cell whose neighbour holds text, so a left label and a
- * right-flush tail have to share one merged cell padded by spaces.
+ * right-flush tail have to share one merged cell. NBSP, not plain spaces —
+ * a wrapping cell would break at a space run and hide `tail`.
  */
 function receiptXlsxRightFlushGap(head, tail, cols) {
   const cellPx = cols.reduce((sum, w) => sum + Math.round(w * 7 + 5), 0);
-  const space = receiptXlsxTextPx(" ") || 3.34;
+  const nbsp = "\u00A0";
+  const step = receiptXlsxTextPx(nbsp) || 3.34;
   const room =
     cellPx -
     RECEIPT_XLSX_CELL_PAD -
     receiptXlsxTextPx(head) -
     receiptXlsxTextPx(tail);
-  return " ".repeat(Math.max(1, Math.floor(room / space)));
+  return nbsp.repeat(Math.max(1, Math.floor(room / step)));
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
 function xlsxFitColWidth(
@@ -15371,7 +15379,11 @@ function setWarehouseTab(tab) {
 }
 function setInventoryTab(tab) {
   const next = tab === "in" || tab === "out" || tab === "stock" ? tab : "stock";
-  if (next !== "in") stopBarcodeScan();
+  if (next !== "in") {
+    stopBarcodeScan();
+    state.stockInSupplierPickerOpen = false;
+    state.stockInSupplierQuery = "";
+  }
   state.filters.inventory = next;
   if (next === "in") {
     state.stockInEmployeeId = defaultInventoryEmployeeId();
@@ -16117,6 +16129,8 @@ function startStockInSession() {
   state.stockInReceipt = null;
   state.stockInSessionStartedAt = new Date().toISOString();
   state.stockInSupplierId = "";
+  state.stockInSupplierPickerOpen = false;
+  state.stockInSupplierQuery = "";
   state.stockInWarehouseName = "";
   if (state.currentEmployee?.id) {
     state.stockInEmployeeId = state.currentEmployee.id;
@@ -16133,10 +16147,124 @@ function setStockInEmployee(id) {
   state.stockInEmployeeId = id || "";
   render();
 }
-function setStockInSupplier(id) {
+function isStockInSupplierPickerOpen() {
+  return !!state.stockInSupplierPickerOpen;
+}
+function setStockInSupplier(id, ev) {
+  if (ev?.preventDefault) ev.preventDefault();
+  if (ev?.stopPropagation) ev.stopPropagation();
   ensureStockInSession();
   state.stockInSupplierId = id || "";
+  if (state.stockInSupplierPickerOpen && patchStockInSupplierPicker()) return;
   render();
+}
+function toggleStockInSupplierPicker(ev) {
+  if (ev?.preventDefault) ev.preventDefault();
+  if (ev?.stopPropagation) ev.stopPropagation();
+  ensureStockInSession();
+  const willOpen = !state.stockInSupplierPickerOpen;
+  state.stockInSupplierPickerOpen = willOpen;
+  if (!willOpen) state.stockInSupplierQuery = "";
+  render();
+}
+function stockInSupplierQueryFocus() {
+  toolbarSelectFocus();
+}
+function stockInSupplierQueryBlur() {
+  toolbarSelectBlur();
+}
+function stockInSupplierQueryInput(el) {
+  state.stockInSupplierQuery = String(el?.value || "");
+  patchStockInSupplierPicker();
+}
+function stockInSupplierTriggerLabel() {
+  const selected = supplierById(state.stockInSupplierId);
+  if (!selected?.name) return "[Сонгох]";
+  return selected.country
+    ? `${selected.name} · ${supplierCountryLabel(selected.country)}`
+    : selected.name;
+}
+function stockInSupplierMatchesQuery(s, q) {
+  const query = String(q || "").trim();
+  if (!query) return true;
+  return searchTextMatches(
+    `${s?.name || ""} ${s?.phone || ""} ${supplierCountryLabel(s?.country || "")}`,
+    query,
+  );
+}
+function stockInSupplierPickerListHtml() {
+  const q = String(state.stockInSupplierQuery || "").trim();
+  const selected = String(state.stockInSupplierId || "");
+  if (!(state.suppliers || []).length) {
+    return `<p class="stock-in-supplier__empty">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`;
+  }
+  const list = suppliersSorted().filter((s) =>
+    stockInSupplierMatchesQuery(s, q),
+  );
+  if (!list.length) {
+    return `<p class="stock-in-supplier__empty">Олдсонгүй</p>`;
+  }
+  return list
+    .map((s) => {
+      const active = selected === String(s.id) ? " is-active" : "";
+      const meta = s.country ? supplierCountryLabel(s.country) : "";
+      return `<button type="button" class="stock-in-supplier__item${active}" data-supplier-id="${esc(s.id)}" onclick="setStockInSupplier(this.getAttribute('data-supplier-id'), event)"><span class="stock-in-supplier__item-name">${esc(s.name)}</span>${meta ? `<span class="stock-in-supplier__item-meta">${esc(meta)}</span>` : ""}</button>`;
+    })
+    .join("");
+}
+function stockInSupplierPickerPanelHtml() {
+  const q = esc(state.stockInSupplierQuery || "");
+  return `<div class="stock-in-supplier__panel" data-stock-in-supplier-panel onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onpointerdown="event.stopPropagation()"><label class="stock-in-supplier__search"><span class="sr-only">Нийлүүлэгч хайх</span><input id="stockInSupplierQuery" type="text" inputmode="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="stock-in-supplier__search-input" placeholder="Нийлүүлэгч хайх..." value="${q}" oninput="stockInSupplierQueryInput(this)" onfocus="stockInSupplierQueryFocus()" onblur="stockInSupplierQueryBlur()" aria-label="Нийлүүлэгч хайх"></label><div class="stock-in-supplier__list" data-stock-in-supplier-list role="listbox" aria-label="Нийлүүлэгч">${stockInSupplierPickerListHtml()}</div></div>`;
+}
+function patchStockInSupplierPicker() {
+  const root = document.querySelector("[data-stock-in-supplier-picker]");
+  if (!root) return false;
+  const selected = supplierById(state.stockInSupplierId);
+  const valueEl = root.querySelector(".stock-in-supplier__value");
+  if (valueEl) {
+    valueEl.textContent = stockInSupplierTriggerLabel();
+    valueEl.classList.toggle("is-placeholder", !selected);
+  }
+  const list = document.querySelector("[data-stock-in-supplier-list]");
+  if (list) {
+    const html = stockInSupplierPickerListHtml();
+    if (list.innerHTML !== html) list.innerHTML = html;
+  }
+  return true;
+}
+function captureStockInSupplierPicker() {
+  if (!state.stockInSupplierPickerOpen) return null;
+  const input = document.getElementById("stockInSupplierQuery");
+  const list = document.querySelector("[data-stock-in-supplier-list]");
+  const focused = document.activeElement === input;
+  return {
+    focused,
+    value: String(input?.value || state.stockInSupplierQuery || ""),
+    start: focused ? input?.selectionStart : null,
+    end: focused ? input?.selectionEnd : null,
+    listTop: list?.scrollTop ?? 0,
+  };
+}
+function restoreStockInSupplierPicker(snap) {
+  if (!snap || !state.stockInSupplierPickerOpen) return;
+  state.stockInSupplierQuery = String(snap.value || "");
+  const list = document.querySelector("[data-stock-in-supplier-list]");
+  if (list && snap.listTop) list.scrollTop = snap.listTop;
+  const input = document.getElementById("stockInSupplierQuery");
+  if (!input) return;
+  if (input.value !== state.stockInSupplierQuery)
+    input.value = state.stockInSupplierQuery;
+  if (!snap.focused) return;
+  requestAnimationFrame(() => {
+    const el = document.getElementById("stockInSupplierQuery");
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    try {
+      if (snap.start != null && snap.end != null) {
+        el.setSelectionRange(snap.start, snap.end);
+      }
+    } catch (_) {}
+  });
 }
 function setStockInWarehouseName(value) {
   ensureStockInSession();
@@ -16594,6 +16722,9 @@ function applyStockInReceipt(receipt) {
   return saved;
 }
 function focusStockInSupplierField() {
+  ensureStockInSession();
+  state.stockInSupplierPickerOpen = true;
+  render();
   requestAnimationFrame(() => {
     const el = document.getElementById("stockInSupplierSelect");
     if (!el) return;
@@ -16696,17 +16827,17 @@ function stockInEmployeeField() {
 }
 function stockInSupplierField() {
   ensureStockInSession();
-  const options = [
-    `<option value="">[Сонгох]</option>`,
-    ...suppliersSorted().map(
-      (s) =>
-        `<option value="${esc(s.id)}" ${String(state.stockInSupplierId) === String(s.id) ? "selected" : ""}>${esc(s.name)}${s.country ? ` · ${esc(supplierCountryLabel(s.country))}` : ""}</option>`,
-    ),
-  ].join("");
-  const emptyHint = !(state.suppliers || []).length
-    ? `<p class="stock-in-sheet__hint">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
-    : "";
-  return `<label class="stock-in-sheet__field stock-in-sheet__field--half"><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><select id="stockInSupplierSelect" class="stock-in-sheet__select" onchange="setStockInSupplier(this.value)">${options}</select>${emptyHint}</label>`;
+  const open = !!state.stockInSupplierPickerOpen;
+  const selected = supplierById(state.stockInSupplierId);
+  const emptyHint =
+    !(state.suppliers || []).length && !open
+      ? `<p class="stock-in-sheet__hint">Нийлүүлэгч бүртгэгдээгүй. Админ → Нийлүүлэгч хэсэгт нэмнэ үү.</p>`
+      : "";
+  return `<div class="stock-in-sheet__field stock-in-sheet__field--half stock-in-supplier${open ? " is-open" : ""}" data-stock-in-supplier-picker><span class="stock-in-sheet__field-label">Нийлүүлэгч:</span><button type="button" id="stockInSupplierSelect" class="stock-in-sheet__select stock-in-supplier__trigger" onclick="toggleStockInSupplierPicker(event)" aria-expanded="${open ? "true" : "false"}" aria-haspopup="listbox"><span class="stock-in-supplier__value${selected ? "" : " is-placeholder"}">${esc(stockInSupplierTriggerLabel())}</span><svg class="stock-in-supplier__chev" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg></button>${emptyHint}</div>`;
+}
+function stockInSupplierPickerOpenHtml() {
+  if (!state.stockInSupplierPickerOpen) return "";
+  return stockInSupplierPickerPanelHtml();
 }
 function stockInWarehouseField() {
   ensureStockInSession();
@@ -17833,8 +17964,11 @@ function stockInPanel(list) {
       ${stockInUserChipHtml()}
     </div>
     <div class="stock-in-sheet__meta">
-      ${stockInSupplierField()}
-      ${stockInWarehouseField()}
+      <div class="stock-in-sheet__meta-row">
+        ${stockInSupplierField()}
+        ${stockInWarehouseField()}
+      </div>
+      ${stockInSupplierPickerOpenHtml()}
     </div>
   </header>
   <section class="stock-in-sheet__search-panel" aria-label="Бараа хайх">
@@ -28065,6 +28199,7 @@ function render() {
   whReceiptPickerSkipAnim = isWhReceiptPickerOpen();
   const scrollSnap = captureRenderScroll();
   const scanSnap = captureStockInScanFocus();
+  const supplierSnap = captureStockInSupplierPicker();
   const keepDeliveryMap =
     state.currentView === "delivery" &&
     state.deliveryStoreReady &&
@@ -28074,6 +28209,7 @@ function render() {
   lastRenderedView = state.currentView;
   restoreRenderScroll(scrollSnap);
   restoreStockInScanFocus(scanSnap);
+  restoreStockInSupplierPicker(supplierSnap);
   if (whReceiptPickerSkipAnim) {
     document
       .querySelectorAll(".wh-receipt-picker.is-open .wh-receipt-picker__panel")
@@ -33897,6 +34033,10 @@ Object.assign(window, {
   confirmStockOutExcel,
   setStockInEmployee,
   setStockInSupplier,
+  toggleStockInSupplierPicker,
+  stockInSupplierQueryInput,
+  stockInSupplierQueryFocus,
+  stockInSupplierQueryBlur,
   setStockInWarehouseName,
   setStockOutEmployee,
   setStockOutRecipientNote,
