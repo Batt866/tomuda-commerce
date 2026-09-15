@@ -701,17 +701,9 @@ function receiptInfoRows(o) {
       f.customerPhone,
     ),
   ];
-  // Always show email row (value blank when missing — space to fill in)
-  {
-    const emailVal =
-      f.customerEmail && f.customerEmail !== "-" ? f.customerEmail : "";
-    party.push(
-      `<tr class="receipt-grid__meta receipt-grid__meta--email"><td></td><td colspan="4"></td><td colspan="3" class="receipt-grid__label">И-мэйл:</td><td colspan="3" class="receipt-grid__value receipt-grid__value--email">${emailVal}</td></tr>`,
-    );
-  }
   const addrHtml = esc(f.addressPlain || "-");
-  // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА», «Регистрийн».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label receipt-grid__iban-b">Дансны дугаар:</td><td class="receipt-grid__iban-c">IBAN:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td></td><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА групп».
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__label">Дансны дугаар:</td><td class="receipt-grid__iban-c">IBAN:</td><td class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td></td><td></td><td></td><td class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -1065,8 +1057,7 @@ function receiptSignatureRowsHtml(opts = {}) {
   // Label A–E + line F–I (one column forward/left vs old B–F / G–J); J–K clear.
   const block = (role) =>
     `<tr class="receipt-grid__sign"><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td><td></td></tr>`;
-  const gap = `<tr class="receipt-grid__spacer receipt-grid__spacer--sign-gap"><td colspan="11"></td></tr>`;
-  return `${fill}${block(RECEIPT_SIGN_HANDED_LABEL)}${gap}${block(RECEIPT_SIGN_RECEIVED_LABEL)}`;
+  return `${fill}${block(RECEIPT_SIGN_HANDED_LABEL)}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -1911,20 +1902,53 @@ function settlementDateInputValue() {
     })();
   return settlementDateIsoFromParts(parts);
 }
+function orderReceiptSeq(o) {
+  const n = Number(o?.receiptSeq);
+  if (n > 0) return Math.floor(n);
+  return parseFrozenOrderReceiptNumber(o?.receiptNumber)?.seq || 0;
+}
+function assignOrderReceiptSeq(o, seq) {
+  if (!o || !(seq > 0)) return false;
+  const month = o.receiptMonth || receiptMonthKey(o);
+  if (!month) return false;
+  const prevSeq = orderReceiptSeq(o);
+  const prevDisplay = String(o.receiptNumber || "");
+  o.receiptMonth = month;
+  o.receiptSeq = Math.floor(seq);
+  // Frozen display would otherwise keep the old № after seq changes.
+  o.receiptNumber = "";
+  freezeOrderReceiptNumber(o);
+  return prevSeq !== o.receiptSeq || prevDisplay !== String(o.receiptNumber || "");
+}
 function nextReceiptSeq(month) {
   let max = 0;
   for (const o of state.orders) {
     const m = o.receiptMonth || receiptMonthKey(o);
     if (m !== month) continue;
-    const seq = Number(o.receiptSeq);
+    const seq = orderReceiptSeq(o);
     if (seq > max) max = seq;
   }
   return max + 1;
 }
 /** Устгасан баримтын дугаарын цоорхойг тухайн сарын доторх дараагийнхаар нөхнө. */
-function closeReceiptSeqGap(_month, _removedSeq) {
-  // Баримтын дугаарыг хэзээ ч бүү шилжүүл. Устгасан дугаарын цоорхойг
-  // дараагийн баримтууд руу шахах нь хэвлэсэн Excel-тэй зөрүүлнэ.
+function closeReceiptSeqGap(month, removedSeq) {
+  if (!month || !(Number(removedSeq) > 0)) return 0;
+  const removed = Math.floor(Number(removedSeq));
+  const rows = [];
+  for (const o of state.orders || []) {
+    const m = o.receiptMonth || receiptMonthKey(o);
+    if (m !== month) continue;
+    const seq = orderReceiptSeq(o);
+    if (seq > removed) rows.push({ o, seq });
+  }
+  rows.sort((a, b) => a.seq - b.seq);
+  let changed = 0;
+  for (const { o, seq } of rows) {
+    if (!assignOrderReceiptSeq(o, seq - 1)) continue;
+    stampOrderUpdatedAt(o);
+    changed += 1;
+  }
+  return changed;
 }
 function paidFromPaymentTerm(_term) {
   // Бэлэн / зээл аль нь ч төлбөр баталгаажуулахаас өмнө төлөөгүй.
@@ -2275,8 +2299,33 @@ function receiptMonthFullyRetained(month, now = Date.now()) {
  * жагсаалтаас хасагддаг тул тэр сарыг хөндөхгүй — эс бөгөөс амьд баримтуудын
  * дугаар өдөр бүр гулсах байсан.
  */
-function compactRetainedReceiptSeqs(_now = Date.now()) {
-  // Хэвлэсэн/хадгалсан дугаарыг шахж зөрүүлэхгүй.
+function compactRetainedReceiptSeqs(now = Date.now()) {
+  const byMonth = new Map();
+  for (const o of state.orders || []) {
+    const month = o.receiptMonth || receiptMonthKey(o);
+    if (!receiptMonthFullyRetained(month, now)) continue;
+    const seq = orderReceiptSeq(o);
+    if (!(seq > 0)) continue;
+    const rows = byMonth.get(month) || [];
+    rows.push({ o, seq });
+    byMonth.set(month, rows);
+  }
+  let changed = 0;
+  for (const rows of byMonth.values()) {
+    rows.sort(
+      (a, b) => a.seq - b.seq || String(a.o.id).localeCompare(String(b.o.id)),
+    );
+    rows.forEach((row, i) => {
+      const next = i + 1;
+      if (!assignOrderReceiptSeq(row.o, next)) return;
+      stampOrderUpdatedAt(row.o);
+      changed += 1;
+    });
+  }
+  if (changed > 0 && typeof scheduleBackendSave === "function") {
+    scheduleBackendSave();
+  }
+  return changed;
 }
 function nextOrderId() {
   let max = 0;
@@ -2318,9 +2367,15 @@ function buildNewOrder(fields) {
     createdAt,
     takenDay,
     deliveryDate,
+    updatedAt: fields.updatedAt || createdAt,
   };
   freezeOrderReceiptNumber(order);
   return order;
+}
+function stampOrderUpdatedAt(o) {
+  if (!o) return o;
+  o.updatedAt = new Date().toISOString();
+  return o;
 }
 function receiptNo(order, size = "md") {
   const n =
@@ -3932,6 +3987,7 @@ function markOrderDelivered(id) {
   }
   o.deliveryMarkedAt = new Date().toISOString();
   o.deliveryMarkedBy = state.currentEmployee?.id || "";
+  stampOrderUpdatedAt(o);
   render();
   criticalBackendSave();
   showInstallToast("Хүргэлт тэмдэглэгдлээ");
@@ -3960,6 +4016,7 @@ function confirmOrderDelivery(id) {
   o.status = "delivered";
   o.deliveryConfirmedAt = new Date().toISOString();
   o.deliveryConfirmedBy = state.currentEmployee?.id || "";
+  stampOrderUpdatedAt(o);
   render();
   criticalBackendSave();
   showInstallToast("Хүргэлт баталгаажлаа");
@@ -4710,13 +4767,14 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
   // employees/permissions or wipe peer product/customer fields.
   const preferRemote =
     !!opts.preferRemote && (!!opts.pullFromServer || !businessEntityDirty());
-  // Customers, employees, and products stamp updatedAt on edit so a
+  // Customers, employees, products, and orders stamp updatedAt on edit so a
   // in-flight peer pull cannot wipe this device's just-saved row
-  // (e.g. жижиг хайрцаг) with an older server blob.
+  // (e.g. жижиг хайрцаг / зээл↔бэлэн) with an older server blob.
   const useUpdatedAt =
     opts.entityKind === "customers" ||
     opts.entityKind === "employees" ||
-    opts.entityKind === "products";
+    opts.entityKind === "products" ||
+    opts.entityKind === "orders";
   const map = new Map();
   (remote || []).forEach((item) => {
     if (item?.id != null) map.set(String(item.id), { ...item });
@@ -5403,7 +5461,9 @@ function persistOrderSnapshot() {
 function mergeBootPersistentState(backendState, pendingState, ordersBackup) {
   let merged = mergePersistentStates(backendState, pendingState || {});
   if (ordersBackup.length) {
-    merged.orders = retainedOrders(mergeArrayById(merged.orders, ordersBackup));
+    merged.orders = retainedOrders(
+      mergeEntityRecords(merged.orders, ordersBackup, { entityKind: "orders" }),
+    );
   }
   return merged;
 }
@@ -5768,7 +5828,10 @@ function mergePersistentStates(remote = {}, local = {}, opts = {}) {
   const promotionDeletionLog = mergedPromotionDeletionLog(remote, local);
   for (const key of MERGE_BY_ID_KEYS) {
     const mergeFn =
-      key === "products" || key === "customers" || key === "employees"
+      key === "products" ||
+      key === "customers" ||
+      key === "employees" ||
+      key === "orders"
         ? mergeEntityRecords
         : mergeArrayById;
     merged[key] = mergeFn(remote[key], local[key], {
@@ -5998,6 +6061,7 @@ function applyPersistentState(data) {
   applyDeletionLogToCollections();
   normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
+  compactRetainedReceiptSeqs();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
@@ -6875,6 +6939,7 @@ function completeBootUiInit(options = {}) {
   ensureDeliverySelection();
   normalizeOrderTakenDays();
   normalizeOrderReceiptNumbers();
+  compactRetainedReceiptSeqs();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
@@ -11958,21 +12023,8 @@ function appendReceiptSheetRows(
     "Утасны дугаар:",
     f.customerPhone,
   );
-  // Always show И-мэйл row (blank when no customer email)
-  {
-    const r = rowNum;
-    const emailVal =
-      f.customerEmail && f.customerEmail !== "-" ? plain(f.customerEmail) : "";
-    merges.push(`B${r}:E${r}`, `F${r}:H${r}`, `I${r}:K${r}`);
-    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-      xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.metaNormal, null, "empty"),
-      xlsxCellXml(`F${r}`, RECEIPT_XLSX_STYLE.metaNormal, si("И-мэйл:"), "s"),
-      xlsxCellXml(`I${r}`, RECEIPT_XLSX_STYLE.metaNormal, si(emailVal), "s"),
-      ...emptyCells(r, "C", "E", RECEIPT_XLSX_STYLE.metaNormal),
-      ...emptyCells(r, "G", "H", RECEIPT_XLSX_STYLE.metaNormal),
-      ...emptyCells(r, "J", "K", RECEIPT_XLSX_STYLE.metaNormal),
-    ]);
-  }
+
+  pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
 
   // Bank R9–R13
   const addressText = plain(f.addressPlain || "-");
@@ -11990,11 +12042,8 @@ function appendReceiptSheetRows(
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // B:C = Дансны дугаар: + IBAN: right-flush (one cell — B alone clips);
-    // D:E = the numbers only.
+    // B:C = Дансны дугаар: ; D = IBAN: ; E = short IBAN number.
     `B${bankR4}:C${bankR4}`,
-    `D${bankR4}:E${bankR4}`,
-    `D${bankR5}:E${bankR5}`,
   );
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
     xlsxCellXml(
@@ -12003,7 +12052,7 @@ function appendReceiptSheetRows(
       si("Дансны нэр:"),
       "s",
     ),
-    xlsxCellXml(`D${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("ТОМУДА"), "s"),
+    xlsxCellXml(`D${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("ТОМУДА групп"), "s"),
     xlsxCellXml(
       `F${bankR1}`,
       RECEIPT_XLSX_STYLE.metaBold,
@@ -12054,39 +12103,30 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
-  const ibanGap = receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
-    RECEIPT_XLSX_COL_WIDTHS[1],
-    RECEIPT_XLSX_COL_WIDTHS[2],
-  ]);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
-      siRich([
-        { t: "Дансны дугаар:", sz: 9 },
-        { t: ibanGap, sz: 9 },
-        { t: "IBAN:", sz: 9 },
-      ]),
+      si("Дансны дугаар:"),
       "s",
     ),
+    xlsxCellXml(`D${bankR4}`, RECEIPT_XLSX_STYLE.metaNormal, si("IBAN:"), "s"),
     xlsxCellXml(
-      `D${bankR4}`,
+      `E${bankR4}`,
       RECEIPT_XLSX_STYLE.metaBold,
       si(RECEIPT_BANK_IBAN_SHORT),
       "s",
     ),
     ...emptyCells(bankR4, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
-    ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.metaBold),
   ]);
   pushRow(perBankH, [
     xlsxCellXml(
-      `D${bankR5}`,
+      `E${bankR5}`,
       RECEIPT_XLSX_STYLE.metaBold,
       si(RECEIPT_BANK_ACCOUNT),
       "s",
     ),
-    ...emptyCells(bankR5, "B", "C", RECEIPT_XLSX_STYLE.metaNormal),
-    ...emptyCells(bankR5, "E", "E", RECEIPT_XLSX_STYLE.metaBold),
+    ...emptyCells(bankR5, "B", "D", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
@@ -12391,14 +12431,6 @@ function appendReceiptSheetRows(
     ]);
   };
   pushSignRow(RECEIPT_SIGN_HANDED_LABEL);
-  {
-    const gapR = rowNum;
-    pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-      xlsxCellXml(`A${gapR}`, 1, si("\u00A0"), "s"),
-      ...emptyCells(gapR, "B", RECEIPT_XLSX_LAST_COL, 1),
-    ]);
-  }
-  pushSignRow(RECEIPT_SIGN_RECEIVED_LABEL);
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
   if (rowBreaks && footerKeepStart > 1) {
     const keepRows = Math.max(1, rowNum - footerKeepStart);
@@ -27984,6 +28016,7 @@ function cancelWorkerOrderNow(id) {
     });
   }
   order.status = "cancelled";
+  stampOrderUpdatedAt(order);
   closeModal();
   if (String(state.editingOrderId) === String(id)) {
     clearWorkerOrderEditState();
@@ -33407,8 +33440,15 @@ async function saveWorkerOrderEdit() {
       }, 1100);
     }
     order.items = nextItems.map((i) => ({ ...i }));
-    order.paymentTerm = state.paymentTerm === "credit" ? "credit" : "cash";
-    // Засах үед төлбөрийн баталгаажуулалтыг дахин тохируулахгүй.
+    const nextTerm = state.paymentTerm === "credit" ? "credit" : "cash";
+    if (nextTerm === "credit") {
+      const recorded = Number(order.paidAmount);
+      if (!Number.isFinite(recorded) || recorded <= 0) order.isPaid = false;
+    }
+    order.paymentTerm = nextTerm;
+    stampOrderUpdatedAt(order);
+    // Засах үед бүртгэгдсэн төлбөрийг бүү тэглээрэй — зөвхөн бэлэн→зээл
+    // (paidAmount байхгүй) үед төлөөгүй болгоно.
     order.applyPercentDiscount = workerPercentDiscountActive();
     order.percentDiscount = order.applyPercentDiscount
       ? percentDiscountRate()
@@ -33818,7 +33858,7 @@ function deleteReceiptNow(id) {
   if (!o) return;
   const receiptLabel = formatReceiptNumber(o);
   const freedMonth = o.receiptMonth || receiptMonthKey(o);
-  const freedSeq = Number(o.receiptSeq);
+  const freedSeq = orderReceiptSeq(o);
   if (!orderIsCancelled(o)) {
     (o.items || []).forEach((i) => {
       if (i?.productId && i.quantity) stock(i.productId, i.quantity, "in");
@@ -33923,6 +33963,7 @@ function setOrder(id, s) {
     detachOrderFromViews(id);
   }
   o.status = s;
+  stampOrderUpdatedAt(o);
   requestAnimationFrame(() => render());
   void criticalBackendSave({ fast: true });
 }
@@ -33937,6 +33978,7 @@ function setPaid(id, isPaid) {
     o.paidAmount = 0;
     o.isPaid = false;
   }
+  stampOrderUpdatedAt(o);
   const customerId = o.customerId;
   render();
   if (customerId) refreshCustomerEditReceivable(customerId);
@@ -33956,6 +33998,7 @@ function recordOrderPayment(id, amount) {
   const due = orderAmount(o);
   o.paidAmount = paid;
   o.isPaid = paid + 0.009 >= due;
+  stampOrderUpdatedAt(o);
   const payments = Array.isArray(o.payments) ? o.payments.slice() : [];
   payments.push({
     amount: credit,

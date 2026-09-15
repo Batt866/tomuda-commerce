@@ -489,6 +489,12 @@ def upsert_order(request, payload: dict[str, Any] = Body(...)):
     if not isinstance(raw_order, dict) or raw_order.get("id") is None:
         raise HttpError(400, "Захиалгын мэдээлэл дутуу байна")
     order = dict(raw_order)
+    order["updatedAt"] = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     order_id = str(order.get("id"))
     actor = _actor_payload(payload)
     previous_items = payload.get("previousItems")

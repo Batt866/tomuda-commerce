@@ -1147,6 +1147,44 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertEqual(customer["longitude"], 106.917)
         self.assertEqual(customer["updatedAt"], "2026-08-08T10:00:00Z")
 
+    def test_merge_keeps_newer_order_payment_term_from_upsert(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "customers": [],
+            "products": [],
+            "employees": [],
+            "orders": [
+                {
+                    "id": "o-cash-to-credit",
+                    "paymentTerm": "credit",
+                    "isPaid": False,
+                    "updatedAt": "2026-09-15T02:00:00Z",
+                }
+            ],
+            "deletionLog": [],
+        }
+        # Stale phone blob still has the original cash order, no edit stamp.
+        local = {
+            "customers": [],
+            "products": [],
+            "employees": [],
+            "orders": [
+                {
+                    "id": "o-cash-to-credit",
+                    "paymentTerm": "cash",
+                    "isPaid": True,
+                }
+            ],
+            "deletionLog": [],
+        }
+
+        merged = merge_app_states(remote, local)
+        order = next(o for o in merged["orders"] if o["id"] == "o-cash-to-credit")
+        self.assertEqual(order["paymentTerm"], "credit")
+        self.assertFalse(order["isPaid"])
+        self.assertEqual(order["updatedAt"], "2026-09-15T02:00:00Z")
+
     def test_save_state_does_not_wipe_peer_device_customer(self):
         state = default_state()
         state["customers"] = [
@@ -1567,4 +1605,77 @@ class OrderUpsertApiTests(TestCase):
             next(p["stock"] for p in row.data["products"] if p["id"] == "p1"),
             45,
         )
+
+    def test_upsert_payment_term_survives_stale_peer_save(self):
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "p1",
+                "name": "Cola",
+                "price": 1000,
+                "stock": 50,
+                "unit": "ширхэг",
+            }
+        ]
+        state["orders"] = [
+            {
+                "id": "o-term",
+                "customerId": "c1",
+                "customerName": "Шинэ хүнс",
+                "items": [
+                    {
+                        "productId": "p1",
+                        "productName": "Cola",
+                        "quantity": 2,
+                        "price": 1000,
+                        "total": 2000,
+                    }
+                ],
+                "total": 2000,
+                "grossTotal": 2000,
+                "discountAmount": 0,
+                "status": "pending",
+                "paymentTerm": "cash",
+                "isPaid": True,
+                "employeeId": "admin",
+                "employeeName": "Admin",
+                "createdAt": "2026-09-15T07:00:00.000Z",
+                "deliveryDate": "2026-09-16",
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        edited = dict(state["orders"][0])
+        edited["paymentTerm"] = "credit"
+        edited["isPaid"] = False
+        response = self.client.post(
+            "/api/orders/upsert",
+            {
+                "order": edited,
+                "previousItems": edited["items"],
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["order"]["paymentTerm"], "credit")
+        self.assertTrue(response.json()["order"].get("updatedAt"))
+
+        peer = default_state()
+        peer["products"] = state["products"]
+        peer["orders"] = [dict(state["orders"][0])]
+        peer_response = self.client.post(
+            "/api/state",
+            {
+                "state": peer,
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(peer_response.status_code, 200, peer_response.content)
+        saved = next(
+            o for o in peer_response.json()["state"]["orders"] if o["id"] == "o-term"
+        )
+        self.assertEqual(saved["paymentTerm"], "credit")
+        self.assertFalse(saved["isPaid"])
 

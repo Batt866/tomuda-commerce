@@ -17,7 +17,9 @@ DELETION_TYPE = {
 }
 # Field-level last-writer-wins only for collections that stamp updatedAt on edit.
 # Products keep stock via separate rules — do not use updatedAt for products.
-UPDATED_AT_ENTITY_KEYS = frozenset({"customers", "employees", "suppliers"})
+# Orders stamp updatedAt on create/edit so a stale phone blob cannot revert
+# paymentTerm (cash ↔ credit) after another device saved.
+UPDATED_AT_ENTITY_KEYS = frozenset({"customers", "employees", "suppliers", "orders"})
 
 
 def _as_list(value: Any) -> list:
@@ -160,8 +162,9 @@ def merge_array_by_id(
     *,
     deletion_log: list[dict[str, Any]] | None = None,
     deletion_type: str = "",
+    use_updated_at: bool = False,
 ) -> list[dict[str, Any]]:
-    """Union by id; later (local) record wins on conflict."""
+    """Union by id; later (local) record wins on conflict unless use_updated_at."""
     merged: dict[str, dict[str, Any]] = {}
     remote_ids = set()
     local_ids = set()
@@ -176,7 +179,13 @@ def merge_array_by_id(
             continue
         item_id = str(item["id"])
         local_ids.add(item_id)
-        merged[item_id] = dict(item)
+        prev = merged.get(item_id)
+        if not prev or not use_updated_at:
+            merged[item_id] = dict(item)
+        else:
+            merged[item_id] = merge_entity_record_fields(
+                prev, dict(item), use_updated_at=True
+            )
     if deletion_type and deletion_log:
         for item_id in list(merged.keys()):
             if not deletion_log_has(deletion_log, deletion_type, item_id):
@@ -542,6 +551,7 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
                 local_state.get(key),
                 deletion_log=deletion_log,
                 deletion_type=deletion_type,
+                use_updated_at=True,
             )
         else:
             merged[key] = merge_entity_records(
