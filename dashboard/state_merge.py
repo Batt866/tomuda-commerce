@@ -42,6 +42,51 @@ def entity_updated_at_ms(item: Any) -> float:
         return 0.0
 
 
+def entity_payment_updated_at_ms(item: Any) -> float:
+    if not isinstance(item, dict):
+        return 0.0
+    return entity_updated_at_ms({"updatedAt": item.get("paymentUpdatedAt")})
+
+
+def merge_order_payment_fields(
+    winner: dict[str, Any],
+    remote_item: dict[str, Any] | None,
+    local_item: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Keep isPaid/paidAmount from the side that last confirmed payment.
+
+    Receipt-number compact and delivery stamps bump updatedAt without touching
+    payment, so whole-order last-writer-wins must not revert a just-saved
+    төлбөр баталгаажуулалт.
+    """
+    if not isinstance(winner, dict):
+        return winner
+    remote_item = remote_item if isinstance(remote_item, dict) else {}
+    local_item = local_item if isinstance(local_item, dict) else {}
+    remote_ms = entity_payment_updated_at_ms(remote_item)
+    local_ms = entity_payment_updated_at_ms(local_item)
+    if remote_ms <= 0 and local_ms <= 0:
+        return winner
+    if local_ms > remote_ms:
+        src = local_item
+    elif remote_ms > local_ms:
+        src = remote_item
+    else:
+        return winner
+    winner["isPaid"] = bool(src.get("isPaid"))
+    if "paidAmount" in src:
+        winner["paidAmount"] = src.get("paidAmount")
+    else:
+        winner.pop("paidAmount", None)
+    if "payments" in src:
+        winner["payments"] = src.get("payments")
+    else:
+        winner.pop("payments", None)
+    if src.get("paymentUpdatedAt"):
+        winner["paymentUpdatedAt"] = src.get("paymentUpdatedAt")
+    return winner
+
+
 def merge_entity_record_fields(
     remote_item: dict[str, Any],
     local_item: dict[str, Any],
@@ -163,6 +208,7 @@ def merge_array_by_id(
     deletion_log: list[dict[str, Any]] | None = None,
     deletion_type: str = "",
     use_updated_at: bool = False,
+    merge_payments: bool = False,
 ) -> list[dict[str, Any]]:
     """Union by id; later (local) record wins on conflict unless use_updated_at."""
     merged: dict[str, dict[str, Any]] = {}
@@ -183,9 +229,13 @@ def merge_array_by_id(
         if not prev or not use_updated_at:
             merged[item_id] = dict(item)
         else:
-            merged[item_id] = merge_entity_record_fields(
-                prev, dict(item), use_updated_at=True
+            incoming = dict(item)
+            next_item = merge_entity_record_fields(
+                prev, incoming, use_updated_at=True
             )
+            if merge_payments:
+                next_item = merge_order_payment_fields(next_item, prev, incoming)
+            merged[item_id] = next_item
     if deletion_type and deletion_log:
         for item_id in list(merged.keys()):
             if not deletion_log_has(deletion_log, deletion_type, item_id):
@@ -552,6 +602,7 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
                 deletion_log=deletion_log,
                 deletion_type=deletion_type,
                 use_updated_at=True,
+                merge_payments=True,
             )
         else:
             merged[key] = merge_entity_records(

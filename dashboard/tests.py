@@ -375,6 +375,24 @@ class OrderRetentionTests(TestCase):
 
         self.assertEqual([o["id"] for o in cleaned["orders"]], ["old-unpaid"])
 
+    def test_retained_orders_keeps_unpaid_cash_missing_is_paid(self):
+        today = date.today()
+        state = default_state()
+        state["settings"]["orderRetentionDays"] = 30
+        state["orders"] = [
+            {
+                "id": "old-cash-open",
+                "createdAt": (today - timedelta(days=90)).isoformat(),
+                "status": "delivered",
+                "paymentTerm": "cash",
+                "total": 1000,
+            }
+        ]
+
+        cleaned = _retained_orders_state(state)
+
+        self.assertEqual([o["id"] for o in cleaned["orders"]], ["old-cash-open"])
+
     def test_get_state_purges_expired_orders_from_database(self):
         today = date.today()
         state = default_state()
@@ -1185,6 +1203,92 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertFalse(order["isPaid"])
         self.assertEqual(order["updatedAt"], "2026-09-15T02:00:00Z")
 
+    def test_merge_keeps_confirmed_payment_over_newer_receipt_stamp(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "customers": [],
+            "products": [],
+            "employees": [],
+            "orders": [
+                {
+                    "id": "o-paid",
+                    "paymentTerm": "cash",
+                    "isPaid": True,
+                    "paidAmount": 5000,
+                    "paymentUpdatedAt": "2026-09-16T08:00:00Z",
+                    "updatedAt": "2026-09-16T08:00:00Z",
+                    "receiptSeq": 3,
+                }
+            ],
+            "deletionLog": [],
+        }
+        local = {
+            "customers": [],
+            "products": [],
+            "employees": [],
+            "orders": [
+                {
+                    "id": "o-paid",
+                    "paymentTerm": "cash",
+                    "isPaid": False,
+                    "paidAmount": 0,
+                    "updatedAt": "2026-09-16T09:00:00Z",
+                    "receiptSeq": 2,
+                }
+            ],
+            "deletionLog": [],
+        }
+
+        merged = merge_app_states(remote, local)
+        order = next(o for o in merged["orders"] if o["id"] == "o-paid")
+        self.assertTrue(order["isPaid"])
+        self.assertEqual(order["paidAmount"], 5000)
+        self.assertEqual(order["receiptSeq"], 2)
+        self.assertEqual(order["paymentUpdatedAt"], "2026-09-16T08:00:00Z")
+
+    def test_merge_keeps_newer_payment_unpay(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "customers": [],
+            "products": [],
+            "employees": [],
+            "orders": [
+                {
+                    "id": "o-unpay",
+                    "paymentTerm": "credit",
+                    "isPaid": True,
+                    "paidAmount": 4000,
+                    "paymentUpdatedAt": "2026-09-16T08:00:00Z",
+                    "updatedAt": "2026-09-16T08:00:00Z",
+                }
+            ],
+            "deletionLog": [],
+        }
+        local = {
+            "customers": [],
+            "products": [],
+            "employees": [],
+            "orders": [
+                {
+                    "id": "o-unpay",
+                    "paymentTerm": "credit",
+                    "isPaid": False,
+                    "paidAmount": 0,
+                    "paymentUpdatedAt": "2026-09-16T10:00:00Z",
+                    "updatedAt": "2026-09-16T10:00:00Z",
+                }
+            ],
+            "deletionLog": [],
+        }
+
+        merged = merge_app_states(remote, local)
+        order = next(o for o in merged["orders"] if o["id"] == "o-unpay")
+        self.assertFalse(order["isPaid"])
+        self.assertEqual(order["paidAmount"], 0)
+        self.assertEqual(order["paymentUpdatedAt"], "2026-09-16T10:00:00Z")
+
     def test_save_state_does_not_wipe_peer_device_customer(self):
         state = default_state()
         state["customers"] = [
@@ -1678,4 +1782,67 @@ class OrderUpsertApiTests(TestCase):
         )
         self.assertEqual(saved["paymentTerm"], "credit")
         self.assertFalse(saved["isPaid"])
+
+    def test_upsert_does_not_revert_confirmed_payment(self):
+        state = default_state()
+        state["products"] = [
+            {
+                "id": "p1",
+                "name": "Cola",
+                "price": 1000,
+                "stock": 50,
+                "unit": "ширхэг",
+            }
+        ]
+        state["orders"] = [
+            {
+                "id": "o-paid",
+                "customerId": "c1",
+                "customerName": "Шинэ хүнс",
+                "items": [
+                    {
+                        "productId": "p1",
+                        "productName": "Cola",
+                        "quantity": 2,
+                        "price": 1000,
+                        "total": 2000,
+                    }
+                ],
+                "total": 2000,
+                "grossTotal": 2000,
+                "discountAmount": 0,
+                "status": "pending",
+                "paymentTerm": "cash",
+                "isPaid": True,
+                "paidAmount": 2000,
+                "paymentUpdatedAt": "2026-09-16T01:00:00Z",
+                "updatedAt": "2026-09-16T01:00:00Z",
+                "employeeId": "admin",
+                "employeeName": "Admin",
+                "createdAt": "2026-09-15T07:00:00.000Z",
+                "deliveryDate": "2026-09-16",
+            }
+        ]
+        AppState.objects.create(key="main", data=state)
+
+        edited = dict(state["orders"][0])
+        edited["status"] = "delivered"
+        edited["isPaid"] = False
+        edited["paidAmount"] = 0
+        edited.pop("paymentUpdatedAt", None)
+        response = self.client.post(
+            "/api/orders/upsert",
+            {
+                "order": edited,
+                "previousItems": edited["items"],
+                "actor": {"id": "admin", "email": "admin@tomuda.mn"},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        saved = response.json()["order"]
+        self.assertEqual(saved["status"], "delivered")
+        self.assertTrue(saved["isPaid"])
+        self.assertEqual(saved["paidAmount"], 2000)
+        self.assertEqual(saved["paymentUpdatedAt"], "2026-09-16T01:00:00Z")
 

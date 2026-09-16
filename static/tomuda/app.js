@@ -1945,7 +1945,6 @@ function closeReceiptSeqGap(month, removedSeq) {
   let changed = 0;
   for (const { o, seq } of rows) {
     if (!assignOrderReceiptSeq(o, seq - 1)) continue;
-    stampOrderUpdatedAt(o);
     changed += 1;
   }
   return changed;
@@ -2187,10 +2186,9 @@ function normalizeOrderPayments() {
       const due = orderAmount(o);
       o.paidAmount = Math.min(due, Math.max(0, recorded));
       o.isPaid = o.paidAmount + 0.009 >= due;
-    } else if (o.paymentTerm === "cash") {
-      // Legacy cash was auto-paid; only explicit false stays unpaid (confirm flow).
-      o.isPaid = o.isPaid !== false;
     } else {
+      // Бэлэн ч, зээл ч — төлбөр баталгаажуулаагүй бол төлөөгүй.
+      // Хуучин isPaid !== false дүрэм хүрээгүй дэлгүүрийг төлсөн болгодог байсан.
       o.isPaid = !!o.isPaid;
     }
     if (o.paymentTerm === "credit" && o.applyPercentDiscount) {
@@ -2318,7 +2316,6 @@ function compactRetainedReceiptSeqs(now = Date.now()) {
     rows.forEach((row, i) => {
       const next = i + 1;
       if (!assignOrderReceiptSeq(row.o, next)) return;
-      stampOrderUpdatedAt(row.o);
       changed += 1;
     });
   }
@@ -2375,6 +2372,13 @@ function buildNewOrder(fields) {
 function stampOrderUpdatedAt(o) {
   if (!o) return o;
   o.updatedAt = new Date().toISOString();
+  return o;
+}
+function stampOrderPaymentAt(o) {
+  if (!o) return o;
+  const now = new Date().toISOString();
+  o.paymentUpdatedAt = now;
+  o.updatedAt = now;
   return o;
 }
 function receiptNo(order, size = "md") {
@@ -4788,6 +4792,9 @@ function mergeEntityRecords(remote = [], local = [], opts = {}) {
       merged = { ...item };
     } else if (useUpdatedAt) {
       merged = mergeEntityRecordByUpdatedAt(prev, item, preferRemote);
+      if (opts.entityKind === "orders") {
+        merged = mergeOrderPaymentFields(merged, prev, item);
+      }
     } else if (preferRemote) {
       merged = { ...item, ...prev };
     } else {
@@ -4870,6 +4877,31 @@ function mergeEntityRecordByUpdatedAt(remoteItem, localItem, preferRemote) {
   return preferRemote
     ? { ...localItem, ...remoteItem }
     : { ...remoteItem, ...localItem };
+}
+function entityPaymentUpdatedAtMs(item) {
+  return entityUpdatedAtMs({ updatedAt: item?.paymentUpdatedAt });
+}
+function mergeOrderPaymentFields(winner, remoteItem, localItem) {
+  const remoteMs = entityPaymentUpdatedAtMs(remoteItem);
+  const localMs = entityPaymentUpdatedAtMs(localItem);
+  if (!remoteMs && !localMs) return winner;
+  let src = winner;
+  if (localMs > remoteMs) src = localItem;
+  else if (remoteMs > localMs) src = remoteItem;
+  else return winner;
+  winner.isPaid = !!src?.isPaid;
+  if (src && Object.prototype.hasOwnProperty.call(src, "paidAmount")) {
+    winner.paidAmount = src.paidAmount;
+  } else {
+    delete winner.paidAmount;
+  }
+  if (src && Object.prototype.hasOwnProperty.call(src, "payments")) {
+    winner.payments = src.payments;
+  } else {
+    delete winner.payments;
+  }
+  if (src?.paymentUpdatedAt) winner.paymentUpdatedAt = src.paymentUpdatedAt;
+  return winner;
 }
 function mergeSettingsStates(remote = {}, local = {}) {
   const remoteSettings = remote || {};
@@ -33443,13 +33475,19 @@ async function saveWorkerOrderEdit() {
       }, 1100);
     }
     order.items = nextItems.map((i) => ({ ...i }));
+    const prevTerm = order.paymentTerm === "credit" ? "credit" : "cash";
+    const prevPaid = !!order.isPaid;
     const nextTerm = state.paymentTerm === "credit" ? "credit" : "cash";
     if (nextTerm === "credit") {
       const recorded = Number(order.paidAmount);
       if (!Number.isFinite(recorded) || recorded <= 0) order.isPaid = false;
     }
     order.paymentTerm = nextTerm;
-    stampOrderUpdatedAt(order);
+    if (order.paymentTerm !== prevTerm || !!order.isPaid !== prevPaid) {
+      stampOrderPaymentAt(order);
+    } else {
+      stampOrderUpdatedAt(order);
+    }
     // Засах үед бүртгэгдсэн төлбөрийг бүү тэглээрэй — зөвхөн бэлэн→зээл
     // (paidAmount байхгүй) үед төлөөгүй болгоно.
     order.applyPercentDiscount = workerPercentDiscountActive();
@@ -33981,7 +34019,7 @@ function setPaid(id, isPaid) {
     o.paidAmount = 0;
     o.isPaid = false;
   }
-  stampOrderUpdatedAt(o);
+  stampOrderPaymentAt(o);
   const customerId = o.customerId;
   render();
   if (customerId) refreshCustomerEditReceivable(customerId);
@@ -34001,7 +34039,7 @@ function recordOrderPayment(id, amount) {
   const due = orderAmount(o);
   o.paidAmount = paid;
   o.isPaid = paid + 0.009 >= due;
-  stampOrderUpdatedAt(o);
+  stampOrderPaymentAt(o);
   const payments = Array.isArray(o.payments) ? o.payments.slice() : [];
   payments.push({
     amount: credit,

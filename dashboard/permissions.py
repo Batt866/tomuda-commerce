@@ -532,9 +532,6 @@ def _order_is_paid(order: dict[str, Any]) -> bool:
         else:
             if paid >= 0:
                 return paid + 0.009 >= due
-    term = str(order.get("paymentTerm") or "").strip()
-    if term == "cash":
-        return order.get("isPaid") is not False
     return bool(order.get("isPaid"))
 
 

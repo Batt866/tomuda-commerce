@@ -42,7 +42,7 @@ from dashboard.profile_images import (
     update_profile_image_in_state,
 )
 from dashboard.seed_data import default_state
-from dashboard.state_merge import merge_app_states
+from dashboard.state_merge import merge_app_states, merge_order_payment_fields
 from dashboard.state_sanitize import sanitize_app_state
 
 api = NinjaAPI(title="Tomuda API")
@@ -543,7 +543,9 @@ def upsert_order(request, payload: dict[str, Any] = Body(...)):
             )
             _validate_order_stock(products, before_items, order.get("items") or [])
             _adjust_order_stock(products, before_items, order.get("items") or [])
-            merged_order = {**previous, **order}
+            merged_order = merge_order_payment_fields(
+                {**previous, **order}, previous, order
+            )
             orders[existing_idx] = merged_order
             saved_order = merged_order
         else:
