@@ -1057,7 +1057,7 @@ function receiptSignatureRowsHtml(opts = {}) {
   // Label A–E + line F–I (one column forward/left vs old B–F / G–J); J–K clear.
   const block = (role) =>
     `<tr class="receipt-grid__sign"><td colspan="5" class="receipt-grid__sign-label">${esc(role)}</td><td colspan="4" class="receipt-grid__sign-line"></td><td></td><td></td></tr>`;
-  return `${fill}${block(RECEIPT_SIGN_HANDED_LABEL)}`;
+  return `${fill}${block(RECEIPT_SIGN_HANDED_LABEL)}${fill}${block(RECEIPT_SIGN_RECEIVED_LABEL)}`;
 }
 function SignatureSection(opts = {}) {
   return receiptSignatureRowsHtml(opts);
@@ -12467,6 +12467,7 @@ function appendReceiptSheetRows(
   };
   pushSignRow(RECEIPT_SIGN_HANDED_LABEL);
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
+  pushSignRow(RECEIPT_SIGN_RECEIVED_LABEL);
   if (rowBreaks && footerKeepStart > 1) {
     const keepRows = Math.max(1, rowNum - footerKeepStart);
     if (receiptXlsxNeedsBreakBefore(footerKeepStart, keepRows)) {
