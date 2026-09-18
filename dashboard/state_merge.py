@@ -143,6 +143,75 @@ def normalize_deletion_log(log: Any) -> list[dict[str, Any]]:
     return out[-500:]
 
 
+def apply_taxonomy_tombstones(
+    products: Any,
+    deletion_log: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Keep deleted types/groups gone even when a peer still stores the old name."""
+    log = deletion_log or []
+    out: list[dict[str, Any]] = []
+    for item in _as_list(products):
+        if not isinstance(item, dict):
+            out.append(item)
+            continue
+        product = dict(item)
+        category = str(product.get("category") or "").strip()
+        if category and deletion_log_has(log, "category", category):
+            product["category"] = "Бусад"
+        group = str(product.get("group") or "").strip()
+        if group and deletion_log_has(log, "productGroup", group):
+            product["group"] = "Бусад"
+        out.append(product)
+    return out
+
+
+def merge_named_list(
+    remote: Any,
+    local: Any,
+    deletion_log: list[dict[str, Any]] | None = None,
+    deletion_type: str = "",
+) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    for value in [*_as_list(remote), *_as_list(local)]:
+        name = str(value or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    if deletion_type and deletion_log:
+        names = [
+            name
+            for name in names
+            if not deletion_log_has(deletion_log, deletion_type, name)
+        ]
+    return names
+
+
+def merge_category_groups(
+    remote: Any,
+    local: Any,
+    deletion_log: list[dict[str, Any]] | None = None,
+) -> dict[str, str]:
+    merged = {
+        **{
+            str(k): str(v)
+            for k, v in _as_dict(remote).items()
+            if k and v
+        },
+        **{
+            str(k): str(v)
+            for k, v in _as_dict(local).items()
+            if k and v
+        },
+    }
+    if deletion_log:
+        for key in list(merged.keys()):
+            if deletion_log_has(deletion_log, "category", key):
+                del merged[key]
+    return merged
+
+
 def deletion_log_has(log: list[dict[str, Any]], entry_type: str, entry_id: Any) -> bool:
     target = str(entry_id)
     return any(
@@ -624,34 +693,23 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
         promotion_deletion_log,
     )
     merged["settings"] = merge_settings(remote_state.get("settings"), local_state.get("settings"))
-    merged["extraCategories"] = list(
-        dict.fromkeys(
-            [
-                *[str(x) for x in _as_list(remote_state.get("extraCategories")) if x],
-                *[str(x) for x in _as_list(local_state.get("extraCategories")) if x],
-            ]
-        )
+    merged["extraCategories"] = merge_named_list(
+        remote_state.get("extraCategories"),
+        local_state.get("extraCategories"),
+        deletion_log,
+        "category",
     )
-    merged["extraGroups"] = list(
-        dict.fromkeys(
-            [
-                *[str(x) for x in _as_list(remote_state.get("extraGroups")) if x],
-                *[str(x) for x in _as_list(local_state.get("extraGroups")) if x],
-            ]
-        )
+    merged["extraGroups"] = merge_named_list(
+        remote_state.get("extraGroups"),
+        local_state.get("extraGroups"),
+        deletion_log,
+        "productGroup",
     )
-    merged["categoryGroups"] = {
-        **{
-            str(k): str(v)
-            for k, v in _as_dict(remote_state.get("categoryGroups")).items()
-            if k and v
-        },
-        **{
-            str(k): str(v)
-            for k, v in _as_dict(local_state.get("categoryGroups")).items()
-            if k and v
-        },
-    }
+    merged["categoryGroups"] = merge_category_groups(
+        remote_state.get("categoryGroups"),
+        local_state.get("categoryGroups"),
+        deletion_log,
+    )
 
     remote_count_ms = _count_session_ms(remote_state.get("countSessionStartedAt"))
     local_count_ms = _count_session_ms(local_state.get("countSessionStartedAt"))
@@ -660,6 +718,9 @@ def merge_app_states(remote: dict[str, Any] | None, local: dict[str, Any] | None
     merged["countOpeningStock"] = dict(_as_dict(count_src.get("countOpeningStock")))
     merged["countSessionStartedAt"] = count_src.get("countSessionStartedAt")
     merged["countDone"] = bool(count_src.get("countDone"))
-    merged["products"] = apply_merged_product_stock(remote_state, merged)
+    merged["products"] = apply_taxonomy_tombstones(
+        apply_merged_product_stock(remote_state, merged),
+        deletion_log,
+    )
 
     return merged

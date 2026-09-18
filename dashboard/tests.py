@@ -1384,6 +1384,50 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertIn("c-keep", saved_ids)
         self.assertNotIn("c-delete", saved_ids)
 
+    def test_merge_keeps_deleted_category_gone(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "extraCategories": ["Ундаа", "Амттан"],
+            "extraGroups": ["Хүнс"],
+            "categoryGroups": {"Ундаа": "Хүнс", "Амттан": "Хүнс"},
+            "products": [
+                {
+                    "id": "p1",
+                    "name": "Cola",
+                    "category": "Ундаа",
+                    "group": "Хүнс",
+                    "stock": 10,
+                }
+            ],
+            "deletionLog": [
+                {
+                    "type": "category",
+                    "id": "Амттан",
+                    "deletedAt": "2026-09-18T00:00:00Z",
+                }
+            ],
+        }
+        local = {
+            "extraCategories": ["Ундаа", "Амттан"],
+            "extraGroups": ["Хүнс"],
+            "categoryGroups": {"Ундаа": "Хүнс", "Амттан": "Хүнс"},
+            "products": [
+                {
+                    "id": "p1",
+                    "name": "Cola",
+                    "category": "Амттан",
+                    "group": "Хүнс",
+                    "stock": 10,
+                }
+            ],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertNotIn("Амттан", merged["extraCategories"])
+        self.assertNotIn("Амттан", merged["categoryGroups"])
+        self.assertEqual(merged["products"][0]["category"], "Бусад")
+
     def test_promotion_deletion_log_removes_rules_on_merge(self):
         from dashboard.state_merge import merge_app_states, promotion_rule_canonical_fingerprint
 
