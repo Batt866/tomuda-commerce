@@ -1428,6 +1428,70 @@ class MultiDeviceStateMergeTests(TestCase):
         self.assertNotIn("Амттан", merged["categoryGroups"])
         self.assertEqual(merged["products"][0]["category"], "Бусад")
 
+    def test_merge_does_not_invent_stock_when_reducing_oversold_order(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "products": [{"id": "p1", "name": "Marshmallow", "stock": -600}],
+            "orders": [
+                {
+                    "id": "o1",
+                    "status": "pending",
+                    "items": [{"productId": "p1", "quantity": 600}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        local = {
+            "products": [{"id": "p1", "name": "Marshmallow", "stock": 0}],
+            "orders": [
+                {
+                    "id": "o1",
+                    "status": "pending",
+                    "items": [{"productId": "p1", "quantity": 0}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(
+            next(p["stock"] for p in merged["products"] if p["id"] == "p1"),
+            0,
+        )
+
+    def test_merge_keeps_negative_stock_when_new_order_oversells(self):
+        from dashboard.state_merge import merge_app_states
+
+        remote = {
+            "products": [{"id": "p1", "name": "Marshmallow", "stock": 0}],
+            "orders": [],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        local = {
+            "products": [{"id": "p1", "name": "Marshmallow", "stock": -9}],
+            "orders": [
+                {
+                    "id": "o-new",
+                    "status": "pending",
+                    "items": [{"productId": "p1", "quantity": 9}],
+                }
+            ],
+            "customers": [],
+            "employees": [],
+            "deletionLog": [],
+        }
+        merged = merge_app_states(remote, local)
+        self.assertEqual(
+            next(p["stock"] for p in merged["products"] if p["id"] == "p1"),
+            -9,
+        )
+
     def test_promotion_deletion_log_removes_rules_on_merge(self):
         from dashboard.state_merge import merge_app_states, promotion_rule_canonical_fingerprint
 

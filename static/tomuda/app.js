@@ -1632,7 +1632,8 @@ function buildOrderReceiptNumber(o) {
     const [y, m, d] = day.split("-");
     const yy = String(y).slice(-2);
     const mm = String(m).padStart(2, "0");
-    const tail = seq > 0 ? String(Math.floor(seq)) : String(Number(d)).padStart(2, "0");
+    const tail =
+      seq > 0 ? String(Math.floor(seq)) : String(Number(d)).padStart(2, "0");
     return `${yy}${mm}-${tail}`;
   }
   if (seq > 0) return String(Math.floor(seq));
@@ -1918,7 +1919,9 @@ function assignOrderReceiptSeq(o, seq) {
   // Frozen display would otherwise keep the old № after seq changes.
   o.receiptNumber = "";
   freezeOrderReceiptNumber(o);
-  return prevSeq !== o.receiptSeq || prevDisplay !== String(o.receiptNumber || "");
+  return (
+    prevSeq !== o.receiptSeq || prevDisplay !== String(o.receiptNumber || "")
+  );
 }
 function nextReceiptSeq(month) {
   let max = 0;
@@ -3018,9 +3021,7 @@ const cats = () =>
       ...state.products.map((p) => p.category),
       ...state.extraCategories,
     ]),
-  ].filter(
-    (c) => c && !deletionLogHas(state.deletionLog, "category", c),
-  );
+  ].filter((c) => c && !deletionLogHas(state.deletionLog, "category", c));
 const OTHER_GROUP = "Бусад";
 const INFERRED_FOOD_TYPES = new Set([
   "Ундаа",
@@ -3159,9 +3160,7 @@ function catsInGroup(group) {
     if (inferredGroupForType(c) === g) names.add(c);
   }
   return [...names]
-    .filter(
-      (c) => c && !deletionLogHas(state.deletionLog, "category", c),
-    )
+    .filter((c) => c && !deletionLogHas(state.deletionLog, "category", c))
     .sort(taxonomyNameSort);
 }
 function ensureGroupName(name) {
@@ -4149,14 +4148,12 @@ const MOBILE_NAV_SVG = {
     '<path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 17V9"/><path d="M12 17V7"/><path d="M16 17v-4"/>',
   promotions:
     '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
-  warehouseReceipts:
-    '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',
+  warehouseReceipts: '<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',
   employeePermissions:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M15 11h6M18 8v6"/>',
   settings:
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  suppliers:
-    '<path d="M3 9h18v12H3z"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/>',
+  suppliers: '<path d="M3 9h18v12H3z"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/>',
   admin:
     '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   __more__: '<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -5161,13 +5158,11 @@ async function uploadProfileImageOnce(profileKind, entityId, dataUrl) {
   return "";
 }
 async function uploadProfileImageWithRetry(profileKind, entityId, dataUrl) {
-  for (
-    let attempt = 0;
-    attempt < PROFILE_IMAGE_UPLOAD_ATTEMPTS;
-    attempt += 1
-  ) {
+  for (let attempt = 0; attempt < PROFILE_IMAGE_UPLOAD_ATTEMPTS; attempt += 1) {
     try {
-      return (await uploadProfileImageOnce(profileKind, entityId, dataUrl)) || "";
+      return (
+        (await uploadProfileImageOnce(profileKind, entityId, dataUrl)) || ""
+      );
     } catch (error) {
       if (attempt + 1 >= PROFILE_IMAGE_UPLOAD_ATTEMPTS) {
         console.warn("Profile image upload failed", error);
@@ -5217,9 +5212,7 @@ async function flushPendingProfileImages() {
         continue;
       }
       const list = kind === "employee" ? state.employees : state.customers;
-      const entity = (list || []).find(
-        (item) => String(item?.id) === entityId,
-      );
+      const entity = (list || []).find((item) => String(item?.id) === entityId);
       if (!entity) {
         dropPendingProfileImage(kind, entityId);
         continue;
@@ -5547,7 +5540,12 @@ function deletionLogHas(log = [], type, id) {
     (entry) => entry.type === type && String(entry.id) === String(id),
   );
 }
-function mergeNamedList(remote = [], local = [], deletionLog = [], deletionType) {
+function mergeNamedList(
+  remote = [],
+  local = [],
+  deletionLog = [],
+  deletionType,
+) {
   return [
     ...new Set(
       [...(remote || []), ...(local || [])]
@@ -10229,9 +10227,9 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 9.50 / 8.83 / 4.83 / 4.00 / 2.83 / 8.00 / 9.00. */
-.receipt-grid__a { width: 2.93%; } .receipt-grid__b { width: 7.20%; } .receipt-grid__c { width: 22.30%; } .receipt-grid__d { width: 4.05%; } .receipt-grid__e { width: 12.84%; }
-.receipt-grid__f { width: 11.93%; } .receipt-grid__g { width: 6.53%; } .receipt-grid__h { width: 5.41%; } .receipt-grid__i { width: 3.82%; } .receipt-grid__j { width: 10.81%; } .receipt-grid__k { width: 12.17%; }
+/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 9.50 / 8.83 / 4.83 / 4.00 / 3.00 / 8.00 / 9.00. */
+.receipt-grid__a { width: 2.93%; } .receipt-grid__b { width: 7.19%; } .receipt-grid__c { width: 22.25%; } .receipt-grid__d { width: 4.05%; } .receipt-grid__e { width: 12.81%; }
+.receipt-grid__f { width: 11.91%; } .receipt-grid__g { width: 6.51%; } .receipt-grid__h { width: 5.39%; } .receipt-grid__i { width: 4.05%; } .receipt-grid__j { width: 10.79%; } .receipt-grid__k { width: 12.14%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -11082,7 +11080,13 @@ tbody.receipt-footer-keep {
   color: ${RECEIPT_TEXT};
   font-weight: 400;
 }
-.receipt-grid__warn-line--first { line-height: 1.15; height: 24pt; }
+.receipt-grid--sheet .receipt-grid__warn .receipt-grid__warn-line--first {
+  height: 36pt;
+  min-height: 36pt;
+  line-height: 1.2;
+  overflow: visible;
+  white-space: normal;
+}
 .receipt-grid__warn-line--bold { font-weight: 700; font-size: 10pt; }
 .receipt-grid__warn-em { font-weight: 700; font-size: 9pt; white-space: nowrap; }
 .receipt-grid__sign-label {
@@ -11332,8 +11336,8 @@ const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20;
 const RECEIPT_XLSX_HEADER_R2_HEIGHT = 28;
 /** Row 3 «ЗАРЛАГЫН БАРИМТ». */
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31;
-/** First payment-warning paragraph — the only body row that is taller. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 24;
+/** First payment-warning paragraph — two designed lines, extra wrap needs ~3×9pt. */
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 36;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 78 → indices 0–77). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -11356,7 +11360,7 @@ const RECEIPT_XLSX_STYLE = {
 };
 // Unit E wide enough that wrapped «Хэмжих / нэгж» never clips.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  2.17, 5.33, 16.5, 3.0, 9.5, 8.83, 4.83, 4.0, 2.83, 8.0, 9.0,
+  2.17, 5.33, 16.5, 3.0, 9.5, 8.83, 4.83, 4.0, 3.0, 8.0, 9.0,
 ];
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
@@ -12146,7 +12150,12 @@ function appendReceiptSheetRows(
       si("Дансны нэр:"),
       "s",
     ),
-    xlsxCellXml(`D${bankR1}`, RECEIPT_XLSX_STYLE.metaNormal, si("ТОМУДА групп"), "s"),
+    xlsxCellXml(
+      `D${bankR1}`,
+      RECEIPT_XLSX_STYLE.metaNormal,
+      si("ТОМУДА групп"),
+      "s",
+    ),
     xlsxCellXml(
       `F${bankR1}`,
       RECEIPT_XLSX_STYLE.metaBold,
@@ -12212,22 +12221,12 @@ function appendReceiptSheetRows(
       ]),
       "s",
     ),
-    xlsxCellXml(
-      `D${bankR4}`,
-      21,
-      si(RECEIPT_BANK_IBAN_SHORT),
-      "s",
-    ),
+    xlsxCellXml(`D${bankR4}`, 21, si(RECEIPT_BANK_IBAN_SHORT), "s"),
     ...emptyCells(bankR4, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR4, "E", "E", 21),
   ]);
   pushRow(perBankH, [
-    xlsxCellXml(
-      `D${bankR5}`,
-      21,
-      si(RECEIPT_BANK_ACCOUNT),
-      "s",
-    ),
+    xlsxCellXml(`D${bankR5}`, 21, si(RECEIPT_BANK_ACCOUNT), "s"),
     ...emptyCells(bankR5, "B", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR5, "E", "E", 21),
   ]);
@@ -12273,14 +12272,24 @@ function appendReceiptSheetRows(
     const unitText = String(p.unit || item.unit || "ш").trim() || "ш";
     merges.push(`B${r}:D${r}`, `F${r}:G${r}`, `H${r}:I${r}`);
     pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
-      xlsxCellXml(`A${r}`, RECEIPT_XLSX_STYLE.itemNum, si(String(index + 1)), "s"),
+      xlsxCellXml(
+        `A${r}`,
+        RECEIPT_XLSX_STYLE.itemNum,
+        si(String(index + 1)),
+        "s",
+      ),
       xlsxCellXml(`B${r}`, 8, si(nameText), "s"),
       xlsxCellXml(`E${r}`, 9, si(unitText), "s"),
       barcodeText !== "-"
         ? xlsxBarcodeCell(`F${r}`, 34, barcodeText, si)
         : xlsxCellXml(`F${r}`, 34, null, "empty"),
       xlsxCellXml(`H${r}`, 11, qty, "n"),
-      xlsxCellXml(`J${r}`, RECEIPT_XLSX_STYLE.itemPrice, Number(unitPrice) || 0, "n"),
+      xlsxCellXml(
+        `J${r}`,
+        RECEIPT_XLSX_STYLE.itemPrice,
+        Number(unitPrice) || 0,
+        "n",
+      ),
       xlsxCellXml(`K${r}`, 10, Number(lineTotal) || 0, "n"),
       ...emptyCells(r, "C", "D", 8),
       ...emptyCells(r, "G", "G", 34),
@@ -12422,7 +12431,12 @@ function appendReceiptSheetRows(
     cells.push(...emptyCells(r, "C", "D", labelStyle));
     if (grand && note) {
       cells.push(
-        xlsxCellXml(`E${r}`, RECEIPT_XLSX_STYLE.grandLabel, siRich([{ t: note, sz: 9 }]), "s"),
+        xlsxCellXml(
+          `E${r}`,
+          RECEIPT_XLSX_STYLE.grandLabel,
+          siRich([{ t: note, sz: 9 }]),
+          "s",
+        ),
       );
       cells.push(...emptyCells(r, "F", "I", RECEIPT_XLSX_STYLE.grandLabel));
     } else {
@@ -12468,7 +12482,12 @@ function appendReceiptSheetRows(
     const term = receiptPaymentTermDisplay(o);
     merges.push(`B${r}:D${r}`, `H${r}:K${r}`);
     pushRow(RECEIPT_XLSX_ROW_HEIGHT, [
-      xlsxCellXml(`B${r}`, RECEIPT_XLSX_STYLE.payLabel, si("Төлбөрийн нөхцөл"), "s"),
+      xlsxCellXml(
+        `B${r}`,
+        RECEIPT_XLSX_STYLE.payLabel,
+        si("Төлбөрийн нөхцөл"),
+        "s",
+      ),
       xlsxCellXml(`H${r}`, RECEIPT_XLSX_STYLE.payValue, si(term), "s"),
       ...emptyCells(r, "C", "D", RECEIPT_XLSX_STYLE.payLabel),
       ...emptyCells(r, "E", "G", 1),
@@ -13361,17 +13380,21 @@ function customerPhonesFromFormData(fd) {
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 }
-function customerPhoneFieldRow(value = "", index = 0, total = 1, locked = false) {
+function customerPhoneFieldRow(
+  value = "",
+  index = 0,
+  total = 1,
+  locked = false,
+) {
   const canRemove = total > 1 && !locked;
-  const lock = locked
-    ? " readonly tabindex='-1' aria-readonly='true'"
-    : "";
+  const lock = locked ? " readonly tabindex='-1' aria-readonly='true'" : "";
   return `<div class="customer-phone-row" data-customer-phone-row><label class="customer-phone-row__field"><span class="block text-sm font-medium mb-2">Утас ${index + 1}</span><input name="phones" type="tel" inputmode="tel" autocomplete="tel" value="${esc(value || "")}" placeholder="Утасны дугаар"${lock} class="w-full px-4 py-3 bg-secondary rounded app-input${locked ? " is-locked" : ""}"></label>${canRemove ? `<button type="button" class="customer-phone-row__remove" onclick="removeCustomerPhoneField(this)" aria-label="Утас устгах" title="Устгах">×</button>` : ""}</div>`;
 }
 function customerPhonesFieldsHtml(c, locked = false) {
   let phones = customerPhonesList(c);
   if (!phones.length) phones = [""];
-  const addHidden = locked || phones.length >= CUSTOMER_PHONE_MAX ? " hidden" : "";
+  const addHidden =
+    locked || phones.length >= CUSTOMER_PHONE_MAX ? " hidden" : "";
   return `<div class="customer-phones" data-customer-phones><div class="customer-phones__list" id="customerPhonesList">${phones.map((p, i) => customerPhoneFieldRow(p, i, phones.length, locked)).join("")}</div>${locked ? "" : `<button type="button" class="customer-phones__add"${addHidden} onclick="addCustomerPhoneField()">+ Утас нэмэх</button>`}</div>`;
 }
 function renumberCustomerPhoneFields() {
@@ -21518,10 +21541,7 @@ function warehousePreparePatchStylesXml(
   if (!out.includes(WAREHOUSE_PREPARE_PROMO_FONT_MARK)) {
     out = xlsxStylesAppendPart(out, "fonts", [WAREHOUSE_PREPARE_PROMO_FONT]);
   }
-  const promoFontId = Math.max(
-    0,
-    xlsxStylesCountPart(out, "fonts") - 1,
-  );
+  const promoFontId = Math.max(0, xlsxStylesCountPart(out, "fonts") - 1);
   const promoHeadXf = `<xf numFmtId="0" fontId="${promoFontId}" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="0"/></xf>`;
   if (!out.includes(promoHeadXf)) appendXfs.push(promoHeadXf);
   if (appendXfs.length) {
@@ -21690,7 +21710,12 @@ function buildWarehousePrepareSheetXml(orders, workerIds) {
     const promoHeadRow = rowNum;
     merges.push(`A${promoHeadRow}:${last}${promoHeadRow}`);
     pushRow(ht.body, [
-      xlsxCellXml(`A${promoHeadRow}`, x.promoHead, si(PROMO_PRODUCT_LABEL), "s"),
+      xlsxCellXml(
+        `A${promoHeadRow}`,
+        x.promoHead,
+        si(PROMO_PRODUCT_LABEL),
+        "s",
+      ),
       ...spanCells(promoHeadRow, "B", last, x.promoHeadFill),
     ]);
     pushPrepareGroups(sections.promo, true);
@@ -22940,9 +22965,7 @@ function stockReportPeriodHint() {
   const year = String(state.filters.stockReportYear || "").trim();
   const month = String(state.filters.stockReportMonth || "").trim();
   const empId = String(state.filters.stockReportEmployeeId || "").trim();
-  const emp = empId
-    ? stockReportEmployees().find((e) => e.id === empId)
-    : null;
+  const emp = empId ? stockReportEmployees().find((e) => e.id === empId) : null;
   const who = emp?.name ? ` · ${emp.name}` : "";
   const productId = String(state.filters.stockReportProductId || "").trim();
   const cat = String(state.filters.stockReportCategory || "all").trim();
@@ -23099,7 +23122,10 @@ function stockReportReceiptsFiltered(kind) {
         if (month && day.slice(5, 7) !== month) return false;
       }
       const lines = receipt.lines || [];
-      if (lineFilter && !lines.some((line) => stockReportLineMatchesFilters(line))) {
+      if (
+        lineFilter &&
+        !lines.some((line) => stockReportLineMatchesFilters(line))
+      ) {
         return false;
       }
       if (q) {
@@ -23156,8 +23182,7 @@ function stockReportEmployeeRows(receipts) {
   }
   return [...map.values()].sort(
     (a, b) =>
-      b.amount - a.amount ||
-      String(a.name).localeCompare(String(b.name), "mn"),
+      b.amount - a.amount || String(a.name).localeCompare(String(b.name), "mn"),
   );
 }
 function stockReportDailyRows(receipts) {
@@ -23344,9 +23369,7 @@ function stockReportDailyBodyHtml(kind, receipts) {
   const isOut = kind === "out";
   const thead = `<tr><th>Огноо</th><th>Ажилтан</th><th class="num">Баримт</th><th class="num">Тоо</th><th class="num">Дүн</th></tr>`;
   const body = rows.map((row) => {
-    const who = row.employeeNames.length
-      ? row.employeeNames.join(", ")
-      : "—";
+    const who = row.employeeNames.length ? row.employeeNames.join(", ") : "—";
     return `<tr><td>${esc(warehouseDateDisplayText(row.day))}</td><td>${esc(who)}</td><td class="num">${row.receiptCount}</td><td class="num">${row.qty.toLocaleString()}</td><td class="num">${fmt(row.amount)}</td></tr>`;
   });
   return stockReportSectionTableHtml(
@@ -24842,7 +24865,7 @@ function quantityPromoPoolAmount(rule, amountByProduct) {
     const val =
       key != null
         ? amountByProduct[key]
-        : amountByProduct?.[id] ?? amountByProduct?.[String(id)];
+        : (amountByProduct?.[id] ?? amountByProduct?.[String(id)]);
     return sum + (Number(val) || 0);
   }, 0);
 }
@@ -24864,7 +24887,9 @@ function quantityPromoSets(rule, qtyByProduct, amountByProduct) {
   if (!buyIds.length) return 0;
   const minAmount = quantityPromoMinAmount(rule);
   if (minAmount > 0) {
-    return Math.floor(quantityPromoPoolAmount(rule, amountByProduct) / minAmount);
+    return Math.floor(
+      quantityPromoPoolAmount(rule, amountByProduct) / minAmount,
+    );
   }
   const counts = quantityPromoNormalizeQtyMap(rule, qtyByProduct);
   const haveOf = (id) => promoMixQtyOf(counts, id);
@@ -25001,14 +25026,15 @@ function quantityPromoRuleProgress(rule, qtyByProduct, amountByProduct) {
   let needForNext;
   if (usesAmount) {
     remainder = minAmount > 0 ? combinedAmount % minAmount : 0;
-    needForNext =
-      remainder === 0
-        ? minAmount
-        : minAmount - remainder;
+    needForNext = remainder === 0 ? minAmount : minAmount - remainder;
   } else {
     remainder = buyQty > 0 ? combinedQty % buyQty : 0;
     needForNext =
-      remainder === 0 ? (combinedQty > 0 ? buyQty : buyQty) : buyQty - remainder;
+      remainder === 0
+        ? combinedQty > 0
+          ? buyQty
+          : buyQty
+        : buyQty - remainder;
   }
   return {
     rule,
@@ -25043,11 +25069,7 @@ function quantityPromoProgressMeter(prog, qtyByProduct) {
     const rem = goal > 0 ? combined % goal : 0;
     const sets = Math.max(0, Math.floor(Number(prog?.sets) || 0));
     const current =
-      rem === 0 && sets > 0
-        ? goal
-        : rem === 0
-          ? Math.min(combined, goal)
-          : rem;
+      rem === 0 && sets > 0 ? goal : rem === 0 ? Math.min(combined, goal) : rem;
     return {
       current,
       goal,
@@ -26377,7 +26399,11 @@ function workerOrderLines() {
     gross = paid.reduce((s, l) => s + l.total, 0),
     promoOpts = { limitToStock: true };
   return applyPaymentPromotions(
-    applyPricePromotions(applyQuantityPromotions(paid, promoOpts), gross, promoOpts),
+    applyPricePromotions(
+      applyQuantityPromotions(paid, promoOpts),
+      gross,
+      promoOpts,
+    ),
     gross,
     state.paymentTerm,
     promoOpts,
@@ -26437,7 +26463,8 @@ function promoLineQtyByProduct(lines) {
     if (!line?.isPromoFree) return;
     const id = String(line.productId || "");
     if (!id) return;
-    map[id] = (map[id] || 0) + Math.max(0, Math.floor(Number(line.quantity) || 0));
+    map[id] =
+      (map[id] || 0) + Math.max(0, Math.floor(Number(line.quantity) || 0));
   });
   return map;
 }
@@ -29427,9 +29454,7 @@ function field(name, label, value = "", type = "text", placeholder = "") {
 }
 function customerRegistrationField(value = "", locked = false) {
   const attrs = inputAttrs(value, "Регистрийн дугаар");
-  const lock = locked
-    ? " readonly tabindex='-1' aria-readonly='true'"
-    : "";
+  const lock = locked ? " readonly tabindex='-1' aria-readonly='true'" : "";
   const lookup = locked
     ? ""
     : ` oninput="scheduleCustomerRegistryLookup(this.value)" onblur="fillCustomerFromRegistration(this.value)"`;
@@ -30120,7 +30145,10 @@ async function fillCustomerFromRegistration(code) {
     reg = parsed.digits,
     lookupId = ++customerRegistryLookupId;
   if (!form) return;
-  if (form.dataset.customerId && customerHasOpenBalance(form.dataset.customerId))
+  if (
+    form.dataset.customerId &&
+    customerHasOpenBalance(form.dataset.customerId)
+  )
     return;
   if (!reg) {
     if (status) {
@@ -31317,6 +31345,15 @@ function receiptEditQtyCommit(el) {
     Math.floor(Number(String(el.value || "").replace(/\D/g, "")) || 0),
   );
   if (q === oldQ) return;
+  if (q > oldQ) {
+    const extra = [
+      { productId: item.productId, productName: item.productName, quantity: q - oldQ },
+    ];
+    if (alertOrderStockIssues(orderStockIssues(extra))) {
+      el.value = String(oldQ);
+      return;
+    }
+  }
   const name = esc(item.productName);
   const unitPrice = resolveOrderItemUnitPrice(item);
   const oldTotal = oldQ * unitPrice;
@@ -31366,9 +31403,24 @@ function applyReceiptEditToOrder() {
   if (!o || !state.receiptEditItems) return false;
   if (!canEditWorkerOrder(o)) return false;
   const orig = state.receiptEditOriginalItems || o.items;
-  adjustReceiptEditStock(orig, state.receiptEditItems);
-  o.items = state.receiptEditItems.map((i) => ({ ...i }));
+  const nextItems = (state.receiptEditItems || []).filter(
+    (i) => i?.isPromoFree || (Number(i.quantity) || 0) > 0,
+  );
+  const stockCredit = {};
+  (orig || []).forEach((i) => {
+    if (!i?.productId) return;
+    const pid = String(i.productId);
+    stockCredit[pid] = (stockCredit[pid] || 0) + (Number(i.quantity) || 0);
+  });
+  if (alertOrderStockIssues(orderStockIssues(nextItems, { stockCredit }))) {
+    return false;
+  }
+  adjustReceiptEditStock(orig, nextItems);
+  o.items = nextItems.map((i) => ({ ...i }));
+  syncOrderPromoItemsFromRules(o, { adjustStock: true });
   recalcOrderTotals(o);
+  stampOrderUpdatedAt(o);
+  state.receiptEditItems = o.items.map((i) => ({ ...i }));
   criticalBackendSave();
   return true;
 }
@@ -31440,7 +31492,7 @@ async function downloadOrderReceiptExcelNow(id) {
     state.receiptEditItems &&
     receiptEditHasChanges();
   if (hadChanges) {
-    applyReceiptEditToOrder();
+    if (!applyReceiptEditToOrder()) return;
     clearReceiptEdit();
     render();
   }
@@ -31503,7 +31555,7 @@ function printOrderReceipt(id, ev) {
 }
 function printOrderReceiptNow(id) {
   if (state.receiptEditOrderId === id && state.receiptEditItems) {
-    applyReceiptEditToOrder();
+    if (receiptEditHasChanges() && !applyReceiptEditToOrder()) return;
     clearReceiptEdit();
     render();
   }
@@ -31715,7 +31767,9 @@ function isPreferredM58Address(address) {
 }
 
 function isZj5809PrinterName(name) {
-  const n = String(name || "").toLowerCase().replace(/\s+/g, " ");
+  const n = String(name || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
   return (
     n.includes("bluetooth printer") ||
     n.includes("bluetoothprinter") ||
@@ -31740,7 +31794,8 @@ function btPrinterKindLabel(kind) {
 function btListedDevices(listed) {
   if (!listed) return [];
   const fromJson = (raw) => {
-    if (Array.isArray(raw)) return raw.filter((d) => d && (d.address || d.name));
+    if (Array.isArray(raw))
+      return raw.filter((d) => d && (d.address || d.name));
     if (raw && typeof raw === "object") {
       return Object.keys(raw)
         .filter((key) => key !== "length")
@@ -32320,7 +32375,9 @@ function stock(id, qty, type) {
   if (!p) return;
   const current = Number(p.stock) || 0;
   const q = Number(qty) || 0;
-  p.stock = type === "in" ? current + q : Math.max(0, current - q);
+  // Do not clamp at 0 on "out". Clamping then restoring extras invents stock
+  // (0 − 600 → 0, later +600 → 600) for goods that were already gone.
+  p.stock = type === "in" ? current + q : current - q;
 }
 function orderStockIssues(items, opts = {}) {
   const need = {};
@@ -32844,9 +32901,7 @@ function applyPickerBarcode(value, scanned = false) {
   state.filters.workerCategory = "";
   state.filters.workerGroup = "";
   const product =
-    state.products.find((p) =>
-      productMatchCodes(p).some((c) => c === code),
-    ) ||
+    state.products.find((p) => productMatchCodes(p).some((c) => c === code)) ||
     findProductByBarcodeLoose(code) ||
     findProductsByQuery(code)[0];
   if (product) {
@@ -33980,9 +34035,14 @@ function deleteReceiptNow(id) {
 }
 function recordDeletion(type, id) {
   if (
-    !["product", "customer", "employee", "order", "category", "productGroup"].includes(
-      type,
-    ) ||
+    ![
+      "product",
+      "customer",
+      "employee",
+      "order",
+      "category",
+      "productGroup",
+    ].includes(type) ||
     !id
   )
     return;

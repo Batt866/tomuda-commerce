@@ -616,7 +616,7 @@ def apply_merged_product_stock(
             product_id,
             "out",
         )
-        next_product["stock"] = _stock_value(max(0.0, stock))
+        next_product["stock"] = _stock_value(stock)
         products.append(next_product)
     return products
 

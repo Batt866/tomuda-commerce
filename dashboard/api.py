@@ -445,10 +445,9 @@ def _adjust_order_stock(
             stock = float(product.get("stock") or 0)
         except (TypeError, ValueError):
             stock = 0.0
-        if delta > 0:
-            product["stock"] = max(0, stock - delta)
-        else:
-            product["stock"] = stock - delta  # delta negative => increase
+        # Never clamp at 0 on deduct. Clamping then restoring extras invents
+        # stock for goods that were already gone (0 − 600 → 0, later +600 → 600).
+        product["stock"] = stock - delta
 
 
 def _validate_order_stock(
