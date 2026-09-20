@@ -10227,9 +10227,9 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 9.50 / 8.83 / 4.83 / 4.00 / 3.00 / 8.00 / 9.00. */
-.receipt-grid__a { width: 2.93%; } .receipt-grid__b { width: 7.19%; } .receipt-grid__c { width: 22.25%; } .receipt-grid__d { width: 4.05%; } .receipt-grid__e { width: 12.81%; }
-.receipt-grid__f { width: 11.91%; } .receipt-grid__g { width: 6.51%; } .receipt-grid__h { width: 5.39%; } .receipt-grid__i { width: 4.05%; } .receipt-grid__j { width: 10.79%; } .receipt-grid__k { width: 12.14%; }
+/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 10.70 / 8.83 / 4.83 / 4.00 / 3.00 / 8.00 / 9.00. */
+.receipt-grid__a { width: 2.88%; } .receipt-grid__b { width: 7.07%; } .receipt-grid__c { width: 21.89%; } .receipt-grid__d { width: 3.98%; } .receipt-grid__e { width: 14.20%; }
+.receipt-grid__f { width: 11.72%; } .receipt-grid__g { width: 6.41%; } .receipt-grid__h { width: 5.31%; } .receipt-grid__i { width: 3.98%; } .receipt-grid__j { width: 10.62%; } .receipt-grid__k { width: 11.94%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -11360,7 +11360,7 @@ const RECEIPT_XLSX_STYLE = {
 };
 // Unit E wide enough that wrapped «Хэмжих / нэгж» never clips.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  2.17, 5.33, 16.5, 3.0, 9.5, 8.83, 4.83, 4.0, 3.0, 8.0, 9.0,
+  2.17, 5.33, 16.5, 3.0, 10.7, 8.83, 4.83, 4.0, 3.0, 8.0, 9.0,
 ];
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
