@@ -11525,22 +11525,20 @@ function receiptXlsxWrappedRowHeight(
   return Math.max(min, Math.min(max, lines * linePt + pad));
 }
 function receiptXlsxColsXml() {
+  // Excel stores a padded internal width. Dialog/tooltip “Width” is the
+  // character value below; Arial 15 Normal (see receiptExpenseXlsxStylesXml)
+  // is required so 2.38 does not snap to 1.75 or 2.33.
+  const mdw = 8;
   const widths = [
     2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
   ];
   return widths
-    .map(
-      (width, index) =>
-        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
-    )
+    .map((chars, index) => {
+      const width = Math.floor(((chars * mdw + 5) / mdw) * 256) / 256;
+      return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
+    })
     .join("");
 }
-/**
- * Excel’s Column Width tooltip is characters, not pixels. With Normal = Arial
- * 11, Mac Excel’s digit is 6px so 2.38 snaps to 2.33 (19 pixels). Normal =
- * Arial 15 makes the digit 8px, so A–K show 2.38 / 5.63 / … as given.
- * Visible receipt text stays on the other Arial 8–18 fontIds.
- */
 function receiptExpenseXlsxStylesXml() {
   let xml = receiptXlsxStylesXml();
   xml = xml.replace(
