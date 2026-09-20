@@ -11535,6 +11535,34 @@ function receiptXlsxColsXml() {
     )
     .join("");
 }
+/**
+ * Excel’s Column Width tooltip is characters, not pixels. With Normal = Arial
+ * 11, Mac Excel’s digit is 6px so 2.38 snaps to 2.33 (19 pixels). Normal =
+ * Arial 15 makes the digit 8px, so A–K show 2.38 / 5.63 / … as given.
+ * Visible receipt text stays on the other Arial 8–18 fontIds.
+ */
+function receiptExpenseXlsxStylesXml() {
+  let xml = receiptXlsxStylesXml();
+  xml = xml.replace(
+    '<fonts count="18"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font>',
+    '<fonts count="19"><font><sz val="15"/><color rgb="FF000000"/><name val="Arial"/></font>',
+  );
+  xml = xml.replace(
+    "</fonts>",
+    '<font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font></fonts>',
+  );
+  xml = xml.split('numFmtId="4" fontId="0" fillId="0" borderId="3"').join(
+    'numFmtId="4" fontId="18" fillId="0" borderId="3"',
+  );
+  xml = xml
+    .split(
+      'numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
+    )
+    .join(
+      'numFmtId="0" fontId="18" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
+    );
+  return xml;
+}
 function excelSerialFromDate(value) {
   const d = value ? new Date(value) : new Date();
   if (Number.isNaN(d.getTime())) return excelSerialFromDate(new Date());
@@ -19389,7 +19417,7 @@ async function assembleStyledXlsxZip(
     "xl/_rels/workbook.xml.rels",
     styledWorkbookRelsXml(sheetIds.length),
   );
-  xlsxZipWriteUtf8(zip, "xl/styles.xml", receiptXlsxStylesXml());
+  xlsxZipWriteUtf8(zip, "xl/styles.xml", receiptExpenseXlsxStylesXml());
   xlsxZipWriteUtf8(zip, "xl/sharedStrings.xml", built.sharedStringsXml);
   built.sheets.forEach((sheet) => {
     xlsxZipWriteUtf8(zip, `xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
