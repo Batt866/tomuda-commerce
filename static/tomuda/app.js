@@ -10227,9 +10227,9 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 10.70 / 8.83 / 4.83 / 4.00 / 3.00 / 8.00 / 9.00. */
-.receipt-grid__a { width: 2.88%; } .receipt-grid__b { width: 7.07%; } .receipt-grid__c { width: 21.89%; } .receipt-grid__d { width: 3.98%; } .receipt-grid__e { width: 14.20%; }
-.receipt-grid__f { width: 11.72%; } .receipt-grid__g { width: 6.41%; } .receipt-grid__h { width: 5.31%; } .receipt-grid__i { width: 3.98%; } .receipt-grid__j { width: 10.62%; } .receipt-grid__k { width: 11.94%; }
+/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 10.70 / 8.83 / 4.83 / 4.00 / 2.25 / 8.38 / 8.38. */
+.receipt-grid__a { width: 2.92%; } .receipt-grid__b { width: 7.17%; } .receipt-grid__c { width: 22.19%; } .receipt-grid__d { width: 4.03%; } .receipt-grid__e { width: 14.39%; }
+.receipt-grid__f { width: 11.87%; } .receipt-grid__g { width: 6.49%; } .receipt-grid__h { width: 5.38%; } .receipt-grid__i { width: 3.03%; } .receipt-grid__j { width: 11.27%; } .receipt-grid__k { width: 11.27%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -10267,7 +10267,7 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__bank td,
 .receipt-grid--sheet .receipt-grid__warn td,
 .receipt-grid--sheet .receipt-grid__sign td {
-  height: 14pt;
+  height: 14.5pt;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: top;
@@ -10285,7 +10285,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
   font-size: 9pt;
-  height: 14pt;
+  height: 14.5pt;
   box-sizing: border-box;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
@@ -10359,7 +10359,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--sm > td {
   border: none !important;
-  height: 14pt;
+  height: 14.5pt;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -10715,7 +10715,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__return-line { min-height: 12px; }
 .receipt-grid--sheet .receipt-grid__gross td {
   background: #d9d9d9 !important;
-  height: 14pt;
+  height: 14.5pt;
   padding: 0 6px;
   font-weight: 700;
   font-size: 9px;
@@ -10740,7 +10740,7 @@ tbody.receipt-footer-keep {
   font-weight: 700;
 }
 .receipt-grid--sheet .receipt-grid__summary td {
-  height: 14pt;
+  height: 14.5pt;
   padding: 0 6px;
   font-size: 11pt;
   line-height: 1.15;
@@ -10748,7 +10748,7 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: ${RECEIPT_GRAND_BG} !important;
   color: ${RECEIPT_TEXT} !important;
-  height: 14pt;
+  height: 14.5pt;
   padding: 0 6px;
   font-weight: 700;
   font-size: 12pt;
@@ -10790,7 +10790,7 @@ tbody.receipt-footer-keep {
   border-bottom: 0.75pt solid #555 !important;
   background: ${RECEIPT_GRAND_BG} !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14pt; font-size: 11pt; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14.5pt; font-size: 11pt; }
 .receipt-grid--sheet .receipt-grid__summary--pay .receipt-grid__summary-label { font-weight: 700; }
 .receipt-grid__summary-note {
   text-align: center;
@@ -10823,14 +10823,14 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__sign-line {
   border: none !important;
   border-bottom: 0.4pt dotted #666 !important;
-  height: 14pt;
+  height: 14.5pt;
   padding: 0 !important;
   vertical-align: bottom;
 }
 .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
   border: none !important;
   border-bottom: 0.75pt dotted #000 !important;
-  height: 14pt;
+  height: 14.5pt;
   padding: 0 !important;
   vertical-align: bottom;
 }
@@ -10892,8 +10892,8 @@ tbody.receipt-footer-keep {
   line-height: 1.2;
   text-align: left;
 }
-.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 20pt; }
-.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 28pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 20.5pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 28.5pt; }
 .receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
   height: 0;
   padding: 0 !important;
@@ -10949,9 +10949,9 @@ tbody.receipt-footer-keep {
   line-height: 1.15;
   box-sizing: border-box;
 }
-.receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31pt; }
+.receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31.5pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14pt; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.5pt; }
 .receipt-grid__meta--email .receipt-grid__value--email {
   font-size: 9pt !important;
   font-weight: 400 !important;
@@ -10995,8 +10995,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--before-promo td { height: 6mm; padding: 0; }
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
-.receipt-grid__spacer--pay-warn td { height: 14pt; padding: 0; }
-.receipt-grid__spacer--sign td { height: 14pt; }
+.receipt-grid__spacer--pay-warn td { height: 14.5pt; padding: 0; }
+.receipt-grid__spacer--sign td { height: 14.5pt; }
 .receipt-grid__fill td { height: 5.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
@@ -11081,8 +11081,8 @@ tbody.receipt-footer-keep {
   font-weight: 400;
 }
 .receipt-grid--sheet .receipt-grid__warn .receipt-grid__warn-line--first {
-  height: 36pt;
-  min-height: 36pt;
+  height: 36.5pt;
+  min-height: 36.5pt;
   line-height: 1.2;
   overflow: visible;
   white-space: normal;
@@ -11323,21 +11323,21 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 /** Uniform body/spacer row height from row 4 onward. */
-const RECEIPT_XLSX_ROW_HEIGHT = 14;
+const RECEIPT_XLSX_ROW_HEIGHT = 14.5;
 /** Item table header matches body row height. */
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.5;
 /** Item table product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.5;
 /** Signature rows match body height. */
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14;
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.5;
 /** Row 1 brand line. */
-const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20;
+const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.5;
 /** Row 2 address line. */
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 28;
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 28.5;
 /** Row 3 «ЗАРЛАГЫН БАРИМТ». */
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31;
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
 /** First payment-warning paragraph — two designed lines, extra wrap needs ~3×9pt. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 36;
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 36.5;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 78 → indices 0–77). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -11360,7 +11360,7 @@ const RECEIPT_XLSX_STYLE = {
 };
 // Unit E wide enough that wrapped «Хэмжих / нэгж» never clips.
 const RECEIPT_XLSX_COL_WIDTHS = [
-  2.17, 5.33, 16.5, 3.0, 10.7, 8.83, 4.83, 4.0, 3.0, 8.0, 9.0,
+  2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
 ];
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
@@ -31347,7 +31347,11 @@ function receiptEditQtyCommit(el) {
   if (q === oldQ) return;
   if (q > oldQ) {
     const extra = [
-      { productId: item.productId, productName: item.productName, quantity: q - oldQ },
+      {
+        productId: item.productId,
+        productName: item.productName,
+        quantity: q - oldQ,
+      },
     ];
     if (alertOrderStockIssues(orderStockIssues(extra))) {
       el.value = String(oldQ);
