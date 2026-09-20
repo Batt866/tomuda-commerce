@@ -10227,9 +10227,9 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A–K Excel widths 2.17 / 5.33 / 16.50 / 3.00 / 10.70 / 8.83 / 4.83 / 4.00 / 2.25 / 8.38 / 8.38. */
-.receipt-grid__a { width: 2.92%; } .receipt-grid__b { width: 7.17%; } .receipt-grid__c { width: 22.19%; } .receipt-grid__d { width: 4.03%; } .receipt-grid__e { width: 14.39%; }
-.receipt-grid__f { width: 11.87%; } .receipt-grid__g { width: 6.49%; } .receipt-grid__h { width: 5.38%; } .receipt-grid__i { width: 3.03%; } .receipt-grid__j { width: 11.27%; } .receipt-grid__k { width: 11.27%; }
+/* A–K Excel widths 2.38 / 5.63 / 16.75 / 3.25 / 10.13 / 7.5 / 4.13 / 3.38 / 2.25 / 8.38 / 8.38. */
+.receipt-grid__a { width: 3.30%; } .receipt-grid__b { width: 7.80%; } .receipt-grid__c { width: 23.21%; } .receipt-grid__d { width: 4.50%; } .receipt-grid__e { width: 14.04%; }
+.receipt-grid__f { width: 10.39%; } .receipt-grid__g { width: 5.72%; } .receipt-grid__h { width: 4.68%; } .receipt-grid__i { width: 3.12%; } .receipt-grid__j { width: 11.61%; } .receipt-grid__k { width: 11.61%; }
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
