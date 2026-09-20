@@ -11356,22 +11356,22 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-/** Body/spacer row height from row 4 onward. Excel shows 19px. */
-const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
+/** Body/spacer row height from row 4 onward. Excel row-header pixels. */
+const RECEIPT_XLSX_ROW_HEIGHT = 19;
 /** Item table header matches body row height. */
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 19;
 /** Item table product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 19;
 /** Signature rows match body height. */
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
-/** Row 1 brand line. Excel shows 27px. */
-const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
-/** Row 2 address line. Excel shows 36px. */
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
-/** Row 3 «ЗАРЛАГЫН БАРИМТ». Excel shows 42px. */
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 19;
+/** Row 1 brand line. Excel row-header pixels. */
+const RECEIPT_XLSX_HEADER_R1_HEIGHT = 27;
+/** Row 2 address line. Excel row-header pixels. */
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 36;
+/** Row 3 «ЗАРЛАГЫН БАРИМТ». Excel row-header pixels. */
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 42;
 /** From row 4 down every line is 19px, including the payment warning. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 19;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 78 → indices 0–77). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -12594,7 +12594,7 @@ function receiptWorksheetXml(
   const fitsOnePage = lastRow <= RECEIPT_XLSX_PAGE_ROWS;
   const fitH = fitsOnePage ? "1" : "0";
   // Page Setup from the №260941 video: 0.4 / 0.4 / 0.45 / 0.35 in, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="14.25"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="19"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
