@@ -11525,20 +11525,15 @@ function receiptXlsxWrappedRowHeight(
   return Math.max(min, Math.min(max, lines * linePt + pad));
 }
 function receiptXlsxColsXml() {
-  return RECEIPT_XLSX_COL_WIDTHS.map((width, index) => {
-    const targetPx = RECEIPT_XLSX_COL_WIDTH_PX[index];
-    let units = Math.round(Number(width) * 256);
-    let stored = units / 256;
-    while (receiptExcelPixelsOfWidth(stored) < targetPx && units < 256 * 255) {
-      units += 1;
-      stored = units / 256;
-    }
-    while (receiptExcelPixelsOfWidth(stored) > targetPx && units > 0) {
-      units -= 1;
-      stored = units / 256;
-    }
-    return `<col min="${index + 1}" max="${index + 1}" width="${receiptExcelColWidthAttr(stored)}" customWidth="1"/>`;
-  }).join("");
+  const widths = [
+    2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
+  ];
+  return widths
+    .map(
+      (width, index) =>
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+    )
+    .join("");
 }
 function excelSerialFromDate(value) {
   const d = value ? new Date(value) : new Date();
