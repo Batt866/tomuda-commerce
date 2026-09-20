@@ -12064,7 +12064,7 @@ function appendReceiptSheetRows(
   // Brand/address/title start at C so A/B stay thin for the logo + №.
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header: logo A; B thin; brand C:H; address C:I; title C:K; date J:K / K.
+  // Header: logo A; B thin; brand C:H; address C:I; title A:K; date J:K / K.
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
@@ -12072,7 +12072,7 @@ function appendReceiptSheetRows(
     `A${hr1}:A${hr2}`,
     `C${hr1}:H${hr1}`,
     `C${hr2}:I${hr2}`,
-    `C${hr3}:K${hr3}`,
+    `A${hr3}:K${hr3}`,
     `J${hr1}:K${hr1}`,
   );
   pushRow(RECEIPT_XLSX_HEADER_R1_HEIGHT, [
@@ -12098,8 +12098,8 @@ function appendReceiptSheetRows(
     ...emptyCells(hr2, "D", "I", 41),
   ]);
   pushRow(RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT, [
-    xlsxCellXml(`C${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
-    ...emptyCells(hr3, "D", "K", 40),
+    xlsxCellXml(`A${hr3}`, 40, si(`ЗАРЛАГЫН БАРИМТ №${receiptNo}`), "s"),
+    ...emptyCells(hr3, "B", "K", 40),
   ]);
 
   const pushMetaPairRow = (
