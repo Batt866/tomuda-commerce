@@ -552,19 +552,26 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Excel A–K character widths. HTML/print use these same numbers, not a reduced scale. */
-const RECEIPT_XLSX_COL_WIDTHS = [
-  2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
+/** Excel A–K column widths in pixels (Format tooltip / dragged size). */
+const RECEIPT_XLSX_COL_WIDTH_PX = [
+  24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
 ];
+/** Excel stores column width as (px − 5 padding) / 7px max-digit width. */
+function receiptExcelWidthFromPx(px) {
+  return Math.round(((Number(px) - 5) / 7) * 100) / 100;
+}
+const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
+  receiptExcelWidthFromPx,
+);
 const RECEIPT_XLSX_COL_LETTERS = "abcdefghijk";
 function receiptColWidthSum() {
-  return RECEIPT_XLSX_COL_WIDTHS.reduce((sum, width) => sum + width, 0);
+  return RECEIPT_XLSX_COL_WIDTH_PX.reduce((sum, width) => sum + width, 0);
 }
 function receiptGridColWidthCss() {
   const sum = receiptColWidthSum();
-  return RECEIPT_XLSX_COL_WIDTHS.map(
-    (width, index) =>
-      `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${width} / ${sum}); }`,
+  return RECEIPT_XLSX_COL_WIDTH_PX.map(
+    (px, index) =>
+      `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${px} / ${sum}); }`,
   ).join(" ");
 }
 function receiptPartyFields(o) {
@@ -599,9 +606,9 @@ function receiptPartyFields(o) {
 }
 function receiptGridColgroup() {
   const sum = receiptColWidthSum();
-  return `<colgroup>${RECEIPT_XLSX_COL_WIDTHS.map(
-    (width, index) =>
-      `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${width} / ${sum})">`,
+  return `<colgroup>${RECEIPT_XLSX_COL_WIDTH_PX.map(
+    (px, index) =>
+      `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${px} / ${sum})">`,
   ).join("")}</colgroup>`;
 }
 function receiptDeliveryDateValue(o) {
@@ -11503,7 +11510,7 @@ function receiptXlsxWrappedRowHeight(
 function receiptXlsxColsXml() {
   return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
-      `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`,
+      `<col min="${index + 1}" max="${index + 1}" width="${Number(width).toFixed(2)}" customWidth="1"/>`,
   ).join("");
 }
 function excelSerialFromDate(value) {
