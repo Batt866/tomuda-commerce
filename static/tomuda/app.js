@@ -552,6 +552,21 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
+/** Excel A–K character widths. HTML/print use these same numbers, not a reduced scale. */
+const RECEIPT_XLSX_COL_WIDTHS = [
+  2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
+];
+const RECEIPT_XLSX_COL_LETTERS = "abcdefghijk";
+function receiptColWidthSum() {
+  return RECEIPT_XLSX_COL_WIDTHS.reduce((sum, width) => sum + width, 0);
+}
+function receiptGridColWidthCss() {
+  const sum = receiptColWidthSum();
+  return RECEIPT_XLSX_COL_WIDTHS.map(
+    (width, index) =>
+      `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${width} / ${sum}); }`,
+  ).join(" ");
+}
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
     sales = state.employees.find((e) => e.id === o.employeeId) || {},
@@ -583,8 +598,11 @@ function receiptPartyFields(o) {
   };
 }
 function receiptGridColgroup() {
-  // Source zarlaga jishee col widths → % of ~84.5 units
-  return `<colgroup><col class="receipt-grid__a"><col class="receipt-grid__b"><col class="receipt-grid__c"><col class="receipt-grid__d"><col class="receipt-grid__e"><col class="receipt-grid__f"><col class="receipt-grid__g"><col class="receipt-grid__h"><col class="receipt-grid__i"><col class="receipt-grid__j"><col class="receipt-grid__k"></colgroup>`;
+  const sum = receiptColWidthSum();
+  return `<colgroup>${RECEIPT_XLSX_COL_WIDTHS.map(
+    (width, index) =>
+      `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${width} / ${sum})">`,
+  ).join("")}</colgroup>`;
 }
 function receiptDeliveryDateValue(o) {
   return orderDeliveryDay(o) || "";
@@ -10227,9 +10245,7 @@ td, th { border: none; }
   line-height: 1.15;
   color: ${RECEIPT_TEXT};
 }
-/* A–K Excel widths 2.38 / 5.63 / 16.75 / 3.25 / 10.13 / 7.5 / 4.13 / 3.38 / 2.25 / 8.38 / 8.38. */
-.receipt-grid__a { width: 3.30%; } .receipt-grid__b { width: 7.80%; } .receipt-grid__c { width: 23.21%; } .receipt-grid__d { width: 4.50%; } .receipt-grid__e { width: 14.04%; }
-.receipt-grid__f { width: 10.39%; } .receipt-grid__g { width: 5.72%; } .receipt-grid__h { width: 4.68%; } .receipt-grid__i { width: 3.12%; } .receipt-grid__j { width: 11.61%; } .receipt-grid__k { width: 11.61%; }
+${receiptGridColWidthCss()}
 .receipt-grid--sheet .receipt-grid__header td,
 .receipt-grid--sheet .receipt-grid__meta td,
 .receipt-grid--sheet .receipt-grid__bank td,
@@ -10267,14 +10283,12 @@ td, th { border: none; }
 .receipt-grid--sheet .receipt-grid__bank td,
 .receipt-grid--sheet .receipt-grid__warn td,
 .receipt-grid--sheet .receipt-grid__sign td {
-  height: 14.5pt;
+  height: 14.25pt;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: top;
   padding: 0 !important;
   overflow: visible;
-  width: 2.93%;
-  min-width: 0;
 }
 .receipt-grid--sheet tr.receipt-items__head > td,
 .receipt-grid--sheet tr.receipt-items__row > td {
@@ -10285,7 +10299,7 @@ td, th { border: none; }
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
   font-size: 9pt;
-  height: 14.5pt;
+  height: 14.25pt;
   box-sizing: border-box;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
@@ -10359,7 +10373,7 @@ td, th { border: none; }
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--sm > td {
   border: none !important;
-  height: 14.5pt;
+  height: 14.25pt;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -10715,7 +10729,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__return-line { min-height: 12px; }
 .receipt-grid--sheet .receipt-grid__gross td {
   background: #d9d9d9 !important;
-  height: 14.5pt;
+  height: 14.25pt;
   padding: 0 6px;
   font-weight: 700;
   font-size: 9px;
@@ -10740,7 +10754,7 @@ tbody.receipt-footer-keep {
   font-weight: 700;
 }
 .receipt-grid--sheet .receipt-grid__summary td {
-  height: 14.5pt;
+  height: 14.25pt;
   padding: 0 6px;
   font-size: 11pt;
   line-height: 1.15;
@@ -10748,7 +10762,7 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: ${RECEIPT_GRAND_BG} !important;
   color: ${RECEIPT_TEXT} !important;
-  height: 14.5pt;
+  height: 14.25pt;
   padding: 0 6px;
   font-weight: 700;
   font-size: 12pt;
@@ -10790,7 +10804,7 @@ tbody.receipt-footer-keep {
   border-bottom: 0.75pt solid #555 !important;
   background: ${RECEIPT_GRAND_BG} !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14.5pt; font-size: 11pt; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14.25pt; font-size: 11pt; }
 .receipt-grid--sheet .receipt-grid__summary--pay .receipt-grid__summary-label { font-weight: 700; }
 .receipt-grid__summary-note {
   text-align: center;
@@ -10823,14 +10837,14 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__sign-line {
   border: none !important;
   border-bottom: 0.4pt dotted #666 !important;
-  height: 14.5pt;
+  height: 14.25pt;
   padding: 0 !important;
   vertical-align: bottom;
 }
 .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
   border: none !important;
   border-bottom: 0.75pt dotted #000 !important;
-  height: 14.5pt;
+  height: 14.25pt;
   padding: 0 !important;
   vertical-align: bottom;
 }
@@ -10892,8 +10906,8 @@ tbody.receipt-footer-keep {
   line-height: 1.2;
   text-align: left;
 }
-.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 20.5pt; }
-.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 28.5pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 20.25pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 27pt; }
 .receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
   height: 0;
   padding: 0 !important;
@@ -10951,7 +10965,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31.5pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.5pt; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; }
 .receipt-grid__meta--email .receipt-grid__value--email {
   font-size: 9pt !important;
   font-weight: 400 !important;
@@ -10995,8 +11009,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__spacer--before-promo td { height: 6mm; padding: 0; }
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
-.receipt-grid__spacer--pay-warn td { height: 14.5pt; padding: 0; }
-.receipt-grid__spacer--sign td { height: 14.5pt; }
+.receipt-grid__spacer--pay-warn td { height: 14.25pt; padding: 0; }
+.receipt-grid__spacer--sign td { height: 14.25pt; }
 .receipt-grid__fill td { height: 5.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
@@ -11081,8 +11095,8 @@ tbody.receipt-footer-keep {
   font-weight: 400;
 }
 .receipt-grid--sheet .receipt-grid__warn .receipt-grid__warn-line--first {
-  height: 36.5pt;
-  min-height: 36.5pt;
+  height: 14.25pt;
+  min-height: 14.25pt;
   line-height: 1.2;
   overflow: visible;
   white-space: normal;
@@ -11137,8 +11151,6 @@ tbody.receipt-footer-keep {
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
     overflow: visible !important;
-    width: 2.93% !important;
-    min-width: 0 !important;
   }
   .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
     border: none !important;
@@ -11322,22 +11334,22 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-/** Uniform body/spacer row height from row 4 onward. */
-const RECEIPT_XLSX_ROW_HEIGHT = 14.5;
+/** Uniform body/spacer row height from row 4 onward. Excel shows 19px. */
+const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
 /** Item table header matches body row height. */
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.5;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
 /** Item table product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.5;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
 /** Signature rows match body height. */
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.5;
-/** Row 1 brand line. */
-const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.5;
-/** Row 2 address line. */
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 28.5;
-/** Row 3 «ЗАРЛАГЫН БАРИМТ». */
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
+/** Row 1 brand line. Excel shows 27px. */
+const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
+/** Row 2 address line. Excel shows 36px. */
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
+/** Row 3 «ЗАРЛАГЫН БАРИМТ». Excel shows 42px. */
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
-/** First payment-warning paragraph — two designed lines, extra wrap needs ~3×9pt. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 36.5;
+/** From row 4 down every line is 19px, including the payment warning. */
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 78 → indices 0–77). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -11358,10 +11370,6 @@ const RECEIPT_XLSX_STYLE = {
   itemPrice: 76,
   unitHead: 77,
 };
-// Unit E wide enough that wrapped «Хэмжих / нэгж» never clips.
-const RECEIPT_XLSX_COL_WIDTHS = [
-  2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
-];
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
 /** Approx printable rows per A4 page (fitToWidth, portrait, current margins/heights). */
