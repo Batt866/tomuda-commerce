@@ -557,23 +557,26 @@ const RECEIPT_XLSX_COL_WIDTH_PX = [
   24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
 ];
 /**
- * Excel’s <col width> is the padded internal width, not the Column Width
- * dialog value. On Microsoft Excel, screen pixels = Round(width × 6), so
- * 50px must be stored as 50/6 (dialog then shows 7.50 = 50 pixels).
- * Writing (px-5)/6 stored 7.5 and Excel opened it at 45px.
+ * This Excel (Mac screenshot): Width 7.50 = 50 pixels.
+ * pixels = Truncate(width × 6 + 5). B must be stored as 7.5, not 6.43.
  */
 const RECEIPT_XLSX_COL_MDW = 6;
+/** Character width so Excel’s tooltip pixels = Truncate(width * MDW + 5). */
 function receiptExcelWidthFromPx(px) {
   const pixels = Math.round(Number(px));
   const mdw = RECEIPT_XLSX_COL_MDW;
   if (pixels <= 0) return 0;
-  return pixels / mdw;
+  if (pixels < 12) return pixels / (mdw + 5);
+  return (pixels - 5) / mdw;
 }
 function receiptExcelColWidthAttr(width) {
   return (Math.round(Number(width) * 256) / 256).toFixed(8).replace(/\.?0+$/, "");
 }
 function receiptExcelPixelsOfWidth(width) {
-  return Math.round(Number(width) * RECEIPT_XLSX_COL_MDW);
+  const w = Number(width);
+  const mdw = RECEIPT_XLSX_COL_MDW;
+  if (w < 1) return Math.floor(w * (mdw + 5));
+  return Math.floor(w * mdw + 5);
 }
 const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
   receiptExcelWidthFromPx,
@@ -11451,7 +11454,7 @@ function receiptXlsxTextPx(text) {
  */
 function receiptXlsxRightFlushGap(head, tail, cols) {
   const cellPx = cols.reduce(
-    (sum, w) => sum + Math.round(w * RECEIPT_XLSX_COL_MDW),
+    (sum, w) => sum + Math.round(w * RECEIPT_XLSX_COL_MDW + 5),
     0,
   );
   const nbsp = "\u00A0";
