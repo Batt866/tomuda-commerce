@@ -552,15 +552,31 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Excel A–K column widths in pixels (Format tooltip / dragged size). */
+/** Excel A–K column widths in pixels (column-header drag tooltip at 100% zoom). */
 const RECEIPT_XLSX_COL_WIDTH_PX = [
   24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
 ];
-/** Arial 11 max digit width in px. MDW=7 made every column too wide. */
-const RECEIPT_XLSX_COL_MDW = 8;
-/** Excel stores column width as (px − 5 padding) / MDW. */
+/**
+ * Excel column-width MDW (max digit width) at 96dpi. Calibri/Arial 11 = 7px.
+ * Do not round to 2 decimals: (24-5)/7 = 2.714… → 24px, but 2.71 → 23px.
+ */
+const RECEIPT_XLSX_COL_MDW = 7;
+/** Character width so Excel’s tooltip pixels = Truncate(width * MDW + 5). */
 function receiptExcelWidthFromPx(px) {
-  return Math.round(((Number(px) - 5) / RECEIPT_XLSX_COL_MDW) * 100) / 100;
+  const pixels = Math.round(Number(px));
+  const mdw = RECEIPT_XLSX_COL_MDW;
+  if (pixels <= 0) return 0;
+  if (pixels < 12) return pixels / (mdw + 5);
+  return (pixels - 5) / mdw;
+}
+function receiptExcelColWidthAttr(width) {
+  return (Math.round(Number(width) * 256) / 256).toFixed(8).replace(/\.?0+$/, "");
+}
+function receiptExcelPixelsOfWidth(width) {
+  const w = Number(width);
+  const mdw = RECEIPT_XLSX_COL_MDW;
+  if (w < 1) return Math.floor(w * (mdw + 5));
+  return Math.floor(w * mdw + 5);
 }
 const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
   receiptExcelWidthFromPx,
@@ -11513,10 +11529,20 @@ function receiptXlsxWrappedRowHeight(
   return Math.max(min, Math.min(max, lines * linePt + pad));
 }
 function receiptXlsxColsXml() {
-  return RECEIPT_XLSX_COL_WIDTHS.map(
-    (width, index) =>
-      `<col min="${index + 1}" max="${index + 1}" width="${Number(width).toFixed(2)}" customWidth="1"/>`,
-  ).join("");
+  return RECEIPT_XLSX_COL_WIDTHS.map((width, index) => {
+    const targetPx = RECEIPT_XLSX_COL_WIDTH_PX[index];
+    let units = Math.round(Number(width) * 256);
+    let stored = units / 256;
+    while (receiptExcelPixelsOfWidth(stored) < targetPx && units < 256 * 255) {
+      units += 1;
+      stored = units / 256;
+    }
+    while (receiptExcelPixelsOfWidth(stored) > targetPx && units > 0) {
+      units -= 1;
+      stored = units / 256;
+    }
+    return `<col min="${index + 1}" max="${index + 1}" width="${receiptExcelColWidthAttr(stored)}" customWidth="1"/>`;
+  }).join("");
 }
 function excelSerialFromDate(value) {
   const d = value ? new Date(value) : new Date();
