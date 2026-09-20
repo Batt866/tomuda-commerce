@@ -11355,22 +11355,22 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-/** Body/spacer row height from row 4 onward. Excel row-header pixels. */
-const RECEIPT_XLSX_ROW_HEIGHT = 19;
+/** Body/spacer row height from row 4 onward. Excel Row Height 14.25 (19 px). */
+const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
 /** Item table header matches body row height. */
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 19;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
 /** Item table product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 19;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
 /** Signature rows match body height. */
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 19;
-/** Row 1 brand line. Excel row-header pixels. */
-const RECEIPT_XLSX_HEADER_R1_HEIGHT = 27;
-/** Row 2 address line. Excel row-header pixels. */
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 36;
-/** Row 3 «ЗАРЛАГЫН БАРИМТ». Excel row-header pixels. */
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 42;
-/** From row 4 down every line is 19px, including the payment warning. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 19;
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
+/** Row 1 brand line. Excel Row Height 20.25 (27 px). */
+const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
+/** Row 2 address line. Excel Row Height 27.00 (36 px). */
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
+/** Row 3 «ЗАРЛАГЫН БАРИМТ». Excel Row Height 31.50 (42 px). */
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
+/** From row 4 down every line is 14.25, including the payment warning. */
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 78 → indices 0–77). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -11943,14 +11943,15 @@ function ptToEmu(pt) {
   return Math.round(Number(pt) * 12700);
 }
 function receiptDrawingXml() {
-  // Square logo, slightly larger than 16.5mm; sit just above row-2 bottom line.
-  const logoEmu = mmToEmu(18.5);
+  // Square logo; sit just above row-2 bottom line. Cap to rows 1–2 so it
+  // still fits after the 20.25 + 27 header heights.
   const pad = mmToEmu(0.2);
   const bottomGap = mmToEmu(0.3);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
   const boxH = ptToEmu(
     RECEIPT_XLSX_HEADER_R1_HEIGHT + RECEIPT_XLSX_HEADER_R2_HEIGHT,
   );
+  const logoEmu = Math.min(mmToEmu(18.5), Math.max(pad, boxH - pad - bottomGap));
   const rowOff = Math.max(pad, boxH - logoEmu - bottomGap);
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
@@ -12625,7 +12626,7 @@ function receiptWorksheetXml(
   const fitsOnePage = lastRow <= RECEIPT_XLSX_PAGE_ROWS;
   const fitH = fitsOnePage ? "1" : "0";
   // Page Setup from the №260941 video: 0.4 / 0.4 / 0.45 / 0.35 in, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="19"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT}"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
