@@ -557,26 +557,22 @@ const RECEIPT_XLSX_COL_WIDTH_PX = [
   24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
 ];
 /**
- * This Excel (Mac screenshot): Width 7.50 = 50 pixels.
- * pixels = Truncate(width × 6 + 5). B must be stored as 7.5, not 6.43.
+ * Excel’s <col width> is the padded internal width, not the Column Width
+ * dialog value. On Microsoft Excel, screen pixels = Round(width × 6), so
+ * 50px must be stored as 50/6 (dialog then shows 7.50 = 50 pixels).
  */
 const RECEIPT_XLSX_COL_MDW = 6;
-/** Character width so Excel’s tooltip pixels = Truncate(width * MDW + 5). */
 function receiptExcelWidthFromPx(px) {
   const pixels = Math.round(Number(px));
   const mdw = RECEIPT_XLSX_COL_MDW;
   if (pixels <= 0) return 0;
-  if (pixels < 12) return pixels / (mdw + 5);
-  return (pixels - 5) / mdw;
+  return pixels / mdw;
 }
 function receiptExcelColWidthAttr(width) {
   return (Math.round(Number(width) * 256) / 256).toFixed(8).replace(/\.?0+$/, "");
 }
 function receiptExcelPixelsOfWidth(width) {
-  const w = Number(width);
-  const mdw = RECEIPT_XLSX_COL_MDW;
-  if (w < 1) return Math.floor(w * (mdw + 5));
-  return Math.floor(w * mdw + 5);
+  return Math.round(Number(width) * RECEIPT_XLSX_COL_MDW);
 }
 const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
   receiptExcelWidthFromPx,
@@ -11454,7 +11450,7 @@ function receiptXlsxTextPx(text) {
  */
 function receiptXlsxRightFlushGap(head, tail, cols) {
   const cellPx = cols.reduce(
-    (sum, w) => sum + Math.round(w * RECEIPT_XLSX_COL_MDW + 5),
+    (sum, w) => sum + Math.round(w * RECEIPT_XLSX_COL_MDW),
     0,
   );
   const nbsp = "\u00A0";
@@ -11919,12 +11915,23 @@ async function assembleStockReceiptXlsxZip({
   xlsxZipWriteUtf8(zip, "xl/worksheets/sheet1.xml", sheetXml);
   return zip;
 }
+function mmToEmu(mm) {
+  return Math.round((Number(mm) / 25.4) * 914400);
+}
+function ptToEmu(pt) {
+  return Math.round(Number(pt) * 12700);
+}
 function receiptDrawingXml() {
-  // Fixed 16.5mm square from A; A+B are wide enough that it ends before C.
+  // Square logo, slightly larger than 16.5mm; sit just above row-2 bottom line.
+  const logoEmu = mmToEmu(18.5);
+  const pad = mmToEmu(0.2);
+  const bottomGap = mmToEmu(0.3);
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  const pad = Math.round((0.25 / 25.4) * 914400);
-  const logoEmu = Math.round((16.5 / 25.4) * 914400);
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${pad}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const boxH = ptToEmu(
+    RECEIPT_XLSX_HEADER_R1_HEIGHT + RECEIPT_XLSX_HEADER_R2_HEIGHT,
+  );
+  const rowOff = Math.max(pad, boxH - logoEmu - bottomGap);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>${pad}</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
