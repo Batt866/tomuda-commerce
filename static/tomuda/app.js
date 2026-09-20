@@ -28595,7 +28595,7 @@ function box(title, body, max = "max-w-2xl", opts = {}) {
   if (!wasOpen) pushAppHistory();
 }
 const IMAGE_LIGHTBOX_SKIP =
-  ".receipt-logo, .boot-screen__logo, .wh-receipt-sheet__logo, .auth-card__logo, .tomuda-logo, #image-lightbox img, .promo-page, .modal-panel--promo, [data-promo-modal]";
+  ".receipt-logo, .boot-screen__logo, .wh-receipt-sheet__logo, .auth-card__logo, .tomuda-logo, #image-lightbox img, .promo-page, .modal-panel--promo, [data-promo-modal], .leaflet-container";
 let imageLightboxEl = null;
 function imageLightboxOpen() {
   return imageLightboxEl && !imageLightboxEl.hidden;
