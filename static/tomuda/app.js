@@ -11355,22 +11355,22 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-/** Body/spacer from row 4. Mac Excel pixels (14.25pt @ 96dpi → 19px). */
-const RECEIPT_XLSX_ROW_HEIGHT = 19;
+/** Body/spacer from row 4. 14.25pt = 19px on 96dpi (large display). */
+const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
 /** Item table header matches body row height. */
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 19;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
 /** Item table product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 19;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
 /** Signature rows match body height. */
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 19;
-/** Row 1 brand. Mac Excel pixels (20.25pt @ 96dpi → 27px). */
-const RECEIPT_XLSX_HEADER_R1_HEIGHT = 27;
-/** Row 2 address. Mac Excel pixels (27.00pt @ 96dpi → 36px). */
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 36;
-/** Row 3 «ЗАРЛАГЫН БАРИМТ». Mac Excel pixels (31.50pt @ 96dpi → 42px). */
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 42;
-/** From row 4 down every line is 19px, including the payment warning. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 19;
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
+/** Row 1 brand. 20.25pt = 27px on 96dpi (same look as 27px on this Mac). */
+const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
+/** Row 2 address. 27pt = 36px on 96dpi. */
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
+/** Row 3 «ЗАРЛАГЫН БАРИМТ». 31.5pt = 42px on 96dpi. */
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
+/** From row 4 down every line is 14.25pt (19px on 96dpi). */
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 78 → indices 0–77). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 5,
@@ -11525,9 +11525,9 @@ function receiptXlsxWrappedRowHeight(
   return Math.max(min, Math.min(max, lines * linePt + pad));
 }
 function receiptXlsxColsXml() {
-  // Excel stores a padded internal width. Dialog/tooltip “Width” is the
-  // character value below; Arial 15 Normal (see receiptExpenseXlsxStylesXml)
-  // is required so 2.38 does not snap to 1.75 or 2.33.
+  // Character widths 2.38…8.38. Internal XML is padded for MDW=8 so a
+  // 96dpi display (large PC) matches this Mac’s pixel look; dialog numbers
+  // may differ between computers.
   const mdw = 8;
   const widths = [
     2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
@@ -11538,28 +11538,6 @@ function receiptXlsxColsXml() {
       return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
     })
     .join("");
-}
-function receiptExpenseXlsxStylesXml() {
-  let xml = receiptXlsxStylesXml();
-  xml = xml.replace(
-    '<fonts count="18"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font>',
-    '<fonts count="19"><font><sz val="15"/><color rgb="FF000000"/><name val="Arial"/></font>',
-  );
-  xml = xml.replace(
-    "</fonts>",
-    '<font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font></fonts>',
-  );
-  xml = xml.split('numFmtId="4" fontId="0" fillId="0" borderId="3"').join(
-    'numFmtId="4" fontId="18" fillId="0" borderId="3"',
-  );
-  xml = xml
-    .split(
-      'numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
-    )
-    .join(
-      'numFmtId="0" fontId="18" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
-    );
-  return xml;
 }
 function excelSerialFromDate(value) {
   const d = value ? new Date(value) : new Date();
@@ -19416,7 +19394,7 @@ async function assembleStyledXlsxZip(
     "xl/_rels/workbook.xml.rels",
     styledWorkbookRelsXml(sheetIds.length),
   );
-  xlsxZipWriteUtf8(zip, "xl/styles.xml", receiptExpenseXlsxStylesXml());
+  xlsxZipWriteUtf8(zip, "xl/styles.xml", receiptXlsxStylesXml());
   xlsxZipWriteUtf8(zip, "xl/sharedStrings.xml", built.sharedStringsXml);
   built.sheets.forEach((sheet) => {
     xlsxZipWriteUtf8(zip, `xl/worksheets/sheet${sheet.id}.xml`, sheet.sheetXml);
