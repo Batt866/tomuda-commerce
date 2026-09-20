@@ -557,10 +557,10 @@ const RECEIPT_XLSX_COL_WIDTH_PX = [
   24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
 ];
 /**
- * Excel column-width MDW (max digit width) at 96dpi. Calibri/Arial 11 = 7px.
- * Do not round to 2 decimals: (24-5)/7 = 2.714… → 24px, but 2.71 → 23px.
+ * Excel Mac tooltip: Width 7.50 = 50 pixels → pixels = width × 6 + 5.
+ * Do not round to 2 decimals.
  */
-const RECEIPT_XLSX_COL_MDW = 7;
+const RECEIPT_XLSX_COL_MDW = 6;
 /** Character width so Excel’s tooltip pixels = Truncate(width * MDW + 5). */
 function receiptExcelWidthFromPx(px) {
   const pixels = Math.round(Number(px));
