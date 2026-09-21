@@ -6443,6 +6443,26 @@ function setWorkerPayFilter(value) {
 function syncBackendSaveMarker(stateData = null) {
   backendLastSaved = backendStateSnapshot(stateData || persistentState());
 }
+/** Mark one customer as saved without JSON-stringifying the whole catalog. */
+function patchBackendSaveMarkerCustomer(customer) {
+  if (!customer?.id) return;
+  try {
+    const parsed = JSON.parse(backendLastSaved || "{}");
+    if (!parsed.state || !Array.isArray(parsed.state.customers)) return;
+    const next = { ...customer };
+    const image = String(next.image || "").trim();
+    if (image.startsWith("data:image/")) delete next.image;
+    const id = String(customer.id);
+    const idx = parsed.state.customers.findIndex(
+      (item) => String(item?.id) === id,
+    );
+    if (idx >= 0) parsed.state.customers[idx] = { ...parsed.state.customers[idx], ...next };
+    else parsed.state.customers.push(next);
+    backendLastSaved = JSON.stringify(parsed);
+  } catch {
+    /* keep previous marker */
+  }
+}
 function captureSessionSnapshot() {
   return {
     isLoggedIn: state.isLoggedIn,
@@ -11355,22 +11375,16 @@ const RECEIPT_XLSX_SOURCE_TEMPLATE =
 const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
-/** Body/spacer from row 4. Excel Row Height 14.25. */
-const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
-/** Item table header matches body row height. */
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
-/** Item table product/promo lines. */
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
-/** Signature rows match body height. */
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
-/** Row 1 brand. Excel Row Height 20.25. */
+/** Excel row `ht` uses the mm numbers (not the px column): 20.25 / 27.00 / 31.50 / 14.25. */
+const RECEIPT_XLSX_ROW_HEIGHT_MM = 14.25;
+const RECEIPT_XLSX_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT_MM;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT_MM;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT_MM;
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT_MM;
 const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
-/** Row 2 address. Excel Row Height 27.00. */
 const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
-/** Row 3 «ЗАРЛАГЫН БАРИМТ». Excel Row Height 31.50. */
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
-/** From row 4 down every line is 14.25. */
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = RECEIPT_XLSX_ROW_HEIGHT_MM;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 81 → indices 0–80). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 78,
@@ -19522,7 +19536,11 @@ function xlsxCellXml(ref, styleId, value, kind) {
   return `<c r="${ref}" s="${styleId}"/>`;
 }
 function xlsxRowXml(rowNum, height, cells, lastCol = "J") {
-  const ht = height ? ` ht="${height}" customHeight="1"` : "";
+  const n = Number(height);
+  const ht =
+    Number.isFinite(n) && n > 0
+      ? ` ht="${n.toFixed(2)}" customHeight="1"`
+      : "";
   const body = cells.join("");
   const spanEnd = "ABCDEFGHIJKLMNOP".indexOf(lastCol) + 1;
   return `<row r="${rowNum}" spans="1:${spanEnd}"${ht}>${body}</row>`;
@@ -29843,7 +29861,13 @@ async function upsertCustomerOnServer(customer) {
       return res.json();
     } catch (error) {
       lastError = error;
-      if (attempt === 0) await sleep(400);
+      const retryable =
+        error?.name === "AbortError" ||
+        /failed to fetch|network|timeout|load failed/i.test(
+          String(error?.message || error || ""),
+        );
+      if (attempt === 0 && retryable) await sleep(400);
+      else break;
     }
   }
   const raw = String(lastError?.message || lastError || "").trim();
@@ -29916,7 +29940,10 @@ async function applyCustomerSave(data, id) {
   }
   if (customer) {
     customer.updatedAt = new Date().toISOString();
-    await persistProfileImageToMedia(customer, "customer");
+    const image = String(customer.image || "").trim();
+    if (image.startsWith("data:image/")) {
+      await persistProfileImageToMedia(customer, "customer");
+    }
   }
   const customerId = customer?.id || "";
   const customerName = customer?.name || customer?.companyName || "Харилцагч";
@@ -29935,27 +29962,23 @@ async function applyCustomerSave(data, id) {
           ...state.customers[idx],
           ...payload.customer,
         };
+        customer = state.customers[idx];
       }
     }
+    if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
     if (payload?.state) {
       const session = captureSessionSnapshot();
       const merged = mergePersistentStates(payload.state, persistentState());
       applyPersistentState(merged);
       restoreSessionSnapshot(session);
-    }
-    if (payload?.updatedAt) serverUpdatedAt = payload.updatedAt;
-    saveLocalBackendCache({
-      state: payload?.state || stateForBackendSave(),
-      updatedAt: payload?.updatedAt || "",
-    });
-    if (payload?.state) {
+      saveLocalBackendCache({
+        state: payload.state,
+        updatedAt: payload.updatedAt || "",
+      });
       reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
     } else {
-      // Lightweight upsert no longer returns full state — keep local dirty
-      // so peer sync still POSTs any other pending rows.
-      scheduleBackendSave();
+      patchBackendSaveMarkerCustomer(customer);
     }
-    clearOrderPersistenceCache();
     clearBackendSaveFailed();
   } catch (error) {
     upsertError = String(error?.message || "").trim();

@@ -204,7 +204,7 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
             raise HttpError(403, "Нэвтэрсэн ажилтан шаардлагатай")
 
         customers = [
-            dict(item)
+            item
             for item in (current.get("customers") or [])
             if isinstance(item, dict) and item.get("id") is not None
         ]
@@ -238,18 +238,24 @@ def upsert_customer(request, payload: dict[str, Any] = Body(...)):
                 merged_customer["updatedAt"] = customer.get("updatedAt")
             if not merged_customer.get("image") and previous.get("image"):
                 merged_customer["image"] = previous["image"]
-            cid = str(previous.get("id") or customer_id)
-            has_open_balance = any(
-                isinstance(order, dict)
-                and str(order.get("customerId") or "") == cid
-                and _order_has_open_receivable(order)
-                for order in (current.get("orders") or [])
+            name_or_reg_changed = str(merged_customer.get("name") or "") != str(
+                previous.get("name") or ""
+            ) or str(merged_customer.get("registrationNumber") or "") != str(
+                previous.get("registrationNumber") or ""
             )
-            if has_open_balance:
-                merged_customer["name"] = previous.get("name")
-                merged_customer["registrationNumber"] = previous.get(
-                    "registrationNumber"
+            if name_or_reg_changed:
+                cid = str(previous.get("id") or customer_id)
+                has_open_balance = any(
+                    isinstance(order, dict)
+                    and str(order.get("customerId") or "") == cid
+                    and _order_has_open_receivable(order)
+                    for order in (current.get("orders") or [])
                 )
+                if has_open_balance:
+                    merged_customer["name"] = previous.get("name")
+                    merged_customer["registrationNumber"] = previous.get(
+                        "registrationNumber"
+                    )
             customers[existing_idx] = merged_customer
             saved_customer = merged_customer
         else:
