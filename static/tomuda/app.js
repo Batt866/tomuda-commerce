@@ -552,43 +552,31 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Excel A–K column widths in pixels (column-header drag tooltip at 100% zoom). */
-const RECEIPT_XLSX_COL_WIDTH_PX = [
-  24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
+/** Excel A–K column widths (Column Width dialog, character units). */
+const RECEIPT_XLSX_COL_WIDTHS = [
+  2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
 ];
-/**
- * Excel’s <col width> is the padded internal width, not the Column Width
- * dialog value. On Microsoft Excel, screen pixels = Round(width × 6), so
- * 50px must be stored as 50/6 (dialog then shows 7.50 = 50 pixels).
- */
+/** Approximate screen pixels per column width unit (layout math only). */
 const RECEIPT_XLSX_COL_MDW = 6;
-function receiptExcelWidthFromPx(px) {
-  const pixels = Math.round(Number(px));
-  const mdw = RECEIPT_XLSX_COL_MDW;
-  if (pixels <= 0) return 0;
-  return pixels / mdw;
-}
 function receiptExcelColWidthAttr(width) {
   return (Math.round(Number(width) * 256) / 256).toFixed(8).replace(/\.?0+$/, "");
 }
 function receiptExcelPixelsOfWidth(width) {
   return Math.round(Number(width) * RECEIPT_XLSX_COL_MDW);
 }
-const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
-  receiptExcelWidthFromPx,
-);
 /** Logo spans Excel columns A–B (same 2×2 block as the sample screenshot). */
 const RECEIPT_LOGO_COL_PX =
-  RECEIPT_XLSX_COL_WIDTH_PX[0] + RECEIPT_XLSX_COL_WIDTH_PX[1];
+  receiptExcelPixelsOfWidth(RECEIPT_XLSX_COL_WIDTHS[0]) +
+  receiptExcelPixelsOfWidth(RECEIPT_XLSX_COL_WIDTHS[1]);
 const RECEIPT_XLSX_COL_LETTERS = "abcdefghijk";
 function receiptColWidthSum() {
-  return RECEIPT_XLSX_COL_WIDTH_PX.reduce((sum, width) => sum + width, 0);
+  return RECEIPT_XLSX_COL_WIDTHS.reduce((sum, width) => sum + width, 0);
 }
 function receiptGridColWidthCss() {
   const sum = receiptColWidthSum();
-  return RECEIPT_XLSX_COL_WIDTH_PX.map(
-    (px, index) =>
-      `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${px} / ${sum}); }`,
+  return RECEIPT_XLSX_COL_WIDTHS.map(
+    (width, index) =>
+      `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${width} / ${sum}); }`,
   ).join(" ");
 }
 function receiptPartyFields(o) {
@@ -623,9 +611,9 @@ function receiptPartyFields(o) {
 }
 function receiptGridColgroup() {
   const sum = receiptColWidthSum();
-  return `<colgroup>${RECEIPT_XLSX_COL_WIDTH_PX.map(
-    (px, index) =>
-      `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${px} / ${sum})">`,
+  return `<colgroup>${RECEIPT_XLSX_COL_WIDTHS.map(
+    (width, index) =>
+      `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${width} / ${sum})">`,
   ).join("")}</colgroup>`;
 }
 function receiptDeliveryDateValue(o) {
@@ -11009,7 +10997,8 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31.5pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; vertical-align: middle !important; }
+.receipt-grid--sheet .receipt-grid__bank td { vertical-align: middle !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
   font-size: 9pt !important;
   font-weight: 400 !important;
@@ -11545,16 +11534,10 @@ function receiptXlsxWrappedRowHeight(
   return Math.max(min, Math.min(max, lines * linePt + pad));
 }
 function receiptXlsxColsXml() {
-  const mdw = 8;
-  const widths = [
-    2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
-  ];
-  return widths
-    .map((chars, index) => {
-      const width = Math.floor(((chars * mdw + 5) / mdw) * 256) / 256;
-      return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
-    })
-    .join("");
+  return RECEIPT_XLSX_COL_WIDTHS.map((chars, index) => {
+    const width = receiptExcelColWidthAttr(chars);
+    return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
+  }).join("");
 }
 function receiptExpenseXlsxStylesXml() {
   let xml = receiptXlsxStylesXml();

@@ -1,4 +1,4 @@
-const CACHE = "tomuda-v1052";
+const CACHE = "tomuda-v1053";
 const MEDIA_CACHE = "tomuda-media-v2";
 // Keep PRECACHE to boot-critical assets only. Optional templates must not
 // block service-worker install via cache.addAll failures.
