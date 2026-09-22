@@ -554,7 +554,7 @@ const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /** Excel A–K column widths (Column Width dialog, character units). */
 const RECEIPT_XLSX_COL_WIDTHS = [
-  2.38, 5.63, 16.75, 3.25, 10.13, 7.5, 4.13, 3.38, 2.25, 8.38, 8.38,
+  2.25, 5.38, 16.13, 3.13, 9.75, 7.25, 4.0, 3.25, 2.13, 8.13, 8.13,
 ];
 /** Approximate screen pixels per column width unit (layout math only). */
 const RECEIPT_XLSX_COL_MDW = 6;
@@ -1041,9 +1041,12 @@ function receiptWarningRowsHtml() {
     `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-line${extra}">${text}</td></tr>`;
   return (
     row(
-      // Хоёр мөр: эхний мөр «гүйлгээний утга дээр» хүртэл, доод мөрөнд бүтэн «дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.»
-      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр<br><b class="receipt-grid__warn-em">дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
-      " receipt-grid__warn-line--first",
+      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж",
+      " receipt-grid__warn-line--first receipt-grid__warn-line--split",
+    ) +
+    row(
+      `<b class="receipt-grid__warn-em">гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
+      " receipt-grid__warn-line--split",
     ) +
     row(
       "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
@@ -11133,8 +11136,8 @@ tbody.receipt-footer-keep {
   height: 14.25pt;
   min-height: 14.25pt;
   line-height: 1.2;
-  overflow: visible;
-  white-space: normal;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .receipt-grid__warn-line--bold { font-weight: 700; font-size: 10pt; }
 .receipt-grid__warn-em { font-weight: 700; font-size: 9pt; white-space: nowrap; }
@@ -12629,12 +12632,16 @@ function appendReceiptSheetRows(
       42,
       [
         {
-          t: "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж ",
+          t: "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж",
           sz: 9,
         },
-        { t: "гүйлгээний утга", b: true, sz: 9 },
-        { t: " дээр\n", sz: 9 },
-        { t: "дэлгүүрийн нэр, ААН-ийн РЕГИСТР", b: true, sz: 9 },
+      ],
+    ],
+    [
+      null,
+      42,
+      [
+        { t: "гүйлгээний утга дээр дэлгүүрийн нэр, ААН-ийн РЕГИСТР", b: true, sz: 9 },
         { t: "-ийг бичээрэй.", sz: 9 },
       ],
     ],
@@ -12644,10 +12651,7 @@ function appendReceiptSheetRows(
   ].forEach(([text, style, richParts], index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    const warnH =
-      index === 0
-        ? RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT
-        : RECEIPT_XLSX_ROW_HEIGHT;
+    const warnH = RECEIPT_XLSX_ROW_HEIGHT;
     const value = richParts ? siRich(richParts) : si(text);
     pushRow(warnH, [
       xlsxCellXml(`B${r}`, style, value, "s"),
