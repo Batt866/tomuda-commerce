@@ -11139,7 +11139,10 @@ tbody.receipt-footer-keep {
   overflow: hidden;
   white-space: nowrap;
 }
-.receipt-grid__warn-line--bold { font-weight: 700; font-size: 10pt; }
+.receipt-grid__warn-line--split {
+  white-space: nowrap;
+  overflow: hidden;
+}
 .receipt-grid__warn-em { font-weight: 700; font-size: 9pt; white-space: nowrap; }
 .receipt-grid__sign-label {
   font-size: 11pt;
