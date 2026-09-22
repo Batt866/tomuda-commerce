@@ -552,17 +552,24 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Excel A–K column widths (Column Width dialog, character units). */
-const RECEIPT_XLSX_COL_WIDTHS = [
-  2.25, 5.38, 16.13, 3.13, 9.75, 7.25, 4.0, 3.25, 2.13, 8.13, 8.13,
+/** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
+const RECEIPT_XLSX_COL_WIDTH_PX = [
+  22, 44, 118, 27, 82, 58, 34, 28, 21, 64, 64,
 ];
-/** Approximate screen pixels per column width unit (layout math only). */
-const RECEIPT_XLSX_COL_MDW = 6;
+/** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
+const RECEIPT_XLSX_COL_MDW = 8;
+/** Excel stores column width as (px − 5 padding) / MDW. */
+function receiptExcelWidthFromPx(px) {
+  return Math.round(((Number(px) - 5) / RECEIPT_XLSX_COL_MDW) * 100) / 100;
+}
+const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
+  receiptExcelWidthFromPx,
+);
 function receiptExcelColWidthAttr(width) {
   return (Math.round(Number(width) * 256) / 256).toFixed(8).replace(/\.?0+$/, "");
 }
 function receiptExcelPixelsOfWidth(width) {
-  return Math.round(Number(width) * RECEIPT_XLSX_COL_MDW);
+  return Math.max(0, Math.round(Number(width) * RECEIPT_XLSX_COL_MDW + 5));
 }
 /** Logo sits in A1:B2, square, flush with the row-2 bottom line (20.25+27). */
 const RECEIPT_XLSX_LOGO_HEIGHT = 47.25;
