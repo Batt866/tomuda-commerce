@@ -10981,7 +10981,7 @@ tbody.receipt-footer-keep {
   padding-bottom: 0 !important;
 }
 .receipt-grid--sheet tr.receipt-grid__header--r2 > td.receipt-grid__date {
-  vertical-align: top;
+  vertical-align: top !important;
   font-weight: 700;
   padding-top: 0 !important;
 }
@@ -11384,7 +11384,7 @@ const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
 const RECEIPT_XLSX_MIDDLE_ALIGN_FROM = 3;
 const RECEIPT_XLSX_MIDDLE_ALIGN_TO = 14;
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
-/** Resolved from receiptXlsxStylesXml() cellXfs (count 86 → indices 0–85). */
+/** Resolved from receiptXlsxStylesXml() cellXfs (count 87 → indices 0–86). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 78,
   metaBold: 79,
@@ -11396,6 +11396,7 @@ const RECEIPT_XLSX_STYLE = {
   titleLeft: 83,
   addressLeft: 84,
   ibanLeft: 85,
+  dateTop: 86,
   ibanLabel: 3,
   signLabel: 74,
   signLine: 57,
@@ -11614,6 +11615,7 @@ function receiptXlsxStylesXml() {
     `<xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`,
     `<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
+    `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="0"/></xf>`,
   ]);
 }
 function warehousePrepareStylesXml() {
@@ -12183,7 +12185,7 @@ function appendReceiptSheetRows(
   const companyAddrH = RECEIPT_XLSX_HEADER_R2_HEIGHT;
   pushRow(companyAddrH, [
     xlsxCellXml(`C${hr2}`, 41, si(companyAddr), "s"),
-    xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
+    xlsxCellXml(`K${hr2}`, RECEIPT_XLSX_STYLE.dateTop, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "D", "I", 41),
   ]);
   pushRow(RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT, [
