@@ -741,7 +741,7 @@ function receiptInfoRows(o) {
   ];
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА групп».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-bc"><span>Дансны дугаар:</span><span>IBAN:</span></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label">Дансны дугаар:</td><td class="receipt-grid__iban-tail">IBAN:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -11032,8 +11032,13 @@ tbody.receipt-footer-keep {
   padding-top: 1px !important;
   background: transparent !important;
 }
-.receipt-grid__iban-bc span:last-child {
-  float: right;
+.receipt-grid__iban-tail {
+  text-align: right !important;
+  white-space: nowrap;
+  font-size: 9pt !important;
+  font-weight: 400;
+  vertical-align: middle !important;
+  padding: 1px 2px !important;
 }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
   vertical-align: top !important;
@@ -11159,7 +11164,7 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT};
   padding: 2px 4px 1px 0;
   vertical-align: bottom;
-  text-align: left;
+  text-align: right;
   white-space: nowrap;
   overflow: visible;
   color: ${RECEIPT_TEXT};
@@ -11633,7 +11638,7 @@ function receiptXlsxStylesXml() {
     `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom" wrapText="0"/></xf>`,
+    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
   ]);
@@ -12102,6 +12107,8 @@ function appendReceiptSheetRows(
       id === RECEIPT_XLSX_STYLE.ibanLeft
     )
       return RECEIPT_XLSX_STYLE.ibanLeft;
+    if (id === RECEIPT_XLSX_STYLE.payLabel || id === RECEIPT_XLSX_STYLE.payValue)
+      return id;
     return RECEIPT_XLSX_STYLE.metaLeft;
   };
   const leftAlignCellXml = (cellXml) =>
@@ -12295,8 +12302,7 @@ function appendReceiptSheetRows(
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // B:C = Дансны дугаар: + gap + IBAN: ; D:E = the numbers.
-    `B${bankR4}:C${bankR4}`,
+    // B = Дансны дугаар: ; C = IBAN: flush to D ; D:E = the numbers.
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
@@ -12363,28 +12369,20 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
-  const ibanGap = receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
-    RECEIPT_XLSX_COL_WIDTHS[1],
-    RECEIPT_XLSX_COL_WIDTHS[2],
-  ]);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
-      siRich([
-        { t: "Дансны дугаар:", sz: 9 },
-        { t: ibanGap, sz: 9 },
-        { t: "IBAN:", sz: 9 },
-      ]),
+      si("Дансны дугаар:"),
       "s",
     ),
+    xlsxCellXml(`C${bankR4}`, RECEIPT_XLSX_STYLE.payLabel, si("IBAN:"), "s"),
     xlsxCellXml(
       `D${bankR4}`,
       RECEIPT_XLSX_STYLE.ibanCenter,
       si(RECEIPT_BANK_IBAN_SHORT),
       "s",
     ),
-    ...emptyCells(bankR4, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.ibanCenter),
   ]);
   pushRow(perBankH, [
@@ -12677,7 +12675,7 @@ function appendReceiptSheetRows(
   });
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
-  // Label A:E left-aligned like the original .xls; dotted signature line F→I.
+  // Label A:E right-aligned against the dotted signature line F→I.
   const pushSignRow = (role) => {
     const r = rowNum;
     merges.push(`A${r}:E${r}`, `F${r}:I${r}`);
