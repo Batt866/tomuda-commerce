@@ -741,7 +741,7 @@ function receiptInfoRows(o) {
   ];
   const addrHtml = esc(f.addressPlain || "-");
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА групп».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td class="receipt-grid__label">Дансны дугаар:</td><td class="receipt-grid__iban-tail">IBAN:</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-bc"><span>Дансны дугаар:</span><span class="receipt-grid__iban-gap">${"\u00A0".repeat(19)}</span><span>IBAN:</span></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -10367,6 +10367,9 @@ ${receiptGridColWidthCss()}
 .receipt-grid--sheet tr.receipt-items__head > td.receipt-items__name {
   text-align: center;
 }
+.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__qty {
+  font-weight: 700 !important;
+}
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: center;
   padding: 3px 2px;
@@ -10998,7 +11001,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid--sheet tr.receipt-grid__header--r2 > td.receipt-grid__date {
   vertical-align: top !important;
-  font-weight: 700;
+  font-weight: 400;
   padding-top: 0 !important;
 }
 .receipt-title {
@@ -11036,13 +11039,8 @@ tbody.receipt-footer-keep {
   padding-top: 1px !important;
   background: transparent !important;
 }
-.receipt-grid__iban-tail {
-  text-align: right !important;
-  white-space: nowrap;
-  font-size: 9pt !important;
-  font-weight: 400;
-  vertical-align: middle !important;
-  padding: 1px 2px !important;
+.receipt-grid__iban-gap {
+  white-space: pre;
 }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
   vertical-align: top !important;
@@ -11409,7 +11407,7 @@ const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
 const RECEIPT_XLSX_MIDDLE_ALIGN_FROM = 3;
 const RECEIPT_XLSX_MIDDLE_ALIGN_TO = 14;
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
-/** Resolved from receiptXlsxStylesXml() cellXfs (count 92 → indices 0–91). */
+/** Resolved from receiptXlsxStylesXml() cellXfs (count 93 → indices 0–92). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 81,
   metaBold: 82,
@@ -11435,6 +11433,7 @@ const RECEIPT_XLSX_STYLE = {
   itemNum: 75,
   itemPrice: 76,
   unitHead: 77,
+  qtyHead: 92,
 };
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
@@ -11640,12 +11639,13 @@ function receiptXlsxStylesXml() {
     `<xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>`,
     `<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="0"/></xf>`,
+    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
+    `<xf numFmtId="0" fontId="6" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
   ]);
 }
 function warehousePrepareStylesXml() {
@@ -12307,7 +12307,8 @@ function appendReceiptSheetRows(
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // B = Дансны дугаар: ; C = IBAN: flush to D ; D:E = the numbers.
+    // B:C = Дансны дугаар: + 19 spaces + IBAN: ; D:E = the numbers.
+    `B${bankR4}:C${bankR4}`,
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
   );
@@ -12374,20 +12375,25 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
+  const ibanLabelGap = "\u00A0".repeat(19);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
-      si("Дансны дугаар:"),
+      siRich([
+        { t: "Дансны дугаар:", sz: 9 },
+        { t: ibanLabelGap, sz: 9 },
+        { t: "IBAN:", sz: 9 },
+      ]),
       "s",
     ),
-    xlsxCellXml(`C${bankR4}`, RECEIPT_XLSX_STYLE.payLabel, si("IBAN:"), "s"),
     xlsxCellXml(
       `D${bankR4}`,
       RECEIPT_XLSX_STYLE.ibanCenter,
       si(RECEIPT_BANK_IBAN_SHORT),
       "s",
     ),
+    ...emptyCells(bankR4, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR4, "E", "E", RECEIPT_XLSX_STYLE.ibanCenter),
   ]);
   pushRow(perBankH, [
@@ -12420,12 +12426,12 @@ function appendReceiptSheetRows(
       "s",
     ),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
+    xlsxCellXml(`H${headerRow}`, RECEIPT_XLSX_STYLE.qtyHead, si("Тоо/ш"), "s"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
     ...emptyCells(headerRow, "C", "D", 7),
     ...emptyCells(headerRow, "G", "G", 7),
-    ...emptyCells(headerRow, "I", "I", 7),
+    ...emptyCells(headerRow, "I", "I", RECEIPT_XLSX_STYLE.qtyHead),
   ]);
 
   items.forEach((item, index) => {
