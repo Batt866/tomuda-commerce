@@ -12415,7 +12415,7 @@ function appendReceiptSheetRows(
     receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
       RECEIPT_XLSX_COL_WIDTHS[1],
       RECEIPT_XLSX_COL_WIDTHS[2],
-    ]) + "\u00A0".repeat(22);
+    ]) + "\u00A0".repeat(21);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
