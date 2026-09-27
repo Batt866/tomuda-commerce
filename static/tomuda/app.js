@@ -10387,7 +10387,7 @@ ${receiptGridColWidthCss()}
   text-align: center;
   font-weight: 400;
   font-size: 9pt;
-  font-family: Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__barcode {
   text-align: center;
@@ -10461,7 +10461,7 @@ ${receiptGridColWidthCss()}
   text-align: left;
   padding-left: 6px !important;
 }
-.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9pt; font-family: Arial, Helvetica, sans-serif; }
+.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9pt; font-variant-numeric: tabular-nums; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
   text-align: right;
   white-space: nowrap;
@@ -10675,7 +10675,7 @@ tbody.receipt-footer-keep {
   font-size: 8px;
   line-height: 1.15;
 }
-.receipt-items__qty { width: 7%; text-align: center; font-size: 9pt; font-family: Arial, Helvetica, sans-serif; }
+.receipt-items__qty { width: 7%; text-align: center; font-size: 9pt; font-variant-numeric: tabular-nums; }
 .receipt-items__price { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .receipt-items__total { width: 13%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .receipt-items--promo { width: 100%; table-layout: fixed; border-collapse: collapse; }
@@ -11433,7 +11433,6 @@ const RECEIPT_XLSX_STYLE = {
   itemNum: 75,
   itemPrice: 76,
   unitHead: 77,
-  qtyHead: 92,
 };
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
@@ -12426,12 +12425,12 @@ function appendReceiptSheetRows(
       "s",
     ),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`H${headerRow}`, RECEIPT_XLSX_STYLE.qtyHead, si("Тоо/ш"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
     ...emptyCells(headerRow, "C", "D", 7),
     ...emptyCells(headerRow, "G", "G", 7),
-    ...emptyCells(headerRow, "I", "I", RECEIPT_XLSX_STYLE.qtyHead),
+    ...emptyCells(headerRow, "I", "I", 7),
   ]);
 
   items.forEach((item, index) => {
