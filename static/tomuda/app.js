@@ -1052,7 +1052,7 @@ function receiptWarningRowsHtml() {
       " receipt-grid__warn-line--first receipt-grid__warn-line--split",
     ) +
     row(
-      `<b class="receipt-grid__warn-em">гүйлгээний утга дээр</b> <b class="receipt-grid__warn-em">дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
+      `гүйлгээний утга дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
       " receipt-grid__warn-line--split",
     ) +
     row(
@@ -12707,7 +12707,7 @@ function appendReceiptSheetRows(
       null,
       42,
       [
-        { t: "гүйлгээний утга дээр", b: true, sz: 9 },
+        { t: "гүйлгээний утга дээр", sz: 9 },
         { t: " дэлгүүрийн нэр, ААН-ийн РЕГИСТР", b: true, sz: 9 },
         { t: "-ийг бичээрэй.", sz: 9 },
       ],
