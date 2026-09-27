@@ -11531,11 +11531,11 @@ function receiptXlsxRightFlushGap(head, tail, cols) {
   );
   const nbsp = "\u00A0";
   const step = receiptXlsxTextPx(nbsp) || 3.34;
-  // Hold back extra slack so the tail (IBAN:) never clips at the cell edge.
+  // Small pad only — Excel draws Cyrillic narrower than canvas measureText.
   const room =
     cellPx -
     RECEIPT_XLSX_CELL_PAD -
-    10 -
+    2 -
     receiptXlsxTextPx(head) -
     receiptXlsxTextPx(tail);
   return nbsp.repeat(Math.max(1, Math.floor(room / step)));
@@ -12410,11 +12410,12 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
-  // Flush IBAN: to the right of B:C without overflowing (extra pad clipped the label).
-  const ibanLabelGap = receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
-    RECEIPT_XLSX_COL_WIDTHS[1],
-    RECEIPT_XLSX_COL_WIDTHS[2],
-  ]);
+  // Push IBAN: next to D. Canvas overestimates Cyrillic, so add a fixed nudge.
+  const ibanLabelGap =
+    receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
+      RECEIPT_XLSX_COL_WIDTHS[1],
+      RECEIPT_XLSX_COL_WIDTHS[2],
+    ]) + "\u00A0".repeat(16);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
