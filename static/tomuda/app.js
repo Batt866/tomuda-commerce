@@ -27868,10 +27868,7 @@ function initDeliveryRouteMap(stores, selectedId) {
     zoomAnimation: true,
   }).setView(start, selected ? 15 : 12);
   window.deliveryMapSelectedId = selectedId || "";
-  window.deliveryTileLayer = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    { maxZoom: 19, attribution: "&copy; OpenStreetMap" },
-  ).addTo(window.deliveryMap);
+  window.deliveryTileLayer = addTomudaMapTiles(window.deliveryMap);
   window.deliveryMapMarkers = [];
   const bounds = [];
   points.forEach((p) => {
@@ -29865,6 +29862,59 @@ function customerModal(id, draft = null) {
   });
   loadLesRegistryIndex();
 }
+/** Free Leaflet tiles (no API key). OSM.org tiles are often blocked for apps. */
+const TOMUDA_MAP_TILE_SOURCES = [
+  {
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    options: {
+      maxZoom: 20,
+      subdomains: "abcd",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO',
+    },
+  },
+  {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    options: {
+      maxZoom: 19,
+      attribution: "Tiles &copy; Esri",
+    },
+  },
+  {
+    url: "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
+    options: {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    },
+  },
+];
+function addTomudaMapTiles(map) {
+  if (!map || !window.L) return null;
+  let sourceIndex = 0;
+  let layer = null;
+  let fallingBack = false;
+  const attach = (index) => {
+    const src = TOMUDA_MAP_TILE_SOURCES[index];
+    if (!src) return null;
+    const next = L.tileLayer(src.url, src.options);
+    next.on("tileerror", () => {
+      if (fallingBack || index + 1 >= TOMUDA_MAP_TILE_SOURCES.length) return;
+      fallingBack = true;
+      try {
+        if (map.hasLayer(next)) map.removeLayer(next);
+      } catch {
+        /* ignore */
+      }
+      sourceIndex = index + 1;
+      layer = attach(sourceIndex);
+      fallingBack = false;
+    });
+    next.addTo(map);
+    return next;
+  };
+  layer = attach(0);
+  return layer;
+}
 function loadLeaflet(cb) {
   if (window.L) return cb();
   if (window.leafletLoading) {
@@ -29884,9 +29934,11 @@ function loadLeaflet(cb) {
   };
   script.onerror = () => {
     window.leafletLoading = false;
-    const el = document.getElementById("customerMap");
-    if (el)
-      el.innerHTML = `<div class="h-full grid place-items-center text-sm text-muted-foreground bg-secondary rounded">Map сүлжээнээс ачаалж чадсангүй</div>`;
+    const msg = `<div class="h-full grid place-items-center text-sm text-muted-foreground bg-secondary rounded">Map сүлжээнээс ачаалж чадсангүй</div>`;
+    const customerEl = document.getElementById("customerMap");
+    const deliveryEl = document.getElementById("deliveryMap");
+    if (customerEl) customerEl.innerHTML = msg;
+    if (deliveryEl) deliveryEl.innerHTML = msg;
   };
   document.body.appendChild(script);
 }
@@ -29919,26 +29971,7 @@ function initCustomerMap(lat, lng) {
     tap: true,
     zoomControl: true,
   }).setView(start, has ? 15 : 12);
-  window.customerTileFallback = false;
-  window.customerTileLayer = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap",
-    },
-  ).addTo(window.customerMap);
-  window.customerTileLayer.on("tileerror", () => {
-    if (window.customerTileFallback || !window.customerMap) return;
-    window.customerTileFallback = true;
-    if (window.customerTileLayer?.remove) window.customerTileLayer.remove();
-    window.customerTileLayer = L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap &copy; CARTO",
-      },
-    ).addTo(window.customerMap);
-  });
+  window.customerTileLayer = addTomudaMapTiles(window.customerMap);
   const setPoint = (la, ln) => setCustomerMapPoint(la, ln);
   if (has) setPoint(start[0], start[1]);
   window.customerMap.on("click", (e) => setPoint(e.latlng.lat, e.latlng.lng));
