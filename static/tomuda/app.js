@@ -29862,19 +29862,18 @@ function customerModal(id, draft = null) {
   });
   loadLesRegistryIndex();
 }
-/** Free Leaflet tiles (no API key). OSM.org tiles are often blocked for apps. */
+/** Free Leaflet tiles — no API key. CARTO basemaps now require a key. */
 const TOMUDA_MAP_TILE_SOURCES = [
   {
-    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
     options: {
-      maxZoom: 20,
-      subdomains: "abcd",
+      maxZoom: 19,
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO',
+        'Tiles &copy; Esri &mdash; Source: Esri, OpenStreetMap',
     },
   },
   {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
     options: {
       maxZoom: 19,
       attribution: "Tiles &copy; Esri",
@@ -29884,7 +29883,16 @@ const TOMUDA_MAP_TILE_SOURCES = [
     url: "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
     options: {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    },
+  },
+  {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    options: {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     },
   },
 ];
