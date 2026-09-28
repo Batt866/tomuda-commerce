@@ -554,10 +554,10 @@ const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
 const RECEIPT_XLSX_COL_WIDTH_PX = [
-  24, 50, 139, 31, 86, 65, 38, 32, 23, 72, 72,
+  22, 42, 108, 30, 64, 48, 36, 30, 22, 68, 68,
 ];
-/** Excel default max-digit width (Calibri/Arial 11 ≈ 7px). */
-const RECEIPT_XLSX_COL_MDW = 7;
+/** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
+const RECEIPT_XLSX_COL_MDW = 8;
 /** Excel stores column width as (px − 5 padding) / MDW. */
 function receiptExcelWidthFromPx(px) {
   return Math.round(((Number(px) - 5) / RECEIPT_XLSX_COL_MDW) * 100) / 100;
@@ -10332,7 +10332,7 @@ ${receiptGridColWidthCss()}
 .receipt-grid--sheet .receipt-grid__bank td,
 .receipt-grid--sheet .receipt-grid__warn td,
 .receipt-grid--sheet .receipt-grid__sign td {
-  height: 15pt;
+  height: 14.25pt;
 }
 .receipt-grid--sheet .receipt-grid__logo-cell {
   vertical-align: top;
@@ -10348,7 +10348,7 @@ ${receiptGridColWidthCss()}
   color: ${RECEIPT_TEXT};
   line-height: 1.15;
   font-size: 9pt;
-  height: 15pt;
+  height: 14.25pt;
   box-sizing: border-box;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
@@ -10435,7 +10435,7 @@ ${receiptGridColWidthCss()}
   vertical-align: middle;
   font-size: 9pt;
   line-height: 1.15;
-  height: 15pt;
+  height: 14.25pt;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
 }
@@ -10447,13 +10447,13 @@ ${receiptGridColWidthCss()}
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--sm > td {
   border: none !important;
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 !important;
   background: transparent !important;
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--before-promo > td {
   border: none !important;
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -10804,7 +10804,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__return-line { min-height: 12px; }
 .receipt-grid--sheet .receipt-grid__gross td {
   background: #d9d9d9 !important;
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 6px;
   font-weight: 700;
   font-size: 9px;
@@ -10829,7 +10829,7 @@ tbody.receipt-footer-keep {
   font-weight: 700;
 }
 .receipt-grid--sheet .receipt-grid__summary td {
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 6px;
   font-size: 11pt;
   line-height: 1.15;
@@ -10837,7 +10837,7 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: ${RECEIPT_GRAND_BG} !important;
   color: ${RECEIPT_TEXT} !important;
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 6px;
   font-weight: 700;
   font-size: 12pt;
@@ -10879,7 +10879,7 @@ tbody.receipt-footer-keep {
   border-bottom: 0.75pt solid #555 !important;
   background: ${RECEIPT_GRAND_BG} !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--pay td { height: 15pt; font-size: 9pt; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14.25pt; font-size: 9pt; }
 .receipt-grid--sheet .receipt-grid__summary--pay .receipt-grid__summary-label { font-weight: 400; }
 .receipt-grid__summary-note {
   text-align: center;
@@ -10912,14 +10912,14 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__sign-line {
   border: none !important;
   border-bottom: 0.4pt dotted #666 !important;
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 !important;
   vertical-align: bottom;
 }
 .receipt-grid--sheet tr.receipt-grid__sign > td.receipt-grid__sign-line {
   border: none !important;
   border-bottom: 0.75pt dotted #000 !important;
-  height: 15pt;
+  height: 14.25pt;
   padding: 0 !important;
   vertical-align: bottom;
 }
@@ -11042,7 +11042,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31.5pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 15pt; vertical-align: middle !important; text-align: left !important; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; vertical-align: middle !important; text-align: left !important; }
 .receipt-grid--sheet .receipt-grid__bank td { vertical-align: middle !important; text-align: left !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
   font-size: 9pt !important;
@@ -11096,11 +11096,11 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT};
 }
 .receipt-grid__spacer td { height: 1px; padding: 0; }
-.receipt-grid__spacer--before-promo td { height: 15pt; padding: 0; }
+.receipt-grid__spacer--before-promo td { height: 14.25pt; padding: 0; }
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
-.receipt-grid__spacer--pay-warn td { height: 15pt; padding: 0; }
-.receipt-grid__spacer--sign td { height: 15pt; }
+.receipt-grid__spacer--pay-warn td { height: 14.25pt; padding: 0; }
+.receipt-grid__spacer--sign td { height: 14.25pt; }
 .receipt-grid__fill td { height: 5.5mm; padding: 0; border: none !important; }
 .receipt-grid__money { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .receipt-grid__money--strong { font-weight: 700; font-size: 9pt; }
@@ -11185,8 +11185,8 @@ tbody.receipt-footer-keep {
   font-weight: 400;
 }
 .receipt-grid--sheet .receipt-grid__warn .receipt-grid__warn-line--first {
-  height: 15pt;
-  min-height: 15pt;
+  height: 14.25pt;
+  min-height: 14.25pt;
   line-height: 1.2;
   overflow: hidden;
   white-space: nowrap;
@@ -11435,18 +11435,19 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 /**
- * Excel row heights: body = default 15; header band from sample sheet.
+ * Excel Row Height numbers from the spec (called mm in chat, not the px column):
+ * 20.25 / 27.00 / 31.50 / 14.25 from row 4 down.
  */
-const RECEIPT_XLSX_ROW_HEIGHT = 15;
-const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 15;
-const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 15;
-const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 15;
+const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
+const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
 const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
 const RECEIPT_XLSX_MIDDLE_ALIGN_FROM = 3;
 const RECEIPT_XLSX_MIDDLE_ALIGN_TO = 14;
-const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 15;
+const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
 /** Resolved from receiptXlsxStylesXml() cellXfs (count 93 → indices 0–92). */
 const RECEIPT_XLSX_STYLE = {
   metaNormal: 81,
