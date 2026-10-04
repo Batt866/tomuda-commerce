@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TOMUDA</string>
+    <string name="title_activity_main">TOMUDA</string>
+    <string name="package_name">mn.tomuda.commerce</string>
+    <string name="custom_url_scheme">mn.tomuda.commerce</string>
+</resources>
