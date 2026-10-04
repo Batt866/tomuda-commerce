@@ -554,7 +554,7 @@ const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
 const RECEIPT_XLSX_COL_WIDTH_PX = [
-  20, 32, 114.6, 27, 58, 43, 32, 27, 20, 61, 61,
+  20, 32, 113.6, 27, 58, 43, 32, 27, 20, 61, 61,
 ];
 /** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
 const RECEIPT_XLSX_COL_MDW = 8;
@@ -22353,7 +22353,7 @@ function reportDateFiltersHtml(exportOnclick = "confirmReportExport()") {
       return `<option value="${m}" ${month === m ? "selected" : ""}>${m}-р сар</option>`;
     }),
   ].join("");
-  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Харилцагч, баримт №-ээр хайх..." })}<div class="sales-report-filters"><label class="sales-report-filters__field"><span class="sales-report-filters__label">Ажилтан</span><select onchange="setReportEmployee(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Ажилтан">${empOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Жил</span><select onchange="setReportYear(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Жил">${yearOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Сар</span><select onchange="setReportMonth(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Сар">${monthOpts}</select></label><span class="page-toolbar__hint">${esc(reportPeriodHint())}</span></div>`;
+  const filters = `${pageToolbarSearch({ focusKey: "reports", value: q, placeholder: "Харилцагч, РД, баримт №-ээр хайх..." })}<div class="sales-report-filters"><label class="sales-report-filters__field"><span class="sales-report-filters__label">Ажилтан</span><select onchange="setReportEmployee(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Ажилтан">${empOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Жил</span><select onchange="setReportYear(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Жил">${yearOpts}</select></label><label class="sales-report-filters__field"><span class="sales-report-filters__label">Сар</span><select onchange="setReportMonth(this.value)"${pageToolbarSelectHandlers()} class="page-toolbar__select app-input" aria-label="Сар">${monthOpts}</select></label><span class="page-toolbar__hint">${esc(reportPeriodHint())}</span></div>`;
   return pageToolbarHtml({
     filters,
     actions: excelDownloadBtn(exportOnclick),
@@ -23790,17 +23790,38 @@ function stockReportDetailView(kind) {
     : `<div class="line-panel line-panel--stock-products"><div class="line-panel__section-title">Дэлгэрэнгүй · ${esc(period)}</div><p class="line-panel__empty">${emptyPeriod}</p></div>`;
   return `<div class="sales-report-dash">${pageHead(title)}<p class="sales-report-dash__period">${esc(period)}</p>${filters}${kpiHtml}${receipts.length ? stockReportEmployeesBodyHtml(flow, receipts) : ""}${receipts.length ? stockReportDailyBodyHtml(flow, receipts) : ""}${receipts.length ? stockReportProductsBodyHtml(flow, receipts) : ""}${listPanel}</div>`;
 }
+function orderMatchesReportSearch(o, q) {
+  const needle = String(q || "").trim();
+  if (!needle) return true;
+  const customer = findCustomerForOrder(o);
+  const reg = customer ? customerRegistrationDisplay(customer) : "";
+  const hay =
+    `${orderCustomerName(o)} ${reg} ${o?.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o?.receiptNumber || ""}`.toLowerCase();
+  if (hay.includes(needle.toLowerCase())) return true;
+  if (!customer) return false;
+  const parsedQ = parseRegistrationNumber(needle);
+  const stored = parseRegistrationNumber(customer.registrationNumber);
+  if (parsedQ.digits && parsedQ.digits.length >= 3 && stored.digits) {
+    if (
+      stored.digits.includes(parsedQ.digits) ||
+      parsedQ.digits.includes(stored.digits)
+    )
+      return true;
+  }
+  if (
+    parsedQ.full &&
+    parsedQ.full.length >= 3 &&
+    stored.full &&
+    stored.full.toLowerCase().includes(parsedQ.full.toLowerCase())
+  )
+    return true;
+  return false;
+}
 function salesReportOrdersFiltered() {
   const orders = reportOrdersFiltered();
-  const q = String(state.searches.reports || "")
-    .trim()
-    .toLowerCase();
+  const q = String(state.searches.reports || "").trim();
   if (!q) return orders;
-  return orders.filter((o) => {
-    const hay =
-      `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
-    return hay.includes(q);
-  });
+  return orders.filter((o) => orderMatchesReportSearch(o, q));
 }
 function salesReportDetailView() {
   const filtered = salesReportFilteredWithCustomer();
@@ -23863,15 +23884,9 @@ function salesReportDetailView() {
 }
 function salesReportFilteredWithCustomerPeriod(period) {
   let orders = reportOrdersFiltered(period);
-  const q = String(state.searches.reports || "")
-    .trim()
-    .toLowerCase();
+  const q = String(state.searches.reports || "").trim();
   if (q) {
-    orders = orders.filter((o) => {
-      const hay =
-        `${orderCustomerName(o)} ${o.employeeName || ""} ${formatReceiptNumber(o) || ""} ${o.receiptNumber || ""}`.toLowerCase();
-      return hay.includes(q);
-    });
+    orders = orders.filter((o) => orderMatchesReportSearch(o, q));
   }
   const custId = String(state.filters.reportCustomerId || "").trim();
   if (custId) {
@@ -28167,8 +28182,9 @@ function workerStorePickRestHtml() {
   const selected = state.workerCustomer
     ? state.customers.find((c) => c.id === state.workerCustomer)
     : null;
+  const receivableHtml = selected ? workerReceivableHtml(selected.id) : "";
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { variant: "rail" })}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { variant: "rail" })}${receivableHtml}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
     : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
   const listHtml = rows.length
     ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>`
