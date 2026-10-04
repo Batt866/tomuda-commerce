@@ -554,7 +554,7 @@ const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
 const RECEIPT_XLSX_COL_WIDTH_PX = [
-  20, 38, 97, 27, 58, 43, 32, 27, 20, 61, 61,
+  20, 32, 108, 27, 58, 43, 32, 27, 20, 61, 61,
 ];
 /** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
 const RECEIPT_XLSX_COL_MDW = 8;
@@ -571,8 +571,8 @@ function receiptExcelColWidthAttr(width) {
 function receiptExcelPixelsOfWidth(width) {
   return Math.max(0, Math.round(Number(width) * RECEIPT_XLSX_COL_MDW + 5));
 }
-/** Logo sits in A1:B2, square, flush with the row-2 bottom line (20.25+27). */
-const RECEIPT_XLSX_LOGO_HEIGHT = 47.25;
+/** Logo sits in A1:B2, square, flush with the row-2 bottom line (16+24). */
+const RECEIPT_XLSX_LOGO_HEIGHT = 40;
 const RECEIPT_LOGO_COL_PX =
   receiptExcelPixelsOfWidth(RECEIPT_XLSX_COL_WIDTHS[0]) +
   receiptExcelPixelsOfWidth(RECEIPT_XLSX_COL_WIDTHS[1]);
@@ -10983,7 +10983,7 @@ tbody.receipt-footer-keep {
   vertical-align: bottom !important;
 }
 .receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 16pt; }
-.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 20pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 24pt; }
 .receipt-grid--sheet tr.receipt-grid__header--r2 > td.receipt-grid__address {
   vertical-align: top !important;
   padding-left: 0 !important;
@@ -11443,7 +11443,7 @@ const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_HEADER_R1_HEIGHT = 16;
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 20;
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 24;
 const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 18;
 const RECEIPT_XLSX_MIDDLE_ALIGN_FROM = 3;
 const RECEIPT_XLSX_MIDDLE_ALIGN_TO = 14;
