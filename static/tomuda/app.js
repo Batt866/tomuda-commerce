@@ -11074,8 +11074,8 @@ tbody.receipt-footer-keep {
 .receipt-grid__iban-gap {
   white-space: pre;
 }
-.receipt-grid__iban-tag {
-  white-space: nowrap;
+.receipt-grid__iban-bc > span:first-child {
+  font-size: 11pt !important;
 }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
   vertical-align: top !important;
@@ -11534,7 +11534,7 @@ function receiptXlsxTextPx(text) {
  * right-flush tail have to share one merged cell. NBSP, not plain spaces —
  * a wrapping cell would break at a space run and hide `tail`.
  */
-function receiptXlsxRightFlushGap(head, tail, cols) {
+function receiptXlsxRightFlushGap(head, tail, cols, headScale = 1) {
   const cellPx = cols.reduce(
     (sum, w) => sum + receiptExcelPixelsOfWidth(w),
     0,
@@ -11546,17 +11546,19 @@ function receiptXlsxRightFlushGap(head, tail, cols) {
     cellPx -
     RECEIPT_XLSX_CELL_PAD -
     2 -
-    receiptXlsxTextPx(head) -
+    receiptXlsxTextPx(head) * headScale -
     receiptXlsxTextPx(tail);
   return nbsp.repeat(Math.max(1, Math.floor(room / step)));
 }
 /** Shared web + Excel IBAN label padding (flush to column D). */
 function receiptIbanLabelGap() {
   return (
-    receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
-      RECEIPT_XLSX_COL_WIDTHS[1],
-      RECEIPT_XLSX_COL_WIDTHS[2],
-    ]) + "\u00A0".repeat(28)
+    receiptXlsxRightFlushGap(
+      "Дансны дугаар:",
+      "IBAN:",
+      [RECEIPT_XLSX_COL_WIDTHS[1], RECEIPT_XLSX_COL_WIDTHS[2]],
+      11 / 9,
+    ) + "\u00A0".repeat(28)
   );
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
@@ -12436,7 +12438,7 @@ function appendReceiptSheetRows(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
       siRich([
-        { t: "Дансны дугаар:", sz: 9 },
+        { t: "Дансны дугаар:", sz: 11 },
         { t: ibanLabelGap, sz: 9 },
         { t: "IBAN:", sz: 9 },
       ]),
