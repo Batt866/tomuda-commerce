@@ -139,7 +139,7 @@ const BRAND = {
   logoWhite: "/static/tomuda/branding/logo-white.png",
   logoBlue: "/static/tomuda/branding/logo-blue.png",
   receiptLogo:
-    "/static/tomuda/branding/receipt-logo-mark.png?v=20260922-logo-tall",
+    "/static/tomuda/branding/receipt-logo-mark.png?v=20260921-logo-fill",
 };
 const RECEIPT_LOGO_DATA_URI =
   "data:image/png;base64,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";
@@ -552,37 +552,29 @@ const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
-/** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
-const RECEIPT_XLSX_COL_WIDTH_PX = [
-  22, 42, 108, 30, 64, 48, 36, 30, 22, 68, 68,
+/** Excel A–K column widths (Column Width dialog, character units). */
+const RECEIPT_XLSX_COL_WIDTHS = [
+  2.14, 5.07, 15.08, 2.93, 9.12, 6.75, 3.72, 3.04, 2.03, 7.54, 7.54,
 ];
-/** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
-const RECEIPT_XLSX_COL_MDW = 8;
-/** Excel stores column width as (px − 5 padding) / MDW. */
-function receiptExcelWidthFromPx(px) {
-  return Math.round(((Number(px) - 5) / RECEIPT_XLSX_COL_MDW) * 100) / 100;
-}
-const RECEIPT_XLSX_COL_WIDTHS = RECEIPT_XLSX_COL_WIDTH_PX.map(
-  receiptExcelWidthFromPx,
-);
+/** Approximate screen pixels per column width unit (layout math only). */
+const RECEIPT_XLSX_COL_MDW = 6;
 function receiptExcelColWidthAttr(width) {
   return (Math.round(Number(width) * 256) / 256).toFixed(8).replace(/\.?0+$/, "");
 }
 function receiptExcelPixelsOfWidth(width) {
-  return Math.max(0, Math.round(Number(width) * RECEIPT_XLSX_COL_MDW + 5));
+  return Math.round(Number(width) * RECEIPT_XLSX_COL_MDW);
 }
-/** Logo sits in A1:B2, square, flush with the row-2 bottom line (20.25+27). */
-const RECEIPT_XLSX_LOGO_HEIGHT = 47.25;
+/** Logo spans Excel columns A–B (same 2×2 block as the sample screenshot). */
 const RECEIPT_LOGO_COL_PX =
   receiptExcelPixelsOfWidth(RECEIPT_XLSX_COL_WIDTHS[0]) +
   receiptExcelPixelsOfWidth(RECEIPT_XLSX_COL_WIDTHS[1]);
 const RECEIPT_XLSX_COL_LETTERS = "abcdefghijk";
 function receiptColWidthSum() {
-  return RECEIPT_XLSX_COL_WIDTH_PX.reduce((sum, width) => sum + Number(width), 0);
+  return RECEIPT_XLSX_COL_WIDTHS.reduce((sum, width) => sum + width, 0);
 }
 function receiptGridColWidthCss() {
   const sum = receiptColWidthSum();
-  return RECEIPT_XLSX_COL_WIDTH_PX.map(
+  return RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
       `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${width} / ${sum}); }`,
   ).join(" ");
@@ -619,7 +611,7 @@ function receiptPartyFields(o) {
 }
 function receiptGridColgroup() {
   const sum = receiptColWidthSum();
-  return `<colgroup>${RECEIPT_XLSX_COL_WIDTH_PX.map(
+  return `<colgroup>${RECEIPT_XLSX_COL_WIDTHS.map(
     (width, index) =>
       `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${width} / ${sum})">`,
   ).join("")}</colgroup>`;
@@ -627,12 +619,12 @@ function receiptGridColgroup() {
 function receiptDeliveryDateValue(o) {
   return orderDeliveryDay(o) || "";
 }
-/** Display dates as M/D/YYYY like the original zarlaga sheet (7/15/2026). */
+/** Display dates as MM/DD/YYYY (сар/өдөр/он). */
 function formatDisplayDateParts(y, m, d) {
   const yy = String(y ?? "").padStart(4, "0");
-  const mm = Number(m);
-  const dd = Number(d);
-  if (!yy || !mm || !dd) return "";
+  const mm = String(m ?? "").padStart(2, "0");
+  const dd = String(d ?? "").padStart(2, "0");
+  if (!yy || mm === "00" || dd === "00") return "";
   return `${mm}/${dd}/${yy}`;
 }
 function formatIsoDayDisplay(iso) {
@@ -740,9 +732,8 @@ function receiptInfoRows(o) {
     ),
   ];
   const addrHtml = esc(f.addressPlain || "-");
-  const ibanGap = receiptIbanLabelGap();
   // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА групп».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-bc"><span>Дансны дугаар:</span><span class="receipt-grid__iban-gap">${ibanGap}</span><span class="receipt-grid__iban-tag">IBAN:</span></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Хаан банк</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-bc"><span>Дансны дугаар:</span><span>IBAN:</span></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -779,7 +770,7 @@ function receiptPaymentTermDisplay(o) {
 function receiptHeaderRows(logoSrc, o) {
   const deliveryDate = receiptDeliveryDateDisplay(o);
   const addr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}<br>${RECEIPT_COMPANY_ADDRESS_LINE2}`;
-  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" colspan="2" class="receipt-grid__logo-cell"></td><td colspan="6" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="7" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td colspan="11" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
+  return `<tr class="receipt-grid__header receipt-grid__header--r1"><td rowspan="2" colspan="2" class="receipt-grid__logo-cell"></td><td colspan="6" class="receipt-grid__brand">ТОМУДА ГРУПП</td><td></td><td colspan="2" class="receipt-grid__date-label">Хүргэлтийн огноо:</td></tr><tr class="receipt-grid__header receipt-grid__header--r2"><td colspan="7" class="receipt-grid__address">${addr}</td><td></td><td class="receipt-grid__date">${esc(deliveryDate)}</td></tr><tr class="receipt-grid__header receipt-grid__header--title-gap"><td colspan="11"></td></tr><tr class="receipt-grid__header receipt-grid__header--title"><td></td><td></td><td colspan="9" class="receipt-title">ЗАРЛАГЫН БАРИМТ №${formatReceiptNumber(o)}</td></tr>`;
 }
 function receiptHeaderHtml(logoSrc, o) {
   return `<table class="receipt-grid receipt-grid--sheet" role="presentation">${receiptGridColgroup()}${receiptHeaderRows(logoSrc, o)}</table>`;
@@ -813,7 +804,7 @@ function receiptTableRowsHtml(
         hasPromoAfter && n === list.length - 1
           ? " receipt-items__row--before-promo"
           : "";
-      return `<tr class="receipt-items__row${beforePromo}"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(receiptProductNameText(i.productName))}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoneyPlain(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoneyPlain(resolveOrderItemLineTotal(i))}</td></tr>`;
+      return `<tr class="receipt-items__row${beforePromo}"><td class="receipt-items__num">${startIndex + n + 1}</td><td colspan="3" class="receipt-items__name">${esc(receiptProductNameText(i.productName))}</td><td class="receipt-items__unit">${esc(p.unit || "ш")}</td><td colspan="2" class="receipt-items__barcode">${esc(p.barcode || "-")}</td><td colspan="2" class="receipt-items__qty">${esc(orderLineQtyLabel(i, p))}</td><td class="receipt-items__price">${receiptMoney(resolveOrderItemUnitPrice(i))}</td><td class="receipt-items__total">${receiptMoney(resolveOrderItemLineTotal(i))}</td></tr>`;
     })
     .join("");
 }
@@ -970,8 +961,8 @@ function receiptPromoRowsHtml(o) {
       .map((i, idx) => {
         const name = esc(receiptProductNameText(i.productName));
         const qty = i.quantity;
-        const price = receiptMoneyPlain(receiptPromoDisplayPrice(i));
-        const total = receiptMoneyPlain(receiptPromoDisplayTotal(i));
+        const price = receiptMoney(receiptPromoDisplayPrice(i));
+        const total = receiptMoney(receiptPromoDisplayTotal(i));
         if (idx === 0) {
           return `<tr class="receipt-items__promo"><td></td><td></td><td colspan="2" class="receipt-items__promo-label">Урамшуулал</td><td colspan="3" class="receipt-items__promo-name">${name}</td><td colspan="2" class="receipt-items__qty">${qty}</td><td class="receipt-items__price">${price}</td><td class="receipt-items__total">${total}</td></tr>`;
         }
@@ -1049,12 +1040,9 @@ function receiptWarningRowsHtml() {
     `<tr class="receipt-grid__warn"><td></td><td colspan="10" class="receipt-grid__warn-line${extra}">${text}</td></tr>`;
   return (
     row(
-      "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж",
-      " receipt-grid__warn-line--first receipt-grid__warn-line--split",
-    ) +
-    row(
-      `гүйлгээний утга дээр <b class="receipt-grid__warn-em">дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
-      " receipt-grid__warn-line--split",
+      // Хоёр мөр: эхний мөр «гүйлгээний утга дээр» хүртэл, доод мөрөнд бүтэн «дэлгүүрийн нэр, ААН-ийн РЕГИСТР-ийг бичээрэй.»
+      `Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж <b class="receipt-grid__warn-em">гүйлгээний утга</b> дээр<br><b class="receipt-grid__warn-em">дэлгүүрийн нэр, ААН-ийн РЕГИСТР</b>-ийг бичээрэй.`,
+      " receipt-grid__warn-line--first",
     ) +
     row(
       "Хувь хүний дансанд шилжүүлэхгүй байхыг анхаараарай.",
@@ -1701,10 +1689,6 @@ function formatReceiptNumber(o) {
 }
 function receiptMoney(n) {
   return Number(n || 0).toLocaleString();
-}
-/** Item-row amounts on the original sheet have no thousands separator (6650). */
-function receiptMoneyPlain(n) {
-  return String(Math.round(Number(n || 0)));
 }
 function receiptMoneyDetailed(n) {
   const v = Number(n || 0);
@@ -10270,14 +10254,13 @@ td, th { border: none; }
   position: absolute;
   left: 0;
   top: 0;
-  width: ${RECEIPT_LOGO_COL_PX}px !important;
-  height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  min-width: ${RECEIPT_LOGO_COL_PX}px !important;
-  max-width: ${RECEIPT_LOGO_COL_PX}px !important;
-  min-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
+  width: calc(100% * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+  height: 36pt !important;
+  min-width: calc(100% * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+  max-width: calc(100% * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+  min-height: 36pt !important;
+  max-height: 36pt !important;
   object-fit: contain;
-  object-position: left bottom;
   display: block;
   margin: 0;
   z-index: 2;
@@ -10316,15 +10299,15 @@ ${receiptGridColWidthCss()}
   color: ${RECEIPT_TEXT};
 }
 .receipt-grid--sheet .receipt-grid__bank .receipt-grid__address-cell {
-  vertical-align: top !important;
+  vertical-align: top;
   font-weight: 400;
   font-size: 9pt;
-  line-height: 1.25;
+  line-height: 1.35;
   color: #000;
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
-  padding: 1px 4px 0 !important;
+  padding: 2px 4px !important;
 }
 .receipt-grid--sheet .receipt-grid__label--strong {
   font-weight: 700 !important;
@@ -10352,61 +10335,38 @@ ${receiptGridColWidthCss()}
   box-sizing: border-box;
 }
 .receipt-grid--sheet tr.receipt-items__head > td {
-  background: #fff !important;
-  font-weight: 400;
+  background: ${RECEIPT_HEADER_BG} !important;
+  font-weight: 700;
   font-size: 9pt;
   text-align: center;
-  padding: 1px 4px;
-  text-decoration: none !important;
+  padding: 3px 4px;
 }
 .receipt-grid--sheet tr.receipt-items__head > td.receipt-items__unit {
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
   line-height: 1.15;
   word-break: keep-all;
   overflow-wrap: normal;
-  font-weight: 400 !important;
 }
 .receipt-grid--sheet tr.receipt-items__head > td.receipt-items__name {
   text-align: center;
-  font-weight: 400 !important;
-}
-.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__qty {
-  font-weight: 700 !important;
-}
-.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__barcode,
-.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__price,
-.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__total,
-.receipt-grid--sheet tr.receipt-items__head > td.receipt-items__num {
-  font-weight: 400 !important;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__num {
   text-align: center;
   padding: 3px 2px;
   font-size: 9pt;
-  font-weight: 400;
+  font-weight: 700;
   color: ${RECEIPT_TEXT};
 }
-.receipt-grid--sheet tr.receipt-items__row > td.receipt-items__name {
-  text-align: left;
-  word-break: keep-all;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  overflow: visible;
-  font-weight: 400;
-}
+.receipt-grid--sheet tr.receipt-items__row > td.receipt-items__name { text-align: left; word-break: break-word; font-weight: 400; }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__unit {
   text-align: center;
-  font-size: 9pt;
+  font-size: 8pt;
   font-weight: 400;
-  white-space: nowrap;
-  overflow: visible;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__qty {
   text-align: center;
-  font-weight: 700;
-  font-size: 9pt;
-  font-variant-numeric: tabular-nums;
+  font-weight: 400;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__barcode {
   text-align: center;
@@ -10425,17 +10385,15 @@ ${receiptGridColWidthCss()}
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-size: 9pt;
-  font-weight: 400;
-  color: ${RECEIPT_TEXT} !important;
+  font-weight: 700;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td {
   border: none !important;
   border-bottom: 0.4pt solid #666 !important;
-  padding: 1px 4px;
+  padding: 5px 6px;
   vertical-align: middle;
   font-size: 9pt;
-  line-height: 1.15;
-  height: 14.25pt;
+  line-height: 1.3;
   background: #fff;
   color: ${RECEIPT_TEXT} !important;
 }
@@ -10453,7 +10411,7 @@ ${receiptGridColWidthCss()}
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--before-promo > td {
   border: none !important;
-  height: 14.25pt;
+  height: 6mm;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -10473,7 +10431,7 @@ ${receiptGridColWidthCss()}
   font-weight: 700;
   font-size: 11pt;
   white-space: nowrap;
-  text-align: center;
+  text-align: right;
   padding-right: 8px !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__promo-name {
@@ -10482,19 +10440,19 @@ ${receiptGridColWidthCss()}
   text-align: left;
   padding-left: 6px !important;
 }
-.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 700; font-size: 9pt; font-variant-numeric: tabular-nums; }
+.receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__qty { text-align: center; font-weight: 400; font-size: 9pt; }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
   text-align: right;
   white-space: nowrap;
   font-size: 9pt;
-  font-weight: 400;
-  color: ${RECEIPT_TEXT} !important;
+  font-weight: 700;
+  color: #000 !important;
 }
 .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
   text-align: right;
   white-space: nowrap;
   font-size: 9pt;
-  font-weight: 400;
+  font-weight: 700;
   color: #2E86C1 !important;
 }
 .receipt-grid--sheet tr.receipt-grid__items-wrap > td.receipt-grid__items-cell { padding: 1px 0 !important; }
@@ -10649,9 +10607,8 @@ ${receiptGridColWidthCss()}
 }
 .receipt-items__head th {
   border: 0.4pt solid #777 !important;
-  border-top: none !important;
-  background: #fff !important;
-  font-weight: 400;
+  background: ${RECEIPT_HEADER_BG} !important;
+  font-weight: 700;
   font-size: 9px;
   text-align: center;
   color: ${RECEIPT_TEXT};
@@ -10672,7 +10629,7 @@ tbody.receipt-footer-keep {
 }
 .receipt-items__row td { font-size: 10px; }
 .receipt-items__gutter { width: 0; padding: 0 !important; border: none !important; }
-.receipt-items__num { width: 9.4mm; text-align: center; padding: 2px 2px; font-size: 9pt; font-weight: 400; color: ${RECEIPT_TEXT}; }
+.receipt-items__num { width: 9.4mm; text-align: center; padding: 2px 2px; font-size: 9pt; font-weight: 700; color: ${RECEIPT_TEXT}; }
 .receipt-items__name {
   width: 38%;
   text-align: left;
@@ -10697,9 +10654,9 @@ tbody.receipt-footer-keep {
   font-size: 8px;
   line-height: 1.15;
 }
-.receipt-items__qty { width: 7%; text-align: center; font-size: 9pt; font-weight: 700; font-variant-numeric: tabular-nums; }
+.receipt-items__qty { width: 7%; text-align: center; }
 .receipt-items__price { width: 12%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.receipt-items__total { width: 13%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: ${RECEIPT_TEXT}; }
+.receipt-items__total { width: 13%; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .receipt-items--promo { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .receipt-items--promo th,
 .receipt-items--promo td {
@@ -10741,7 +10698,7 @@ tbody.receipt-footer-keep {
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
-  text-align: center;
+  text-align: right;
   white-space: nowrap;
   vertical-align: middle;
   padding-left: 4px;
@@ -10774,8 +10731,8 @@ tbody.receipt-footer-keep {
   vertical-align: middle;
 }
 .receipt-items--promo .receipt-items__qty { width: 8%; text-align: center; }
-.receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: ${RECEIPT_TEXT} !important; font-weight: 400; }
-.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #2E86C1 !important; font-weight: 400; }
+.receipt-items--promo .receipt-items__price { width: 12%; text-align: right; white-space: nowrap; color: #000 !important; font-weight: 700; }
+.receipt-items--promo .receipt-items__total { width: 14%; text-align: right; white-space: nowrap; color: #2E86C1 !important; }
 .receipt-grid--sheet .receipt-grid__return td {
   padding: 0;
   height: auto;
@@ -10879,8 +10836,8 @@ tbody.receipt-footer-keep {
   border-bottom: 0.75pt solid #555 !important;
   background: ${RECEIPT_GRAND_BG} !important;
 }
-.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14.25pt; font-size: 9pt; }
-.receipt-grid--sheet .receipt-grid__summary--pay .receipt-grid__summary-label { font-weight: 400; }
+.receipt-grid--sheet .receipt-grid__summary--pay td { height: 14.25pt; font-size: 11pt; }
+.receipt-grid--sheet .receipt-grid__summary--pay .receipt-grid__summary-label { font-weight: 700; }
 .receipt-grid__summary-note {
   text-align: center;
   font-size: 9pt !important;
@@ -10890,12 +10847,12 @@ tbody.receipt-footer-keep {
 }
 .receipt-grid__pay-opt {
   text-align: right;
-  font-size: 9pt;
+  font-size: 11pt;
   font-weight: 400;
   color: ${RECEIPT_TEXT};
 }
 .receipt-grid__pay-opt--on {
-  font-weight: 400;
+  font-weight: 700;
 }
 .receipt-grid__settle-note td { padding: 1px 0 !important; }
 .receipt-grid__settle-note-text {
@@ -10980,18 +10937,16 @@ tbody.receipt-footer-keep {
   color: ${RECEIPT_TEXT};
   line-height: 1.2;
   text-align: left;
-  vertical-align: bottom !important;
 }
-.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 20.25pt; }
-.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 27pt; }
-.receipt-grid--sheet tr.receipt-grid__header--r2 > td.receipt-grid__address {
-  vertical-align: top !important;
-  padding-left: 0 !important;
-  margin: 0;
+.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 16pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 20pt; }
+.receipt-grid--sheet tr.receipt-grid__header--title-gap > td {
+  height: 0;
+  padding: 0 !important;
+  border: none !important;
 }
 .receipt-grid__header--r2 .receipt-grid__address {
   padding-left: 0 !important;
-  margin: 0;
 }
 .receipt-grid__address,
 .receipt-grid__phone {
@@ -11024,14 +10979,14 @@ tbody.receipt-footer-keep {
   padding-bottom: 0 !important;
 }
 .receipt-grid--sheet tr.receipt-grid__header--r2 > td.receipt-grid__date {
-  vertical-align: top !important;
-  font-weight: 400;
+  vertical-align: top;
+  font-weight: 700;
   padding-top: 0 !important;
 }
 .receipt-title {
-  text-align: center !important;
+  text-align: center;
   font-family: ${RECEIPT_FONT_TITLE};
-  font-size: 14pt;
+  font-size: 11pt;
   font-weight: 700;
   padding: 0 4px !important;
   margin: 0;
@@ -11040,26 +10995,20 @@ tbody.receipt-footer-keep {
   line-height: 1.15;
   box-sizing: border-box;
 }
-.receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31.5pt; }
+.receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 18pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
-.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; vertical-align: middle !important; text-align: left !important; }
-.receipt-grid--sheet .receipt-grid__bank td { vertical-align: middle !important; text-align: left !important; }
+.receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; vertical-align: middle !important; }
+.receipt-grid--sheet .receipt-grid__bank td { vertical-align: middle !important; }
 .receipt-grid__meta--email .receipt-grid__value--email {
   font-size: 9pt !important;
   font-weight: 400 !important;
 }
-.receipt-grid__label {
-  color: ${RECEIPT_TEXT};
-  white-space: nowrap;
-  overflow: visible;
-  font-weight: 400;
-  font-size: 9pt;
-}
+.receipt-grid__label { color: ${RECEIPT_TEXT}; white-space: nowrap; font-weight: 400; font-size: 9pt; }
 .receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9pt; }
 .receipt-grid__value b { font-weight: 700; font-size: inherit; }
 .receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9pt; }
-.receipt-grid__iban-nums { font-weight: 700; font-size: 11pt !important; line-height: 1.25; }
-.receipt-grid__iban-nums b { font-size: 11pt !important; font-weight: 700; }
+.receipt-grid__iban-nums { font-weight: 700; font-size: 9pt !important; line-height: 1.25; }
+.receipt-grid__iban-nums b { font-size: 9pt !important; font-weight: 700; }
 .receipt-grid__iban-bc {
   text-align: left !important;
   white-space: nowrap;
@@ -11067,15 +11016,10 @@ tbody.receipt-footer-keep {
   font-weight: 400;
   vertical-align: top !important;
   padding-top: 1px !important;
-  padding-right: 0 !important;
   background: transparent !important;
-  overflow: visible;
 }
-.receipt-grid__iban-gap {
-  white-space: pre;
-}
-.receipt-grid__iban-tag {
-  white-space: nowrap;
+.receipt-grid__iban-bc span:last-child {
+  float: right;
 }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
   vertical-align: top !important;
@@ -11086,7 +11030,6 @@ tbody.receipt-footer-keep {
   line-height: 1.25;
   white-space: nowrap;
   padding-top: 1px !important;
-  overflow: visible;
 }
 .receipt-info__value,
 .receipt-info__address-text,
@@ -11096,7 +11039,7 @@ tbody.receipt-footer-keep {
   font-family: ${RECEIPT_FONT};
 }
 .receipt-grid__spacer td { height: 1px; padding: 0; }
-.receipt-grid__spacer--before-promo td { height: 14.25pt; padding: 0; }
+.receipt-grid__spacer--before-promo td { height: 6mm; padding: 0; }
 .receipt-grid__spacer--note td { height: 6px; padding: 0; }
 .receipt-grid__spacer--gross-promo td { height: 15px; padding: 0; }
 .receipt-grid__spacer--pay-warn td { height: 14.25pt; padding: 0; }
@@ -11120,7 +11063,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__summary-label {
   background: transparent;
   font-weight: 400;
-  font-size: 9pt;
+  font-size: 11pt;
   text-align: right;
   color: ${RECEIPT_TEXT};
   padding-right: 6px !important;
@@ -11131,7 +11074,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__summary-rule,
 .receipt-grid__summary-value {
   text-align: right;
-  font-size: 9pt;
+  font-size: 11pt;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   font-weight: 400;
@@ -11188,16 +11131,13 @@ tbody.receipt-footer-keep {
   height: 14.25pt;
   min-height: 14.25pt;
   line-height: 1.2;
-  overflow: hidden;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
 }
-.receipt-grid__warn-line--split {
-  white-space: nowrap;
-  overflow: hidden;
-}
-.receipt-grid__warn-em { font-weight: 700 !important; font-size: 9pt; white-space: nowrap; }
+.receipt-grid__warn-line--bold { font-weight: 700; font-size: 10pt; }
+.receipt-grid__warn-em { font-weight: 700; font-size: 9pt; white-space: nowrap; }
 .receipt-grid__sign-label {
-  font-size: 9pt;
+  font-size: 11pt;
   font-weight: 400;
   font-family: ${RECEIPT_FONT};
   padding: 2px 4px 1px 0;
@@ -11231,16 +11171,15 @@ tbody.receipt-footer-keep {
   }
   .receipt-logo.receipt-logo--overlay {
     top: 0;
-    width: ${RECEIPT_LOGO_COL_PX}px !important;
-    height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-    min-width: ${RECEIPT_LOGO_COL_PX}px !important;
-    max-width: ${RECEIPT_LOGO_COL_PX}px !important;
-    min-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-    max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-    object-position: left bottom;
+    width: calc(100% * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+    height: 36pt !important;
+    min-width: calc(100% * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+    max-width: calc(100% * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+    min-height: 36pt !important;
+    max-height: 36pt !important;
   }
   .receipt-grid { max-width: none; font-size: 9pt; }
-  .receipt-title { font-size: 14pt; text-align: center !important; }
+  .receipt-title { font-size: 11pt; }
   .receipt-grid__brand { font-size: 11pt; padding-left: 0 !important; }
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
@@ -11288,14 +11227,8 @@ tbody.receipt-footer-keep {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__price {
-    color: ${RECEIPT_TEXT} !important;
-  }
   .receipt-grid--sheet tr.receipt-items__promo > td.receipt-items__total {
     color: #2E86C1 !important;
-  }
-  .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__total {
-    color: ${RECEIPT_TEXT} !important;
   }
   .receipt-grid--sheet tr.receipt-items__promo > td:first-child,
   .receipt-grid--sheet tr.receipt-items__promo > td:nth-child(2),
@@ -11435,47 +11368,37 @@ const RECEIPT_XLSX_TEMPLATE = RECEIPT_XLSX_SOURCE_TEMPLATE;
 /** No top pad — sample starts at R1. */
 const RECEIPT_XLSX_TOP_PAD_ROWS = 0;
 /**
- * Excel Row Height numbers from the spec (called mm in chat, not the px column):
- * 20.25 / 27.00 / 31.50 / 14.25 from row 4 down.
+ * Compact header so the sheet matches the reference receipt (Sheet1).
+ * Body rows stay 14.25.
  */
 const RECEIPT_XLSX_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_ITEM_HEAD_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_ITEM_ROW_HEIGHT = 14.25;
 const RECEIPT_XLSX_TITLE_ROW_HEIGHT = 14.25;
-const RECEIPT_XLSX_HEADER_R1_HEIGHT = 20.25;
-const RECEIPT_XLSX_HEADER_R2_HEIGHT = 27;
-const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 31.5;
-const RECEIPT_XLSX_MIDDLE_ALIGN_FROM = 3;
-const RECEIPT_XLSX_MIDDLE_ALIGN_TO = 14;
+const RECEIPT_XLSX_HEADER_R1_HEIGHT = 16;
+const RECEIPT_XLSX_HEADER_R2_HEIGHT = 20;
+const RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT = 18;
 const RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT = 14.25;
-/** Resolved from receiptXlsxStylesXml() cellXfs (count 93 → indices 0–92). */
+/** Resolved from receiptXlsxStylesXml() cellXfs (count 81 → indices 0–80). */
 const RECEIPT_XLSX_STYLE = {
-  metaNormal: 81,
-  metaBold: 82,
+  metaNormal: 78,
+  metaBold: 79,
   metaBoldRight: 20,
   metaNormalRight: 56,
-  ibanCenter: 85,
-  metaLeft: 81,
-  metaBoldLeft: 82,
-  titleLeft: 83,
-  addressLeft: 84,
-  ibanLeft: 85,
-  dateTop: 86,
+  ibanCenter: 80,
   ibanLabel: 3,
-  signLabel: 89,
+  signLabel: 74,
   signLine: 57,
-  summaryLabel: 88,
+  summaryLabel: 68,
   summaryValueDec: 69,
   grandLabel: 71,
   grandValue: 72,
-  payLabel: 90,
-  payValue: 90,
-  promoLabel: 87,
-  itemNum: 9,
+  payLabel: 70,
+  payValue: 70,
+  promoLabel: 73,
+  itemNum: 75,
   itemPrice: 76,
-  itemTotal: 10,
-  promoTotal: 93,
-  unitHead: 7,
+  unitHead: 77,
 };
 /** Cell padding + slack (px) held back so right-flush text never wraps. */
 const RECEIPT_XLSX_CELL_PAD = 6;
@@ -11536,28 +11459,17 @@ function receiptXlsxTextPx(text) {
  */
 function receiptXlsxRightFlushGap(head, tail, cols) {
   const cellPx = cols.reduce(
-    (sum, w) => sum + receiptExcelPixelsOfWidth(w),
+    (sum, w) => sum + Math.round(w * RECEIPT_XLSX_COL_MDW),
     0,
   );
   const nbsp = "\u00A0";
   const step = receiptXlsxTextPx(nbsp) || 3.34;
-  // Small pad only — Excel draws Cyrillic narrower than canvas measureText.
   const room =
     cellPx -
     RECEIPT_XLSX_CELL_PAD -
-    2 -
     receiptXlsxTextPx(head) -
     receiptXlsxTextPx(tail);
   return nbsp.repeat(Math.max(1, Math.floor(room / step)));
-}
-/** Shared web + Excel IBAN label padding (flush to column D). */
-function receiptIbanLabelGap() {
-  return (
-    receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
-      RECEIPT_XLSX_COL_WIDTHS[1],
-      RECEIPT_XLSX_COL_WIDTHS[2],
-    ]) + "\u00A0".repeat(16)
-  );
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
 function xlsxFitColWidth(
@@ -11642,7 +11554,7 @@ function receiptExpenseXlsxStylesXml() {
   );
   xml = xml
     .split(
-      'numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
+      'numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
     )
     .join(
       'numFmtId="0" fontId="18" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
@@ -11685,22 +11597,7 @@ function receiptXlsxStylesXml() {
   // Style 34 = barcode text (@) so Excel/Numbers never show 4.82E+12.
   // Item rows use borderId 4 = hair all sides (finest line).
   // Promo/sign use borderId 3 = hair bottom; summary amounts borderId 5 = top+bottom hair.
-  const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="18"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF2E86C1"/><name val="Arial"/></font><font><sz val="7.5"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="12"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_SETTLE_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_WARN_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_GRAND_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="9"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="81"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="15" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="1" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="1" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1" indent="0"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="0"/></xf><xf numFmtId="0" fontId="1" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="17" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="0" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="16" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="16" fillId="9" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="1" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
-  return xlsxStylesAppendPart(xml, "cellXfs", [
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
-    `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>`,
-    `<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>`,
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="top" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="6" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
-    `<xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`,
-  ]);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="18"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="18"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FF000000"/><name val="Arial"/></font><font><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="8"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="11"/><color rgb="FF000000"/><name val="Times New Roman"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="16"/><color rgb="FF0F7A3F"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF2E86C1"/><name val="Arial"/></font><font><sz val="7.5"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FF000000"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FF000000"/><name val="Arial"/></font></fonts><fills count="10"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_SETTLE_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EBEE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3F3F3"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF7F7F7"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F7A3F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_WARN_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB8E6C8"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="${RECEIPT_GRAND_BG_XLSX}"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="9"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FF808080"/></left><right style="thin"><color rgb="FF808080"/></right><top style="thin"><color rgb="FF808080"/></top><bottom style="thin"><color rgb="FF808080"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF333333"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top style="hair"><color rgb="FF666666"/></top><bottom style="hair"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FF666666"/></left><right style="thin"><color rgb="FF666666"/></right><top style="thin"><color rgb="FF666666"/></top><bottom style="thin"><color rgb="FF666666"/></bottom><diagonal/></border><border><left/><right/><top/><bottom style="dotted"><color rgb="FF666666"/></bottom><diagonal/></border><border><left style="hair"><color rgb="FF666666"/></left><right style="hair"><color rgb="FF666666"/></right><top style="hair"><color rgb="FF666666"/></top><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="81"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="15" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="5" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="5" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="3" borderId="3" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="8" fillId="6" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="3" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="9" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1" indent="0"/></xf><xf numFmtId="0" fontId="10" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1" indent="0"/></xf><xf numFmtId="0" fontId="1" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="17" fillId="7" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="12" fillId="8" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="13" fillId="8" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="1" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="6" fillId="9" borderId="5" xfId="0" applyBorder="1" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="7" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="8" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="2" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="8" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="4" fontId="1" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="16" fillId="9" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="3" fontId="16" fillId="9" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="4" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="3" fontId="1" fillId="0" borderId="4" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0" shrinkToFit="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="0"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/></styleSheet>`;
 }
 function warehousePrepareStylesXml() {
   return receiptXlsxStylesXml();
@@ -12046,14 +11943,10 @@ function ptToEmu(pt) {
   return Math.round(Number(pt) * 12700);
 }
 function receiptDrawingXml() {
-  // Square logo as tall as rows 1–2 so it is not capped by thin A–B width.
+  // Logo fills merged A1:B2 (2 columns × header rows 1–2).
   const logoRow = Math.max(0, RECEIPT_XLSX_TOP_PAD_ROWS);
-  const boxH = ptToEmu(
-    RECEIPT_XLSX_HEADER_R1_HEIGHT + RECEIPT_XLSX_HEADER_R2_HEIGHT,
-  );
-  const logoEmu = boxH;
-  const rowOff = 0;
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>${rowOff}</xdr:rowOff></xdr:from><xdr:ext cx="${logoEmu}" cy="${logoEmu}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>`;
+  const logoEndRow = logoRow + 2;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${logoEndRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="TOMUDA logo"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
 }
 function receiptDrawingRelsXml() {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/receipt-logo.png"/></Relationships>`;
@@ -12147,71 +12040,23 @@ function appendReceiptSheetRows(
   const { si, siRich } = ctx;
   let rowNum = startRow;
   let footerKeepStart = 0;
-  const receiptLocalRow = (excelRow) => excelRow - startRow + 1;
-  const isTitleRow = (excelRow) => receiptLocalRow(excelRow) === 3;
-  const isHeaderTextRow = (excelRow) => {
-    const local = receiptLocalRow(excelRow);
-    return local >= 4 && local <= RECEIPT_XLSX_MIDDLE_ALIGN_TO;
-  };
-  const leftAlignStyleId = (styleId) => {
-    const id = Number(styleId);
-    if (id === RECEIPT_XLSX_STYLE.metaBold || id === RECEIPT_XLSX_STYLE.metaBoldLeft)
-      return RECEIPT_XLSX_STYLE.metaBoldLeft;
-    if (id === 40 || id === RECEIPT_XLSX_STYLE.titleLeft)
-      return RECEIPT_XLSX_STYLE.titleLeft;
-    if (id === 22 || id === RECEIPT_XLSX_STYLE.addressLeft)
-      return RECEIPT_XLSX_STYLE.addressLeft;
-    if (
-      id === RECEIPT_XLSX_STYLE.ibanCenter ||
-      id === RECEIPT_XLSX_STYLE.ibanLeft
-    )
-      return RECEIPT_XLSX_STYLE.ibanLeft;
-    if (id === RECEIPT_XLSX_STYLE.payLabel || id === RECEIPT_XLSX_STYLE.payValue)
-      return id;
-    return RECEIPT_XLSX_STYLE.metaLeft;
-  };
-  const leftAlignCellXml = (cellXml) =>
-    String(cellXml || "").replace(/\bs="(\d+)"/g, (_, id) => {
-      return `s="${leftAlignStyleId(id)}"`;
-    });
   const emptyCells = (
     row,
     from = "A",
     to = RECEIPT_XLSX_LAST_COL,
     style = 1,
   ) => {
-    const alignStyle =
-      style === 1 && isHeaderTextRow(row)
-        ? RECEIPT_XLSX_STYLE.metaLeft
-        : isHeaderTextRow(row)
-          ? leftAlignStyleId(style)
-          : style;
     const cols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(from),
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(to) + 1,
     );
     return cols
       .split("")
-      .map((col) => xlsxCellXml(`${col}${row}`, alignStyle, null, "empty"));
+      .map((col) => xlsxCellXml(`${col}${row}`, style, null, "empty"));
   };
   const pushRow = (height, cells) => {
-    const filtered = filterXlsxCellsOutsideMerges(cells, merges).map((cell) =>
-      isHeaderTextRow(rowNum) ? leftAlignCellXml(cell) : cell,
-    );
-    const rowStyle = isTitleRow(rowNum)
-      ? ` s="40" customFormat="1"`
-      : isHeaderTextRow(rowNum)
-        ? ` s="${RECEIPT_XLSX_STYLE.metaLeft}" customFormat="1"`
-        : "";
-    rows.push(
-      xlsxRowXml(
-        rowNum,
-        height,
-        filtered,
-        RECEIPT_XLSX_LAST_COL,
-        rowStyle,
-      ),
-    );
+    const filtered = filterXlsxCellsOutsideMerges(cells, merges);
+    rows.push(xlsxRowXml(rowNum, height, filtered, RECEIPT_XLSX_LAST_COL));
     rowNum += 1;
   };
   const pushItemTableRow = (height, cells) => {
@@ -12241,7 +12086,7 @@ function appendReceiptSheetRows(
   // Brand/address/title start at C so A/B stay thin for the logo + №.
   const companyAddr = `Хаяг: ${RECEIPT_COMPANY_ADDRESS_LINE1}\n${RECEIPT_COMPANY_ADDRESS_LINE2}`;
 
-  // Header: logo A1:B2; brand C:H; address C:I; title A:K Merge & Center.
+  // Header: logo A; B thin; brand C:H; address C:I; title A:K; date J:K / K.
   const hr1 = rowNum;
   const hr2 = rowNum + 1;
   const hr3 = rowNum + 2;
@@ -12271,7 +12116,7 @@ function appendReceiptSheetRows(
   const companyAddrH = RECEIPT_XLSX_HEADER_R2_HEIGHT;
   pushRow(companyAddrH, [
     xlsxCellXml(`C${hr2}`, 41, si(companyAddr), "s"),
-    xlsxCellXml(`K${hr2}`, RECEIPT_XLSX_STYLE.dateTop, si(deliveryDateText), "s"),
+    xlsxCellXml(`K${hr2}`, 46, si(deliveryDateText), "s"),
     ...emptyCells(hr2, "D", "I", 41),
   ]);
   pushRow(RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT, [
@@ -12361,7 +12206,7 @@ function appendReceiptSheetRows(
     `F${bankR2}:K${bankR5}`,
     `B${bankR3}:C${bankR3}`,
     `D${bankR3}:E${bankR3}`,
-    // B:C = Дансны дугаар: + gap + IBAN: (flush to D) ; D:E = the numbers.
+    // B:C = Дансны дугаар: + gap + IBAN: ; D:E = the numbers.
     `B${bankR4}:C${bankR4}`,
     `D${bankR4}:E${bankR4}`,
     `D${bankR5}:E${bankR5}`,
@@ -12429,15 +12274,17 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
-  // Push IBAN: next to D (shared with web via receiptIbanLabelGap).
-  const ibanLabelGap = receiptIbanLabelGap();
+  const ibanGap = receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
+    RECEIPT_XLSX_COL_WIDTHS[1],
+    RECEIPT_XLSX_COL_WIDTHS[2],
+  ]);
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
       siRich([
         { t: "Дансны дугаар:", sz: 9 },
-        { t: ibanLabelGap, sz: 9 },
+        { t: ibanGap, sz: 9 },
         { t: "IBAN:", sz: 9 },
       ]),
       "s",
@@ -12481,12 +12328,12 @@ function appendReceiptSheetRows(
       "s",
     ),
     xlsxCellXml(`F${headerRow}`, 7, si("Баркод"), "s"),
-    xlsxCellXml(`H${headerRow}`, 75, si("Тоо/ш"), "s"),
+    xlsxCellXml(`H${headerRow}`, 7, si("Тоо/ш"), "s"),
     xlsxCellXml(`J${headerRow}`, 7, si("Нэгж үнэ"), "s"),
     xlsxCellXml(`K${headerRow}`, 7, si("Нийт үнэ"), "s"),
     ...emptyCells(headerRow, "C", "D", 7),
     ...emptyCells(headerRow, "G", "G", 7),
-    ...emptyCells(headerRow, "I", "I", 75),
+    ...emptyCells(headerRow, "I", "I", 7),
   ]);
 
   items.forEach((item, index) => {
@@ -12596,9 +12443,9 @@ function appendReceiptSheetRows(
     const bodyStyle = 35;
     const labelStyle = idx === 0 ? RECEIPT_XLSX_STYLE.promoLabel : clearStyle;
     const qtyStyle = 37;
-    // Promo нэгж үнэ black; нийт үнэ blue (same as paid line totals).
-    const unitMoneyStyle = 59;
-    const totalMoneyStyle = RECEIPT_XLSX_STYLE.promoTotal;
+    const unitMoneyStyle = 47; // black — нэгж үнэ
+    // Style 59 = pale blue Нийт үнэ (promo only) — see receiptXlsxStylesXml.
+    const totalMoneyStyle = 59;
     pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, clearStyle, null, "empty"),
       xlsxCellXml(`B${r}`, clearStyle, null, "empty"),
@@ -12713,17 +12560,12 @@ function appendReceiptSheetRows(
       42,
       [
         {
-          t: "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж",
+          t: "Эрхэм харилцагч та төлбөрөө заавал баримт дээрх компанийн дансанд шилжүүлж ",
           sz: 9,
         },
-      ],
-    ],
-    [
-      null,
-      42,
-      [
-        { t: "гүйлгээний утга дээр", sz: 9 },
-        { t: " дэлгүүрийн нэр, ААН-ийн РЕГИСТР", b: true, sz: 9 },
+        { t: "гүйлгээний утга", b: true, sz: 9 },
+        { t: " дээр\n", sz: 9 },
+        { t: "дэлгүүрийн нэр, ААН-ийн РЕГИСТР", b: true, sz: 9 },
         { t: "-ийг бичээрэй.", sz: 9 },
       ],
     ],
@@ -12733,7 +12575,10 @@ function appendReceiptSheetRows(
   ].forEach(([text, style, richParts], index) => {
     const r = rowNum;
     merges.push(`B${r}:K${r}`);
-    const warnH = RECEIPT_XLSX_ROW_HEIGHT;
+    const warnH =
+      index === 0
+        ? RECEIPT_XLSX_WARN_FIRST_ROW_HEIGHT
+        : RECEIPT_XLSX_ROW_HEIGHT;
     const value = richParts ? siRich(richParts) : si(text);
     pushRow(warnH, [
       xlsxCellXml(`B${r}`, style, value, "s"),
@@ -12742,7 +12587,7 @@ function appendReceiptSheetRows(
   });
 
   pushRow(RECEIPT_XLSX_ROW_HEIGHT, emptyCells(rowNum));
-  // Label A:E right-aligned against the dotted signature line F→I.
+  // Label A:E right-aligned; dotted signature line F→I (one column forward/left).
   const pushSignRow = (role) => {
     const r = rowNum;
     merges.push(`A${r}:E${r}`, `F${r}:I${r}`);
@@ -12784,7 +12629,7 @@ function receiptWorksheetXml(
   const fitsOnePage = lastRow <= RECEIPT_XLSX_PAGE_ROWS;
   const fitH = fitsOnePage ? "1" : "0";
   // Page Setup from the №260941 video: 0.4 / 0.4 / 0.45 / 0.35 in, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" zoomScale="100" zoomScaleNormal="100" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT.toFixed(2)}" customHeight="1"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" zoomScale="80" zoomScaleNormal="80" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT.toFixed(2)}" customHeight="1"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -13268,12 +13113,12 @@ function ensureReceiptScreenStyles() {
 .wh-receipt-preview__doc.receipt-page .receipt-logo.receipt-logo--overlay {
   left: 18mm;
   top: 14mm;
-  width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  max-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
+  width: calc((100% - 26mm) * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+  height: 36pt !important;
+  max-width: calc((100% - 26mm) * ${RECEIPT_LOGO_COL_PX} / ${receiptColWidthSum()}) !important;
+  max-height: 36pt !important;
   object-fit: contain;
-  object-position: left bottom;
+  object-position: left top;
 }
 .wh-receipt-preview .wh-receipt-detail__bar {
   padding: 0 4px 4px;
@@ -19672,7 +19517,7 @@ function xlsxCellXml(ref, styleId, value, kind) {
   }
   return `<c r="${ref}" s="${styleId}"/>`;
 }
-function xlsxRowXml(rowNum, height, cells, lastCol = "J", extraAttrs = "") {
+function xlsxRowXml(rowNum, height, cells, lastCol = "J") {
   const n = Number(height);
   const ht =
     Number.isFinite(n) && n > 0
@@ -19680,7 +19525,7 @@ function xlsxRowXml(rowNum, height, cells, lastCol = "J", extraAttrs = "") {
       : "";
   const body = cells.join("");
   const spanEnd = "ABCDEFGHIJKLMNOP".indexOf(lastCol) + 1;
-  return `<row r="${rowNum}" spans="1:${spanEnd}"${ht}${extraAttrs}>${body}</row>`;
+  return `<row r="${rowNum}" spans="1:${spanEnd}"${ht}>${body}</row>`;
 }
 const COUNT_XLSX_LAST_COL = "M";
 const PRODUCT_XLSX_LAST_COL = "H";
@@ -27868,7 +27713,10 @@ function initDeliveryRouteMap(stores, selectedId) {
     zoomAnimation: true,
   }).setView(start, selected ? 15 : 12);
   window.deliveryMapSelectedId = selectedId || "";
-  window.deliveryTileLayer = addTomudaMapTiles(window.deliveryMap);
+  window.deliveryTileLayer = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom: 19, attribution: "&copy; OpenStreetMap" },
+  ).addTo(window.deliveryMap);
   window.deliveryMapMarkers = [];
   const bounds = [];
   points.forEach((p) => {
@@ -29862,67 +29710,6 @@ function customerModal(id, draft = null) {
   });
   loadLesRegistryIndex();
 }
-/** Free Leaflet tiles — no API key. CARTO basemaps now require a key. */
-const TOMUDA_MAP_TILE_SOURCES = [
-  {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-    options: {
-      maxZoom: 19,
-      attribution:
-        'Tiles &copy; Esri &mdash; Source: Esri, OpenStreetMap',
-    },
-  },
-  {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-    options: {
-      maxZoom: 19,
-      attribution: "Tiles &copy; Esri",
-    },
-  },
-  {
-    url: "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
-    options: {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    },
-  },
-  {
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    options: {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    },
-  },
-];
-function addTomudaMapTiles(map) {
-  if (!map || !window.L) return null;
-  let sourceIndex = 0;
-  let layer = null;
-  let fallingBack = false;
-  const attach = (index) => {
-    const src = TOMUDA_MAP_TILE_SOURCES[index];
-    if (!src) return null;
-    const next = L.tileLayer(src.url, src.options);
-    next.on("tileerror", () => {
-      if (fallingBack || index + 1 >= TOMUDA_MAP_TILE_SOURCES.length) return;
-      fallingBack = true;
-      try {
-        if (map.hasLayer(next)) map.removeLayer(next);
-      } catch {
-        /* ignore */
-      }
-      sourceIndex = index + 1;
-      layer = attach(sourceIndex);
-      fallingBack = false;
-    });
-    next.addTo(map);
-    return next;
-  };
-  layer = attach(0);
-  return layer;
-}
 function loadLeaflet(cb) {
   if (window.L) return cb();
   if (window.leafletLoading) {
@@ -29942,11 +29729,9 @@ function loadLeaflet(cb) {
   };
   script.onerror = () => {
     window.leafletLoading = false;
-    const msg = `<div class="h-full grid place-items-center text-sm text-muted-foreground bg-secondary rounded">Map сүлжээнээс ачаалж чадсангүй</div>`;
-    const customerEl = document.getElementById("customerMap");
-    const deliveryEl = document.getElementById("deliveryMap");
-    if (customerEl) customerEl.innerHTML = msg;
-    if (deliveryEl) deliveryEl.innerHTML = msg;
+    const el = document.getElementById("customerMap");
+    if (el)
+      el.innerHTML = `<div class="h-full grid place-items-center text-sm text-muted-foreground bg-secondary rounded">Map сүлжээнээс ачаалж чадсангүй</div>`;
   };
   document.body.appendChild(script);
 }
@@ -29979,7 +29764,26 @@ function initCustomerMap(lat, lng) {
     tap: true,
     zoomControl: true,
   }).setView(start, has ? 15 : 12);
-  window.customerTileLayer = addTomudaMapTiles(window.customerMap);
+  window.customerTileFallback = false;
+  window.customerTileLayer = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    },
+  ).addTo(window.customerMap);
+  window.customerTileLayer.on("tileerror", () => {
+    if (window.customerTileFallback || !window.customerMap) return;
+    window.customerTileFallback = true;
+    if (window.customerTileLayer?.remove) window.customerTileLayer.remove();
+    window.customerTileLayer = L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap &copy; CARTO",
+      },
+    ).addTo(window.customerMap);
+  });
   const setPoint = (la, ln) => setCustomerMapPoint(la, ln);
   if (has) setPoint(start[0], start[1]);
   window.customerMap.on("click", (e) => setPoint(e.latlng.lat, e.latlng.lng));
