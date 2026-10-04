@@ -554,7 +554,7 @@ const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
 const RECEIPT_XLSX_COL_WIDTH_PX = [
-  20, 32, 112.6, 27, 58, 43, 32, 27, 20, 61, 61,
+  20, 32, 114.6, 27, 58, 43, 32, 27, 20, 61, 61,
 ];
 /** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
 const RECEIPT_XLSX_COL_MDW = 8;
