@@ -11556,7 +11556,7 @@ function receiptIbanLabelGap() {
     receiptXlsxRightFlushGap("Дансны дугаар:", "IBAN:", [
       RECEIPT_XLSX_COL_WIDTHS[1],
       RECEIPT_XLSX_COL_WIDTHS[2],
-    ]) + "\u00A0".repeat(16)
+    ]) + "\u00A0".repeat(28)
   );
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
