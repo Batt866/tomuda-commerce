@@ -47,6 +47,7 @@ const state = {
     reportProductId: "",
     reportOrderStatus: "all",
     salesReportShowAll: { products: false, employees: false, customers: false },
+    customerKind: "all",
   },
   promotionRules: { quantity: [], price: [], payment: [] },
   workerCustomer: "",
@@ -13942,15 +13943,65 @@ function customerCardPhonesHtml(c) {
 function customerListHead() {
   return `<div class="customer-list__head" aria-hidden="true"><span>Харилцагч</span><span>Хаяг</span><span class="customer-list__head-actions">Үйлдэл</span></div>`;
 }
+const CUSTOMER_KIND_LABELS = {
+  all: "Бүгд",
+  customer: "Харилцагч",
+  school: "Сургууль",
+  kindergarten: "Цэцэрлэг",
+};
+function customerOrgKind(c) {
+  const text = `${c?.name || ""} ${c?.companyName || ""}`
+    .toLowerCase()
+    .normalize("NFKC");
+  if (text.includes("цэцэрлэг")) return "kindergarten";
+  if (text.includes("сургууль")) return "school";
+  return "customer";
+}
+function customerKindCounts() {
+  const counts = { all: 0, customer: 0, school: 0, kindergarten: 0 };
+  for (const c of state.customers || []) {
+    const kind = customerOrgKind(c);
+    counts[kind] += 1;
+    counts.all += 1;
+  }
+  return counts;
+}
+function setCustomerKindFilter(kind) {
+  const next = String(kind || "all");
+  state.filters.customerKind = CUSTOMER_KIND_LABELS[next] ? next : "all";
+  render();
+}
+function customerKindFilterChipsHtml() {
+  const active = state.filters.customerKind || "all";
+  const counts = customerKindCounts();
+  const chips = ["all", "customer", "school", "kindergarten"]
+    .map((key) =>
+      categoryFilterChipBtn(
+        `${CUSTOMER_KIND_LABELS[key]} (${counts[key]})`,
+        key,
+        active,
+        "setCustomerKindFilter",
+      ),
+    )
+    .join("");
+  return `<div class="customer-kind-chips picker-cat-chips" role="tablist" aria-label="Төрлөөр шүүх">${chips}</div>`;
+}
+function customerKindTagHtml(c) {
+  const kind = customerOrgKind(c);
+  if (kind !== "school" && kind !== "kindergarten") return "";
+  return `<span class="customer-card__kind-tag">${esc(CUSTOMER_KIND_LABELS[kind])}</span>`;
+}
 function customerListRow(c, actionsHtml, active = false) {
   const addr = customerAddress(c);
   const sub = customerSubtitle(c);
-  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3></div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c, { variant: "rail" })}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
+  const kindTag = customerKindTagHtml(c);
+  return `<article class="customer-card${active ? " customer-card--active" : ""}" data-customer-id="${esc(c.id)}"><header class="customer-card__head">${customerAvatarHtml(c)}<div class="customer-card__identity"><div class="customer-card__text"><div class="customer-card__name-row"><h3 class="customer-card__name">${esc(customerDisplayName(c))}</h3>${kindTag}</div>${sub ? `<p class="customer-card__sub">${esc(sub)}</p>` : ""}${customerCardPhonesHtml(c)}</div></div></header><div class="customer-card__addr"><p class="customer-card__line" title="${esc(addr)}">${customerCardPinIcon()}<span>${esc(addr)}</span></p>${customerStoreRatingHtml(c, { variant: "rail" })}</div><footer class="customer-card__actions">${actionsHtml}</footer></article>`;
 }
 function focusSavedCustomer(customerId, customerName, opts = {}) {
   if (!customerId) return;
   state.currentView = "customers";
   state.searches.customers = "";
+  state.filters.customerKind = "all";
   state.customerHighlightId = customerId;
   render();
   if (!opts.silent) {
@@ -13971,8 +14022,12 @@ function focusSavedCustomer(customerId, customerName, opts = {}) {
 }
 function customersListHtml() {
   const q = state.searches.customers || "";
+  const kind = state.filters.customerKind || "all";
   let rows = sortCustomersByName(
-    state.customers.filter((c) => customerMatchesQuery(c, q)),
+    state.customers.filter((c) => {
+      if (kind !== "all" && customerOrgKind(c) !== kind) return false;
+      return customerMatchesQuery(c, q);
+    }),
   );
   const highlightId = state.customerHighlightId || "";
   if (highlightId) {
@@ -14007,7 +14062,7 @@ function customersView() {
       hasPermission("customerAdd.view")
         ? pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer")
         : "";
-  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${customersListHtml()}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${customerKindFilterChipsHtml()}${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${customersListHtml()}</div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Мэдээлэл татах уу?") {
   confirmModal(title, message, {
@@ -34767,6 +34822,7 @@ Object.assign(window, {
   setInventoryTab,
   setWarehouseTab,
   setCountCategory,
+  setCustomerKindFilter,
   setWorkerQty,
   setWorkerOrderActive,
   finishWorkerOrderEdit,
