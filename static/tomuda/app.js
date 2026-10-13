@@ -2298,59 +2298,39 @@ function normalizeOrderTotals() {
     }
   }
 }
+function compareOrdersChronoForReceipt(a, b) {
+  const dayA = orderTakenDay(a) || isoDay(a?.createdAt) || "";
+  const dayB = orderTakenDay(b) || isoDay(b?.createdAt) || "";
+  if (dayA !== dayB) return dayA.localeCompare(dayB);
+  const at = new Date(a?.createdAt || 0).getTime() || 0;
+  const bt = new Date(b?.createdAt || 0).getTime() || 0;
+  if (at !== bt) return at - bt;
+  return String(a?.id || "").localeCompare(String(b?.id || ""), "mn");
+}
+/**
+ * Сарын доторх №-ийг авсан өдөр + цагийн дарааллаар 1..n болгоно.
+ * Хуучин холилдсон seq-ийг хадгалахгүй — жагсаалт/хэвлэлт ижил дараалалтай гарна.
+ */
 function normalizeOrderReceiptNumbers() {
-  if (!Array.isArray(state.orders)) return;
-  // Taken day first, then create time — keeps № sequence with each order day.
-  const sorted = [...state.orders].sort((a, b) => {
-    const dayA = orderTakenDay(a) || isoDay(a?.createdAt) || "";
-    const dayB = orderTakenDay(b) || isoDay(b?.createdAt) || "";
-    if (dayA !== dayB) return dayA.localeCompare(dayB);
-    const at = new Date(a?.createdAt || 0).getTime();
-    const bt = new Date(b?.createdAt || 0).getTime();
-    if (at !== bt) return at - bt;
-    return String(a?.id || "").localeCompare(String(b?.id || ""), "mn");
-  });
-  const maxByMonth = {};
-  const usedByMonth = {};
-  const claimed = new Map();
-
-  for (const o of sorted) {
-    const takenMonth = receiptMonthKey(o);
-    const frozen = parseFrozenOrderReceiptNumber(o.receiptNumber);
-    // № month must match the day the order was taken.
-    if (frozen && takenMonth && frozen.monthKey !== takenMonth) {
-      o.receiptNumber = "";
-      o.receiptSeq = 0;
-      o.receiptMonth = takenMonth;
-    }
-    const month = takenMonth || frozen?.monthKey || o.receiptMonth || "";
+  if (!Array.isArray(state.orders)) return 0;
+  const byMonth = new Map();
+  for (const o of state.orders) {
+    const month = receiptMonthKey(o);
     if (!month) continue;
     o.receiptMonth = month;
-    if (!usedByMonth[month]) usedByMonth[month] = new Set();
-    const seq =
-      parseFrozenOrderReceiptNumber(o.receiptNumber)?.seq || Number(o.receiptSeq);
-    if (seq > 0 && !usedByMonth[month].has(seq)) {
-      usedByMonth[month].add(seq);
-      claimed.set(o.id, seq);
-      maxByMonth[month] = Math.max(maxByMonth[month] || 0, seq);
-    }
+    const rows = byMonth.get(month) || [];
+    rows.push(o);
+    byMonth.set(month, rows);
   }
-
-  for (const o of sorted) {
-    const month = receiptMonthKey(o) || o.receiptMonth || "";
-    if (!month) continue;
-    o.receiptMonth = month;
-    if (claimed.has(o.id)) {
-      o.receiptSeq = claimed.get(o.id);
-      freezeOrderReceiptNumber(o);
-      continue;
-    }
-    maxByMonth[month] = (maxByMonth[month] || 0) + 1;
-    o.receiptSeq = maxByMonth[month];
-    if (!usedByMonth[month]) usedByMonth[month] = new Set();
-    usedByMonth[month].add(o.receiptSeq);
-    freezeOrderReceiptNumber(o);
+  let changed = 0;
+  for (const [month, rows] of byMonth) {
+    rows.sort(compareOrdersChronoForReceipt);
+    rows.forEach((o, index) => {
+      o.receiptMonth = month;
+      if (assignOrderReceiptSeq(o, index + 1)) changed += 1;
+    });
   }
+  return changed;
 }
 /**
  * Тухайн сарын нэг ч захиалга хадгалах хугацаанаасаа хараахан гараагүй эсэх.
@@ -2383,7 +2363,10 @@ function compactRetainedReceiptSeqs(now = Date.now()) {
   let changed = 0;
   for (const rows of byMonth.values()) {
     rows.sort(
-      (a, b) => a.seq - b.seq || String(a.o.id).localeCompare(String(b.o.id)),
+      (a, b) =>
+        compareOrdersChronoForReceipt(a.o, b.o) ||
+        a.seq - b.seq ||
+        String(a.o.id).localeCompare(String(b.o.id)),
     );
     rows.forEach((row, i) => {
       const next = i + 1;
@@ -6912,14 +6895,16 @@ function applyRemoteState(payload, opts = {}) {
   ensureEmployeeEmails();
   ensureEmployeePercentDiscount();
   normalizeOrderTakenDays();
-  normalizeOrderReceiptNumbers();
+  const receiptRenumbered = normalizeOrderReceiptNumbers();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
   // Baseline against SERVER state. Marking local as clean here used to drop
   // never-POSTed products/customers so peers never saw them.
   reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
-  if (
+  if (receiptRenumbered) {
+    scheduleBackendSave();
+  } else if (
     !backendSaving &&
     !backendSaveFailedMessage &&
     !hasLocalOnlyEntities(payload.state) &&
@@ -7106,14 +7091,16 @@ function completeBootUiInit(options = {}) {
   ensureEmployeePercentDiscount();
   ensureDeliverySelection();
   normalizeOrderTakenDays();
-  normalizeOrderReceiptNumbers();
+  const receiptRenumbered = normalizeOrderReceiptNumbers();
   compactRetainedReceiptSeqs();
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
   state.workerQty = {};
   restoreAuthSession();
-  if (
+  if (receiptRenumbered) {
+    scheduleBackendSave();
+  } else if (
     !readLocalPendingState() &&
     !readLocalOrdersBackup().length &&
     !localStateDirty()
@@ -13066,11 +13053,16 @@ function orderReceiptExportSnapshots(
     }
     const selected = new Set(selectedIds);
     const picked = filtered.filter((o) => selected.has(String(o.id)));
-    if (picked.length) return picked.map(orderReceiptSnapshot);
+    if (picked.length) {
+      return [...picked]
+        .sort(compareOrdersByReceiptAsc)
+        .map(orderReceiptSnapshot);
+    }
     // Fall back to raw order lookup so a stale filter cannot empty a valid check.
     return selectedIds
       .map((id) => state.orders.find((o) => String(o.id) === id))
       .filter((o) => o && !orderIsCancelled(o))
+      .sort(compareOrdersByReceiptAsc)
       .map(orderReceiptSnapshot);
   }
   return filtered.map(orderReceiptSnapshot);
@@ -14386,18 +14378,14 @@ function compareOrdersNewestFirst(a, b) {
   if (seqB !== seqA) return seqB - seqA;
   return String(b?.id || "").localeCompare(String(a?.id || ""), "mn");
 }
-/** Баримтын №-ийг өдөр дотроо өсөхөөр жагсаана (№2608-1, №2608-2, …). */
+/** Баримтыг авсан өдөр/цаг + №-ийн өсөх дарааллаар жагсаана. */
 function compareOrdersByReceiptAsc(a, b) {
-  const dayA = orderTakenDay(a) || "";
-  const dayB = orderTakenDay(b) || "";
-  if (dayA !== dayB) return dayA.localeCompare(dayB);
+  const chrono = compareOrdersChronoForReceipt(a, b);
+  if (chrono) return chrono;
   const seqA = orderReceiptSeq(a);
   const seqB = orderReceiptSeq(b);
   if (seqA !== seqB) return seqA - seqB;
-  const at = new Date(a?.createdAt || 0).getTime();
-  const bt = new Date(b?.createdAt || 0).getTime();
-  if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
-  return String(a?.id || "").localeCompare(String(b?.id || ""), "mn");
+  return 0;
 }
 function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
   const workerRank = new Map(workerIds.map((id, idx) => [id, idx]));
@@ -32707,7 +32695,9 @@ function printOrderReceiptsNow(ids) {
   const found = idOrder
     .map((id) => state.orders.find((o) => o.id === id))
     .filter(Boolean);
-  const orders = found.filter((o) => !orderIsCancelled(o));
+  const orders = found
+    .filter((o) => !orderIsCancelled(o))
+    .sort(compareOrdersByReceiptAsc);
   if (!orders.length) {
     return alert(
       found.length ? "Цуцалсан захиалга хэвлэхгүй" : "Захиалга олдсонгүй",
