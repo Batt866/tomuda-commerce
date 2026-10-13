@@ -628,13 +628,13 @@ function receiptGridColgroup() {
 function receiptDeliveryDateValue(o) {
   return orderDeliveryDay(o) || "";
 }
-/** Display dates as M/D/YYYY like the original zarlaga sheet (7/15/2026). */
+/** Display dates as YYYY/M/D on every receipt and list (2026/9/2). */
 function formatDisplayDateParts(y, m, d) {
   const yy = String(y ?? "").padStart(4, "0");
   const mm = Number(m);
   const dd = Number(d);
   if (!yy || !mm || !dd) return "";
-  return `${mm}/${dd}/${yy}`;
+  return `${Number(yy)}/${mm}/${dd}`;
 }
 function formatIsoDayDisplay(iso) {
   const text = String(iso || "").trim();
@@ -642,7 +642,7 @@ function formatIsoDayDisplay(iso) {
   const [y, m, d] = text.split("-");
   return formatDisplayDateParts(y, m, d);
 }
-/** ҮНДСЭН / UI: delivery date as MM/DD/YYYY (сар/өдөр/он). */
+/** ҮНДСЭН / UI: delivery date as YYYY/M/D (он/сар/өдөр). */
 function receiptDeliveryDateDisplay(o) {
   const iso = receiptDeliveryDateValue(o);
   return formatIsoDayDisplay(iso) || iso || "";
@@ -1684,20 +1684,27 @@ function buildOrderReceiptNumber(o) {
 }
 function freezeOrderReceiptNumber(o) {
   if (!o) return "";
+  const takenMonth = receiptMonthKey(o);
   const frozen = parseFrozenOrderReceiptNumber(o.receiptNumber);
-  if (frozen) {
+  if (frozen && (!takenMonth || frozen.monthKey === takenMonth)) {
     o.receiptNumber = frozen.display;
     if (!(Number(o.receiptSeq) > 0)) o.receiptSeq = frozen.seq;
     if (!o.receiptMonth) o.receiptMonth = frozen.monthKey;
     return frozen.display;
   }
+  // Taken day moved to another month — rebuild so № stays with that day.
+  if (takenMonth) o.receiptMonth = takenMonth;
   const built = buildOrderReceiptNumber(o);
   if (built) o.receiptNumber = built;
   return built;
 }
 function formatReceiptNumber(o) {
   const frozen = parseFrozenOrderReceiptNumber(o?.receiptNumber);
-  if (frozen) return frozen.display;
+  const takenMonth = receiptMonthKey(o);
+  // Keep the frozen № only when it still belongs to the order's taken month.
+  if (frozen && (!takenMonth || frozen.monthKey === takenMonth)) {
+    return frozen.display;
+  }
   return buildOrderReceiptNumber(o);
 }
 function receiptMoney(n) {
@@ -2293,20 +2300,35 @@ function normalizeOrderTotals() {
 }
 function normalizeOrderReceiptNumbers() {
   if (!Array.isArray(state.orders)) return;
-  const sorted = [...state.orders].sort(
-    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
-  );
+  // Taken day first, then create time — keeps № sequence with each order day.
+  const sorted = [...state.orders].sort((a, b) => {
+    const dayA = orderTakenDay(a) || isoDay(a?.createdAt) || "";
+    const dayB = orderTakenDay(b) || isoDay(b?.createdAt) || "";
+    if (dayA !== dayB) return dayA.localeCompare(dayB);
+    const at = new Date(a?.createdAt || 0).getTime();
+    const bt = new Date(b?.createdAt || 0).getTime();
+    if (at !== bt) return at - bt;
+    return String(a?.id || "").localeCompare(String(b?.id || ""), "mn");
+  });
   const maxByMonth = {};
   const usedByMonth = {};
   const claimed = new Map();
 
   for (const o of sorted) {
+    const takenMonth = receiptMonthKey(o);
     const frozen = parseFrozenOrderReceiptNumber(o.receiptNumber);
-    const month = frozen?.monthKey || o.receiptMonth || receiptMonthKey(o);
+    // № month must match the day the order was taken.
+    if (frozen && takenMonth && frozen.monthKey !== takenMonth) {
+      o.receiptNumber = "";
+      o.receiptSeq = 0;
+      o.receiptMonth = takenMonth;
+    }
+    const month = takenMonth || frozen?.monthKey || o.receiptMonth || "";
     if (!month) continue;
-    if (!o.receiptMonth) o.receiptMonth = month;
+    o.receiptMonth = month;
     if (!usedByMonth[month]) usedByMonth[month] = new Set();
-    const seq = frozen?.seq || Number(o.receiptSeq);
+    const seq =
+      parseFrozenOrderReceiptNumber(o.receiptNumber)?.seq || Number(o.receiptSeq);
     if (seq > 0 && !usedByMonth[month].has(seq)) {
       usedByMonth[month].add(seq);
       claimed.set(o.id, seq);
@@ -2315,9 +2337,9 @@ function normalizeOrderReceiptNumbers() {
   }
 
   for (const o of sorted) {
-    const frozen = parseFrozenOrderReceiptNumber(o.receiptNumber);
-    const month = frozen?.monthKey || o.receiptMonth || receiptMonthKey(o);
+    const month = receiptMonthKey(o) || o.receiptMonth || "";
     if (!month) continue;
+    o.receiptMonth = month;
     if (claimed.has(o.id)) {
       o.receiptSeq = claimed.get(o.id);
       freezeOrderReceiptNumber(o);
@@ -14364,6 +14386,19 @@ function compareOrdersNewestFirst(a, b) {
   if (seqB !== seqA) return seqB - seqA;
   return String(b?.id || "").localeCompare(String(a?.id || ""), "mn");
 }
+/** Баримтын №-ийг өдөр дотроо өсөхөөр жагсаана (№2608-1, №2608-2, …). */
+function compareOrdersByReceiptAsc(a, b) {
+  const dayA = orderTakenDay(a) || "";
+  const dayB = orderTakenDay(b) || "";
+  if (dayA !== dayB) return dayA.localeCompare(dayB);
+  const seqA = orderReceiptSeq(a);
+  const seqB = orderReceiptSeq(b);
+  if (seqA !== seqB) return seqA - seqB;
+  const at = new Date(a?.createdAt || 0).getTime();
+  const bt = new Date(b?.createdAt || 0).getTime();
+  if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
+  return String(a?.id || "").localeCompare(String(b?.id || ""), "mn");
+}
 function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
   const workerRank = new Map(workerIds.map((id, idx) => [id, idx]));
   const deliveryRank = new Map(deliveryIds.map((id, idx) => [id, idx]));
@@ -14388,7 +14423,7 @@ function sortOrdersBySelectedPeople(orders, workerIds = [], deliveryIds = []) {
           : Number.MAX_SAFE_INTEGER;
       if (ar !== br) return ar - br;
     }
-    return compareOrdersNewestFirst(a, b);
+    return compareOrdersByReceiptAsc(a, b);
   });
 }
 function canPickWarehouseWorkers() {
@@ -27491,7 +27526,7 @@ function workerOrdersList() {
   }
   const day = state.filters.workerDate;
   if (day) list = list.filter((o) => orderMatchesWorkerDate(o, day));
-  return list.sort(compareOrdersNewestFirst);
+  return list.sort(compareOrdersByReceiptAsc);
 }
 function workerViewTabsHtml(tab) {
   if (state.editingOrderId) return "";
