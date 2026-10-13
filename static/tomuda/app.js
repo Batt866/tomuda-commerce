@@ -1973,9 +1973,11 @@ function assignOrderReceiptSeq(o, seq) {
   // Frozen display would otherwise keep the old № after seq changes.
   o.receiptNumber = "";
   freezeOrderReceiptNumber(o);
-  return (
-    prevSeq !== o.receiptSeq || prevDisplay !== String(o.receiptNumber || "")
-  );
+  const changed =
+    prevSeq !== o.receiptSeq || prevDisplay !== String(o.receiptNumber || "");
+  // Stamp updatedAt so peer merge keeps the renumbered № over a stale server row.
+  if (changed) o.updatedAt = new Date().toISOString();
+  return changed;
 }
 function nextReceiptSeq(month) {
   let max = 0;
@@ -6360,18 +6362,22 @@ function hasUnsyncedDeletions(
   );
 }
 /**
- * After peer pull / upsert: keep dirty when this device has never-POSTed
- * entity ids OR deletion tombstones. Otherwise mark merged memory clean.
+ * After peer pull / upsert: baseline the dirty marker against SERVER state.
+ * (Marking against local memory used to hide receipt renumbers — dirty became
+ * false so flushBackendSave never POSTed the fixed №.)
  */
 function reconcileBackendMarkerFromServer(serverState, updatedAt = "") {
   if (updatedAt) serverUpdatedAt = updatedAt;
   if (!serverState || typeof serverState !== "object") return false;
-  if (hasLocalOnlyEntities(serverState) || hasUnsyncedDeletions(serverState)) {
-    syncBackendSaveMarker(serverState);
+  syncBackendSaveMarker(serverState);
+  if (
+    hasLocalOnlyEntities(serverState) ||
+    hasUnsyncedDeletions(serverState) ||
+    localStateDirty()
+  ) {
     if (canAutoSaveBackendState()) scheduleBackendSave();
     return true;
   }
-  syncBackendSaveMarker();
   clearLocalPendingState();
   return false;
 }
@@ -6899,16 +6905,16 @@ function applyRemoteState(payload, opts = {}) {
   normalizeOrderPayments();
   normalizeOrderDeliveryDates();
   normalizeOrderTotals();
-  // Baseline against SERVER state. Marking local as clean here used to drop
-  // never-POSTed products/customers so peers never saw them.
+  // Baseline against SERVER so local receipt renumber stays dirty until POST.
   reconcileBackendMarkerFromServer(payload.state, payload.updatedAt || "");
   if (receiptRenumbered) {
-    scheduleBackendSave();
+    void criticalBackendSave({ fast: true });
   } else if (
     !backendSaving &&
     !backendSaveFailedMessage &&
     !hasLocalOnlyEntities(payload.state) &&
     !hasUnsyncedDeletions(payload.state) &&
+    !localStateDirty() &&
     serverSnapshotLooksFresherThanLocal(payload.state, payload.updatedAt || "")
   ) {
     clearLocalPendingState();
@@ -7099,7 +7105,8 @@ function completeBootUiInit(options = {}) {
   state.workerQty = {};
   restoreAuthSession();
   if (receiptRenumbered) {
-    scheduleBackendSave();
+    // Must POST immediately — deferred autosave used to no-op after marker sync.
+    void criticalBackendSave({ fast: true });
   } else if (
     !readLocalPendingState() &&
     !readLocalOrdersBackup().length &&
@@ -9271,6 +9278,8 @@ async function mergeServerStateBeforeSave() {
     if (JSON.stringify(merged) !== JSON.stringify(persistentState())) {
       applyPersistentState(merged);
       restoreSessionSnapshot(session);
+      normalizeOrderTakenDays();
+      normalizeOrderReceiptNumbers();
       if (!shouldDeferBackendSync()) safeRender();
     }
     if (latest.updatedAt) serverUpdatedAt = latest.updatedAt;

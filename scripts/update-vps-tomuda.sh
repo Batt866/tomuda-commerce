@@ -45,6 +45,7 @@ pip install -q -r requirements.txt
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py sync_product_images --timeout 8 || true
+python manage.py resequence_receipts --apply --force || true
 systemctl restart "$SERVICE"
 
 echo ""

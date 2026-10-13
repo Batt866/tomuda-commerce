@@ -41,6 +41,7 @@ from dashboard.profile_images import (
     save_profile_image,
     update_profile_image_in_state,
 )
+from dashboard.receipt_seq import ensure_chrono_receipt_seqs
 from dashboard.seed_data import default_state
 from dashboard.state_merge import merge_app_states, merge_order_payment_fields
 from dashboard.state_sanitize import sanitize_app_state
@@ -116,6 +117,11 @@ def get_state(request):
     retained = _retained_orders_state(data)
     if len(retained.get("orders") or []) < len(data.get("orders") or []):
         data = retained
+        changed = True
+    # One-shot: fix scrambled month receipt № on the server so clients
+    # cannot keep overwriting with a dirty-marker bug that never POSTed.
+    data, receipt_changed = ensure_chrono_receipt_seqs(data)
+    if receipt_changed:
         changed = True
     if changed:
         row.data = data
