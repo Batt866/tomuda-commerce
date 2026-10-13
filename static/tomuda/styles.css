@@ -1672,6 +1672,23 @@ textarea.text-sm,
   white-space: normal;
 }
 
+.customer-card__kind-tag {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #c4a574 28%, var(--hex-secondary));
+  color: #6b5330;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.customer-kind-chips {
+  margin: 0 0 10px;
+}
+
 .customer-card__phones {
   flex: 0 0 auto;
   display: flex;
