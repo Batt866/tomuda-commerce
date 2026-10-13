@@ -555,7 +555,7 @@ const RECEIPT_BANK_IBAN_SHORT = "60000500";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /** Excel A–K pixel widths from the sample sheet (100% zoom, Format tooltip). */
 const RECEIPT_XLSX_COL_WIDTH_PX = [
-  20, 32, 114.4, 27, 58, 43, 32, 27, 20, 61, 61,
+  22, 34, 118, 29, 62, 46, 34, 29, 22, 65, 65,
 ];
 /** Arial 11 max-digit width. MDW=7 stored columns too wide on Microsoft Excel. */
 const RECEIPT_XLSX_COL_MDW = 8;
@@ -10254,10 +10254,10 @@ td, th { border: none; }
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page {
   position: relative;
-  width: 184mm;
-  max-width: 184mm;
-  margin: 0;
-  /* A4: left/top margin via @page; right smaller than left. */
+  width: ${receiptColWidthSum()}px;
+  max-width: ${receiptColWidthSum()}px;
+  margin: 0 auto;
+  /* Match Excel column pixel widths instead of stretching to A4. */
   padding: 4mm 0 2mm 0;
   box-sizing: border-box;
   font-size: 9pt;
@@ -11221,11 +11221,11 @@ tbody.receipt-footer-keep {
   }
   .receipt-page {
     position: relative;
-    width: 184mm;
-    max-width: 184mm;
+    width: ${receiptColWidthSum()}px;
+    max-width: ${receiptColWidthSum()}px;
     min-height: auto;
     padding: 0;
-    margin: 0;
+    margin: 0 auto;
     box-shadow: none !important;
     overflow: visible;
     font-size: 9pt;
@@ -12787,7 +12787,7 @@ function receiptWorksheetXml(
   const fitsOnePage = lastRow <= RECEIPT_XLSX_PAGE_ROWS;
   const fitH = fitsOnePage ? "1" : "0";
   // Page Setup from the №260941 video: 0.4 / 0.4 / 0.45 / 0.35 in, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" zoomScale="80" zoomScaleNormal="80" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT.toFixed(2)}" customHeight="1"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" zoomScale="100" zoomScaleNormal="100" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT.toFixed(2)}" customHeight="1"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -32563,10 +32563,13 @@ async function sendThermalReceiptsToPrinter(plugin, address, orders) {
   try {
     for (let i = 0; i < orders.length; i += 1) {
       const bytes = thermalEscPosReceipt(orders[i]);
-      await plugin.write({
+      const payload = {
         address,
         data: thermalBytesToBase64(bytes),
-      });
+      };
+      // Two identical copies.
+      await plugin.write(payload);
+      await plugin.write(payload);
     }
   } finally {
     try {
@@ -32615,7 +32618,11 @@ function printOrdersViaBrowser(orders) {
     }));
     const buildHtml = () => {
       const pages = snapshots
-        .map((o, i) => receiptExcelPages(o, logoSrc, layouts[i]))
+        .flatMap((o, i) => {
+          const page = receiptExcelPages(o, logoSrc, layouts[i]);
+          // Two identical copies so print matches the usual Excel pair.
+          return [page, page];
+        })
         .join("");
       return `<!DOCTYPE html><html class="receipt-a4-print"><head><meta charset="utf-8"><title> </title><style>${RECEIPT_EXCEL_STYLES}</style></head><body>${pages}</body></html>`;
     };
