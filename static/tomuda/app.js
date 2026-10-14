@@ -10269,15 +10269,22 @@ body {
 }
 table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
 td, th { border: none; }
-.receipt-excel-sheet { display: block; background: #fff; color: ${RECEIPT_TEXT}; font-family: ${RECEIPT_FONT}; }
+.receipt-excel-sheet {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  color: ${RECEIPT_TEXT};
+  font-family: ${RECEIPT_FONT};
+}
 .receipt-excel-sheet + .receipt-excel-sheet { page-break-before: always; mso-page-break-before: always; }
 .receipt-page {
   position: relative;
-  width: ${receiptColWidthSum()}px;
-  max-width: ${receiptColWidthSum()}px;
+  /* Excel fitToWidth: fill printable A4 width; columns keep % ratios. */
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  /* Match Excel column pixel widths instead of stretching to A4. */
-  padding: 4mm 0 2mm 0;
+  padding: 0;
   box-sizing: border-box;
   font-size: 9pt;
   line-height: 1.15;
@@ -10431,7 +10438,9 @@ ${receiptGridColWidthCss()}
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__barcode {
   text-align: center;
   font-size: 9pt;
-  word-break: break-all;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
 }
 .receipt-grid--sheet tr.receipt-items__row > td.receipt-items__price {
   text-align: right;
@@ -10708,13 +10717,13 @@ tbody.receipt-footer-keep {
 .receipt-items__barcode {
   width: 18%;
   text-align: center;
-  white-space: normal;
-  word-break: break-all;
-  overflow-wrap: anywhere;
-  overflow: visible;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: clip;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
-  font-size: 8px;
+  font-size: 8pt;
   line-height: 1.15;
 }
 .receipt-items__qty { width: 7%; text-align: center; font-size: 9pt; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -11285,14 +11294,17 @@ tbody.receipt-footer-keep {
   }
   .receipt-page {
     position: relative;
-    width: ${receiptColWidthSum()}px;
-    max-width: ${receiptColWidthSum()}px;
+    width: 100%;
+    max-width: 100%;
     min-height: auto;
     padding: 0;
     margin: 0 auto;
     box-shadow: none !important;
     overflow: visible;
     font-size: 9pt;
+  }
+  .receipt-excel-sheet {
+    width: 100%;
   }
   .receipt-logo.receipt-logo--overlay {
     top: 0;
@@ -13326,24 +13338,29 @@ function ensureReceiptScreenStyles() {
   padding: 16px;
 }
 .wh-receipt-preview__doc.receipt-page {
-  /* Exact Excel sheet width — do not stretch to A4 (that warped columns / IBAN). */
-  min-height: 0;
-  width: ${receiptColWidthSum()}px !important;
-  max-width: ${receiptColWidthSum()}px !important;
-  min-width: ${receiptColWidthSum()}px !important;
+  /* A4 paper preview — content fills the printable area like Excel fitToWidth. */
+  width: 210mm !important;
+  max-width: 210mm !important;
+  min-width: 210mm !important;
+  min-height: 297mm;
   margin: 0 auto;
-  padding: 8px 0 6px !important;
+  padding: 14mm 10mm 12mm 16mm !important;
+  box-sizing: border-box !important;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
   overflow: visible;
 }
+.wh-receipt-preview__doc.receipt-page .receipt-grid--sheet {
+  width: 100% !important;
+  max-width: 100% !important;
+}
 .wh-receipt-preview__doc.receipt-page .receipt-logo.receipt-logo--overlay {
-  left: 0 !important;
-  top: 0 !important;
-  width: ${RECEIPT_LOGO_COL_PX}px !important;
+  left: 16mm !important;
+  top: 14mm !important;
+  width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  min-width: ${RECEIPT_LOGO_COL_PX}px !important;
-  max-width: ${RECEIPT_LOGO_COL_PX}px !important;
+  min-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
+  max-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   min-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   object-fit: contain;
@@ -13356,6 +13373,9 @@ function ensureReceiptScreenStyles() {
   .wh-receipt-preview__scroll {
     padding: 8px;
     margin: 0 -2px;
+  }
+  .wh-receipt-preview__doc.receipt-page {
+    min-width: 210mm;
   }
 }
 `;
