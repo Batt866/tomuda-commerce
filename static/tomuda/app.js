@@ -741,9 +741,9 @@ function receiptInfoRows(o) {
     ),
   ];
   const addrHtml = esc(f.addressPlain || "-");
-  const ibanGap = receiptIbanLabelGap();
-  // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13). Value «ТОМУДА групп».
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Khan bank</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-bc"><span>Дансны дугаар:</span><span class="receipt-grid__iban-gap">${ibanGap}</span><span class="receipt-grid__iban-tag">IBAN:</span></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  // ҮНДСЭН R9–R13: B:C | D:E | F:H label | F:K address (R10–R13).
+  // Label cell rowspan=2 + flex flush — numbers stay on separate rows (no NBSP overflow).
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Khan bank</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" rowspan="2" class="receipt-grid__iban-bc"><div class="receipt-grid__iban-bc-inner"><span class="receipt-grid__iban-head">Дансны дугаар:</span><span class="receipt-grid__iban-tag">IBAN:</span></div></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -993,11 +993,12 @@ function receiptGrossRowHtml(o) {
 /** SummarySection — grand → cash settle note → pay term (cash note above term). */
 function receiptSummaryRowsHtml(sub, vat, payable, payTerm, o) {
   const grandNote = receiptGrandNote(o);
-  const subRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">Бараа ажил үйлчилгээний дүн</td><td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value">${receiptMoneyDetailed(sub)}</td></tr>`;
-  const vatRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">НӨАТ</td><td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value">${receiptMoneyDetailed(vat)}</td></tr>`;
+  // Match Excel merges: label B:D, mid E:I, amount J:K.
+  const subRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">Бараа ажил үйлчилгээний дүн</td><td colspan="5" class="receipt-grid__summary-rule"></td><td colspan="2" class="receipt-grid__summary-value">${receiptMoneyDetailed(sub)}</td></tr>`;
+  const vatRow = `<tr class="receipt-grid__summary"><td></td><td colspan="3" class="receipt-grid__summary-label">НӨАТ</td><td colspan="5" class="receipt-grid__summary-rule"></td><td colspan="2" class="receipt-grid__summary-value">${receiptMoneyDetailed(vat)}</td></tr>`;
   const noteCell = grandNote
-    ? `<td colspan="6" class="receipt-grid__summary-note">${esc(grandNote)}</td><td class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`
-    : `<td colspan="6" class="receipt-grid__summary-rule"></td><td class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`;
+    ? `<td colspan="5" class="receipt-grid__summary-note">${esc(grandNote)}</td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`
+    : `<td colspan="5" class="receipt-grid__summary-rule"></td><td colspan="2" class="receipt-grid__summary-value receipt-grid__summary-value--grand">${receiptMoney(payable)}</td>`;
   const grandRow = `<tr class="receipt-grid__summary receipt-grid__summary--grand"><td></td><td colspan="3" class="receipt-grid__summary-label receipt-grid__summary-label--grand">Таны нийт төлөх дүн</td>${noteCell}</tr>`;
   const term = payTerm || receiptPaymentTermDisplay(o);
   const payRow = `<tr class="receipt-grid__summary receipt-grid__summary--pay"><td></td><td colspan="3" class="receipt-grid__summary-label">Төлбөрийн нөхцөл</td><td colspan="3"></td><td colspan="4" class="receipt-grid__pay-opt receipt-grid__pay-opt--on">${esc(term)}</td></tr>`;
@@ -10478,13 +10479,13 @@ ${receiptGridColWidthCss()}
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--promo-gap > td {
   border: none !important;
-  height: 4mm;
+  height: 14.25pt;
   padding: 0 !important;
   background: transparent !important;
 }
 .receipt-grid--sheet tr.receipt-grid__spacer--gross-promo > td {
   border: none !important;
-  height: 15px;
+  height: 14.25pt;
   padding: 0 !important;
   background: transparent !important;
 }
@@ -10826,7 +10827,7 @@ tbody.receipt-footer-keep {
   height: 14.25pt;
   padding: 0 6px;
   font-weight: 700;
-  font-size: 9px;
+  font-size: 9pt;
   border: none !important;
 }
 .receipt-grid--sheet .receipt-grid__gross .receipt-grid__gross-label {
@@ -10850,8 +10851,13 @@ tbody.receipt-footer-keep {
 .receipt-grid--sheet .receipt-grid__summary td {
   height: 14.25pt;
   padding: 0 6px;
-  font-size: 11pt;
+  font-size: 9pt;
   line-height: 1.15;
+}
+.receipt-grid--sheet .receipt-grid__summary .receipt-grid__summary-value {
+  font-size: 9pt;
+  text-align: right !important;
+  white-space: nowrap;
 }
 .receipt-grid--sheet .receipt-grid__summary--grand td {
   background: ${RECEIPT_GRAND_BG} !important;
@@ -10919,7 +10925,7 @@ tbody.receipt-footer-keep {
 .receipt-grid__settle-note td { padding: 1px 0 !important; }
 .receipt-grid__settle-note-text {
   text-align: center !important;
-  font-size: 7.5px;
+  font-size: 7.5pt;
   line-height: 1.25;
   padding: 3px 6px !important;
   color: ${RECEIPT_TEXT};
@@ -11062,7 +11068,14 @@ tbody.receipt-footer-keep {
 .receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 18pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
 .receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; vertical-align: middle !important; text-align: left !important; }
-.receipt-grid--sheet .receipt-grid__bank td { vertical-align: middle !important; text-align: left !important; }
+.receipt-grid--sheet .receipt-grid__bank td {
+  vertical-align: middle !important;
+  text-align: left !important;
+  height: 14.25pt;
+  min-height: 14.25pt;
+  line-height: 1.15;
+  overflow: hidden;
+}
 .receipt-grid__meta--email .receipt-grid__value--email {
   font-size: 9pt !important;
   font-weight: 400 !important;
@@ -11070,43 +11083,76 @@ tbody.receipt-footer-keep {
 .receipt-grid__label {
   color: ${RECEIPT_TEXT};
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
   font-weight: 400;
   font-size: 9pt;
 }
 .receipt-grid__value { font-weight: 400; font-family: ${RECEIPT_FONT}; color: #000; font-size: 9pt; }
 .receipt-grid__value b { font-weight: 700; font-size: inherit; }
 .receipt-grid__value--address { white-space: normal; line-height: 1.15; font-weight: 400; color: #000; font-size: 9pt; }
-.receipt-grid__iban-nums { font-weight: 700; font-size: 9pt !important; line-height: 1.25; }
-.receipt-grid__iban-nums b { font-size: 9pt !important; font-weight: 700; }
 .receipt-grid__iban-bc {
   text-align: left !important;
-  white-space: nowrap;
   font-size: 9pt !important;
   font-weight: 400;
   vertical-align: top !important;
-  padding-top: 1px !important;
-  padding-right: 0 !important;
+  padding: 2px 2px 0 !important;
   background: transparent !important;
-  overflow: visible;
+  overflow: hidden !important;
 }
-.receipt-grid__iban-gap {
-  white-space: pre;
+.receipt-grid__iban-bc-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
 }
-.receipt-grid__iban-bc > span:first-child {
+.receipt-grid__iban-head {
   font-size: 11pt !important;
+  font-weight: 400;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+}
+.receipt-grid__iban-tag {
+  font-size: 9pt !important;
+  font-weight: 400;
+  flex: 0 0 auto;
+}
+.receipt-grid--sheet tr.receipt-grid__bank--iban {
+  height: 14.25pt;
 }
 .receipt-grid--sheet .receipt-grid__bank--iban > td {
+  vertical-align: middle !important;
+  height: 14.25pt !important;
+  max-height: 14.25pt !important;
+  overflow: hidden !important;
+}
+.receipt-grid--sheet .receipt-grid__bank--iban > td.receipt-grid__iban-bc {
   vertical-align: top !important;
+  height: auto !important;
+  max-height: none !important;
 }
 .receipt-grid__iban-nums {
-  text-align: left !important;
-  vertical-align: top !important;
-  line-height: 1.25;
+  display: table-cell;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-weight: 700 !important;
+  font-size: 9pt !important;
+  line-height: 14.25pt !important;
+  height: 14.25pt !important;
+  max-height: 14.25pt !important;
   white-space: nowrap;
-  padding-top: 1px !important;
-  overflow: visible;
+  padding: 0 2px !important;
+  overflow: hidden !important;
+  position: relative;
+  z-index: 1;
 }
+.receipt-grid__iban-nums b { font-size: 9pt !important; font-weight: 700; }
 .receipt-info__value,
 .receipt-info__address-text,
 .receipt-items__promo-label,
@@ -11569,15 +11615,13 @@ function receiptXlsxRightFlushGap(head, tail, cols, headScale = 1) {
     receiptXlsxTextPx(tail);
   return nbsp.repeat(Math.max(1, Math.floor(room / step)));
 }
-/** Shared web + Excel IBAN label padding (flush to column D). */
+/** Excel-only IBAN label padding (flush «IBAN:» to column D). HTML uses flex. */
 function receiptIbanLabelGap() {
-  return (
-    receiptXlsxRightFlushGap(
-      "Дансны дугаар:",
-      "IBAN:",
-      [RECEIPT_XLSX_COL_WIDTHS[1], RECEIPT_XLSX_COL_WIDTHS[2]],
-      11 / 9,
-    ) + "\u00A0".repeat(28)
+  return receiptXlsxRightFlushGap(
+    "Дансны дугаар:",
+    "IBAN:",
+    [RECEIPT_XLSX_COL_WIDTHS[1], RECEIPT_XLSX_COL_WIDTHS[2]],
+    11 / 9,
   );
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
@@ -13282,21 +13326,25 @@ function ensureReceiptScreenStyles() {
   padding: 16px;
 }
 .wh-receipt-preview__doc.receipt-page {
+  /* Exact Excel sheet width — do not stretch to A4 (that warped columns / IBAN). */
   min-height: 0;
-  width: 210mm;
-  max-width: 210mm;
+  width: ${receiptColWidthSum()}px !important;
+  max-width: ${receiptColWidthSum()}px !important;
+  min-width: ${receiptColWidthSum()}px !important;
   margin: 0 auto;
-  /* Match A4 print: top/left larger, right smaller than left */
-  padding: 14mm 8mm 12mm 18mm;
+  padding: 8px 0 6px !important;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
+  overflow: visible;
 }
 .wh-receipt-preview__doc.receipt-page .receipt-logo.receipt-logo--overlay {
-  left: 18mm;
-  top: 14mm;
-  width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: ${RECEIPT_LOGO_COL_PX}px !important;
   height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-  max-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
+  min-width: ${RECEIPT_LOGO_COL_PX}px !important;
+  max-width: ${RECEIPT_LOGO_COL_PX}px !important;
+  min-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   object-fit: contain;
   object-position: left bottom;
@@ -13308,10 +13356,6 @@ function ensureReceiptScreenStyles() {
   .wh-receipt-preview__scroll {
     padding: 8px;
     margin: 0 -2px;
-  }
-  .wh-receipt-preview__doc.receipt-page {
-    min-width: 210mm;
-    padding: 14mm 8mm 12mm 18mm;
   }
 }
 `;
