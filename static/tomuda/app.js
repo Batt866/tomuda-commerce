@@ -586,12 +586,19 @@ const RECEIPT_XLSX_COL_LETTERS = "abcdefghijk";
 function receiptColWidthSum() {
   return RECEIPT_XLSX_COL_WIDTH_PX.reduce((sum, width) => sum + Number(width), 0);
 }
-function receiptGridColWidthCss() {
-  const sum = receiptColWidthSum();
+function receiptGridColPercents() {
+  const sum = receiptColWidthSum() || 1;
   return RECEIPT_XLSX_COL_WIDTH_PX.map(
-    (width, index) =>
-      `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: calc(100% * ${width} / ${sum}); }`,
-  ).join(" ");
+    (width) => `${((Number(width) / sum) * 100).toFixed(3)}%`,
+  );
+}
+function receiptGridColWidthCss() {
+  return receiptGridColPercents()
+    .map(
+      (pct, index) =>
+        `.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}, col.receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]} { width: ${pct} !important; }`,
+    )
+    .join(" ");
 }
 function receiptPartyFields(o) {
   const c = state.customers.find((x) => x.id === o.customerId) || {},
@@ -624,11 +631,12 @@ function receiptPartyFields(o) {
   };
 }
 function receiptGridColgroup() {
-  const sum = receiptColWidthSum();
-  return `<colgroup>${RECEIPT_XLSX_COL_WIDTH_PX.map(
-    (width, index) =>
-      `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:calc(100% * ${width} / ${sum})">`,
-  ).join("")}</colgroup>`;
+  return `<colgroup>${receiptGridColPercents()
+    .map(
+      (pct, index) =>
+        `<col class="receipt-grid__${RECEIPT_XLSX_COL_LETTERS[index]}" style="width:${pct}">`,
+    )
+    .join("")}</colgroup>`;
 }
 function receiptDeliveryDateValue(o) {
   return orderDeliveryDay(o) || "";
@@ -746,8 +754,8 @@ function receiptInfoRows(o) {
     ),
   ];
   const addrHtml = esc(f.addressPlain || "-");
-  // Same B:C label string as the Excel export so print and .xlsx match.
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Khan bank</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" rowspan="2" class="receipt-grid__iban-bc">${RECEIPT_IBAN_ROW_LABEL}</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  // Excel B12:C12 = «Дансны дугаар:» + gap + «IBAN:»; B13:C13 empty; D:E numbers.
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Khan bank</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__iban-bc"><div class="receipt-grid__iban-line"><span>Дансны дугаар:</span><span>IBAN:</span></div></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2"></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -11112,7 +11120,21 @@ tbody.receipt-footer-keep {
   padding: 0 2px !important;
   background: transparent !important;
   overflow: visible !important;
-  white-space: pre !important;
+}
+.receipt-grid__iban-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+  box-sizing: border-box;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+.receipt-grid__iban-line span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 9pt;
+  font-weight: 400;
 }
 .receipt-grid--sheet tr.receipt-grid__bank--iban {
   height: 14.25pt;
@@ -11298,7 +11320,8 @@ tbody.receipt-footer-keep {
     max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
     object-position: left bottom;
   }
-  .receipt-grid { max-width: none; font-size: 9pt; }
+  .receipt-grid { max-width: none; width: 100% !important; table-layout: fixed !important; font-size: 9pt; }
+  .receipt-grid__iban-line { flex-wrap: nowrap !important; white-space: nowrap !important; }
   .receipt-title { font-size: 11pt; text-align: center !important; }
   .receipt-grid__brand { font-size: 11pt; padding-left: 0 !important; }
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
