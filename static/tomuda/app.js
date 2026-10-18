@@ -11073,7 +11073,7 @@ tbody.receipt-footer-keep {
   line-height: 1.15;
   box-sizing: border-box;
 }
-.receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 18pt; }
+.receipt-grid__header--title td { padding-top: 0 !important; padding-bottom: 0 !important; height: 31.5pt; }
 .receipt-grid--sheet .receipt-grid__header td { line-height: 1.15; }
 .receipt-grid__meta td { font-size: 9pt; line-height: 1.15; padding: 1px 2px !important; height: 14.25pt; vertical-align: middle !important; text-align: left !important; }
 .receipt-grid--sheet .receipt-grid__bank td {
