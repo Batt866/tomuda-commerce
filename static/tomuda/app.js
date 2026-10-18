@@ -11704,27 +11704,9 @@ function receiptXlsxColsXml() {
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
   }).join("");
 }
+/** Zarlaga .xlsx styles — keep Excel-standard 11pt default (no 15pt “zoom”). */
 function receiptExpenseXlsxStylesXml() {
-  let xml = receiptXlsxStylesXml();
-  xml = xml.replace(
-    '<fonts count="18"><font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font>',
-    '<fonts count="19"><font><sz val="15"/><color rgb="FF000000"/><name val="Arial"/></font>',
-  );
-  xml = xml.replace(
-    "</fonts>",
-    '<font><sz val="11"/><color rgb="FF000000"/><name val="Arial"/></font></fonts>',
-  );
-  xml = xml.split('numFmtId="4" fontId="0" fillId="0" borderId="3"').join(
-    'numFmtId="4" fontId="18" fillId="0" borderId="3"',
-  );
-  xml = xml
-    .split(
-      'numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
-    )
-    .join(
-      'numFmtId="0" fontId="18" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/>',
-    );
-  return xml;
+  return receiptXlsxStylesXml();
 }
 function excelSerialFromDate(value) {
   const d = value ? new Date(value) : new Date();
