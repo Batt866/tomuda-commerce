@@ -552,6 +552,9 @@ const RECEIPT_WARN_BG = "#F2F2F2";
 const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
+/** Exact label from zarlaga-receipt-undsen.xls B12 (9pt Arial, B:C merge). */
+const RECEIPT_IBAN_ROW_LABEL =
+  "Дансны дугаар:" + " ".repeat(21) + "IBAN:" + " ".repeat(6);
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /**
  * Excel A–K widths from zarlaga-receipt-undsen.xls (Format → Column Width).
@@ -12495,17 +12498,12 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
-  // B:C = «Дансны дугаар:» left + gap + «IBAN:» flush against D.
-  const ibanLabelGap = receiptIbanLabelGap();
+  // B:C = undsen B12 literal («Дансны дугаар:» + 21 spaces + «IBAN:»).
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
-      siRich([
-        { t: "Дансны дугаар:", sz: 11 },
-        { t: ibanLabelGap, sz: 9 },
-        { t: "IBAN:", sz: 9 },
-      ]),
+      si(RECEIPT_IBAN_ROW_LABEL),
       "s",
     ),
     xlsxCellXml(
