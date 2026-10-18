@@ -552,9 +552,12 @@ const RECEIPT_WARN_BG = "#F2F2F2";
 const RECEIPT_WARN_BG_XLSX = "FFF2F2F2";
 const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
-/** Exact label from zarlaga-receipt-undsen.xls B12 (9pt Arial, B:C merge). */
+/**
+ * B:C label, both 9pt — 11pt head pushed IBAN under column D.
+ * 12 NBSP ≈ undsen mid-gap without overflowing into D.
+ */
 const RECEIPT_IBAN_ROW_LABEL =
-  "Дансны дугаар:" + " ".repeat(21) + "IBAN:" + " ".repeat(6);
+  "Дансны дугаар:" + "\u00A0".repeat(12) + "IBAN:";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /**
  * Excel A–K widths from zarlaga-receipt-undsen.xls (Format → Column Width).
@@ -11119,7 +11122,7 @@ tbody.receipt-footer-keep {
   white-space: nowrap;
 }
 .receipt-grid__iban-head {
-  font-size: 11pt !important;
+  font-size: 9pt !important;
   font-weight: 400;
   flex: 0 0 auto;
   white-space: nowrap;
@@ -12498,12 +12501,16 @@ function appendReceiptSheetRows(
     ...emptyCells(bankR3, "C", "C", RECEIPT_XLSX_STYLE.metaNormal),
     ...emptyCells(bankR3, "E", "E", RECEIPT_XLSX_STYLE.metaNormal),
   ]);
-  // B:C = undsen B12 literal («Дансны дугаар:» + 21 spaces + «IBAN:»).
+  // B:C, 9pt throughout so «IBAN:» stays inside the merge (D clips overflow).
   pushRow(perBankH, [
     xlsxCellXml(
       `B${bankR4}`,
       RECEIPT_XLSX_STYLE.metaNormal,
-      si(RECEIPT_IBAN_ROW_LABEL),
+      siRich([
+        { t: "Дансны дугаар:", sz: 9 },
+        { t: "\u00A0".repeat(12), sz: 9 },
+        { t: "IBAN:", sz: 9 },
+      ]),
       "s",
     ),
     xlsxCellXml(
@@ -19761,7 +19768,7 @@ function xlsxSharedStringsXml(strings) {
             const raw = String(part?.t ?? "");
             const text = xlsxXmlEsc(raw);
             const preserve =
-              /^\s|\s$/.test(raw) || raw.includes("\n")
+              /[\s\u00A0]/.test(raw) || raw.includes("\n")
                 ? ' xml:space="preserve"'
                 : "";
             const bold = part?.b ? "<b/>" : "";
@@ -19775,7 +19782,7 @@ function xlsxSharedStringsXml(strings) {
       const text = xlsxXmlEsc(raw);
       // Newlines / edge spaces must be preserved or Excel collapses IBAN lines.
       const preserve =
-        /^\s|\s$/.test(raw) || raw.includes("\n")
+        /[\s\u00A0]/.test(raw) || raw.includes("\n")
           ? ' xml:space="preserve"'
           : "";
       return `<si><t${preserve}>${text}</t></si>`;
