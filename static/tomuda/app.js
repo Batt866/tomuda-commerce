@@ -11623,19 +11623,24 @@ function receiptXlsxRightFlushGap(head, tail, cols, headScale = 1) {
   return nbsp.repeat(Math.max(1, Math.floor(room / step)));
 }
 /**
- * Excel-only: «Дансны дугаар:» left, gap, «IBAN:» flush against column D.
- * Extra NBSP — Excel draws Cyrillic narrower than canvas measureText.
- * HTML preview uses flex, not this gap.
+ * Excel-only: «Дансны дугаар:» + gap + «IBAN:» inside merged B:C.
+ * Keep a safety margin — column D clips any overflow so IBAN must stay inside.
+ * HTML preview uses flex space-between, not this gap.
  */
 function receiptIbanLabelGap() {
-  return (
-    receiptXlsxRightFlushGap(
-      "Дансны дугаар:",
-      "IBAN:",
-      [RECEIPT_XLSX_COL_WIDTHS[1], RECEIPT_XLSX_COL_WIDTHS[2]],
-      11 / 9,
-    ) + "\u00A0".repeat(10)
+  const cols = [RECEIPT_XLSX_COL_WIDTHS[1], RECEIPT_XLSX_COL_WIDTHS[2]];
+  const cellPx = cols.reduce(
+    (sum, w) => sum + receiptExcelPixelsOfWidth(w),
+    0,
   );
+  const nbsp = "\u00A0";
+  const step = receiptXlsxTextPx(nbsp) || 3.34;
+  const headPx = receiptXlsxTextPx("Дансны дугаар:") * (11 / 9);
+  const tailPx = receiptXlsxTextPx("IBAN:");
+  // Leave room so «IBAN:» never sits under column D.
+  const safety = Math.max(16, Math.ceil(tailPx * 0.35));
+  const room = cellPx - headPx - tailPx - safety;
+  return nbsp.repeat(Math.max(4, Math.floor(room / step)));
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
 function xlsxFitColWidth(
