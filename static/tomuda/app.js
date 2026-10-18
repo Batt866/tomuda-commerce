@@ -554,10 +554,10 @@ const RECEIPT_TEXT = "#222222";
 const RECEIPT_BANK_IBAN_SHORT = "60000500";
 /**
  * B:C label, both 9pt — 11pt head pushed IBAN under column D.
- * 14 NBSP — mid-gap without overflowing into D.
+ * 15 NBSP — mid-gap without overflowing into D.
  */
 const RECEIPT_IBAN_ROW_LABEL =
-  "Дансны дугаар:" + "\u00A0".repeat(14) + "IBAN:";
+  "Дансны дугаар:" + "\u00A0".repeat(15) + "IBAN:";
 const RECEIPT_BANK_ACCOUNT = "5133333307";
 /**
  * Excel A–K widths from zarlaga-receipt-undsen.xls (Format → Column Width).
@@ -12508,7 +12508,7 @@ function appendReceiptSheetRows(
       RECEIPT_XLSX_STYLE.metaNormal,
       siRich([
         { t: "Дансны дугаар:", sz: 9 },
-        { t: "\u00A0".repeat(14), sz: 9 },
+        { t: "\u00A0".repeat(15), sz: 9 },
         { t: "IBAN:", sz: 9 },
       ]),
       "s",
