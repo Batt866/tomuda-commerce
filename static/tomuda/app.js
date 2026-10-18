@@ -11624,7 +11624,8 @@ function receiptXlsxRightFlushGap(head, tail, cols, headScale = 1) {
 }
 /**
  * Excel-only: «Дансны дугаар:» + gap + «IBAN:» inside merged B:C.
- * Keep a safety margin — column D clips any overflow so IBAN must stay inside.
+ * Label-units overestimate Cyrillic vs Excel, so scale the head down or the
+ * gap stays too tight. Still leave a safety margin — D clips overflow.
  * HTML preview uses flex space-between, not this gap.
  */
 function receiptIbanLabelGap() {
@@ -11635,12 +11636,12 @@ function receiptIbanLabelGap() {
   );
   const nbsp = "\u00A0";
   const step = receiptXlsxTextPx(nbsp) || 3.34;
-  const headPx = receiptXlsxTextPx("Дансны дугаар:") * (11 / 9);
+  // 0.74 ≈ Excel Arial Cyrillic vs our wider canvas/units measure.
+  const headPx = receiptXlsxTextPx("Дансны дугаар:") * (11 / 9) * 0.74;
   const tailPx = receiptXlsxTextPx("IBAN:");
-  // Leave room so «IBAN:» never sits under column D.
-  const safety = Math.max(16, Math.ceil(tailPx * 0.35));
+  const safety = 12;
   const room = cellPx - headPx - tailPx - safety;
-  return nbsp.repeat(Math.max(4, Math.floor(room / step)));
+  return nbsp.repeat(Math.max(10, Math.floor(room / step)));
 }
 /** Excel column width that keeps `text` on one line (9pt Arial ≈ 1.0 unit). */
 function xlsxFitColWidth(
