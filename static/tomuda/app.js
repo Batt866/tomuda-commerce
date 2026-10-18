@@ -746,8 +746,8 @@ function receiptInfoRows(o) {
     ),
   ];
   const addrHtml = esc(f.addressPlain || "-");
-  // ҮНДСЭН: B:C = «Дансны дугаар:» + space + «IBAN:» (flush → D); D:E = numbers.
-  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Khan bank</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" rowspan="2" class="receipt-grid__iban-bc"><div class="receipt-grid__iban-bc-inner"><span class="receipt-grid__iban-head">Дансны дугаар:</span><span class="receipt-grid__iban-tag">IBAN:</span></div></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
+  // Same B:C label string as the Excel export so print and .xlsx match.
+  const bank = `<tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Дансны нэр:</td><td colspan="2" class="receipt-grid__value">ТОМУДА групп</td><td colspan="3" class="receipt-grid__label receipt-grid__label--strong">Хүргэлтийн хаяг:</td><td colspan="3"></td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Регистрийн дугаар:</td><td colspan="2" class="receipt-grid__value">5397987</td><td colspan="6" rowspan="4" class="receipt-grid__address-cell">${addrHtml}</td></tr><tr class="receipt-grid__bank"><td></td><td colspan="2" class="receipt-grid__label">Банкны нэр:</td><td colspan="2" class="receipt-grid__value">Khan bank</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" rowspan="2" class="receipt-grid__iban-bc">${RECEIPT_IBAN_ROW_LABEL}</td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_IBAN_SHORT}</td></tr><tr class="receipt-grid__bank receipt-grid__bank--iban"><td></td><td colspan="2" class="receipt-grid__value receipt-grid__iban-nums">${RECEIPT_BANK_ACCOUNT}</td></tr>`;
   return `${party.join("")}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>${bank}<tr class="receipt-grid__spacer receipt-grid__spacer--sm"><td colspan="11"></td></tr>`;
 }
 function receiptInfoSectionHtml(o) {
@@ -10253,7 +10253,7 @@ function receiptExcelPages(o, logoSrc, opts = {}) {
   return `<div class="receipt-excel-sheet">${receiptPrintPageHtml(o, logoSrc, opts)}</div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 18mm 8mm 12mm 18mm; }
+@page { size: A4 portrait; margin: 0.45in 0.4in 0.35in 0.4in; }
 @page {
   @top-left { content: none; }
   @top-center { content: none; }
@@ -11020,8 +11020,8 @@ tbody.receipt-footer-keep {
   text-align: left;
   vertical-align: bottom !important;
 }
-.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 16pt; }
-.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 24pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r1 > td { height: 20.25pt; }
+.receipt-grid--sheet tr.receipt-grid__header--r2 > td { height: 27pt; }
 .receipt-grid--sheet tr.receipt-grid__header--r2 > td.receipt-grid__address {
   vertical-align: top !important;
   padding-left: 0 !important;
@@ -11107,33 +11107,12 @@ tbody.receipt-footer-keep {
   text-align: left !important;
   font-size: 9pt !important;
   font-weight: 400;
+  font-family: ${RECEIPT_FONT};
   vertical-align: middle !important;
   padding: 0 2px !important;
   background: transparent !important;
   overflow: visible !important;
-}
-.receipt-grid__iban-bc-inner {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
-  white-space: nowrap;
-}
-.receipt-grid__iban-head {
-  font-size: 9pt !important;
-  font-weight: 400;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-.receipt-grid__iban-tag {
-  font-size: 9pt !important;
-  font-weight: 400;
-  flex: 0 0 auto;
-  text-align: right !important;
-  white-space: nowrap;
-  padding: 0 !important;
+  white-space: pre !important;
 }
 .receipt-grid--sheet tr.receipt-grid__bank--iban {
   height: 14.25pt;
@@ -11310,10 +11289,11 @@ tbody.receipt-footer-keep {
   }
   .receipt-logo.receipt-logo--overlay {
     top: 0;
-    width: ${RECEIPT_LOGO_COL_PX}px !important;
+    left: 0;
+    width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
     height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
-    min-width: ${RECEIPT_LOGO_COL_PX}px !important;
-    max-width: ${RECEIPT_LOGO_COL_PX}px !important;
+    min-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
+    max-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
     min-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
     max-height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
     object-position: left bottom;
@@ -13338,7 +13318,7 @@ function ensureReceiptScreenStyles() {
   min-width: 210mm !important;
   min-height: 297mm;
   margin: 0 auto;
-  padding: 14mm 10mm 12mm 16mm !important;
+  padding: 0.45in 0.4in 0.35in 0.4in !important;
   box-sizing: border-box !important;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
@@ -13349,8 +13329,8 @@ function ensureReceiptScreenStyles() {
   max-width: 100% !important;
 }
 .wh-receipt-preview__doc.receipt-page .receipt-logo.receipt-logo--overlay {
-  left: 16mm !important;
-  top: 14mm !important;
+  left: 0.4in !important;
+  top: 0.45in !important;
   width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   min-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
