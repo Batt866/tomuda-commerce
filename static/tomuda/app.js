@@ -7479,12 +7479,22 @@ function qtyStepperApply(btn) {
   if (inPicker) pickerQtyChange(id, q);
   else setWorkerQty(id, q);
 }
-const PRODUCT_UNIT_OPTIONS = ["ширхэг", "кг", "метр"];
+const PRODUCT_UNIT_OPTIONS = ["ширхэг", "кг", "л", "метр"];
 function normalizeProductUnit(unit) {
   const u = String(unit || "").trim();
   if (!u) return "ширхэг";
   const lower = u.toLowerCase();
   if (lower === "kg" || u === "KG") return "кг";
+  if (
+    lower === "l" ||
+    lower === "lt" ||
+    lower === "liter" ||
+    lower === "litre" ||
+    lower === "литр" ||
+    lower === "литр." ||
+    u === "L"
+  )
+    return "л";
   if (lower === "ш" || lower === "ш.") return "ширхэг";
   if (PRODUCT_UNIT_OPTIONS.includes(u)) return u;
   return u;
@@ -30659,6 +30669,7 @@ function productCountryFromBarcodeData(product) {
 }
 function productUnitFromBarcodeData(product) {
   const quantity = String(product.quantity || "").toLowerCase();
+  if (/\b(l|lt|liter|litre|л|литр)\b/.test(quantity)) return "л";
   if (/\b(kg|g|гр|кг)\b/.test(quantity)) return "кг";
   if (/\b(m|cm|метр)\b/.test(quantity)) return "метр";
   return "ширхэг";
