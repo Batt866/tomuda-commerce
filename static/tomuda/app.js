@@ -10514,7 +10514,7 @@ ${receiptGridColWidthCss()}
   font-weight: 700;
   font-size: 11pt;
   white-space: nowrap;
-  text-align: left !important;
+  text-align: right !important;
   padding-left: 0 !important;
   padding-right: 2px !important;
 }
@@ -10783,7 +10783,7 @@ tbody.receipt-footer-keep {
 .receipt-items--promo .receipt-items__promo-label {
   font-weight: 700;
   font-size: 11px;
-  text-align: left !important;
+  text-align: right !important;
   white-space: nowrap;
   vertical-align: middle;
   padding-left: 0;
@@ -11076,7 +11076,7 @@ tbody.receipt-footer-keep {
   padding-top: 0 !important;
 }
 .receipt-title {
-  text-align: left !important;
+  text-align: center !important;
   font-family: ${RECEIPT_FONT_TITLE};
   font-size: 16pt;
   font-weight: 700;
@@ -11324,7 +11324,7 @@ tbody.receipt-footer-keep {
   }
   .receipt-grid { max-width: none; width: 100% !important; table-layout: fixed !important; font-size: 9pt; }
   .receipt-grid__iban-line { flex-wrap: nowrap !important; white-space: nowrap !important; }
-  .receipt-title { font-size: 16pt; text-align: left !important; }
+  .receipt-title { font-size: 16pt; text-align: center !important; }
   .receipt-grid__brand { font-size: 11pt; padding-left: 0 !important; }
   .receipt-grid__header--r2 .receipt-grid__address { padding-left: 0 !important; }
   .receipt-grid--sheet .receipt-grid__logo-cell {
@@ -11775,7 +11775,7 @@ function receiptXlsxStylesXml() {
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="bottom" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
     `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0"/></xf>`,
-    `<xf numFmtId="0" fontId="6" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
+    `<xf numFmtId="0" fontId="6" fillId="4" borderId="4" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="0" shrinkToFit="1"/></xf>`,
     `<xf numFmtId="3" fontId="14" fillId="0" borderId="3" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>`,
   ]);
 }
@@ -12276,7 +12276,7 @@ function appendReceiptSheetRows(
       isHeaderTextRow(rowNum) ? leftAlignCellXml(cell) : cell,
     );
     const rowStyle = isTitleRow(rowNum)
-      ? ` s="39" customFormat="1"`
+      ? ` s="40" customFormat="1"`
       : isHeaderTextRow(rowNum)
         ? ` s="${RECEIPT_XLSX_STYLE.metaLeft}" customFormat="1"`
         : "";
@@ -12354,11 +12354,11 @@ function appendReceiptSheetRows(
   pushRow(RECEIPT_XLSX_RECEIPT_TITLE_ROW_HEIGHT, [
     xlsxCellXml(
       `A${hr3}`,
-      39,
+      40,
       siRich([{ t: `ЗАРЛАГЫН БАРИМТ №${receiptNo}`, sz: 16, b: true }]),
       "s",
     ),
-    ...emptyCells(hr3, "B", "K", 39),
+    ...emptyCells(hr3, "B", "K", 40),
   ]);
 
   const pushMetaPairRow = (
