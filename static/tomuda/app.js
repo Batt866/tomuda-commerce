@@ -12680,6 +12680,7 @@ function appendReceiptSheetRows(
     // Promo нэгж үнэ black; нийт үнэ blue (same as paid line totals).
     const unitMoneyStyle = 59;
     const totalMoneyStyle = RECEIPT_XLSX_STYLE.promoTotal;
+    // C:D merge, value in C (Excel master), right-aligned so it sits on D's edge.
     pushItemTableRow(RECEIPT_XLSX_ITEM_ROW_HEIGHT, [
       xlsxCellXml(`A${r}`, clearStyle, null, "empty"),
       xlsxCellXml(`B${r}`, clearStyle, null, "empty"),
@@ -12690,7 +12691,6 @@ function appendReceiptSheetRows(
       xlsxCellXml(`H${r}`, qtyStyle, qty, "n"),
       xlsxCellXml(`J${r}`, unitMoneyStyle, Number(unitPrice) || 0, "n"),
       xlsxCellXml(`K${r}`, totalMoneyStyle, Number(lineTotal) || 0, "n"),
-      ...emptyCells(r, "D", "D", labelStyle),
       ...emptyCells(r, "F", "G", bodyStyle),
       ...emptyCells(r, "I", "I", qtyStyle),
     ]);
