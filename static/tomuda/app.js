@@ -11553,7 +11553,7 @@ const RECEIPT_XLSX_STYLE = {
   grandValue: 72,
   payLabel: 90,
   payValue: 90,
-  promoLabel: 87,
+  promoLabel: 70,
   itemNum: 9,
   itemPrice: 76,
   itemTotal: 10,
