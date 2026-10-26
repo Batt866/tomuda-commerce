@@ -10261,7 +10261,7 @@ function receiptExcelPages(o, logoSrc, opts = {}) {
   return `<div class="receipt-excel-sheet">${receiptPrintPageHtml(o, logoSrc, opts)}</div>`;
 }
 const RECEIPT_EXCEL_STYLES = `
-@page { size: A4 portrait; margin: 0.45in 0.4in 0.35in 0.4in; }
+@page { size: A4 portrait; margin: 0.75in 0.25in 0.25in 0.75in; }
 @page {
   @top-left { content: none; }
   @top-center { content: none; }
@@ -12866,7 +12866,7 @@ function receiptWorksheetXml(
   const fitsOnePage = lastRow <= RECEIPT_XLSX_PAGE_ROWS;
   const fitH = fitsOnePage ? "1" : "0";
   // Page Setup from the №260941 video: 0.4 / 0.4 / 0.45 / 0.35 in, horizontally centered.
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" zoomScale="100" zoomScaleNormal="100" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT.toFixed(2)}" customHeight="1"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.45" bottom="0.35" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${RECEIPT_XLSX_LAST_COL}${lastRow}"/><sheetViews><sheetView showGridLines="1" zoomScale="100" zoomScaleNormal="100" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="${RECEIPT_XLSX_ROW_HEIGHT.toFixed(2)}" customHeight="1"/><cols>${receiptXlsxColsXml()}</cols><sheetData>${rows.join("")}</sheetData>${mergeCellsXml}<printOptions horizontalCentered="1"/><pageMargins left="0.75" right="0.25" top="0.75" bottom="0.25" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="${fitH}"/>${breaksXml}${drawingXml}</worksheet>`;
 }
 function buildReceiptSheetXml(
   o,
@@ -13349,7 +13349,7 @@ function ensureReceiptScreenStyles() {
   min-width: 210mm !important;
   min-height: 297mm;
   margin: 0 auto;
-  padding: 0.45in 0.4in 0.35in 0.4in !important;
+  padding: 0.75in 0.25in 0.25in 0.75in !important;
   box-sizing: border-box !important;
   background: #fff;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
@@ -13360,8 +13360,8 @@ function ensureReceiptScreenStyles() {
   max-width: 100% !important;
 }
 .wh-receipt-preview__doc.receipt-page .receipt-logo.receipt-logo--overlay {
-  left: 0.4in !important;
-  top: 0.45in !important;
+  left: 0.75in !important;
+  top: 0.75in !important;
   width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   height: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
   min-width: ${RECEIPT_XLSX_LOGO_HEIGHT}pt !important;
