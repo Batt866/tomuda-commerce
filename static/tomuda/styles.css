@@ -18883,6 +18883,23 @@ img.worker-order-store__avatar {
   padding: 10px 0 12px;
 }
 
+.worker-orders-filters > .search-field {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.worker-orders-filters .page-toolbar__search {
+  width: 100%;
+}
+
+.worker-orders-filters__dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
 .worker-orders-filters__chip {
   padding: 8px 12px;
   border-radius: 8px;

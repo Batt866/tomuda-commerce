@@ -9657,6 +9657,7 @@ function search(key, value) {
 function patchLiveSearch(key) {
   if (key === "workerStore") return patchWorkerStorePickList();
   if (key === "customers") return patchCustomersList();
+  if (key === "workerOrders") return patchWorkerOrdersList();
   return false;
 }
 function scrollAppMainToTop() {
@@ -14254,9 +14255,13 @@ function confirmPrintExport(title, onConfirm) {
 }
 function orderReceiptSearchText(o) {
   const customer = state.customers.find((x) => x.id === o.customerId) || {};
+  const receiptNoText = formatReceiptNumber(o);
+  const items = Array.isArray(o?.items) ? o.items : [];
   return [
     o.id,
-    formatReceiptNumber(o),
+    receiptNoText,
+    `№${receiptNoText}`,
+    orderCustomerName(o),
     o.customerName,
     customer.name,
     customer.companyName,
@@ -14264,10 +14269,21 @@ function orderReceiptSearchText(o) {
     customer.phone1,
     customer.phone2,
     ...customerPhonesList(customer),
+    customerAddress(customer),
     o.employeeName,
     o.employeePhone,
     paymentTermLabel(o.paymentTerm),
     o.status,
+    status(o.status),
+    orderAmount(o),
+    fmt(orderAmount(o)),
+    orderTakenDay(o),
+    orderDeliveryDay(o),
+    dte(orderTakenDay(o)),
+    dte(orderDeliveryDay(o)),
+    o.settlementText,
+    ...items.map((item) => item?.productName),
+    ...items.map((item) => item?.barcode),
   ]
     .map((value) => String(value || "").toLowerCase())
     .join(" ");
@@ -27676,6 +27692,10 @@ function workerOrdersList() {
   }
   const day = state.filters.workerDate;
   if (day) list = list.filter((o) => orderMatchesWorkerDate(o, day));
+  const q = state.searches.workerOrders || "";
+  if (String(q).trim()) {
+    list = list.filter((o) => orderReceiptMatchesQuery(o, q));
+  }
   return list.sort(compareOrdersByReceiptAsc);
 }
 function workerViewTabsHtml(tab) {
@@ -28853,6 +28873,40 @@ function workerSelectedRow(p) {
   const row = `<div class="worker-selected-row${editing ? " is-editing" : ""}"><img src="${productImageThumbAttr(p)}" referrerpolicy="no-referrer" ${productImgDataAttrs(p, { thumb: true })} class="product-thumb worker-selected-row__thumb" width="56" height="56" loading="lazy" decoding="async" alt=""><div class="worker-selected-row__body"><p class="worker-selected-row__name">${esc(p.name)}</p>${tags ? `<p class="worker-selected-row__tags">${tags}</p>` : ""}<p class="worker-selected-row__price"><b class="worker-selected-row__total">${fmt(lineTotal)}</b></p></div><div class="worker-selected-row__qty">${workerOrderQtyHtml(p, p.qty)}</div></div>`;
   return workerSwipeRowHtml(p.id, row);
 }
+function workerOrdersEmptyText(orders) {
+  if (orders.length) return "";
+  const q = String(state.searches.workerOrders || "").trim();
+  if (q) return "Хайлтад захиалга олдсонгүй";
+  const day = state.filters.workerDate || "";
+  const today = todayIso();
+  if (day === today) return "Өнөөдөр захиалга байхгүй";
+  if (day) return "Сонгосон өдөр захиалга байхгүй";
+  return "Захиалга байхгүй";
+}
+function workerOrdersListHtml(orders) {
+  return orders.length
+    ? orders.map(workerOrderListRow).join("")
+    : `<p class="line-panel__empty">${workerOrdersEmptyText(orders)}</p>`;
+}
+function patchWorkerOrdersList() {
+  if (state.currentView !== "worker" || state.filters.worker !== "orders") {
+    return false;
+  }
+  const panel = document.querySelector(".worker-orders-panel");
+  const list = panel?.querySelector(".line-list");
+  if (!panel || !list) return false;
+  healOrderCustomerNames();
+  const orders = workerOrdersList();
+  const values = panel.querySelectorAll(".metrics-bar__value");
+  if (values[0]) values[0].textContent = String(orders.length);
+  if (values[1]) {
+    values[1].textContent = fmt(
+      orders.reduce((sum, order) => sum + orderAmount(order), 0),
+    );
+  }
+  list.innerHTML = workerOrdersListHtml(orders);
+  return true;
+}
 function workerOrders(orders) {
   healOrderCustomerNames();
   const total = orders.reduce((s, o) => s + orderAmount(o), 0),
@@ -28860,9 +28914,10 @@ function workerOrders(orders) {
     day = state.filters.workerDate || "",
     today = todayIso(),
     todayActive = day === today,
-    todayBtnClass = `worker-orders-filters__chip${todayActive ? " is-active" : ""}`;
+    todayBtnClass = `worker-orders-filters__chip${todayActive ? " is-active" : ""}`,
+    q = state.searches.workerOrders || "";
   // Өнөөдөр must always be clickable — even when a past date is selected.
-  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"></div><div class="line-list line-list--scroll">${orders.length ? orders.map(workerOrderListRow).join("") : `<p class="line-panel__empty">${day === today ? "Өнөөдөр захиалга байхгүй" : day ? "Сонгосон өдөр захиалга байхгүй" : "Захиалга байхгүй"}</p>`}</div></section>`;
+  return `<section class="worker-orders-panel">${metricsBar(`${card("Захиалга", orderCount)}${card("Нийт дүн", fmt(total))}`, 2)}<div class="line-panel__toolbar worker-orders-filters">${pageToolbarSearch({ focusKey: "workerOrders", value: q, placeholder: "Баримт, харилцагч, утас..." })}<div class="worker-orders-filters__dates"><button type="button" onclick="clearWorkerOrderDate()" class="worker-orders-filters__chip${!day ? " is-active" : ""}">Бүгд</button><button type="button" onclick="selectWorkerOrderToday()" class="${todayBtnClass}">Өнөөдөр</button><input type="date" value="${esc(day)}" onchange="setWorkerOrderDate(this.value)" oninput="setWorkerOrderDate(this.value)" onfocus="toolbarSelectFocus()" onblur="toolbarSelectBlur()" class="flex-1 min-w-[140px] px-3 py-2 bg-secondary rounded text-sm app-input" aria-label="Огноо"></div></div><div class="line-list line-list--scroll">${workerOrdersListHtml(orders)}</div></section>`;
 }
 function workerOrderDetail(id) {
   openWorkerOrderEdit(id);
