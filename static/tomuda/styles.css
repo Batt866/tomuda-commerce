@@ -1691,10 +1691,6 @@ textarea.text-sm,
   white-space: nowrap;
 }
 
-.customer-kind-chips {
-  margin: 0 0 10px;
-}
-
 .customer-card__phones {
   flex: 0 0 auto;
   display: flex;

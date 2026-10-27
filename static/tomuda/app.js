@@ -14199,12 +14199,8 @@ function focusSavedCustomer(customerId, customerName, opts = {}) {
 }
 function customersListHtml() {
   const q = state.searches.customers || "";
-  const kind = state.filters.customerKind || "all";
   let rows = sortCustomersByName(
-    state.customers.filter((c) => {
-      if (kind !== "all" && customerOrgKind(c) !== kind) return false;
-      return customerMatchesQuery(c, q);
-    }),
+    state.customers.filter((c) => customerMatchesQuery(c, q)),
   );
   const highlightId = state.customerHighlightId || "";
   if (highlightId) {
@@ -14239,7 +14235,7 @@ function customersView() {
       hasPermission("customerAdd.view")
         ? pageActionAddBtn("Харилцагч нэмэх", "customerModal()", "customer")
         : "";
-  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${customerKindFilterChipsHtml()}${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${customersListHtml()}</div></div></div>`;
+  return `<div class="space-y-4">${pageHead(`Харилцагч <span class="page-head__count">${state.customers.length}</span>`)}<div class="line-panel line-panel--customers">${listActionToolbarHtml({ search: pageToolbarSearch({ focusKey: "customers", value: q, placeholder: "Нэр, РД-ээр хайх..." }), excelBtn, addBtn, importKind: "customers" })}<div class="customer-list">${customersListHtml()}</div></div></div>`;
 }
 function confirmDataExport(title, onConfirm, message = "Мэдээлэл татах уу?") {
   confirmModal(title, message, {
@@ -35071,7 +35067,6 @@ Object.assign(window, {
   setInventoryTab,
   setWarehouseTab,
   setCountCategory,
-  setCustomerKindFilter,
   setWorkerQty,
   setWorkerOrderActive,
   finishWorkerOrderEdit,
