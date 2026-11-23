@@ -52,6 +52,8 @@ const state = {
   promotionRules: { quantity: [], price: [], payment: [] },
   workerCustomer: "",
   workerStoreReady: false,
+  workerPickingCustomer: false,
+  workerSaveNeedsCustomer: false,
   editingOrderId: "",
   editingOrderOriginalItems: null,
   deliveryStoreId: "",
@@ -6598,7 +6600,7 @@ function isOnWorkerStorePickScreen() {
   return (
     state.currentView === "worker" &&
     state.filters.worker === "new" &&
-    !state.workerStoreReady &&
+    (!state.workerStoreReady || !!state.workerPickingCustomer) &&
     !!document.querySelector(".worker-pick")
   );
 }
@@ -7214,14 +7216,9 @@ function canAppBack() {
   if (
     state.currentView === "worker" &&
     state.filters.worker === "new" &&
-    state.workerStoreReady
-  ) {
-    return true;
-  }
-  if (
-    state.currentView === "worker" &&
-    state.filters.worker === "new" &&
-    state.workerCustomer
+    (state.workerStoreReady ||
+      state.workerPickingCustomer ||
+      state.workerCustomer)
   ) {
     return true;
   }
@@ -7327,6 +7324,17 @@ function handleAppBack() {
   if (
     state.currentView === "worker" &&
     state.filters.worker === "new" &&
+    state.workerPickingCustomer
+  ) {
+    state.workerPickingCustomer = false;
+    state.workerStoreReady = true;
+    render();
+    return true;
+  }
+
+  if (
+    state.currentView === "worker" &&
+    state.filters.worker === "new" &&
     state.workerStoreReady
   ) {
     if (state.editingOrderId) {
@@ -7334,21 +7342,14 @@ function handleAppBack() {
       return true;
     }
     if (workerOrderHasCart()) {
-      confirmAbortWorkerOrder();
+      confirmAbortWorkerOrder(() => {
+        abortWorkerOrder();
+        openWorkerOrdersTab();
+      });
       return true;
     }
     abortWorkerOrder();
-    return true;
-  }
-
-  if (
-    state.currentView === "worker" &&
-    state.filters.worker === "new" &&
-    state.workerCustomer &&
-    !state.workerStoreReady
-  ) {
-    state.workerCustomer = "";
-    render();
+    openWorkerOrdersTab();
     return true;
   }
 
@@ -9567,6 +9568,8 @@ function go(view, opts = {}) {
   ) {
     clearWorkerOrderEditState();
     state.workerStoreReady = false;
+    state.workerPickingCustomer = false;
+    state.workerSaveNeedsCustomer = false;
     state.workerCustomer = "";
     state.deliveryDate = "";
     state.settlementAgreed = false;
@@ -27608,7 +27611,9 @@ function restoreAuthSession() {
     )
       ? data.workerCustomer
       : "";
-    state.workerStoreReady = !!state.workerCustomer && !!data.workerStoreReady;
+    state.workerStoreReady = !!data.workerStoreReady;
+    state.workerPickingCustomer = false;
+    state.workerSaveNeedsCustomer = false;
     state.workerQty = cleanSessionQtyMap(data.workerQty);
     state.workerQtyParts = cleanSessionQtyParts(
       data.workerQtyParts,
@@ -27698,12 +27703,20 @@ function workerViewTabsHtml(tab) {
   if (state.editingOrderId) return "";
   return `<div class="worker-view__tabs" role="tablist" aria-label="Захиалга"><button type="button" role="tab" onclick="openWorkerNewTab()" class="seg-tab${tab === "new" ? " is-active" : ""}" aria-selected="${tab === "new" ? "true" : "false"}">+ Шинэ захиалга</button><button type="button" role="tab" onclick="openWorkerOrdersTab()" class="seg-tab${tab === "orders" ? " is-active" : ""}" aria-selected="${tab === "orders" ? "true" : "false"}">Захиалга харах</button></div>`;
 }
+function ensureWorkerDraftOrder() {
+  if (state.currentView !== "worker" || state.filters.worker !== "new") return;
+  if (state.editingOrderId || state.workerPickingCustomer) return;
+  if (state.workerStoreReady) return;
+  state.workerStoreReady = true;
+  if (!state.deliveryDate) state.deliveryDate = defaultDeliveryDate();
+}
 function workerView() {
+  ensureWorkerDraftOrder();
   const tab = state.filters.worker,
     cart = workerCartSummary(),
     orders = workerOrdersList(),
     inActiveOrder =
-      tab === "new" && state.workerStoreReady && !!state.workerCustomer;
+      tab === "new" && state.workerStoreReady && !state.workerPickingCustomer;
   const agentMeta =
     tab === "new" || state.editingOrderId ? workerOrderAgentMetaHtml() : "";
   const receivableMeta = inActiveOrder ? workerOrderReceivableMetaHtml() : "";
@@ -28386,7 +28399,7 @@ function customerDistrictKhoroo(c) {
 }
 function workerStoreSummary(c, compact = false) {
   if (!c)
-    return `<p class="text-sm text-muted-foreground">Харилцагч сонгоогүй</p>`;
+    return `<div class="worker-order-store worker-order-store--empty"><div class="worker-order-store__body"><p class="worker-order-store__name">Харилцагч нэмээгүй</p><p class="text-xs text-muted-foreground">Захиалгаа аваад дараа нь дэлгүүрээ бүртгэнэ</p></div></div>`;
   const addr = [c.province, c.district, c.khoroo, c.address]
     .filter(Boolean)
     .join(", ");
@@ -28441,9 +28454,13 @@ function workerStorePickRestHtml() {
     ? state.customers.find((c) => c.id === state.workerCustomer)
     : null;
   const receivableHtml = selected ? workerReceivableHtml(selected.id) : "";
+  const confirmLabel =
+    workerOrderHasCart() || state.workerSaveNeedsCustomer
+      ? "Захиалгад холбох"
+      : "Сонгоод үргэлжлүүлэх";
   const selectedBanner = selected
-    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { variant: "rail" })}${receivableHtml}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">Захиалга үргэлжлүүлэх</button></div>`
-    : `<p class="worker-pick__hint">Дэлгүүр / харилцагч сонгоно уу</p>`;
+    ? `<div class="worker-pick-selected"><p class="worker-pick-selected__label">Харилцагч</p><div class="worker-pick-selected__store">${workerStoreSummary(selected, true)}</div>${customerStoreRatingHtml(selected, { variant: "rail" })}${receivableHtml}<button type="button" onclick="confirmWorkerStore()" class="btn btn--primary btn--block btn--lg">${confirmLabel}</button></div>`
+    : `<p class="worker-pick__hint">${workerOrderHasCart() ? "Захиалгад дэлгүүр / харилцагч холбоно уу" : "Дэлгүүр / харилцагч сонгоно уу"}</p>`;
   const listHtml = rows.length
     ? `<div class="worker-pick-list">${rows.map(workerPickCard).join("")}</div>`
     : `<p class="worker-pick__empty">${q ? "Олдсонгүй" : "Харилцагч байхгүй"}</p>`;
@@ -28453,7 +28470,7 @@ function patchWorkerStorePickList() {
   if (state.currentView !== "worker" || state.filters.worker !== "new") {
     return false;
   }
-  if (state.workerStoreReady) return false;
+  if (state.workerStoreReady && !state.workerPickingCustomer) return false;
   const listHost = document.querySelector(".worker-pick");
   const toolbar = listHost?.querySelector(".worker-pick__toolbar");
   if (!toolbar) return false;
@@ -28474,7 +28491,10 @@ function patchWorkerStorePickList() {
 }
 function workerStorePickStep() {
   const q = state.searches.workerStore || "";
-  return `<section class="worker-pick"><div class="worker-pick__toolbar">${searchFieldHtml(`<input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" onfocus="workerStoreSearchFocus()" onblur="workerStoreSearchBlur()" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх">`)}</div>${workerStorePickRestHtml()}</section>`;
+  const addBtn = canCreateCustomer()
+    ? `<button type="button" onclick="addWorkerCustomerThenMaybeSave()" class="btn btn--secondary btn--sm worker-pick__add-btn">Харилцагч нэмэх</button>`
+    : "";
+  return `<section class="worker-pick"><div class="worker-pick__toolbar">${searchFieldHtml(`<input data-focus="workerStore" type="text" inputmode="search" value="${esc(q)}" oninput="search('workerStore',this.value)" onfocus="workerStoreSearchFocus()" onblur="workerStoreSearchBlur()" placeholder="Нэр, РД-ээр хайх..." class="worker-pick__search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" name="tomuda-worker-store-q" aria-label="Харилцагч хайх">`)}${addBtn}</div>${workerStorePickRestHtml()}</section>`;
 }
 function pickWorkerStore(id) {
   const nextId = state.workerCustomer === id ? "" : id;
@@ -28511,11 +28531,55 @@ function scrollWorkerPickToTop(behavior = "smooth") {
 }
 function confirmWorkerStore() {
   if (!state.workerCustomer || state.editingOrderId) return;
+  const saveAfter = !!state.workerSaveNeedsCustomer;
+  const keepCart = workerOrderHasCart() || state.workerStoreReady;
+  state.workerPickingCustomer = false;
+  state.workerSaveNeedsCustomer = false;
   state.workerStoreReady = true;
-  state.deliveryDate = defaultDeliveryDate();
-  resetWorkerCart();
+  if (!state.deliveryDate) state.deliveryDate = defaultDeliveryDate();
+  if (!keepCart) resetWorkerCart();
+  if (saveAfter) {
+    render();
+    saveWorker();
+    return;
+  }
   render();
   pushAppHistory();
+}
+function openWorkerCustomerPick() {
+  if (state.editingOrderId) return;
+  state.workerPickingCustomer = true;
+  state.workerStoreReady = true;
+  render();
+  pushAppHistory();
+}
+function addWorkerCustomerThenMaybeSave() {
+  if (state.editingOrderId) return;
+  if (!canCreateCustomer()) {
+    return alertModal("Эрхгүй", "Харилцагч нэмэх эрхгүй.");
+  }
+  customerModal();
+}
+function promptWorkerCustomerForSave() {
+  if (!workerPaidProductsInCart().length) return alert("Бараа сонгоно уу");
+  state.workerSaveNeedsCustomer = true;
+  const addBtn = canCreateCustomer()
+    ? `<button type="button" onclick="startNewCustomerThenSaveOrder()" class="btn btn--primary btn--lg btn--block">Харилцагч нэмэх</button>`
+    : "";
+  box(
+    "Харилцагч холбох",
+    `<div class="p-5 space-y-3"><p class="text-sm text-muted-foreground m-0">Захиалгаа аваад дууссан тул одоо дэлгүүр / харилцагчаа бүртгэнэ. Шинээр нэмсэн харилцагч дээр энэ захиалга үүснэ.</p>${addBtn}<button type="button" onclick="openWorkerCustomerPickThenSave()" class="btn btn--secondary btn--lg btn--block">Байгааг сонгох</button></div>`,
+  );
+}
+function startNewCustomerThenSaveOrder() {
+  state.workerSaveNeedsCustomer = true;
+  closeModal();
+  addWorkerCustomerThenMaybeSave();
+}
+function openWorkerCustomerPickThenSave() {
+  state.workerSaveNeedsCustomer = true;
+  closeModal();
+  openWorkerCustomerPick();
 }
 function startOrderForCustomer(customerId) {
   const id = String(customerId || "").trim();
@@ -28524,18 +28588,22 @@ function startOrderForCustomer(customerId) {
     return false;
   }
   if (state.editingOrderId) return false;
+  const keepCart = workerOrderHasCart();
   state.currentView = "worker";
   state.filters.worker = "new";
   state.workerCustomer = id;
   state.workerStoreReady = true;
-  state.deliveryDate = defaultDeliveryDate();
+  state.workerPickingCustomer = false;
+  if (!state.deliveryDate) state.deliveryDate = defaultDeliveryDate();
   state.searches.workerStore = "";
-  state.settlementAgreed = false;
-  state.settlementText = "";
-  state.settlementMonth = "";
-  state.settlementDay = "";
-  state.applyPercentDiscount = false;
-  resetWorkerCart();
+  if (!keepCart) {
+    state.settlementAgreed = false;
+    state.settlementText = "";
+    state.settlementMonth = "";
+    state.settlementDay = "";
+    state.applyPercentDiscount = false;
+    resetWorkerCart();
+  }
   render();
   pushAppHistory();
   return true;
@@ -28543,6 +28611,8 @@ function startOrderForCustomer(customerId) {
 function abortWorkerOrder() {
   clearWorkerOrderEditState();
   state.workerStoreReady = false;
+  state.workerPickingCustomer = false;
+  state.workerSaveNeedsCustomer = false;
   state.workerCustomer = "";
   state.searches.workerStore = "";
   resetWorkerCart();
@@ -28553,17 +28623,7 @@ function clearWorkerStore() {
     cancelWorkerOrderEdit();
     return;
   }
-  state.workerStoreReady = false;
-  state.workerCustomer = "";
-  state.deliveryDate = "";
-  state.searches.workerStore = "";
-  state.settlementAgreed = false;
-  state.settlementText = "";
-  state.settlementMonth = "";
-  state.settlementDay = "";
-  state.applyPercentDiscount = false;
-  resetWorkerCart();
-  render();
+  openWorkerCustomerPick();
 }
 function clearWorkerOrderEditState() {
   state.editingOrderId = "";
@@ -28630,6 +28690,8 @@ function cancelWorkerOrderNow(id) {
   if (String(state.editingOrderId) === String(id)) {
     clearWorkerOrderEditState();
     state.workerStoreReady = false;
+    state.workerPickingCustomer = false;
+    state.workerSaveNeedsCustomer = false;
     state.workerCustomer = "";
     resetWorkerCart();
     state.filters.worker = "orders";
@@ -28748,6 +28810,8 @@ function openWorkerOrderEdit(id) {
 function cancelWorkerOrderEdit() {
   clearWorkerOrderEditState();
   state.workerStoreReady = false;
+  state.workerPickingCustomer = false;
+  state.workerSaveNeedsCustomer = false;
   state.workerCustomer = "";
   state.deliveryDate = "";
   state.settlementAgreed = false;
@@ -28761,7 +28825,9 @@ function cancelWorkerOrderEdit() {
   pushAppHistory();
 }
 function workerNew(cart) {
-  if (!state.workerStoreReady || !state.workerCustomer)
+  if (state.workerPickingCustomer && !state.editingOrderId)
+    return workerStorePickStep();
+  if (!state.workerStoreReady && !state.editingOrderId)
     return workerStorePickStep();
   return workerNewOrderStep(cart);
 }
@@ -28785,7 +28851,9 @@ function workerNewOrderStep(cart) {
       : "";
   const headAction = editing
     ? cancelOrderBtn
-    : `<button type="button" onclick="clearWorkerStore()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Харилцагч өөрчлөх</button>`;
+    : customer
+      ? `<button type="button" onclick="openWorkerCustomerPick()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Харилцагч өөрчлөх</button>`
+      : `<div class="worker-order-card__head-actions">${canCreateCustomer() ? `<button type="button" onclick="addWorkerCustomerThenMaybeSave()" class="btn btn--primary btn--sm shrink-0"${saving ? " disabled" : ""}>Харилцагч нэмэх</button>` : ""}<button type="button" onclick="openWorkerCustomerPick()" class="btn btn--secondary btn--sm shrink-0"${saving ? " disabled" : ""}>Сонгох</button></div>`;
   const headExtra = editing
     ? `<p class="worker-order-edit-badge">${receiptNo(editingOrder || { id: state.editingOrderId }, "xs")}</p>`
     : "";
@@ -30151,9 +30219,13 @@ function customerModal(id, draft = null) {
   const receivableHost = id
     ? `<div data-customer-receivable-host>${customerEditReceivableSectionHtml(id)}</div>`
     : "";
+  const submitLabel =
+    !id && state.workerSaveNeedsCustomer && workerOrderHasCart()
+      ? "Хадгалаад захиалга үүсгэх"
+      : "Хадгалах";
   box(
     id ? "Харилцагч засах" : "Харилцагч бүртгэх",
-    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${c.id && canViewStoreRating() ? `<div class="store-rating-field"><span class="block text-sm font-medium mb-2">Үнэлгээ</span>${customerStoreRatingHtml(c, { wide: true })}</div>` : ""}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">Хадгалах</button></form>`,
+    `<form data-customer-form data-customer-id="${cidAttr}" novalidate onsubmit="saveCustomer(event,'${cidAttr}')" class="p-6 space-y-4 modal-scroll overflow-y-auto">${customerImageField(c)}${c.id && canViewStoreRating() ? `<div class="store-rating-field"><span class="block text-sm font-medium mb-2">Үнэлгээ</span>${customerStoreRatingHtml(c, { wide: true })}</div>` : ""}${receivableHost}${identityHint}<div class="grid sm:grid-cols-2 gap-4">${nameField}${customerRegistrationField(c.registrationNumber, identityLocked)}</div>${field("companyName", "Байгууллагын нэр", c.companyName)}${customerPhonesFieldsHtml(c)}${field("email", "И-мэйл", c.email, "email")}<div class="grid sm:grid-cols-2 gap-4">${customerProvinceField(c.province)}${customerDistrictFieldHtml(c.province, c.district)}</div>${customerKhorooFieldHtml(c.province, c.district, c.khoroo)}${field("address", "Дэлгэрэнгүй хаяг", c.address)}<div><div class="customer-map-head"><span class="block text-sm font-medium">Байршил (газрын зураг)</span><div class="customer-map-head__actions"><button type="button" class="customer-map-locate">📍 Миний байршил</button><button type="button" id="customerMapSettingsBtn" class="customer-map-settings-btn hidden" hidden>⚙️ Байршил асаах</button><span id="customerMapStatus" class="text-xs text-muted-foreground"></span></div></div><p class="text-xs text-muted-foreground mb-2">Газрын зурагт хадгалахдаа дэлгүүрийн нэр автоматаар орно. Нэр хоосон бол байгууллагын нэрийг ашиглана.</p><div id="customerMap" class="customer-map" style="height:360px;min-height:360px;width:100%;display:block;"></div></div><div class="grid sm:grid-cols-2 gap-4"><label><span class="block text-sm font-medium mb-2">Өргөрөг</span><input id="customerLat" name="latitude" value="${esc(c.latitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label><label><span class="block text-sm font-medium mb-2">Уртраг</span><input id="customerLng" name="longitude" value="${esc(c.longitude || "")}" readonly class="w-full px-4 py-3 bg-secondary rounded"></label></div><button type="submit" class="w-full py-3 bg-primary text-primary-foreground rounded">${submitLabel}</button></form>`,
     "max-w-3xl",
   );
   initCustomerImageField(c);
@@ -30495,6 +30567,26 @@ async function applyCustomerSave(data, id) {
   const syncedOrders = syncOrdersCustomerName(savedCustomer);
   if (syncedOrders > 0) scheduleBackendSave();
   closeModal({ discardCustomerDraft: true });
+  const attachDraftOrder =
+    !id &&
+    !state.editingOrderId &&
+    savedId &&
+    (state.workerSaveNeedsCustomer ||
+      (state.workerStoreReady && workerOrderHasCart()));
+  if (attachDraftOrder) {
+    const saveAfter = !!state.workerSaveNeedsCustomer && workerOrderHasCart();
+    state.workerCustomer = savedId;
+    state.workerStoreReady = true;
+    state.workerPickingCustomer = false;
+    state.workerSaveNeedsCustomer = false;
+    if (saveAfter) {
+      await saveWorker();
+      return true;
+    }
+    render();
+    pushAppHistory();
+    return true;
+  }
   const openedOrder = !id && startOrderForCustomer(savedId);
   if (!openedOrder) {
     focusSavedCustomer(savedId, savedName, { silent: !id });
@@ -34012,7 +34104,10 @@ async function saveWorker() {
   if (state.editingOrderId) return saveWorkerOrderEdit();
   if (!state.isLoggedIn) return alert("Захиалга хадгалахын өмнө нэвтэрнэ үү");
   const c = state.customers.find((x) => x.id === state.workerCustomer);
-  if (!c) return alert("Харилцагч сонгоно уу");
+  if (!c) {
+    promptWorkerCustomerForSave();
+    return;
+  }
   const e = orderActor();
   if (!e?.id) return alert("Худалдааны төлөөлөгч сонгоно уу");
   const cart = workerCartSummary();
@@ -34070,6 +34165,8 @@ async function saveWorker() {
     }
     resetWorkerCart();
     state.workerStoreReady = false;
+    state.workerPickingCustomer = false;
+    state.workerSaveNeedsCustomer = false;
     state.workerCustomer = "";
     state.deliveryDate = "";
     state.settlementAgreed = false;
@@ -34211,6 +34308,8 @@ async function saveWorkerOrderEdit() {
     clearWorkerOrderEditState();
     resetWorkerCart();
     state.workerStoreReady = false;
+    state.workerPickingCustomer = false;
+    state.workerSaveNeedsCustomer = false;
     state.workerCustomer = "";
     state.deliveryDate = "";
     state.settlementAgreed = false;
@@ -34689,8 +34788,8 @@ function deleteNow(type, id) {
     );
     if (String(state.workerCustomer) === String(id)) {
       state.workerCustomer = "";
-      state.workerStoreReady = false;
-      resetWorkerCart();
+      state.workerPickingCustomer = false;
+      state.workerSaveNeedsCustomer = false;
     }
   }
   closeModal();
@@ -35126,6 +35225,11 @@ Object.assign(window, {
   clearDeliveryStore,
   pickWorkerStore,
   confirmWorkerStore,
+  openWorkerCustomerPick,
+  addWorkerCustomerThenMaybeSave,
+  startNewCustomerThenSaveOrder,
+  openWorkerCustomerPickThenSave,
+  promptWorkerCustomerForSave,
   clearWorkerStore,
   openWorkerNewTab,
   openWorkerOrdersTab,
