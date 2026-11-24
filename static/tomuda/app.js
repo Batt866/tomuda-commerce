@@ -13503,12 +13503,21 @@ function canViewStoreRating() {
 function canEditStoreRating() {
   return hasPermission("customers.rate") || hasPermission("customers.edit");
 }
+function hasExplicitStoreRating(c) {
+  const v = c?.storeRating;
+  if (v === null || v === undefined || v === "") return false;
+  return Number.isFinite(Number(v));
+}
 function customerStoreRating(c) {
-  const n = Number(c?.storeRating);
-  if (Number.isFinite(n)) return Math.max(0, Math.min(100, Math.round(n)));
+  if (hasExplicitStoreRating(c)) {
+    const n = Math.max(0, Math.min(100, Math.round(Number(c.storeRating))));
+    // Create-default used to be 90 (near left). Unmoved markers stay far left.
+    if (n === 90) return 100;
+    return n;
+  }
   const mark = normalizeCustomerPayMark(c?.payMark);
   if (mark === "bad") return 25;
-  return 90;
+  return 100;
 }
 function storeRatingToSlider(pct) {
   return 100 - Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
@@ -30490,9 +30499,9 @@ async function applyCustomerSave(data, id) {
     customer = { ...data, id: newEntityId("c") };
     delete customer.locationText;
     customer.payMark = normalizeCustomerPayMark(customer.payMark) || "good";
-    customer.storeRating = Number.isFinite(Number(customer.storeRating))
+    customer.storeRating = hasExplicitStoreRating(customer)
       ? customerStoreRating(customer)
-      : 90;
+      : 100;
     if (!customer.image) delete customer.image;
     applyCustomerPhoneFields(customer, customer.phones);
     state.customers.push(customer);
